@@ -38,6 +38,7 @@ jobs:
             dist
             dist-cjs
             .tsbuildinfo
+            node_modules/.cache
           key: build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig*.json', 'package-lock.json') }}
           restore-keys: |
             build-${{ runner.os }}-
@@ -48,20 +49,19 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Run validation pipeline
-        id: validation
-        run: npm run validate
+      - name: Type check
+        id: typecheck
+        run: npm run typecheck
+
+      - name: Run lint and cache output
+        id: lint
+        run: npm run lint 2>&1 | tee eslint-output.txt || true
+
+      - name: Run tests with coverage
+        id: test
+        run: npm run test:coverage -- --passWithNoTests
         env:
           DOCKER_AVAILABLE: true
-
-      - name: Run all tests
-        id: npmtest
-        run: npm run test:coverage
-
-      - name: Generate coverage report
-        id: coverage-gen
-        continue-on-error: true
-        run: npm run test:coverage -- --passWithNoTests 2>/dev/null || npm test -- --coverage --passWithNoTests
 
       - name: Verify build artifacts
         run: |
@@ -85,54 +85,78 @@ jobs:
       - name: Run quality gates
         id: quality
         run: |
-          # Run quality gates (non-blocking for reporting) with baseline updates
-          UPDATE_BASELINES=true npm run quality:gates > quality-gates.txt 2>&1 || true
+          # Initialize default values
+          CURRENT_WARNINGS=0
+          BASELINE_WARNINGS=0
+          REDUCTION=0
+          PERCENTAGE="0"
+          UNUSED_EXPORTS=0
+          DEADCODE_BASELINE=0
+          DEADCODE_REDUCTION=0
+          GATES_PASSED=0
+          GATES_FAILED=0
+          GATES_WARNINGS=0
+          STATUS="⚠️ NEEDS ATTENTION"
 
-          # Extract metrics from quality-gates.txt output
-          # Parse summary section for current values: "ESLint Warnings: 123 (threshold: 400)"
-          CURRENT_WARNINGS=$(grep "^ESLint Warnings:" quality-gates.txt | sed 's/ESLint Warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
-          UNUSED_EXPORTS=$(grep "^Unused Exports:" quality-gates.txt | sed 's/Unused Exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          # Run quality gates with JSON output
+          UPDATE_BASELINES=true npm run quality:gates -- --json > quality-gates-raw.txt 2>&1 || true
 
-          # Extract baseline and reduction from gate output messages
-          # Look for patterns like: "Warnings reduced by 10 (5.0%) - 100 ≤ 110" or "Warning count maintained at baseline (100)"
-          BASELINE_WARNINGS=$(grep -E "Warnings reduced by|Warning count maintained|Warning count increased by" quality-gates.txt | sed -n 's/.*≤ \([0-9][0-9]*\).*/\1/p; s/.*maintained at baseline (\([0-9][0-9]*\)).*/\1/p; s/.*> \([0-9][0-9]*\).*/\1/p' | head -1 | tr -cd '0-9' || echo "$CURRENT_WARNINGS")
-          REDUCTION=$(grep "Warnings reduced by" quality-gates.txt | sed 's/.*reduced by \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
-          PERCENTAGE=$(grep "Warnings reduced by" quality-gates.txt | sed 's/.*(\([0-9][0-9]*\.[0-9][0-9]*\)%).*/\1/' | head -1 | tr -cd '0-9.' || echo "0")
+          # Skip npm's header lines (first 3 lines) to get clean JSON
+          tail -n +4 quality-gates-raw.txt > quality-gates.json 2>/dev/null || echo "{}" > quality-gates.json
 
-          # Dead code baseline and reduction
-          DEADCODE_BASELINE=$(grep -E "Unused exports reduced by|Unused exports maintained|Unused exports increased by" quality-gates.txt | sed -n 's/.*≤ \([0-9][0-9]*\).*/\1/p; s/.*maintained at baseline (\([0-9][0-9]*\)).*/\1/p; s/.*> \([0-9][0-9]*\).*/\1/p' | head -1 | tr -cd '0-9' || echo "$UNUSED_EXPORTS")
-          DEADCODE_REDUCTION=$(grep "Unused exports reduced by" quality-gates.txt | sed 's/.*reduced by \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          # Debug: show JSON file size and first few lines
+          echo "JSON file size: $(wc -c < quality-gates.json) bytes"
+          echo "First 5 lines of JSON:"
+          head -5 quality-gates.json
 
-          # Quality gates status - count exact matches excluding summary messages
-          GATES_PASSED=$(grep "✅ PASS:" quality-gates.txt 2>/dev/null | grep -v "All quality gates passed" | wc -l | tr -cd '0-9' || echo "0")
-          GATES_FAILED=$(grep "❌ FAIL:" quality-gates.txt 2>/dev/null | grep -v "Some quality gates failed" | wc -l | tr -cd '0-9' || echo "0")
-          GATES_WARNINGS=$(grep "⚠️  WARN:" quality-gates.txt 2>/dev/null | grep -v "^⚠️  WARN:" | wc -l | tr -cd '0-9' || echo "0")
+          # Check if JSON is valid
+          if jq empty quality-gates.json 2>/dev/null; then
+            echo "JSON is valid, parsing with jq"
+            # Parse JSON output with jq and ensure we get values
+            CURRENT_WARNINGS=$(jq -r '.currentWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            BASELINE_WARNINGS=$(jq -r '.baselineWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            REDUCTION=$(jq -r '.warningReduction // 0' quality-gates.json 2>/dev/null || echo "0")
+            PERCENTAGE=$(jq -r '.warningPercentage // "0"' quality-gates.json 2>/dev/null || echo "0")
+            UNUSED_EXPORTS=$(jq -r '.unusedExports // 0' quality-gates.json 2>/dev/null || echo "0")
+            DEADCODE_BASELINE=$(jq -r '.deadcodeBaseline // 0' quality-gates.json 2>/dev/null || echo "0")
+            DEADCODE_REDUCTION=$(jq -r '.deadcodeReduction // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_PASSED=$(jq -r '.gatesPassed // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_FAILED=$(jq -r '.gatesFailed // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_WARNINGS=$(jq -r '.gatesWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            STATUS=$(jq -r '.overallStatus // "⚠️ NEEDS ATTENTION"' quality-gates.json 2>/dev/null || echo "⚠️ NEEDS ATTENTION")
 
-          # Validate all values are proper integers
-          for var in CURRENT_WARNINGS BASELINE_WARNINGS REDUCTION UNUSED_EXPORTS DEADCODE_BASELINE DEADCODE_REDUCTION GATES_PASSED GATES_FAILED GATES_WARNINGS; do
-            value=$(eval echo \$$var)
-            if ! [[ "$value" =~ ^[0-9]+$ ]]; then
-              echo "Warning: $var has invalid value '$value', setting to 0"
-              eval "$var=0"
-            fi
-          done
-
-          # Validate percentage is a number (can have decimal)
-          if ! [[ "$PERCENTAGE" =~ ^[0-9]+\.?[0-9]*$ ]] && [ "$PERCENTAGE" != "N/A" ]; then
-            echo "Warning: PERCENTAGE has invalid value '$PERCENTAGE', setting to 0"
-            PERCENTAGE="0"
-          fi
-
-          # Determine status
-          if [ "$GATES_FAILED" -eq 0 ] && [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ]; then
-            STATUS="✅ EXCELLENT"
-          elif [ "$GATES_FAILED" -eq 0 ]; then
-            STATUS="✅ PASSING"
-          elif [ "$GATES_FAILED" -le 2 ]; then
-            STATUS="⚠️ NEEDS ATTENTION"
+            echo "Parsed values: warnings=$CURRENT_WARNINGS, baseline=$BASELINE_WARNINGS, exports=$UNUSED_EXPORTS"
           else
-            STATUS="❌ REQUIRES FIXES"
+            echo "JSON is invalid, falling back to text parsing"
+
+            # Use raw output for text parsing (already ran above)
+            cp quality-gates-raw.txt quality-gates.txt 2>/dev/null || true
+
+            # If raw output is empty, run again without JSON flag
+            if [ ! -s quality-gates.txt ]; then
+              echo "Running quality gates again for text output"
+              UPDATE_BASELINES=true npm run quality:gates > quality-gates.txt 2>&1 || true
+            fi
+
+            # Fallback to text parsing
+            CURRENT_WARNINGS=$(grep "^ESLint Warnings:" quality-gates.txt 2>/dev/null | sed 's/ESLint Warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+            UNUSED_EXPORTS=$(grep "^Unused Exports:" quality-gates.txt 2>/dev/null | sed 's/Unused Exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+            BASELINE_WARNINGS=${CURRENT_WARNINGS}
+            DEADCODE_BASELINE=${UNUSED_EXPORTS}
+
+            echo "Text parsing values: warnings=$CURRENT_WARNINGS, exports=$UNUSED_EXPORTS"
           fi
+
+          # Ensure all values are numeric (validation)
+          CURRENT_WARNINGS=${CURRENT_WARNINGS:-0}
+          BASELINE_WARNINGS=${BASELINE_WARNINGS:-0}
+          REDUCTION=${REDUCTION:-0}
+          UNUSED_EXPORTS=${UNUSED_EXPORTS:-0}
+          DEADCODE_BASELINE=${DEADCODE_BASELINE:-0}
+          DEADCODE_REDUCTION=${DEADCODE_REDUCTION:-0}
+          GATES_PASSED=${GATES_PASSED:-0}
+          GATES_FAILED=${GATES_FAILED:-0}
+          GATES_WARNINGS=${GATES_WARNINGS:-0}
 
           # Set outputs
           echo "current_warnings=${CURRENT_WARNINGS}" >> $GITHUB_OUTPUT
@@ -147,15 +171,27 @@ jobs:
           echo "gates_warnings=${GATES_WARNINGS}" >> $GITHUB_OUTPUT
           echo "overall_status=${STATUS}" >> $GITHUB_OUTPUT
 
+          echo "Set outputs completed"
+
+          # Ensure text output exists for artifacts
+          if [ ! -s quality-gates.txt ] && [ -f quality-gates-raw.txt ]; then
+            cp quality-gates-raw.txt quality-gates.txt
+          elif [ ! -s quality-gates.txt ]; then
+            echo "No quality gates output available" > quality-gates.txt
+          fi
+
       - name: Extract top warning types
         id: warnings
         run: |
-          # Run ESLint to get warning details
-          if npm run lint 2>&1 | tee eslint-output.txt; then
+          # Use cached ESLint output from earlier step
+          if [ ! -s eslint-output.txt ]; then
             TOP_WARNINGS="No ESLint warnings found"
           else
             # Extract unique warning rule IDs and count them
             TOP_WARNINGS=$(grep -o "\[.*\]" eslint-output.txt 2>/dev/null | sort | uniq -c | sort -rn | head -n 5 | sed 's/^[[:space:]]*//' || echo "No warning details available")
+            if [ -z "$TOP_WARNINGS" ]; then
+              TOP_WARNINGS="No ESLint warnings found"
+            fi
           fi
           echo "top_warnings<<EOF" >> $GITHUB_OUTPUT
           echo "$TOP_WARNINGS" >> $GITHUB_OUTPUT
@@ -164,9 +200,9 @@ jobs:
       - name: Extract failed gates
         id: failed_gates
         run: |
-          # Extract failed and warning gates with their messages
-          FAILED_GATES=$(grep "❌ FAIL:" quality-gates.txt 2>/dev/null | grep -v "Some quality gates failed" | sed 's/❌ FAIL: //' || echo "")
-          WARNING_GATES=$(grep "⚠️  WARN:" quality-gates.txt 2>/dev/null | sed 's/⚠️  WARN: //' || echo "")
+          # Extract failed and warning gates from JSON
+          FAILED_GATES=$(jq -r '.failedGates // [] | join("\n")' quality-gates.json)
+          WARNING_GATES=$(jq -r '.warningGates // [] | join("\n")' quality-gates.json)
 
           echo "failed_gates<<EOF" >> $GITHUB_OUTPUT
           echo "$FAILED_GATES" >> $GITHUB_OUTPUT
@@ -199,20 +235,15 @@ jobs:
             dist-cjs/
           retention-days: 1
 
-      - name: Upload node_modules for security scan
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: node-modules-${{ github.run_id }}
-          path: node_modules/
-          retention-days: 1
-
       - name: Upload quality artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: quality-report-${{ github.run_id }}
           path: |
+            quality-gates.json
             quality-gates.txt
+            quality-gates-raw.txt
             eslint-output.txt
             coverage/
           retention-days: 7

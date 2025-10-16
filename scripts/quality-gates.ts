@@ -105,13 +105,75 @@ const ALLOW_REGRESSION = process.env.ALLOW_REGRESSION === 'true';
 const UPDATE_BASELINES = process.env.UPDATE_BASELINES === 'true';
 const SKIP_TYPECHECK = process.env.SKIP_TYPECHECK === 'true';
 const VERBOSE = process.env.VERBOSE === 'true';
+const JSON_OUTPUT = process.argv.includes('--json');
 
 const QUALITY_CONFIG = 'quality-gates.json';
 
 // Status types
 type Status = 'PASS' | 'FAIL' | 'WARN' | 'INFO';
 
-function printStatus(status: Status, message: string): void {
+interface GateResult {
+  name: string;
+  status: Status;
+  message: string;
+}
+
+interface QualityGatesOutput {
+  timestamp: string;
+  currentErrors: number;
+  currentWarnings: number;
+  baselineWarnings: number;
+  warningReduction: number;
+  warningPercentage: string;
+  unusedExports: number;
+  deadcodeBaseline: number;
+  deadcodeReduction: number;
+  gatesPassed: number;
+  gatesFailed: number;
+  gatesWarnings: number;
+  overallStatus: string;
+  gates: GateResult[];
+  failedGates: string[];
+  warningGates: string[];
+}
+
+// JSON output collection
+let jsonOutput: QualityGatesOutput = {
+  timestamp: new Date().toISOString(),
+  currentErrors: 0,
+  currentWarnings: 0,
+  baselineWarnings: 0,
+  warningReduction: 0,
+  warningPercentage: '0',
+  unusedExports: 0,
+  deadcodeBaseline: 0,
+  deadcodeReduction: 0,
+  gatesPassed: 0,
+  gatesFailed: 0,
+  gatesWarnings: 0,
+  overallStatus: '✅ EXCELLENT',
+  gates: [],
+  failedGates: [],
+  warningGates: [],
+};
+
+function printStatus(status: Status, message: string, gateName = 'unknown'): void {
+  if (JSON_OUTPUT) {
+    // Collect gate results for JSON output
+    jsonOutput.gates.push({ name: gateName, status, message });
+
+    // Track statistics (don't count INFO messages as gates)
+    if (status === 'PASS') jsonOutput.gatesPassed++;
+    else if (status === 'FAIL') {
+      jsonOutput.gatesFailed++;
+      jsonOutput.failedGates.push(message);
+    } else if (status === 'WARN') {
+      jsonOutput.gatesWarnings++;
+      jsonOutput.warningGates.push(message);
+    }
+    return;
+  }
+
   const symbols = {
     PASS: '✅ PASS',
     FAIL: '❌ FAIL',
@@ -119,6 +181,12 @@ function printStatus(status: Status, message: string): void {
     INFO: 'ℹ️  INFO',
   };
   console.log(`${symbols[status]}: ${message}`);
+}
+
+function log(...args: unknown[]): void {
+  if (!JSON_OUTPUT) {
+    console.log(...args);
+  }
 }
 
 function validateNumeric(value: unknown, fieldName: string, defaultValue = 0): number {
@@ -137,8 +205,8 @@ function validateNumeric(value: unknown, fieldName: string, defaultValue = 0): n
 
 function loadConfig(): QualityConfig {
   if (!existsSync(QUALITY_CONFIG)) {
-    console.log('📁 Current directory:', process.cwd());
-    console.log('Creating default quality-gates.json configuration file...');
+    log('📁 Current directory:', process.cwd());
+    log('Creating default quality-gates.json configuration file...');
 
     const defaultConfig: QualityConfig = {
       schemaVersion: 1,
@@ -310,33 +378,37 @@ function findNewWarnings(baseline: string[], current: string[]): string[] {
 }
 
 function main(): void {
-  console.log(`🛡️ Quality Gates Validation ${new Date().toISOString()}`);
-  console.log('=========================================');
-  console.log('');
+  log(`🛡️ Quality Gates Validation ${new Date().toISOString()}`);
+  log('=========================================');
+  log('');
 
   const config = loadConfig();
   const { thresholds, baselines } = config.metrics;
 
   if (VERBOSE) {
-    console.log('📋 Quality Gate Thresholds:');
-    console.log(`  • Max Lint Errors: ${thresholds.lint.maxErrors}`);
-    console.log(`  • Max Lint Warnings: ${thresholds.lint.maxWarnings}`);
-    console.log(`  • Max Type Errors: ${thresholds.typescript.maxErrors}`);
-    console.log(`  • Max Dead Code: ${thresholds.deadcode.max}`);
-    console.log(`  • Max Build Time: ${thresholds.build.maxTimeMs / 1000}s`);
-    console.log('');
+    log('📋 Quality Gate Thresholds:');
+    log(`  • Max Lint Errors: ${thresholds.lint.maxErrors}`);
+    log(`  • Max Lint Warnings: ${thresholds.lint.maxWarnings}`);
+    log(`  • Max Type Errors: ${thresholds.typescript.maxErrors}`);
+    log(`  • Max Dead Code: ${thresholds.deadcode.max}`);
+    log(`  • Max Build Time: ${thresholds.build.maxTimeMs / 1000}s`);
+    log('');
   }
 
   let hasFailures = false;
 
   // Gate 1: ESLint Errors Must Be Zero
-  console.log('Gate 1: ESLint Error Check');
-  console.log('-------------------------');
+  log('Gate 1: ESLint Error Check');
+  log('-------------------------');
 
   const lintResults = processESLintResults();
   const currentErrors = validateNumeric(lintResults.errors, 'errors');
   const currentWarnings = validateNumeric(lintResults.warnings, 'warnings');
   const currentWarningSignatures = lintResults.warningSignatures;
+
+  // Update JSON output
+  jsonOutput.currentErrors = currentErrors;
+  jsonOutput.currentWarnings = currentWarnings;
 
   if (currentErrors <= thresholds.lint.maxErrors) {
     printStatus('PASS', `ESLint errors within threshold: ${currentErrors} ≤ ${thresholds.lint.maxErrors}`);
@@ -345,7 +417,7 @@ function main(): void {
     hasFailures = true;
   }
 
-  console.log('');
+  log('');
 
   // Handle null lint baseline for first run
   let baselineWarnings = baselines.lint.warnings;
@@ -362,14 +434,19 @@ function main(): void {
     }
   }
 
+  // Update JSON output with baseline
+  jsonOutput.baselineWarnings = baselineWarnings;
+
   // Gate 2: ESLint Warning Ratcheting
-  console.log('Gate 2: ESLint Warning Ratcheting');
-  console.log('----------------------------------');
+  log('Gate 2: ESLint Warning Ratcheting');
+  log('----------------------------------');
 
   if (currentWarnings <= baselineWarnings && currentWarnings <= thresholds.lint.maxWarnings) {
     const reduction = baselineWarnings - currentWarnings;
     if (reduction > 0) {
       const percentage = baselineWarnings > 0 ? ((reduction * 100) / baselineWarnings).toFixed(1) : 'N/A';
+      jsonOutput.warningReduction = reduction;
+      jsonOutput.warningPercentage = percentage;
       printStatus('PASS', `Warnings reduced by ${reduction} (${percentage}%) - ${currentWarnings} ≤ ${baselineWarnings}`);
 
       if (UPDATE_BASELINES) {
@@ -394,7 +471,7 @@ function main(): void {
         const newWarnings = findNewWarnings(baselines.lint.warningSignatures, currentWarningSignatures);
         if (newWarnings.length > 0) {
           printStatus('INFO', `New ESLint warnings introduced since baseline (${newWarnings.length}):`);
-          newWarnings.slice(0, 50).forEach((sig) => console.log(`  • ${sig}`));
+          newWarnings.slice(0, 50).forEach((sig) => log(`  • ${sig}`));
           if (newWarnings.length > 50) {
             printStatus('INFO', `... and ${newWarnings.length - 50} more new warnings (showing first 50)`);
           }
@@ -407,12 +484,12 @@ function main(): void {
     }
   }
 
-  console.log('');
+  log('');
 
   // Gate 3: TypeScript Compilation
   if (!SKIP_TYPECHECK) {
-    console.log('Gate 3: TypeScript Compilation');
-    console.log('-------------------------------');
+    log('Gate 3: TypeScript Compilation');
+    log('-------------------------------');
 
     if (checkTypeScript()) {
       printStatus('PASS', 'TypeScript compilation successful');
@@ -421,20 +498,23 @@ function main(): void {
       hasFailures = true;
     }
 
-    console.log('');
+    log('');
   } else {
-    console.log('Gate 3: TypeScript Compilation (SKIPPED)');
-    console.log('----------------------------------------');
+    log('Gate 3: TypeScript Compilation (SKIPPED)');
+    log('----------------------------------------');
     printStatus('WARN', 'TypeScript check skipped by configuration');
-    console.log('');
+    log('');
   }
 
   // Gate 4: Dead Code Check
-  console.log('Gate 4: Dead Code Check');
-  console.log('-----------------------');
+  log('Gate 4: Dead Code Check');
+  log('-----------------------');
 
   const deadcodeCount = checkDeadCode();
   let baselineDeadcode = baselines.deadcode.count;
+
+  // Update JSON output
+  jsonOutput.unusedExports = deadcodeCount;
 
   if (baselineDeadcode === null) {
     printStatus('INFO', `No deadcode baseline set, using current dead code count (${deadcodeCount}) as baseline`);
@@ -448,10 +528,14 @@ function main(): void {
     }
   }
 
+  // Update JSON output with deadcode baseline
+  jsonOutput.deadcodeBaseline = baselineDeadcode;
+
   if (deadcodeCount <= baselineDeadcode) {
     const reduction = baselineDeadcode - deadcodeCount;
     if (reduction > 0) {
       const percentage = baselineDeadcode > 0 ? ((reduction * 100) / baselineDeadcode).toFixed(1) : 'N/A';
+      jsonOutput.deadcodeReduction = reduction;
       printStatus('PASS', `Unused exports reduced by ${reduction} (${percentage}%) - ${deadcodeCount} ≤ ${baselineDeadcode}`);
 
       if (UPDATE_BASELINES) {
@@ -474,11 +558,11 @@ function main(): void {
     }
   }
 
-  console.log('');
+  log('');
 
   // Gate 5: Build Performance
-  console.log('Gate 5: Build Performance');
-  console.log('------------------------');
+  log('Gate 5: Build Performance');
+  log('------------------------');
 
   try {
     const buildTimeMs = measureBuildTime();
@@ -508,23 +592,40 @@ function main(): void {
     hasFailures = true;
   }
 
-  console.log('');
+  log('');
 
   // Final Summary
-  console.log('🎉 Quality Gates Summary');
-  console.log('========================');
-  console.log(`ESLint Errors: ${currentErrors} (threshold: ${thresholds.lint.maxErrors})`);
-  console.log(`ESLint Warnings: ${currentWarnings} (threshold: ${thresholds.lint.maxWarnings})`);
-  console.log(`Unused Exports: ${deadcodeCount} (threshold: ${thresholds.deadcode.max})`);
-  console.log('TypeScript: ✅ Compiles');
-  console.log('Build: ✅ Successful');
-  console.log('');
+  log('🎉 Quality Gates Summary');
+  log('========================');
+  log(`ESLint Errors: ${currentErrors} (threshold: ${thresholds.lint.maxErrors})`);
+  log(`ESLint Warnings: ${currentWarnings} (threshold: ${thresholds.lint.maxWarnings})`);
+  log(`Unused Exports: ${deadcodeCount} (threshold: ${thresholds.deadcode.max})`);
+  log('TypeScript: ✅ Compiles');
+  log('Build: ✅ Successful');
+  log('');
 
   if (currentWarnings > thresholds.lint.maxWarnings || deadcodeCount > thresholds.deadcode.max) {
     printStatus('INFO', 'Consider running aggressive cleanup to reach production targets:');
-    console.log(`  • ESLint warnings target: <${thresholds.lint.maxWarnings} (current: ${currentWarnings})`);
-    console.log(`  • Dead code target: <${thresholds.deadcode.max} (current: ${deadcodeCount})`);
-    console.log('');
+    log(`  • ESLint warnings target: <${thresholds.lint.maxWarnings} (current: ${currentWarnings})`);
+    log(`  • Dead code target: <${thresholds.deadcode.max} (current: ${deadcodeCount})`);
+    log('');
+  }
+
+  // Determine overall status for JSON output
+  if (JSON_OUTPUT) {
+    if (jsonOutput.gatesFailed === 0 && currentWarnings <= baselineWarnings) {
+      jsonOutput.overallStatus = '✅ EXCELLENT';
+    } else if (jsonOutput.gatesFailed === 0) {
+      jsonOutput.overallStatus = '✅ PASSING';
+    } else if (jsonOutput.gatesFailed <= 2) {
+      jsonOutput.overallStatus = '⚠️ NEEDS ATTENTION';
+    } else {
+      jsonOutput.overallStatus = '❌ REQUIRES FIXES';
+    }
+
+    // Output JSON and exit
+    console.log(JSON.stringify(jsonOutput, null, 2));
+    exit(hasFailures ? 1 : 0);
   }
 
   if (hasFailures) {
@@ -532,7 +633,7 @@ function main(): void {
     exit(1);
   } else {
     printStatus('PASS', 'All quality gates passed! 🚀');
-    console.log('');
+    log('');
   }
 }
 

@@ -1,8 +1,12 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import {
   getImageMetadata,
+  DockerRegistry,
+  createDockerRegistry,
   type ImageMetadata,
+  type RegistryConfig,
 } from '../../../../src/infra/docker/registry';
+import Docker from 'dockerode';
 
 // Mock fetch globally
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
@@ -295,6 +299,329 @@ describe('Docker Registry Client', () => {
       expect(result.lastUpdated).toBeUndefined();
       expect(result.architecture).toBeUndefined();
       expect(result.os).toBeUndefined();
+    });
+  });
+
+  describe('DockerRegistry', () => {
+    let mockDocker: any;
+    let registryClient: DockerRegistry;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+
+      mockDocker = {
+        checkAuth: jest.fn(),
+        getImage: jest.fn(),
+      };
+
+      registryClient = createDockerRegistry(mockDocker as unknown as Docker, mockLogger);
+    });
+
+    describe('authenticate', () => {
+      it('should authenticate with username and password', async () => {
+        const config: RegistryConfig = {
+          url: 'https://registry.example.com',
+          username: 'testuser',
+          password: 'testpass',
+        };
+
+        mockDocker.checkAuth.mockResolvedValue(undefined);
+
+        const result = await registryClient.authenticate(config);
+
+        expect(result.ok).toBe(true);
+        expect(mockDocker.checkAuth).toHaveBeenCalledWith({
+          username: 'testuser',
+          password: 'testpass',
+          serveraddress: 'registry.example.com',
+        });
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          { registry: 'registry.example.com' },
+          'Registry authentication successful',
+        );
+      });
+
+      it('should authenticate with token', async () => {
+        const config: RegistryConfig = {
+          url: 'docker.io',
+          token: 'test-token-123',
+        };
+
+        mockDocker.checkAuth.mockResolvedValue(undefined);
+
+        const result = await registryClient.authenticate(config);
+
+        expect(result.ok).toBe(true);
+        expect(mockDocker.checkAuth).toHaveBeenCalledWith({
+          username: '',
+          password: 'test-token-123',
+          serveraddress: 'https://index.docker.io/v1/',
+        });
+      });
+
+      it('should fail when no credentials provided', async () => {
+        const config: RegistryConfig = {
+          url: 'registry.example.com',
+        };
+
+        const result = await registryClient.authenticate(config);
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toContain('username/password or token');
+          expect(result.guidance?.hint).toBeDefined();
+        }
+      });
+
+      it('should handle authentication failure', async () => {
+        const config: RegistryConfig = {
+          url: 'registry.example.com',
+          username: 'wronguser',
+          password: 'wrongpass',
+        };
+
+        mockDocker.checkAuth.mockRejectedValue(new Error('Invalid credentials'));
+
+        const result = await registryClient.authenticate(config);
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toContain('Authentication failed');
+          expect(result.guidance?.message).toBe('Registry authentication failed');
+          expect(result.guidance?.hint).toContain('Invalid credentials');
+        }
+      });
+    });
+
+    describe('healthCheck', () => {
+      it('should return true for accessible registry (200)', async () => {
+        const mockResponse = { ok: true, status: 200 };
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.healthCheck('https://registry.example.com');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toBe(true);
+        }
+      });
+
+      it('should return true for accessible registry requiring auth (401)', async () => {
+        const mockResponse = { ok: false, status: 401 };
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.healthCheck('https://registry.example.com');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toBe(true);
+        }
+      });
+
+      it('should return false for inaccessible registry', async () => {
+        const mockResponse = { ok: false, status: 500 };
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.healthCheck('https://registry.example.com');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toBe(false);
+        }
+      });
+
+      it('should return false on network error', async () => {
+        (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+
+        const result = await registryClient.healthCheck('https://registry.example.com');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toBe(false);
+        }
+      });
+
+      it('should handle Docker Hub health check', async () => {
+        const mockResponse = { ok: true, status: 200 };
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.healthCheck('docker.io');
+
+        expect(result.ok).toBe(true);
+        expect(global.fetch).toHaveBeenCalledWith(
+          'https://registry-1.docker.io/v2/',
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe('imageExists', () => {
+      it('should return true when image exists', async () => {
+        const mockImage = {
+          inspect: jest.fn().mockResolvedValue({ Id: 'sha256:abc123' }),
+        };
+
+        mockDocker.getImage.mockReturnValue(mockImage);
+
+        const result = await registryClient.imageExists('node:18-alpine');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toBe(true);
+        }
+        expect(mockDocker.getImage).toHaveBeenCalledWith('node:18-alpine');
+      });
+
+      it('should return false when image does not exist (404)', async () => {
+        const mockImage = {
+          inspect: jest.fn().mockRejectedValue(new Error('(HTTP code 404) no such image')),
+        };
+
+        mockDocker.getImage.mockReturnValue(mockImage);
+
+        const result = await registryClient.imageExists('nonexistent:latest');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toBe(false);
+        }
+      });
+
+      it('should handle image name with digest', async () => {
+        const mockImage = {
+          inspect: jest.fn().mockResolvedValue({ Id: 'sha256:abc123' }),
+        };
+
+        mockDocker.getImage.mockReturnValue(mockImage);
+
+        const result = await registryClient.imageExists('node@sha256:abc123');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toBe(true);
+        }
+      });
+    });
+
+    describe('listTags', () => {
+      it('should list tags for Docker Hub official repository', async () => {
+        const mockResponse = {
+          ok: true,
+          json: jest.fn().mockResolvedValue({
+            results: [{ name: 'latest' }, { name: '18-alpine' }, { name: '18-slim' }],
+          }),
+        };
+
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.listTags('node');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toEqual(['latest', '18-alpine', '18-slim']);
+        }
+        expect(global.fetch).toHaveBeenCalledWith(
+          'https://hub.docker.com/v2/repositories/library/node/tags?page_size=100',
+          expect.objectContaining({
+            headers: { Accept: 'application/json' },
+          }),
+        );
+      });
+
+      it('should list tags for Docker Hub user/org repository', async () => {
+        const mockResponse = {
+          ok: true,
+          json: jest.fn().mockResolvedValue({
+            results: [{ name: 'v1.0.0' }, { name: 'v1.1.0' }],
+          }),
+        };
+
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.listTags('bitnami/redis');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toEqual(['v1.0.0', 'v1.1.0']);
+        }
+        expect(global.fetch).toHaveBeenCalledWith(
+          'https://hub.docker.com/v2/repositories/bitnami/redis/tags?page_size=100',
+          expect.any(Object),
+        );
+      });
+
+      it('should list tags for private registry', async () => {
+        // First authenticate
+        const config: RegistryConfig = {
+          url: 'registry.example.com',
+          username: 'testuser',
+          password: 'testpass',
+        };
+
+        mockDocker.checkAuth.mockResolvedValue(undefined);
+        await registryClient.authenticate(config);
+
+        // Then list tags
+        const mockResponse = {
+          ok: true,
+          json: jest.fn().mockResolvedValue({
+            tags: ['v1.0', 'v2.0', 'latest'],
+          }),
+        };
+
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.listTags('registry.example.com/myapp');
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toEqual(['v1.0', 'v2.0', 'latest']);
+        }
+        expect(global.fetch).toHaveBeenCalledWith(
+          'https://registry.example.com/v2/myapp/tags/list',
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              Accept: 'application/json',
+              Authorization: expect.stringContaining('Basic'),
+            }),
+          }),
+        );
+      });
+
+      it('should handle unauthorized access to private registry', async () => {
+        const mockResponse = { ok: false, status: 401 };
+
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.listTags('registry.example.com/private/repo');
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toContain('Authentication required');
+          expect(result.guidance?.hint).toContain('Unauthorized');
+        }
+      });
+
+      it('should handle API errors', async () => {
+        const mockResponse = { ok: false, status: 404 };
+
+        (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+        const result = await registryClient.listTags('node');
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toContain('404');
+        }
+      });
+    });
+
+    describe('createDockerRegistry', () => {
+      it('should create a registry client instance', () => {
+        const client = createDockerRegistry(mockDocker as unknown as Docker, mockLogger);
+
+        expect(client).toBeInstanceOf(DockerRegistry);
+      });
     });
   });
 });

@@ -49,6 +49,7 @@ const mockSessionManager = {
 const mockK8sClient = {
   ping: jest.fn(),
   namespaceExists: jest.fn(),
+  ensureNamespace: jest.fn(),
   applyManifest: jest.fn(),
   checkIngressController: jest.fn(),
   checkPermissions: jest.fn(),
@@ -145,6 +146,7 @@ describe('prepareCluster', () => {
     // Reset all mocks
     jest.clearAllMocks();
     mockSessionManager.update.mockResolvedValue(true);
+    mockK8sClient.ensureNamespace.mockResolvedValue({ success: true });
   });
 
   describe('Successful cluster preparation', () => {
@@ -192,7 +194,7 @@ describe('prepareCluster', () => {
     it('should return error when namespace creation fails', async () => {
       mockK8sClient.ping.mockResolvedValue(true);
       mockK8sClient.namespaceExists.mockResolvedValue(false);
-      mockK8sClient.applyManifest.mockResolvedValue({
+      mockK8sClient.ensureNamespace.mockResolvedValue({
         success: false,
         error: 'Failed to create namespace',
       });

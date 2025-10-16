@@ -127,6 +127,14 @@ export interface DockerClient {
   getImage: (id: string) => Promise<Result<DockerImageInfo>>;
 
   /**
+   * Inspects a Docker image and retrieves metadata.
+   * Alias for getImage for consistency with Docker CLI terminology.
+   * @param imageId - Image ID or tag
+   * @returns Result containing image information or error
+   */
+  inspectImage: (imageId: string) => Promise<Result<DockerImageInfo>>;
+
+  /**
    * Tags a Docker image with a new repository and tag.
    * @param imageId - ID of the image to tag
    * @param repository - Target repository name
@@ -139,9 +147,14 @@ export interface DockerClient {
    * Pushes a Docker image to a registry.
    * @param repository - Repository name
    * @param tag - Tag to push
+   * @param authConfig - Optional authentication configuration for registry
    * @returns Result containing push details or error
    */
-  pushImage: (repository: string, tag: string) => Promise<Result<DockerPushResult>>;
+  pushImage: (
+    repository: string,
+    tag: string,
+    authConfig?: { username: string; password: string; serveraddress: string },
+  ) => Promise<Result<DockerPushResult>>;
 
   /**
    * Removes a Docker image.
@@ -188,6 +201,38 @@ function hashBuildContext(options: DockerBuildOptions): string {
  * Create base Docker client implementation
  */
 function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
+  // Helper function to fetch image info (used by both getImage and inspectImage)
+  const fetchImageInfo = async (id: string): Promise<Result<DockerImageInfo>> => {
+    try {
+      const image = docker.getImage(id);
+      const inspect = await image.inspect();
+
+      const imageInfo: DockerImageInfo = {
+        Id: inspect.Id,
+        RepoTags: inspect.RepoTags,
+        Size: inspect.Size,
+        Created: inspect.Created,
+      };
+
+      return Success(imageInfo);
+    } catch (error) {
+      const { message, details } = extractDockerErrorMessage(error);
+      const errorMessage = `Failed to get image: ${message}`;
+
+      logger.error(
+        {
+          error: errorMessage,
+          errorDetails: details,
+          originalError: error,
+          imageId: id,
+        },
+        'Docker get image failed',
+      );
+
+      return Failure(errorMessage);
+    }
+  };
+
   return {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
       const buildLogs: string[] = [];
@@ -293,34 +338,12 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
     },
 
     async getImage(id: string): Promise<Result<DockerImageInfo>> {
-      try {
-        const image = docker.getImage(id);
-        const inspect = await image.inspect();
+      return fetchImageInfo(id);
+    },
 
-        const imageInfo: DockerImageInfo = {
-          Id: inspect.Id,
-          RepoTags: inspect.RepoTags,
-          Size: inspect.Size,
-          Created: inspect.Created,
-        };
-
-        return Success(imageInfo);
-      } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to get image: ${message}`;
-
-        logger.error(
-          {
-            error: errorMessage,
-            errorDetails: details,
-            originalError: error,
-            imageId: id,
-          },
-          'Docker get image failed',
-        );
-
-        return Failure(errorMessage);
-      }
+    async inspectImage(imageId: string): Promise<Result<DockerImageInfo>> {
+      // Alias for getImage - delegate to the same implementation
+      return fetchImageInfo(imageId);
     },
 
     async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {
@@ -350,10 +373,15 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
       }
     },
 
-    async pushImage(repository: string, tag: string): Promise<Result<DockerPushResult>> {
+    async pushImage(
+      repository: string,
+      tag: string,
+      authConfig?: { username: string; password: string; serveraddress: string },
+    ): Promise<Result<DockerPushResult>> {
       try {
         const image = docker.getImage(`${repository}:${tag}`);
-        const stream = await image.push({});
+        // dockerode's Image.push expects auth config inside the first options object
+        const stream = await image.push(authConfig ? { authconfig: authConfig } : {});
 
         let digest = '';
         let size: number | undefined;
@@ -590,6 +618,11 @@ function wrapWithMutex(
       return baseClient.getImage(id);
     },
 
+    async inspectImage(imageId: string): Promise<Result<DockerImageInfo>> {
+      // Image inspection is read-only, no mutex needed
+      return baseClient.inspectImage(imageId);
+    },
+
     async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {
       const lockKey = `docker:tag:${imageId}`;
 
@@ -603,7 +636,11 @@ function wrapWithMutex(
       );
     },
 
-    async pushImage(repository: string, tag: string): Promise<Result<DockerPushResult>> {
+    async pushImage(
+      repository: string,
+      tag: string,
+      authConfig?: { username: string; password: string; serveraddress: string },
+    ): Promise<Result<DockerPushResult>> {
       const lockKey = `docker:push:${repository}:${tag}`;
 
       logger.debug({ lockKey, repository, tag }, 'Acquiring push mutex');
@@ -613,7 +650,7 @@ function wrapWithMutex(
           lockKey,
           async () => {
             logger.debug({ lockKey }, 'Push mutex acquired');
-            const result = await baseClient.pushImage(repository, tag);
+            const result = await baseClient.pushImage(repository, tag, authConfig);
             logger.debug({ lockKey, success: result.ok }, 'Push completed');
             return result;
           },

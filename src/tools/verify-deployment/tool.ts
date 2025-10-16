@@ -70,7 +70,7 @@ export interface VerifyDeploymentResult extends Record<string, unknown> {
 }
 
 /**
- * Check deployment health
+ * Check deployment health using shared client method
  */
 async function checkDeploymentHealth(
   k8sClient: KubernetesClient,
@@ -84,32 +84,28 @@ async function checkDeploymentHealth(
   status: 'healthy' | 'unhealthy' | 'unknown';
   message: string;
 }> {
-  const startTime = Date.now();
-  const pollInterval = DEFAULT_TIMEOUTS.healthCheck || 5000;
+  // Use shared waitForDeploymentReady from client
+  const waitResult = await k8sClient.waitForDeploymentReady(namespace, deploymentName, timeout);
 
-  while (Date.now() - startTime < timeout * 1000) {
-    const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
-
-    if (statusResult.ok && statusResult.value?.ready) {
-      return {
-        ready: true,
-        readyReplicas: statusResult.value.readyReplicas ?? 0,
-        totalReplicas: statusResult.value.totalReplicas ?? 0,
-        status: 'healthy',
-        message: 'Deployment is healthy and ready',
-      };
-    }
-
-    // Wait before checking again using configured interval
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+  if (waitResult.ok && waitResult.value?.ready) {
+    return {
+      ready: true,
+      readyReplicas: waitResult.value.readyReplicas ?? 0,
+      totalReplicas: waitResult.value.totalReplicas ?? 0,
+      status: 'healthy',
+      message: 'Deployment is healthy and ready',
+    };
   }
+
+  // If not ready, get current status
+  const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
 
   return {
     ready: false,
-    readyReplicas: 0,
-    totalReplicas: 1,
+    readyReplicas: statusResult.ok ? (statusResult.value.readyReplicas ?? 0) : 0,
+    totalReplicas: statusResult.ok ? (statusResult.value.totalReplicas ?? 1) : 1,
     status: 'unhealthy',
-    message: 'Deployment health check timed out',
+    message: !waitResult.ok ? waitResult.error : 'Deployment not ready',
   };
 }
 
