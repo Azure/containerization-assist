@@ -8,11 +8,13 @@ This directory contains integration tests for the containerization-assist projec
 
 Tests complete containerization workflows by chaining tools together:
 
-- **containerization-workflow.test.ts** - Full end-to-end containerization journey:
-  - analyze-repo → generate-dockerfile → build-image → scan-image → tag-image → generate-k8s-manifests
-  - Tests single-module Node.js and Python applications
-  - Tests session persistence and state management
-  - Tests error handling across the workflow
+- **containerization-workflow.test.ts** - Complete containerization workflow tests:
+  - Repository Analysis: analyze-repo tool for Node.js and Python applications
+  - Multi-Module Workflow: Detects and analyzes monorepo structures
+  - Docker Operations: build-image → tag-image → scan-image with real Docker operations
+  - Error Handling: Invalid paths, missing files, graceful degradation
+  - Tests use direct tool imports without createApp to avoid ES module issues
+  - NO AI sampling - all operations are deterministic
 
 - **multi-module-workflow.test.ts** - Monorepo and multi-module application workflows:
   - Detects multiple modules in a single repository
@@ -149,9 +151,11 @@ Some tools require AI sampling (generate-dockerfile, generate-k8s-manifests). Te
 
 **Current Test Strategy:**
 - Tests import tools directly without `createApp` to avoid Kubernetes client import issues
-- Tools that require AI are tested with graceful fallbacks
-- Multi-module workflow, Docker operations, and error handling tests pass fully
-- Full end-to-end workflows with AI can be tested via: `npm run smoke:journey`
+- NO AI sampling in integration tests - focus on deterministic operations only
+- All tools being tested (analyze-repo, build-image, tag-image, scan) are AI-free
+- Manual ToolContext creation to avoid transitive imports of Kubernetes client
+- Environment-aware test skipping (Docker/Trivy availability)
+- Full end-to-end workflows with AI tools can be tested via: `npm run smoke:journey`
 
 ### Environment Dependencies
 

@@ -22,16 +22,11 @@ import { createDockerClient } from '@/infra/docker/client';
 
 // Import tools directly to avoid createApp dependency
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
-import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
-import buildImageTool from '@/tools/build-image/tool';
+import buildImageTool, { type BuildImageResult } from '@/tools/build-image/tool';
 import tagImageTool from '@/tools/tag-image/tool';
 import scanImageTool from '@/tools/scan/tool';
-import generateK8sTool from '@/tools/generate-k8s-manifests/tool';
 
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
-import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { BuildResult } from '@/tools/build-image/schema';
-import type { K8sManifestPlan } from '@/tools/generate-k8s-manifests/schema';
 
 describe('Complete Containerization Workflow Integration', () => {
   let testDir: DirResult;
@@ -85,17 +80,17 @@ describe('Complete Containerization Workflow Integration', () => {
     await cleanup();
   });
 
-  describe('Full Workflow: Node.js Application', () => {
-    it('should complete analyze → generate-dockerfile → generate-k8s workflow', async () => {
+  describe('Repository Analysis Workflow', () => {
+    it('should analyze Node.js repository and detect modules', async () => {
       const fixturePath = join(fixtureBasePath, 'node-express');
 
-      // Skip if fixture doesn't exist
-      if (!existsSync(fixturePath)) {
-        console.log('Skipping: node-express fixture not found');
+      // Skip if fixture doesn't exist or doesn't have package.json
+      if (!existsSync(fixturePath) || !existsSync(join(fixturePath, 'package.json'))) {
+        console.log('Skipping: node-express fixture not found or missing package.json');
         return;
       }
 
-      // Step 1: Analyze repository
+      // Analyze repository
       const analysisResult = await analyzeRepoTool.handler({
         repositoryPath: fixturePath,
       }, toolContext);
@@ -110,112 +105,27 @@ describe('Complete Containerization Workflow Integration', () => {
       expect(analysis.modules).toBeDefined();
       expect(analysis.modules.length).toBeGreaterThan(0);
       expect(analysis.modules[0].language).toBe('javascript');
+      expect(analysis.isMonorepo).toBe(false);
+    });
 
-      // Step 2: Generate Dockerfile
-      const dockerfileResult = await generateDockerfileTool.handler({
-        repositoryPath: fixturePath,
-        modules: analysis.modules,
-        outputPath: join(testDir.name, 'Dockerfile.node'),
-      }, toolContext);
-
-      expect(dockerfileResult.ok).toBe(true);
-      if (!dockerfileResult.ok) {
-        console.log('Dockerfile generation failed:', dockerfileResult.error);
-        return;
-      }
-
-      const dockerfilePlan = dockerfileResult.value as DockerfilePlan;
-      expect(dockerfilePlan.recommendations.dockerfile).toBeDefined();
-      expect(dockerfilePlan.recommendations.dockerfile).toContain('FROM');
-      expect(dockerfilePlan.recommendations.dockerfile).toContain('node');
-
-      // Step 3: Generate K8s manifests
-      const k8sResult = await generateK8sTool.handler({
-        repositoryPath: fixturePath,
-        modules: analysis.modules,
-        outputPath: join(testDir.name, 'k8s-node.yaml'),
-        imageName: 'test-app:latest',
-      }, toolContext);
-
-      expect(k8sResult.ok).toBe(true);
-      if (!k8sResult.ok) {
-        console.log('K8s manifest generation failed:', k8sResult.error);
-        return;
-      }
-
-      const k8sPlan = k8sResult.value as K8sManifestPlan;
-      expect(k8sPlan.manifests).toBeDefined();
-      expect(k8sPlan.manifests.length).toBeGreaterThan(0);
-      expect(k8sPlan.manifests.some(m => m.kind === 'Deployment')).toBe(true);
-      expect(k8sPlan.manifests.some(m => m.kind === 'Service')).toBe(true);
-    }, testTimeout);
-
-    it('should complete workflow with Docker build (if Docker available)', async () => {
-      if (!dockerAvailable) {
-        console.log('Skipping: Docker not available');
-        return;
-      }
-
-      const fixturePath = join(fixtureBasePath, 'node-express');
+    it('should analyze Python repository', async () => {
+      const fixturePath = join(fixtureBasePath, 'python-flask');
 
       if (!existsSync(fixturePath)) {
-        console.log('Skipping: node-express fixture not found');
+        console.log('Skipping: python-flask fixture not found');
         return;
       }
 
-      // Analyze
       const analysisResult = await analyzeRepoTool.handler({
         repositoryPath: fixturePath,
       }, toolContext);
 
-      if (!analysisResult.ok) return;
-      const analysis = analysisResult.value as RepositoryAnalysis;
-
-      // Generate Dockerfile
-      const dockerfileResult = await generateDockerfileTool.handler({
-        repositoryPath: fixturePath,
-        modules: analysis.modules,
-        outputPath: join(testDir.name, 'Dockerfile.build-test'),
-      }, toolContext);
-
-      if (!dockerfileResult.ok) return;
-
-      // Build Docker image
-      const imageName = `workflow-test-node:${Date.now()}`;
-      const buildResult = await buildImageTool.handler({
-        dockerfilePath: join(testDir.name, 'Dockerfile.build-test'),
-        context: fixturePath,
-        imageName,
-      }, toolContext);
-
-      if (buildResult.ok) {
-        const build = buildResult.value as BuildResult;
-        expect(build.imageId).toBeDefined();
-        expect(build.imageTags).toContain(imageName);
-        testCleaner.trackImage(build.imageId);
-
-        // Tag the image
-        const tagResult = await tagImageTool.handler({
-          source: imageName,
-          tag: `workflow-test-node:latest`,
-        }, toolContext);
-
-        if (tagResult.ok) {
-          testCleaner.trackImage('workflow-test-node:latest');
-        }
-
-        // Scan image (if Trivy available)
-        const scanResult = await scanImageTool.handler({
-          imageId: build.imageId,
-        }, toolContext);
-
-        if (scanResult.ok) {
-          expect(scanResult.value).toBeDefined();
-        }
-      } else {
-        console.log('Build failed (expected if Docker issues):', buildResult.error);
+      if (analysisResult.ok) {
+        const analysis = analysisResult.value as RepositoryAnalysis;
+        expect(analysis.modules).toBeDefined();
+        expect(analysis.modules[0]?.language).toBe('python');
       }
-    }, testTimeout);
+    });
   });
 
   describe('Multi-Module Workflow', () => {
@@ -264,47 +174,21 @@ describe('Complete Containerization Workflow Integration', () => {
       expect(analysis.isMonorepo).toBe(true);
       expect(analysis.modules.length).toBeGreaterThanOrEqual(2);
 
-      // Generate Dockerfiles for each module
-      for (const module of analysis.modules) {
-        const dockerfileResult = await generateDockerfileTool.handler({
-          repositoryPath: monorepoPath,
-          modules: [module],
-          outputPath: join(testDir.name, `Dockerfile.${module.name}`),
-        }, toolContext);
-
-        if (dockerfileResult.ok) {
-          const plan = dockerfileResult.value as DockerfilePlan;
-          expect(plan.recommendations.dockerfile).toContain('FROM');
-        }
-      }
-
-      // Generate K8s manifests for all modules
-      const k8sResult = await generateK8sTool.handler({
-        repositoryPath: monorepoPath,
-        modules: analysis.modules,
-        outputPath: join(testDir.name, 'k8s-multi-service.yaml'),
-      }, toolContext);
-
-      expect(k8sResult.ok).toBe(true);
-      if (k8sResult.ok) {
-        const k8sPlan = k8sResult.value as K8sManifestPlan;
-        expect(k8sPlan.manifests.length).toBeGreaterThan(0);
-
-        // Should have Deployments for each service
-        const deployments = k8sPlan.manifests.filter(m => m.kind === 'Deployment');
-        expect(deployments.length).toBeGreaterThanOrEqual(2);
-      }
+      // Verify module names
+      const moduleNames = analysis.modules.map(m => m.name);
+      expect(moduleNames).toContain('api');
+      expect(moduleNames).toContain('worker');
     }, testTimeout);
   });
 
   describe('Docker Operations Integration', () => {
-    it('should build, tag, and scan a simple image', async () => {
+    it('should build, tag, and scan image with existing Dockerfile', async () => {
       if (!dockerAvailable) {
         console.log('Skipping: Docker not available');
         return;
       }
 
-      // Create a simple test app
+      // Create a simple test app with a Dockerfile
       const appPath = join(testDir.name, 'simple-app');
       mkdirSync(appPath, { recursive: true });
 
@@ -318,43 +202,33 @@ describe('Complete Containerization Workflow Integration', () => {
       );
       writeFileSync(join(appPath, 'index.js'), 'console.log("Hello");');
 
-      // Generate Dockerfile
-      const analysisResult = await analyzeRepoTool.handler({
-        repositoryPath: appPath,
-      }, toolContext);
-
-      if (!analysisResult.ok) {
-        console.log('Analysis failed, skipping');
-        return;
-      }
-
-      const analysis = analysisResult.value as RepositoryAnalysis;
-      const dockerfileResult = await generateDockerfileTool.handler({
-        repositoryPath: appPath,
-        modules: analysis.modules,
-        outputPath: join(appPath, 'Dockerfile'),
-      }, toolContext);
-
-      if (!dockerfileResult.ok) {
-        console.log('Dockerfile generation failed, skipping');
-        return;
-      }
+      // Write a simple Dockerfile directly (no AI needed)
+      writeFileSync(
+        join(appPath, 'Dockerfile'),
+        `FROM node:18-alpine
+WORKDIR /app
+COPY package.json ./
+COPY index.js ./
+CMD ["node", "index.js"]`
+      );
 
       // Build image
       const imageName = `docker-ops-test:${Date.now()}`;
       const buildResult = await buildImageTool.handler({
-        dockerfilePath: join(appPath, 'Dockerfile'),
-        context: appPath,
+        path: appPath,
+        dockerfile: 'Dockerfile',
         imageName,
       }, toolContext);
 
       if (buildResult.ok) {
-        const build = buildResult.value as BuildResult;
+        const build = buildResult.value as BuildImageResult;
+        expect(build.imageId).toBeDefined();
+        expect(build.tags).toContain(imageName);
         testCleaner.trackImage(build.imageId);
 
         // Tag image
         const tagResult = await tagImageTool.handler({
-          source: imageName,
+          imageId: build.imageId,
           tag: `docker-ops-test:latest`,
         }, toolContext);
 
@@ -371,6 +245,8 @@ describe('Complete Containerization Workflow Integration', () => {
         // Scan may fail if Trivy not installed - that's OK
         if (!scanResult.ok) {
           console.log('Scan skipped (Trivy may not be installed)');
+        } else {
+          expect(scanResult.value).toBeDefined();
         }
       } else {
         console.log('Build failed:', buildResult.error);
