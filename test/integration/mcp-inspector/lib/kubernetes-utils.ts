@@ -28,6 +28,31 @@ export class KubernetesUtils {
   private tempFiles: Set<string> = new Set();
 
   /**
+   * Create a temporary directory asynchronously
+   */
+  private static async createTempDir(prefix: string): Promise<tmp.DirResult> {
+    return new Promise<tmp.DirResult>((resolve, reject) => {
+      tmp.dir({ prefix, unsafeCleanup: true, keep: false }, (err, name, removeCallback) => {
+        if (err) return reject(err);
+        resolve({ name, removeCallback } as tmp.DirResult);
+      });
+    });
+  }
+
+  /**
+   * Clean up temp directory safely
+   */
+  private static cleanupTempDir(tempDirResult: tmp.DirResult | null): void {
+    if (tempDirResult) {
+      try {
+        tempDirResult.removeCallback();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  /**
    * Check if Kubernetes cluster is available
    */
   static async isKubernetesAvailable(): Promise<boolean> {
@@ -94,7 +119,7 @@ export class KubernetesUtils {
       let tempDirResult: tmp.DirResult | null = null;
       try {
         // Create temporary file for manifest
-        tempDirResult = tmp.dirSync({ prefix: 'k8s-manifest-', unsafeCleanup: true, keep: false });
+        tempDirResult = await KubernetesUtils.createTempDir('k8s-manifest-');
         const manifestPath = join(tempDirResult.name, `${manifest.kind}-${manifest.metadata.name}.yaml`);
 
         await writeFile(manifestPath, this.manifestToYaml(manifest));
@@ -128,7 +153,7 @@ export class KubernetesUtils {
 
         // Clean up temp directory for this manifest
         if (tempDirResult) {
-          tempDirResult.removeCallback();
+          KubernetesUtils.cleanupTempDir(tempDirResult);
           tempDirResult = null;
         }
       } catch (error) {
@@ -140,13 +165,7 @@ export class KubernetesUtils {
         });
       } finally {
         // Ensure cleanup even on error
-        if (tempDirResult) {
-          try {
-            tempDirResult.removeCallback();
-          } catch {
-            // Ignore cleanup errors
-          }
-        }
+        KubernetesUtils.cleanupTempDir(tempDirResult);
       }
     }
 
@@ -162,7 +181,7 @@ export class KubernetesUtils {
 
     try {
       // Create temporary file with all manifests
-      tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
+      tempDirResult = await KubernetesUtils.createTempDir('k8s-deploy-');
       const manifestsPath = join(tempDirResult.name, 'manifests.yaml');
 
       const yamlContent = manifests.map(m => this.manifestToYaml(m)).join('---\n');
@@ -199,13 +218,7 @@ export class KubernetesUtils {
       };
     } finally {
       // Clean up temp directory
-      if (tempDirResult) {
-        try {
-          tempDirResult.removeCallback();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
+      KubernetesUtils.cleanupTempDir(tempDirResult);
     }
   }
 
@@ -247,7 +260,7 @@ export class KubernetesUtils {
       await this.ensureNamespace(namespace);
 
       // Create temporary file with all manifests
-      tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
+      tempDirResult = await KubernetesUtils.createTempDir('k8s-deploy-');
       const manifestsPath = join(tempDirResult.name, 'manifests.yaml');
 
       const yamlContent = manifests.map(m => this.manifestToYaml(m)).join('---\n');
@@ -297,13 +310,7 @@ export class KubernetesUtils {
       };
     } finally {
       // Clean up temp directory
-      if (tempDirResult) {
-        try {
-          tempDirResult.removeCallback();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
+      KubernetesUtils.cleanupTempDir(tempDirResult);
     }
   }
 

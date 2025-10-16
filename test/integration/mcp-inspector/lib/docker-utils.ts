@@ -55,6 +55,31 @@ export class DockerUtils {
   private tempFiles: Set<string> = new Set();
 
   /**
+   * Create a temporary directory asynchronously
+   */
+  private static async createTempDir(prefix: string): Promise<tmp.DirResult> {
+    return new Promise<tmp.DirResult>((resolve, reject) => {
+      tmp.dir({ prefix, unsafeCleanup: true, keep: false }, (err, name, removeCallback) => {
+        if (err) return reject(err);
+        resolve({ name, removeCallback } as tmp.DirResult);
+      });
+    });
+  }
+
+  /**
+   * Clean up temp directory safely
+   */
+  private static cleanupTempDir(tempDirResult: tmp.DirResult | null): void {
+    if (tempDirResult) {
+      try {
+        tempDirResult.removeCallback();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  /**
    * Check if Docker is available in the environment
    */
   static async isDockerAvailable(): Promise<boolean> {
@@ -84,7 +109,7 @@ export class DockerUtils {
       }
 
       if (dockerfileContent.includes('\n') || !dockerfileContent.startsWith('FROM')) {
-        tempDirResult = tmp.dirSync({ prefix: 'dockerfile-', unsafeCleanup: true, keep: false });
+        tempDirResult = await DockerUtils.createTempDir('dockerfile-');
         dockerfilePath = join(tempDirResult.name, 'Dockerfile');
         await writeFile(dockerfilePath, dockerfileContent);
         this.tempFiles.add(dockerfilePath);
@@ -154,13 +179,7 @@ export class DockerUtils {
       };
     } finally {
       // Clean up temp directory
-      if (tempDirResult) {
-        try {
-          tempDirResult.removeCallback();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
+      DockerUtils.cleanupTempDir(tempDirResult);
     }
   }
 
