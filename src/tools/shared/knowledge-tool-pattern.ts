@@ -230,6 +230,9 @@ export function createKnowledgeTool<
 
     ctx.logger.info({ topic, filters }, `${config.name}: Querying knowledge base`);
 
+    const detectedDeps = filters.detectedDependencies;
+    const hasDetectedDeps = Array.isArray(detectedDeps) && detectedDeps.length > 0;
+
     const knowledgeOptions = {
       environment: filters.environment || 'production',
       tool: config.name,
@@ -238,6 +241,7 @@ export function createKnowledgeTool<
       category: config.query.category,
       ...(filters.language && { language: filters.language }),
       ...(filters.framework && { framework: filters.framework }),
+      ...(hasDetectedDeps && { detectedDependencies: detectedDeps }),
     };
     const knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
 
