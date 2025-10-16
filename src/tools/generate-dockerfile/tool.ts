@@ -34,6 +34,19 @@ const version = '2.0.0';
 type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPractices';
 
 /**
+ * Extended input parameters that include optional existing Dockerfile data.
+ * This is used internally to pass Dockerfile analysis results from the run function to buildPlan.
+ */
+interface ExtendedDockerfileParams extends GenerateDockerfileParams {
+  _existingDockerfile?: {
+    path: string;
+    content: string;
+    analysis: DockerfileAnalysis;
+    guidance: EnhancementGuidance;
+  };
+}
+
+/**
  * Analyzes an existing Dockerfile to extract structure and patterns
  */
 function analyzeDockerfile(content: string): DockerfileAnalysis {
@@ -256,7 +269,7 @@ function createBaseImageRecommendation(snippet: {
 }
 
 const runPattern = createKnowledgeTool<
-  GenerateDockerfileParams,
+  ExtendedDockerfileParams,
   DockerfilePlan,
   DockerfileCategory,
   DockerfileBuildRules
@@ -329,14 +342,8 @@ const runPattern = createKnowledgeTool<
       const framework = input.framework;
 
       // Access existing Dockerfile info from extended input (added in run function)
-      const extendedInput = input as GenerateDockerfileParams & {
-        _existingDockerfile?: {
-          path: string;
-          content: string;
-          analysis: DockerfileAnalysis;
-          guidance: EnhancementGuidance;
-        };
-      };
+      // Type is already ExtendedDockerfileParams, so no assertion needed
+      const existingDockerfile = input._existingDockerfile;
 
       const knowledgeMatches: DockerfileRequirement[] = knowledge.all.map((snippet) => ({
         id: snippet.id,
@@ -401,11 +408,11 @@ const runPattern = createKnowledgeTool<
         `- Build Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}`,
       ];
 
-      if (extendedInput._existingDockerfile) {
-        const { analysis, guidance } = extendedInput._existingDockerfile;
+      if (existingDockerfile) {
+        const { analysis, guidance } = existingDockerfile;
         summaryParts.push(
           `- Mode: ENHANCE existing Dockerfile`,
-          `- Existing Dockerfile: ${extendedInput._existingDockerfile.path}`,
+          `- Existing Dockerfile: ${existingDockerfile.path}`,
           `- Analysis:`,
           `  - Complexity: ${analysis.complexity}`,
           `  - Security: ${analysis.securityPosture}`,
@@ -453,12 +460,12 @@ const runPattern = createKnowledgeTool<
         knowledgeMatches,
         confidence,
         summary,
-        ...(extendedInput._existingDockerfile && {
+        ...(existingDockerfile && {
           existingDockerfile: {
-            path: extendedInput._existingDockerfile.path,
-            content: extendedInput._existingDockerfile.content,
-            analysis: extendedInput._existingDockerfile.analysis,
-            guidance: extendedInput._existingDockerfile.guidance,
+            path: existingDockerfile.path,
+            content: existingDockerfile.content,
+            analysis: existingDockerfile.analysis,
+            guidance: existingDockerfile.guidance,
           },
         }),
       };

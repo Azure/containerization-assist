@@ -100,10 +100,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         mockContext,
       );
 
-      if (!result.ok) {
-        console.log('Test failed with error:', result.error);
-        console.log('Guidance:', result.guidance);
-      }
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.modules).toHaveLength(1);

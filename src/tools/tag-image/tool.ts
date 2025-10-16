@@ -10,7 +10,7 @@
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/infra/docker/client';
-import { validateImageName } from '@/lib/validation';
+import { validateImageName, validateDockerTag } from '@/lib/validation';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
@@ -43,10 +43,10 @@ async function handleTagImage(
     return Failure('Tag parameter is required');
   }
 
-  // Validate tag format
-  const tagValidation = validateImageName(tag);
-  if (!tagValidation.ok) {
-    return tagValidation;
+  // Validate full image name format (repository:tag)
+  const imageValidation = validateImageName(tag);
+  if (!imageValidation.ok) {
+    return imageValidation;
   }
 
   try {
@@ -66,6 +66,12 @@ async function handleTagImage(
 
     if (!repository) {
       return Failure('Invalid tag format');
+    }
+
+    // Validate the extracted tag part
+    const tagPartValidation = validateDockerTag(tagName);
+    if (!tagPartValidation.ok) {
+      return tagPartValidation;
     }
 
     const tagResult = await dockerClient.tagImage(source, repository, tagName);
