@@ -33,8 +33,7 @@ jest.mock('node:fs', () => ({
 }));
 
 // Import the mocked fs after setting up the mock
-import * as fs from 'node:fs/promises';
-import { promises as fsPromises } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import analyzeTool from '@/tools/analyze-repo/tool';
 
 describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
@@ -89,9 +88,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
       (fs.stat as jest.Mock).mockImplementation(statMock);
       (fs.readdir as jest.Mock).mockImplementation(readdirMock);
       (fs.readFile as jest.Mock).mockImplementation(readFileMock);
-      (fsPromises.stat as jest.Mock).mockImplementation(statMock);
-      (fsPromises.readdir as jest.Mock).mockImplementation(readdirMock);
-      (fsPromises.readFile as jest.Mock).mockImplementation(readFileMock);
 
       const result = await analyzeTool.handler(
         {
@@ -150,9 +146,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
       (fs.stat as jest.Mock).mockImplementation(statMock);
       (fs.readdir as jest.Mock).mockImplementation(readdirMock);
       (fs.readFile as jest.Mock).mockImplementation(readFileMock);
-      (fsPromises.stat as jest.Mock).mockImplementation(statMock);
-      (fsPromises.readdir as jest.Mock).mockImplementation(readdirMock);
-      (fsPromises.readFile as jest.Mock).mockImplementation(readFileMock);
 
       const result = await analyzeTool.handler(
         {
@@ -217,9 +210,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
       (fs.stat as jest.Mock).mockImplementation(statMock);
       (fs.readdir as jest.Mock).mockImplementation(readdirMock);
       (fs.readFile as jest.Mock).mockImplementation(readFileMock);
-      (fsPromises.stat as jest.Mock).mockImplementation(statMock);
-      (fsPromises.readdir as jest.Mock).mockImplementation(readdirMock);
-      (fsPromises.readFile as jest.Mock).mockImplementation(readFileMock);
 
       const result = await analyzeTool.handler(
         {
@@ -243,7 +233,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         isFile: () => false
       });
       (fs.stat as jest.Mock).mockImplementation(statMock);
-      (fsPromises.stat as jest.Mock).mockImplementation(statMock);
 
       const result = await analyzeTool.handler(
         {
@@ -304,8 +293,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
       });
       (fs.stat as jest.Mock).mockImplementation(statMock);
       (fs.readdir as jest.Mock).mockImplementation(readdirMock);
-      (fsPromises.stat as jest.Mock).mockImplementation(statMock);
-      (fsPromises.readdir as jest.Mock).mockImplementation(readdirMock);
 
       const result = await analyzeTool.handler(
         {

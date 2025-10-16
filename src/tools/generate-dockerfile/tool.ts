@@ -38,7 +38,7 @@ type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPrac
  * This is used internally to pass Dockerfile analysis results from the run function to buildPlan.
  */
 interface ExtendedDockerfileParams extends GenerateDockerfileParams {
-  _existingDockerfile?: {
+  existingDockerfile?: {
     path: string;
     content: string;
     analysis: DockerfileAnalysis;
@@ -343,7 +343,7 @@ const runPattern = createKnowledgeTool<
 
       // Access existing Dockerfile info from extended input (added in run function)
       // Type is already ExtendedDockerfileParams, so no assertion needed
-      const existingDockerfile = input._existingDockerfile;
+      const existingDockerfile = input.existingDockerfile;
 
       const knowledgeMatches: DockerfileRequirement[] = knowledge.all.map((snippet) => ({
         id: snippet.id,
@@ -547,7 +547,7 @@ async function handleGenerateDockerfile(
   // Add existing Dockerfile to input if found
   const extendedInput = {
     ...input,
-    ...(existingDockerfile && { _existingDockerfile: existingDockerfile }),
+    ...(existingDockerfile && { existingDockerfile }),
   };
 
   return runPattern(extendedInput, ctx);

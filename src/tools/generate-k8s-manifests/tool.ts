@@ -336,13 +336,6 @@ async function handleGenerateK8sManifests(
   input: z.infer<typeof generateK8sManifestsSchema>,
   ctx: ToolContext,
 ): Promise<Result<ManifestPlan>> {
-  // Validate that exactly one input source is provided
-  if (!input.path && !input.acaManifest) {
-    return Failure(
-      'Either path (for repository analysis) or acaManifest (for ACA conversion) is required.',
-    );
-  }
-
   // If acaManifest is provided, validate it can be parsed
   if (input.acaManifest) {
     try {
