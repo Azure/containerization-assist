@@ -238,26 +238,8 @@ export const loadKnowledgeBase = async (): Promise<void> => {
   }
 };
 
-/**
- * Get entry by ID
- */
-export const getEntryById = (id: string): LoadedEntry | undefined => {
-  return knowledgeState.entries.get(id);
-};
 
-/**
- * Get entries by category
- */
-export const getEntriesByCategory = (category: string): LoadedEntry[] => {
-  return knowledgeState.byCategory.get(category) || [];
-};
 
-/**
- * Get entries by tag
- */
-export const getEntriesByTag = (tag: string): LoadedEntry[] => {
-  return knowledgeState.byTag.get(tag) || [];
-};
 
 /**
  * Get all entries
@@ -266,12 +248,6 @@ export const getAllEntries = (): LoadedEntry[] => {
   return Array.from(knowledgeState.entries.values());
 };
 
-/**
- * Get pattern compilation statistics
- */
-export const getCompilationStats = (): CompilationStats => {
-  return { ...knowledgeState.compilationStats };
-};
 
 /**
  * Get knowledge base statistics
@@ -318,24 +294,6 @@ export const isKnowledgeLoaded = (): boolean => {
   return knowledgeState.loaded;
 };
 
-/**
- * Force reload the knowledge base
- */
-export const reloadKnowledgeBase = async (): Promise<void> => {
-  knowledgeState = {
-    entries: new Map(),
-    byCategory: new Map(),
-    byTag: new Map(),
-    loaded: false,
-    compilationStats: {
-      totalEntries: 0,
-      compiledSuccessfully: 0,
-      compilationErrors: 0,
-      avgCompilationTime: 0,
-    },
-  };
-  await loadKnowledgeBase();
-};
 
 /**
  * Load knowledge data and return entries.

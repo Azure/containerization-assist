@@ -11,11 +11,7 @@ export type {
 } from './types';
 export {
   loadKnowledgeBase,
-  getEntryById,
-  getEntriesByCategory,
-  getEntriesByTag,
   getAllEntries,
-  getCompilationStats,
   isKnowledgeLoaded,
 } from './loader';
 export { findKnowledgeMatches } from './matcher';
