@@ -152,7 +152,7 @@ Some tools require AI sampling (generate-dockerfile, generate-k8s-manifests). Te
 **Current Test Strategy:**
 - Tests import tools directly without `createApp` to avoid Kubernetes client import issues
 - NO AI sampling in integration tests - focus on deterministic operations only
-- All tools being tested (analyze-repo, build-image, tag-image, scan) are AI-free
+- All tools being tested (analyze-repo, build-image, tag-image, scan-image) are AI-free
 - Manual ToolContext creation to avoid transitive imports of Kubernetes client
 - Environment-aware test skipping (Docker/Trivy availability)
 - Full end-to-end workflows with AI tools can be tested via: `npm run smoke:journey`
