@@ -328,7 +328,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toMatch(/does not exist|failed/);
+        expect(result.error).toContain('does not exist');
       }
     });
   });

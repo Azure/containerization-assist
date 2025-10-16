@@ -72,13 +72,25 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
 }
 
 /**
+ * Escape and quote a CSV field value
+ */
+function escapeCSVField(value: string): string {
+  // Escape double quotes by doubling them, then wrap in quotes
+  const escaped = value.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+/**
  * Output tools in CSV format
  */
 function outputCSV(tools: Tool[]): void {
   console.info('Name,Category,Knowledge-Enhanced,Enhancement Capabilities');
   for (const tool of tools) {
     const caps = tool.metadata.enhancementCapabilities?.join(';') ?? '';
-    console.info(`${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},${caps}`);
+    const capsEscaped = escapeCSVField(caps);
+    console.info(
+      `${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},${capsEscaped}`,
+    );
   }
 }
 

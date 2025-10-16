@@ -130,6 +130,16 @@ export function isValidToolMetadata(metadata: unknown): metadata is ToolMetadata
 }
 
 /**
+ * Helper function to check if knowledge-enhanced tool is missing capabilities
+ */
+function isKnowledgeEnhancedWithoutCapabilities(metadata: ToolMetadata): boolean {
+  return (
+    metadata.knowledgeEnhanced &&
+    (!metadata.enhancementCapabilities || metadata.enhancementCapabilities.length === 0)
+  );
+}
+
+/**
  * Validates metadata consistency with tool properties
  */
 export function validateMetadataConsistency(
@@ -139,10 +149,7 @@ export function validateMetadataConsistency(
   const issues: string[] = [];
 
   // Knowledge-enhanced tools should have enhancement capabilities
-  if (
-    metadata.knowledgeEnhanced &&
-    (!metadata.enhancementCapabilities || metadata.enhancementCapabilities.length === 0)
-  ) {
+  if (isKnowledgeEnhancedWithoutCapabilities(metadata)) {
     issues.push('Knowledge-enhanced tools should specify enhancement capabilities');
   }
 
@@ -169,10 +176,7 @@ export function postValidate(tool: ValidatableTool): string[] {
   const issues: string[] = [];
 
   // Knowledge-enhanced tool missing capabilities
-  if (
-    tool.metadata.knowledgeEnhanced &&
-    (!tool.metadata.enhancementCapabilities || tool.metadata.enhancementCapabilities.length === 0)
-  ) {
+  if (isKnowledgeEnhancedWithoutCapabilities(tool.metadata)) {
     issues.push('Knowledge-enhanced tool missing capabilities');
   }
 
