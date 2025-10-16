@@ -131,8 +131,6 @@ describe('Build Output Validation', () => {
 
   describe('ESM Build (dist)', () => {
 
-=======
->>>>>>> fc1c372b (remove unused ai code)
     describe('Knowledge Data Directory', () => {
       // Knowledge data has been moved to top-level knowledge/packs/ directory
       const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
@@ -174,54 +172,11 @@ describe('Build Output Validation', () => {
   });
 
   describe('CommonJS Build (dist-cjs)', () => {
-    describe('AI Module', () => {
-      const aiDir = join(distCjsDir, 'src', 'ai');
-
-      it('should include AI directory in dist-cjs', () => {
-        expect(existsSync(aiDir)).toBe(true);
-      });
-
-      it('should include prompt engine files', () => {
-        // Check for prompt engine module in AI directory
-        const expectedPromptFiles = [
-          'prompt-engine.js'
-        ];
-
-        const files = readdirSync(aiDir).filter(item => {
-          return item.endsWith('.js') || item.endsWith('.d.ts');
-        });
-
-        // Should have at least prompt-engine
-        expect(files.length).toBeGreaterThan(0);
-        expect(files.some(f => f.includes('prompt-engine'))).toBe(true);
-      });
-    });
-
     // Knowledge data is no longer duplicated in dist-cjs
     // It's in the top-level knowledge/packs/ directory only
   });
 
   describe('Package Integrity', () => {
-    it('should have consistent TypeScript modules between ESM and CommonJS builds', () => {
-      const esmAiDir = join(distDir, 'src', 'ai');
-      const cjsAiDir = join(distCjsDir, 'src', 'ai');
-
-      // Count JavaScript files (compiled TypeScript)
-      const countJsFiles = (dir: string): number => {
-        const items = readdirSync(dir);
-        return items.filter(item => item.endsWith('.js')).length;
-      };
-
-      const esmAiCount = countJsFiles(esmAiDir);
-      const cjsAiCount = countJsFiles(cjsAiDir);
-
-      expect(esmAiCount).toBe(cjsAiCount);
-      expect(esmAiCount).toBeGreaterThan(0);
-
-      // Should have at least prompt-engine
-      expect(esmAiCount).toBeGreaterThanOrEqual(1);
-    });
-
     it('should have knowledge data files with reasonable sizes', () => {
       // Knowledge data is now in top-level knowledge/packs/ directory
       const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
@@ -247,19 +202,7 @@ describe('Build Output Validation', () => {
       const files = readdirSync(knowledgeDataDir);
       const jsonFiles = files.filter(f => f.endsWith('.json'));
 
-      // Verify it contains TypeScript modules
-      if (foundAiDir) {
-        const files = readdirSync(foundAiDir);
-        const tsFiles = files.filter(f => f.endsWith('.ts') || f.endsWith('.js'));
-
-        // Should have TypeScript source files or compiled JS files
-        expect(tsFiles.length).toBeGreaterThan(0);
-
-        // Check for key modules
-        const hasPromptEngine = files.some(f => f.includes('prompt-engine'));
-
-        expect(hasPromptEngine).toBe(true);
-      }
+      // Should have knowledge pack files
       expect(jsonFiles.length).toBeGreaterThan(0);
     });
   });
