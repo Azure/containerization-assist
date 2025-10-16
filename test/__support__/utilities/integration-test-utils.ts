@@ -4,9 +4,10 @@
  */
 
 import type { Logger } from 'pino';
-import { tmpdir } from 'os';
 import { join } from 'path';
 import { promises as fs } from 'fs';
+import tmp from 'tmp';
+import type { DirResult } from 'tmp';
 import { DetectionOptions, EnvironmentCapabilities, detectEnvironment } from './environment-detector';
 
 export interface IntegrationTestContext {
@@ -60,21 +61,36 @@ export function createTestLogger(prefix: string = 'integration-test'): Logger {
 
 /**
  * Create a temporary directory for test context
+ * @deprecated Use createTestTempDir() from tmp-helpers.ts instead
  */
-export async function createTestContext(prefix: string = 'integration-test'): Promise<string> {
-  const contextDir = await fs.mkdtemp(join(tmpdir(), `${prefix}-`));
-  return contextDir;
+export function createTestContext(prefix: string = 'integration-test'): string {
+  const dir = tmp.dirSync({
+    prefix: `${prefix}-`,
+    unsafeCleanup: true,
+    keep: false,
+  });
+  return dir.name;
 }
 
 /**
  * Cleanup test resources
+ * Now uses tmp module for automatic cleanup on process exit
  */
 export class IntegrationTestCleanup {
-  private tempDirs: string[] = [];
+  private tempDirs: DirResult[] = [];
   private cleanupTasks: (() => Promise<void>)[] = [];
 
-  addTempDir(dir: string): void {
+  /**
+   * Create and track a temporary directory
+   */
+  createTempDir(prefix: string): string {
+    const dir = tmp.dirSync({
+      prefix: `${prefix}-`,
+      unsafeCleanup: true,
+      keep: false,
+    });
     this.tempDirs.push(dir);
+    return dir.name;
   }
 
   addCleanupTask(task: () => Promise<void>): void {
@@ -91,11 +107,12 @@ export class IntegrationTestCleanup {
       }
     }
 
+    // Clean temp directories using tmp module
     for (const dir of this.tempDirs) {
       try {
-        await fs.rm(dir, { recursive: true, force: true });
+        dir.removeCallback();
       } catch (error) {
-        console.warn(`Failed to cleanup directory ${dir}:`, error);
+        console.warn(`Failed to cleanup directory ${dir.name}:`, error);
       }
     }
 

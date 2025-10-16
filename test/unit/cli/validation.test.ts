@@ -1,29 +1,29 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { createTestTempDir } from '../../__support__/utilities/tmp-helpers';
+import type { DirResult } from 'tmp';
 import { validateOptions } from '@/cli/validation';
 import type { CLIOptions, DockerSocketValidation } from '@/cli/validation';
 
 describe('CLI Validation Module', () => {
-  let testDir: string;
+  let testDir: DirResult;
+  let cleanup: () => Promise<void>;
   let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
 
   beforeEach(() => {
     // Create a secure temporary test directory
-    testDir = mkdtempSync(join(tmpdir(), 'cli-validation-test-'));
+    const result = createTestTempDir('cli-validation-test-');
+    testDir = result.dir;
+    cleanup = result.cleanup;
 
     // Spy on console.error
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Clean up temporary test directory
-    try {
-      rmSync(testDir, { recursive: true, force: true });
-    } catch (error) {
-      // Ignore cleanup errors
-    }
+    await cleanup();
 
     // Restore mocks
     jest.restoreAllMocks();
@@ -63,7 +63,7 @@ describe('CLI Validation Module', () => {
 
     describe('workspace validation', () => {
       it('should accept valid workspace directory', () => {
-        const opts: CLIOptions = { workspace: testDir };
+        const opts: CLIOptions = { workspace: testDir.name };
         const result = validateOptions(opts);
 
         expect(result.valid).toBe(true);
@@ -81,7 +81,7 @@ describe('CLI Validation Module', () => {
       });
 
       it('should reject workspace path that is not a directory', () => {
-        const filePath = join(testDir, 'not-a-dir.txt');
+        const filePath = join(testDir.name, 'not-a-dir.txt');
         writeFileSync(filePath, 'test');
 
         const opts: CLIOptions = { workspace: filePath };
@@ -116,7 +116,7 @@ describe('CLI Validation Module', () => {
 
     describe('config file validation', () => {
       it('should accept valid config file', () => {
-        const configPath = join(testDir, 'config.json');
+        const configPath = join(testDir.name, 'config.json');
         writeFileSync(configPath, '{}');
 
         const opts: CLIOptions = { config: configPath };
@@ -237,12 +237,12 @@ describe('CLI Validation Module', () => {
       });
 
       it('should pass with all valid options', () => {
-        const configPath = join(testDir, 'config.json');
+        const configPath = join(testDir.name, 'config.json');
         writeFileSync(configPath, '{}');
 
         const opts: CLIOptions = {
           logLevel: 'info',
-          workspace: testDir,
+          workspace: testDir.name,
           config: configPath,
         };
 

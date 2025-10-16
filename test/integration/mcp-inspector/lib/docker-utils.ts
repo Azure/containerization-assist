@@ -4,9 +4,9 @@
  */
 
 import { spawn } from 'child_process';
-import { writeFile, unlink, mkdtemp } from 'fs/promises';
+import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import tmp from 'tmp';
 import type { BuildResult } from '../../../../src/types/result-types.js';
 
 export interface BuildConfig {
@@ -83,8 +83,8 @@ export class DockerUtils {
       }
       
       if (dockerfileContent.includes('\n') || !dockerfileContent.startsWith('FROM')) {
-        const tempDir = await mkdtemp(join(tmpdir(), 'dockerfile-'));
-        dockerfilePath = join(tempDir, 'Dockerfile');
+        const tempDirResult = tmp.dirSync({ prefix: 'dockerfile-', unsafeCleanup: true, keep: false });
+        dockerfilePath = join(tempDirResult.name, 'Dockerfile');
         await writeFile(dockerfilePath, dockerfileContent);
         this.tempFiles.add(dockerfilePath);
       } else {

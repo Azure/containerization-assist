@@ -6,14 +6,16 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, rmSync, readFileSync } from 'fs';
+import { existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
+import type { DirResult } from 'tmp';
 
 const PROJECT_ROOT = join(__dirname, '../..');
 
 describe('Package Integrity', () => {
-  let testDir: string;
+  let testDir: DirResult;
+  let cleanup: () => Promise<void>;
   let packageTarball: string;
 
   beforeAll(() => {
@@ -21,15 +23,14 @@ describe('Package Integrity', () => {
     execSync('npm run build', { cwd: PROJECT_ROOT, stdio: 'pipe' });
 
     // Create test directory
-    testDir = join(tmpdir(), `containerization-assist-test-${Date.now()}`);
-    mkdirSync(testDir, { recursive: true });
+    const tempResult = createTestTempDir('containerization-assist-test-');
+    testDir = tempResult.dir;
+    cleanup = tempResult.cleanup;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Cleanup
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
+    await cleanup();
 
     // Clean up any tarballs in project root
     const tarballPattern = /azure-containerization-assist-mcp-.*\.tgz$/;
@@ -82,8 +83,8 @@ describe('Package Integrity', () => {
     let installDir: string;
 
     beforeAll(() => {
-      installDir = join(testDir, 'install-test');
-      mkdirSync(installDir, { recursive: true });
+      installDir = join(testDir.name, 'install-test');
+      execSync(`mkdir -p "${installDir}"`, { stdio: 'pipe' });
 
       // Create package.json
       execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });
@@ -160,8 +161,8 @@ describe('Package Integrity', () => {
     let installDir: string;
 
     beforeAll(() => {
-      installDir = join(testDir, 'import-test');
-      mkdirSync(installDir, { recursive: true });
+      installDir = join(testDir.name, 'import-test');
+      execSync(`mkdir -p "${installDir}"`, { stdio: 'pipe' });
 
       // Create package.json with type: module
       execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });

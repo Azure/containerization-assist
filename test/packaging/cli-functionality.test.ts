@@ -6,14 +6,16 @@
  */
 
 import { execSync, spawn } from 'child_process';
-import { existsSync, mkdirSync, rmSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
+import type { DirResult } from 'tmp';
 
 const PROJECT_ROOT = join(__dirname, '../..');
 
 describe('CLI Functionality', () => {
-  let testDir: string;
+  let testDir: DirResult;
+  let cleanup: () => Promise<void>;
   let packageTarball: string;
   let installDir: string;
   let cliPath: string;
@@ -30,12 +32,13 @@ describe('CLI Functionality', () => {
     packageTarball = join(PROJECT_ROOT, result);
 
     // Create test directory
-    testDir = join(tmpdir(), `cli-test-${Date.now()}`);
-    mkdirSync(testDir, { recursive: true });
+    const tempResult = createTestTempDir('cli-test-');
+    testDir = tempResult.dir;
+    cleanup = tempResult.cleanup;
 
     // Set up installation
-    installDir = join(testDir, 'install');
-    mkdirSync(installDir, { recursive: true });
+    installDir = join(testDir.name, 'install');
+    execSync(`mkdir -p "${installDir}"`, { stdio: 'pipe' });
     execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });
     execSync(`npm install "${packageTarball}"`, {
       cwd: installDir,
@@ -51,11 +54,9 @@ describe('CLI Functionality', () => {
     cliPath = join(installDir, 'node_modules/containerization-assist-mcp', binRelativePath);
   }, 180000); // 3 minutes timeout
 
-  afterAll(() => {
+  afterAll(async () => {
     // Cleanup
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
+    await cleanup();
 
     if (existsSync(packageTarball)) {
       rmSync(packageTarball, { force: true });

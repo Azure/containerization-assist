@@ -6,14 +6,16 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
+import type { DirResult } from 'tmp';
 
 const PROJECT_ROOT = join(__dirname, '../..');
 
 describe('Client API Compatibility', () => {
-  let testDir: string;
+  let testDir: DirResult;
+  let cleanup: () => Promise<void>;
   let packageTarball: string;
   let clientTestDir: string;
 
@@ -29,12 +31,13 @@ describe('Client API Compatibility', () => {
     packageTarball = join(PROJECT_ROOT, result);
 
     // Create test directory
-    testDir = join(tmpdir(), `client-api-test-${Date.now()}`);
-    mkdirSync(testDir, { recursive: true });
+    const tempResult = createTestTempDir('client-api-test-');
+    testDir = tempResult.dir;
+    cleanup = tempResult.cleanup;
 
     // Set up client test environment
-    clientTestDir = join(testDir, 'client');
-    mkdirSync(clientTestDir, { recursive: true });
+    clientTestDir = join(testDir.name, 'client');
+    execSync(`mkdir -p "${clientTestDir}"`, { stdio: 'pipe' });
 
     // Create package.json for client test
     const clientPackageJson = {
@@ -61,11 +64,9 @@ describe('Client API Compatibility', () => {
     });
   }, 180000); // 3 minutes timeout
 
-  afterAll(() => {
+  afterAll(async () => {
     // Cleanup
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
+    await cleanup();
 
     if (existsSync(packageTarball)) {
       rmSync(packageTarball, { force: true });

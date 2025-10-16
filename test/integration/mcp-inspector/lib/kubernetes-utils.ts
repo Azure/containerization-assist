@@ -4,9 +4,9 @@
  */
 
 import { spawn } from 'child_process';
-import { writeFile, unlink, mkdtemp } from 'fs/promises';
+import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import tmp from 'tmp';
 import type { DeployResult, K8sManifest, KubernetesValidationResult } from '../../../../src/types/result-types.js';
 
 // Extended interface for Kubernetes deployment results  
@@ -93,8 +93,8 @@ export class KubernetesUtils {
     for (const manifest of manifests) {
       try {
         // Create temporary file for manifest
-        const tempDir = await mkdtemp(join(tmpdir(), 'k8s-manifest-'));
-        const manifestPath = join(tempDir, `${manifest.kind}-${manifest.metadata.name}.yaml`);
+        const tempDirResult = tmp.dirSync({ prefix: 'k8s-manifest-', unsafeCleanup: true, keep: false });
+        const manifestPath = join(tempDirResult.name, `${manifest.kind}-${manifest.metadata.name}.yaml`);
         
         await writeFile(manifestPath, this.manifestToYaml(manifest));
         this.tempFiles.add(manifestPath);
@@ -145,8 +145,8 @@ export class KubernetesUtils {
     
     try {
       // Create temporary file with all manifests
-      const tempDir = await mkdtemp(join(tmpdir(), 'k8s-deploy-'));
-      const manifestsPath = join(tempDir, 'manifests.yaml');
+      const tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
+      const manifestsPath = join(tempDirResult.name, 'manifests.yaml');
       
       const yamlContent = manifests.map(m => this.manifestToYaml(m)).join('---\n');
       await writeFile(manifestsPath, yamlContent);
@@ -220,8 +220,8 @@ export class KubernetesUtils {
       await this.ensureNamespace(namespace);
 
       // Create temporary file with all manifests
-      const tempDir = await mkdtemp(join(tmpdir(), 'k8s-deploy-'));
-      const manifestsPath = join(tempDir, 'manifests.yaml');
+      const tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
+      const manifestsPath = join(tempDirResult.name, 'manifests.yaml');
       
       const yamlContent = manifests.map(m => this.manifestToYaml(m)).join('---\n');
       await writeFile(manifestsPath, yamlContent);
