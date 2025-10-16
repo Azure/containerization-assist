@@ -427,7 +427,7 @@ async function handlePrepareCluster(
         logger.info({ namespace }, 'Namespace created successfully');
       } else {
         logger.error({ namespace, error: ensureResult.error }, 'Failed to create namespace');
-        return Failure(ensureResult.error || 'Failed to create namespace');
+        return Failure(ensureResult.error || 'Failed to create namespace', ensureResult.guidance);
       }
     } else if (!checks.namespaceExists) {
       warnings.push(`Namespace ${namespace} does not exist - deployment may fail`);

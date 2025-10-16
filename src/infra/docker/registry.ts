@@ -429,7 +429,9 @@ export class DockerRegistry {
       this.logger.debug({ repository }, 'Listing repository tags');
 
       // For Docker Hub, use the public API
-      if (!repository.includes('.')) {
+      // Check only the first path segment for a hostname pattern (dot or colon)
+      const firstSegment = repository.split('/')[0];
+      if (!/[.:]/.test(firstSegment)) {
         return this.listDockerHubTags(repository);
       }
 
