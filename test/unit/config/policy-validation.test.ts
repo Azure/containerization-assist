@@ -483,4 +483,27 @@ describe('Policy System', () => {
       }
     });
   });
+
+  describe('Error Messages', () => {
+    it('should provide helpful validation error messages', () => {
+      const invalidPolicy = {
+        version: '2.0',
+        rules: [
+          {
+            id: 'test',
+            // Missing priority
+            conditions: [],
+            actions: {},
+          },
+        ],
+      };
+
+      const result = validatePolicy(invalidPolicy);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Policy validation failed');
+        expect(result.error).toContain('policies/');
+      }
+    });
+  });
 });

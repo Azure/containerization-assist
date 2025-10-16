@@ -30,7 +30,7 @@ describe('Knowledge Pack & Policy Integration', () => {
     // Create a simple test policy
     policyPath = join(testDir, 'test-policy.yaml');
     const testPolicy = `
-version: "1.0"
+version: "2.0"
 rules:
   - id: block-production-deletion
     category: compliance

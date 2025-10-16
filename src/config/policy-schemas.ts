@@ -100,9 +100,11 @@ export interface UnifiedDefaults extends EnvironmentDefaults {
 export interface Policy {
   version: '2.0';
   metadata?: {
+    name?: string;
     created?: string;
     author?: string;
     description?: string;
+    category?: string;
   };
   defaults?: UnifiedDefaults;
   rules: PolicyRule[];
@@ -184,9 +186,11 @@ export const PolicySchema = z.object({
   version: z.literal('2.0'),
   metadata: z
     .object({
+      name: z.string().optional(),
       created: z.string().optional(),
       author: z.string().optional(),
       description: z.string().optional(),
+      category: z.string().optional(),
     })
     .optional(),
   defaults: UnifiedDefaultsSchema.optional(),

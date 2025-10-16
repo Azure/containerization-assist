@@ -47,6 +47,8 @@
   "files": [
     "dist/**/*",
     "dist-cjs/**/*",
+    "policies/**/*.yaml",
+    "knowledge/**/*.json",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"

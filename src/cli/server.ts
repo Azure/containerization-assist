@@ -24,8 +24,12 @@ async function main(): Promise<void> {
     // Create the application
     app = createApp({
       logger,
-      policyPath: process.env.POLICY_PATH || 'config/policy.yaml',
-      policyEnvironment: process.env.NODE_ENV || 'production',
+      ...(process.env.CONTAINERIZATION_ASSIST_POLICY_PATH && {
+        policyPath: process.env.CONTAINERIZATION_ASSIST_POLICY_PATH,
+      }),
+      ...(process.env.CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT && {
+        policyEnvironment: process.env.CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT,
+      }),
     });
 
     // Start the server with stdio transport

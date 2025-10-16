@@ -11,9 +11,15 @@ export const ERROR_MESSAGES = {
   VALIDATION_FAILED: (issues: string) => `Validation failed: ${issues}`,
 
   // Policy-related errors
-  POLICY_BLOCKED: (rules: string[]) => `Blocked by policies: ${rules.join(', ')}`,
-  POLICY_VALIDATION_FAILED: (issues: string) => `Policy validation failed: ${issues}`,
-  POLICY_LOAD_FAILED: (error: string) => `Failed to load policy: ${error}`,
+  POLICY_BLOCKED: (rules: string[]) =>
+    `Blocked by policy rules: ${rules.join(', ')}\n` +
+    `Tip: Review policy configuration or adjust enforcement level. See https://github.com/Azure/containerization-assist/blob/main/docs/policy-guide.md`,
+  POLICY_VALIDATION_FAILED: (issues: string) =>
+    `Policy validation failed: ${issues}\n` +
+    `Tip: Check policy file syntax against schema. Available policies in policies/ directory.`,
+  POLICY_LOAD_FAILED: (error: string) =>
+    `Failed to load policy: ${error}\n` +
+    `Tip: Verify policy file exists and is valid YAML. See https://github.com/Azure/containerization-assist/blob/main/docs/policy-guide.md for format.`,
 
   // Infrastructure-related errors
   DOCKER_OPERATION_FAILED: (operation: string, error: string) =>

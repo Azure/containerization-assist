@@ -235,15 +235,36 @@ export CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH=/path/to/logs
 The logging directory is validated at startup to ensure it's writable.
 
 
-```bash
-# Set policy file path
-export POLICY_PATH=/path/to/policy.yaml
+### Policy System
 
-# Set policy environment (development, staging, production)
-export POLICY_ENVIRONMENT=production
+The policy system enables enforcement of security, quality, and compliance rules across your containerization workflow.
+
+**Default Behavior (No Configuration Needed):**
+By default, **all policies** in the `policies/` directory are automatically discovered and merged:
+- `policies/base-images.yaml` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions, size optimization)
+- `policies/container-best-practices.yaml` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
+- `policies/security-baseline.yaml` - Essential security rules (root user prevention, registry restrictions, vulnerability scanning)
+
+This provides comprehensive coverage out-of-the-box.
+
+**Use a Specific Policy Only:**
+```bash
+# Use only the security baseline (disables auto-merging)
+export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
+
+# Or specify in VS Code MCP configuration
+"env": {
+  "CONTAINERIZATION_ASSIST_POLICY_PATH": "./policies/security-baseline.yaml"
+}
 ```
 
-See `src/config/policy-schemas.ts`, `src/config/policy-io.ts`, `src/config/policy-eval.ts`, and `src/config/policy-data.ts` for implementation details.
+**Environment-Specific Configuration:**
+```bash
+# Set policy environment (development, staging, production)
+export CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT=production
+```
+
+See **[Policy Guide](./docs/policy-guide.md)** for complete documentation, rule syntax, and examples.
 
 ### MCP Inspector (Testing)
 

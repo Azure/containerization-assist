@@ -1,7 +1,9 @@
 /**
  * Policy IO - lean cache + strict validation
  */
+import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as yaml from 'js-yaml';
 import { z } from 'zod';
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -79,17 +81,46 @@ export function loadPolicy(file: string, env?: string): Result<Policy> {
       return Success(cached);
     }
 
-    // Use the TypeScript policy data directly
-    const base = validatePolicy(policyData);
+    let base: Result<Policy>;
+
+    // Try to load from YAML file if it exists
+    if (fs.existsSync(file)) {
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        const parsed = yaml.load(content);
+        base = validatePolicy(parsed);
+        if (base.ok) {
+          log.debug({ file }, 'Loaded policy from YAML file');
+        }
+      } catch (yamlError) {
+        log.warn(
+          { file, error: yamlError },
+          'Failed to load YAML file, falling back to TypeScript data',
+        );
+        base = validatePolicy(policyData);
+      }
+    } else {
+      // Fall back to TypeScript policy data
+      log.debug({ file }, 'Policy file not found, using default TypeScript data');
+      base = validatePolicy(policyData);
+    }
+
     if (!base.ok) return base;
 
     const resolved = env ? resolveEnvironment(base.value, env) : base.value;
+
+    // Sort rules by priority descending
+    resolved.rules.sort((a, b) => b.priority - a.priority);
+
     const final = validatePolicy(resolved);
     if (!final.ok) return final;
 
     const ttl = final.value.cache?.ttl ?? 300;
     putCached(file, env, final.value, ttl);
-    log.debug({ env }, 'Loaded policy from TypeScript data');
+    log.debug(
+      { file, env, rulesCount: final.value.rules.length },
+      'Policy loaded and cached successfully',
+    );
     return final;
   } catch (err) {
     return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(extractErrorMessage(err)));
