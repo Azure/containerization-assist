@@ -157,17 +157,12 @@ let jsonOutput: QualityGatesOutput = {
   warningGates: [],
 };
 
-function printStatus(status: Status, message: string): void {
+function printStatus(status: Status, message: string, gateName = 'unknown'): void {
   if (JSON_OUTPUT) {
     // Collect gate results for JSON output
-    const currentGate = jsonOutput.gates[jsonOutput.gates.length - 1];
-    if (currentGate) {
-      jsonOutput.gates.push({ name: currentGate.name, status, message });
-    } else {
-      jsonOutput.gates.push({ name: 'unknown', status, message });
-    }
+    jsonOutput.gates.push({ name: gateName, status, message });
 
-    // Track statistics
+    // Track statistics (don't count INFO messages as gates)
     if (status === 'PASS') jsonOutput.gatesPassed++;
     else if (status === 'FAIL') {
       jsonOutput.gatesFailed++;
@@ -185,7 +180,7 @@ function printStatus(status: Status, message: string): void {
     WARN: '⚠️  WARN',
     INFO: 'ℹ️  INFO',
   };
-  log(`${symbols[status]}: ${message}`);
+  console.log(`${symbols[status]}: ${message}`);
 }
 
 function log(...args: unknown[]): void {
