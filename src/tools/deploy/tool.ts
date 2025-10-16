@@ -8,6 +8,7 @@ import * as yaml from 'js-yaml';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
+import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 
@@ -251,6 +252,12 @@ async function handleDeploy(
     replicas = DEPLOYMENT_CONFIG.DEFAULT_REPLICAS,
     environment = DEPLOYMENT_CONFIG.DEFAULT_ENVIRONMENT,
   } = params;
+
+  // Validate namespace
+  const namespaceValidation = validateNamespace(namespace);
+  if (!namespaceValidation.ok) {
+    return namespaceValidation;
+  }
 
   const dryRun = DEPLOYMENT_CONFIG.DRY_RUN;
   const wait = DEPLOYMENT_CONFIG.WAIT_FOR_READY;

@@ -10,6 +10,7 @@
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/infra/docker/client';
+import { validateImageName } from '@/lib/validation';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
@@ -40,6 +41,12 @@ async function handleTagImage(
 
   if (!tag) {
     return Failure('Tag parameter is required');
+  }
+
+  // Validate tag format
+  const tagValidation = validateImageName(tag);
+  if (!tagValidation.ok) {
+    return tagValidation;
   }
 
   try {

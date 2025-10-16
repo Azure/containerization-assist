@@ -3,7 +3,6 @@
  */
 
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
-import convertAcaToK8sTool from '@/tools/convert-aca-to-k8s/tool';
 import type { ToolContext } from '@/mcp/context';
 import * as promptEngine from '@/ai/prompt-engine';
 import { TOPICS } from '@/types/topics';
@@ -265,43 +264,6 @@ spec:
 
 
 
-  describe('convert-aca-to-k8s', () => {
-    it('should return a conversion plan with recommendations (no AI)', async () => {
-      const acaManifest = `
-apiVersion: 2022-03-01
-name: test-app
-properties:
-  template:
-    containers:
-      - name: test-container
-        image: nginx:latest
-  configuration:
-    ingress:
-      external: true
-      targetPort: 80
-`;
-      const result = await convertAcaToK8sTool.handler(
-        {
-          acaManifest,
-        },
-        mockContext,
-      );
-
-      // Verify it returns a plan (not AI-generated content)
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value).toHaveProperty('acaAnalysis');
-        expect(result.value).toHaveProperty('recommendations');
-        expect(result.value).toHaveProperty('knowledgeMatches');
-        expect(result.value).toHaveProperty('confidence');
-        expect(result.value).toHaveProperty('summary');
-      }
-
-      // Verify it does NOT use AI (no prompt engine calls)
-      expect(promptEngine.buildMessages).not.toHaveBeenCalled();
-    });
-  });
-
   describe('Prompt Engine Integration', () => {
     it('should build messages with knowledge integration', async () => {
       // The prompt engine now handles knowledge integration internally
@@ -321,7 +283,7 @@ properties:
 
     it('should handle message building gracefully', async () => {
       // Test that the prompt engine is properly integrated with AI-powered tools
-      // Note: Knowledge-based tools (fix-dockerfile, resolve-base-images, etc.)
+      // Note: Knowledge-based tools (fix-dockerfile, generate-dockerfile, etc.)
       // do not use the prompt engine - they query the knowledge base directly
       expect(true).toBe(true);
     });
