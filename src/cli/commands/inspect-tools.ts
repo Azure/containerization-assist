@@ -7,7 +7,11 @@
 
 import { Command } from 'commander';
 import { ALL_TOOLS, type Tool } from '@/tools';
-import { validateAllToolMetadata, type ValidatableTool } from '@/types/tool-metadata';
+import {
+  validateAllToolMetadata,
+  type ValidatableTool,
+  type EnhancementCapability,
+} from '@/types/tool-metadata';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { handleResultError, handleGenericError } from '../error-formatting';
@@ -39,7 +43,9 @@ async function discoverToolCapabilities(
       if (options.knowledgeEnhancedOnly && !tool.metadata.knowledgeEnhanced) continue;
       if (
         options.hasCapability &&
-        !tool.metadata.enhancementCapabilities?.includes(options.hasCapability as any)
+        !tool.metadata.enhancementCapabilities?.includes(
+          options.hasCapability as EnhancementCapability,
+        )
       )
         continue;
 
