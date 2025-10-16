@@ -59,6 +59,7 @@ export interface PrepareClusterResult {
 interface K8sClientAdapter {
   ping(): Promise<boolean>;
   namespaceExists(namespace: string): Promise<boolean>;
+  ensureNamespace(namespace: string): Promise<{ success: boolean; error?: string }>;
   applyManifest(
     manifest: Record<string, unknown>,
     namespace?: string,
@@ -73,6 +74,14 @@ function createK8sClientAdapter(
   return {
     ping: () => k8sClient.ping(),
     namespaceExists: (namespace: string) => k8sClient.namespaceExists(namespace),
+    ensureNamespace: async (namespace: string) => {
+      const result = await k8sClient.ensureNamespace(namespace);
+      if (result.ok) {
+        return { success: true };
+      } else {
+        return { success: false, error: result.error };
+      }
+    },
     applyManifest: async (manifest: Record<string, unknown>, namespace?: string) => {
       const result = await k8sClient.applyManifest(manifest as unknown as K8sManifest, namespace);
       if (result.ok) {
@@ -112,32 +121,6 @@ async function checkNamespace(
   } catch (error) {
     logger.warn({ namespace, error }, 'Namespace check failed');
     return false;
-  }
-}
-
-async function createNamespace(
-  k8sClient: K8sClientAdapter,
-  namespace: string,
-  logger: pino.Logger,
-): Promise<void> {
-  try {
-    const namespaceManifest = {
-      apiVersion: 'v1',
-      kind: 'Namespace',
-      metadata: {
-        name: namespace,
-      },
-    };
-
-    const result = await k8sClient.applyManifest(namespaceManifest);
-    if (result.success) {
-      logger.info({ namespace }, 'Namespace created');
-    } else {
-      throw new Error(result.error || 'Failed to create namespace');
-    }
-  } catch (error) {
-    logger.error({ namespace, error }, 'Failed to create namespace');
-    throw error;
   }
 }
 
@@ -436,8 +419,14 @@ async function handlePrepareCluster(
 
     checks.namespaceExists = await checkNamespace(k8sClient, namespace, logger);
     if (!checks.namespaceExists && shouldCreateNamespace) {
-      await createNamespace(k8sClient, namespace, logger);
-      checks.namespaceExists = true;
+      const ensureResult = await k8sClient.ensureNamespace(namespace);
+      if (ensureResult.success) {
+        checks.namespaceExists = true;
+        logger.info({ namespace }, 'Namespace created successfully');
+      } else {
+        logger.error({ namespace, error: ensureResult.error }, 'Failed to create namespace');
+        return Failure(ensureResult.error || 'Failed to create namespace');
+      }
     } else if (!checks.namespaceExists) {
       warnings.push(`Namespace ${namespace} does not exist - deployment may fail`);
     }

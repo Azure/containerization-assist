@@ -12,7 +12,6 @@ import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 
 import { Success, Failure, type Result } from '@/types';
-import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
 
 // Type definitions for Kubernetes manifests
@@ -371,58 +370,29 @@ async function handleDeploy(
     let readyReplicas = 0;
     const totalReplicas = deployment?.spec?.replicas ?? replicas;
     if (wait && !dryRun) {
-      // Wait for deployment with configurable retry delay
+      // Use shared waitForDeploymentReady from client
       logger.info(
         { deploymentName, timeoutSeconds: timeout },
         'Waiting for deployment to be ready',
       );
 
-      const startTime = Date.now();
-      const retryDelay = DEFAULT_TIMEOUTS.deploymentPoll || 5000;
-      const maxWaitTime = timeout * 1000;
-      let attempts = 0;
+      const waitResult = await k8sClient.waitForDeploymentReady(namespace, deploymentName, timeout);
 
-      while (Date.now() - startTime < maxWaitTime) {
-        attempts++;
-        const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
-
-        if (statusResult.ok && statusResult.value?.ready) {
-          ready = true;
-          readyReplicas = statusResult.value.readyReplicas || 0;
-          logger.info(
-            {
-              deploymentName,
-              readyReplicas,
-              attempts,
-              elapsedSeconds: Math.round((Date.now() - startTime) / 1000),
-            },
-            'Deployment is ready',
-          );
-          break;
-        }
-
-        // Log progress periodically
-        if (attempts % 6 === 0) {
-          // Every ~30 seconds at 5s intervals
-          logger.debug(
-            {
-              deploymentName,
-              attempt: attempts,
-              elapsedSeconds: Math.round((Date.now() - startTime) / 1000),
-              currentStatus: statusResult.ok ? statusResult.value : undefined,
-            },
-            'Still waiting for deployment',
-          );
-        }
-
-        // Wait before checking again using configured delay
-        await new Promise((resolve) => setTimeout(resolve, retryDelay));
-      }
-
-      if (!ready) {
+      if (waitResult.ok) {
+        ready = true;
+        readyReplicas = waitResult.value.readyReplicas || 0;
+        logger.info(
+          {
+            deploymentName,
+            readyReplicas,
+          },
+          'Deployment is ready',
+        );
+      } else {
+        ready = false;
         logger.error(
-          { deploymentName, timeoutSeconds: timeout, attempts },
-          'Deployment did not become ready within timeout - check pod status and logs',
+          { deploymentName, timeoutSeconds: timeout, error: waitResult.error },
+          'Deployment did not become ready within timeout',
         );
       }
     } else if (dryRun) {

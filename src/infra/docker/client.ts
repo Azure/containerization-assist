@@ -127,6 +127,14 @@ export interface DockerClient {
   getImage: (id: string) => Promise<Result<DockerImageInfo>>;
 
   /**
+   * Inspects a Docker image and retrieves metadata.
+   * Alias for getImage for consistency with Docker CLI terminology.
+   * @param imageId - Image ID or tag
+   * @returns Result containing image information or error
+   */
+  inspectImage: (imageId: string) => Promise<Result<DockerImageInfo>>;
+
+  /**
    * Tags a Docker image with a new repository and tag.
    * @param imageId - ID of the image to tag
    * @param repository - Target repository name
@@ -321,6 +329,11 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 
         return Failure(errorMessage);
       }
+    },
+
+    async inspectImage(imageId: string): Promise<Result<DockerImageInfo>> {
+      // Alias for getImage - delegates to the same implementation
+      return this.getImage(imageId);
     },
 
     async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {
@@ -588,6 +601,11 @@ function wrapWithMutex(
     async getImage(id: string): Promise<Result<DockerImageInfo>> {
       // Image inspection is read-only, no mutex needed
       return baseClient.getImage(id);
+    },
+
+    async inspectImage(imageId: string): Promise<Result<DockerImageInfo>> {
+      // Image inspection is read-only, no mutex needed
+      return baseClient.inspectImage(imageId);
     },
 
     async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {

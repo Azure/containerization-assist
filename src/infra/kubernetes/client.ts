@@ -38,6 +38,12 @@ export interface K8sManifest {
 export interface KubernetesClient {
   applyManifest: (manifest: K8sManifest, namespace?: string) => Promise<Result<void>>;
   getDeploymentStatus: (namespace: string, name: string) => Promise<Result<DeploymentResult>>;
+  waitForDeploymentReady: (
+    namespace: string,
+    name: string,
+    timeoutSeconds: number,
+  ) => Promise<Result<DeploymentResult>>;
+  ensureNamespace: (namespace: string) => Promise<Result<void>>;
   ping: () => Promise<boolean>;
   namespaceExists: (namespace: string) => Promise<boolean>;
   checkPermissions: (namespace: string) => Promise<boolean>;
@@ -109,25 +115,131 @@ export const createKubernetesClient = (
   const k8sApi = kc.makeApiClient(k8s.AppsV1Api);
   const coreApi = kc.makeApiClient(k8s.CoreV1Api);
   const networkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
+  const batchApi = kc.makeApiClient(k8s.BatchV1Api);
+  const rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
+  const objectApi = kc.makeApiClient(k8s.KubernetesObjectApi);
 
   return {
     /**
-     * Apply Kubernetes manifest
+     * Apply Kubernetes manifest (supports all resource types)
+     * Uses generic KubernetesObjectApi for maximum compatibility
      */
     async applyManifest(manifest: K8sManifest, namespace = 'default'): Promise<Result<void>> {
       try {
         logger.debug({ manifest: manifest.kind, namespace }, 'Applying Kubernetes manifest');
 
-        if (manifest.kind === 'Deployment') {
-          await k8sApi.createNamespacedDeployment({
-            namespace,
-            body: manifest as unknown as k8s.V1Deployment,
-          });
-        } else if (manifest.kind === 'Service') {
-          await coreApi.createNamespacedService({
-            namespace,
-            body: manifest as unknown as k8s.V1Service,
-          });
+        // Set namespace in metadata if not already set and not a cluster-scoped resource
+        const isClusterScoped = ['Namespace', 'ClusterRole', 'ClusterRoleBinding'].includes(
+          manifest.kind || '',
+        );
+        if (!isClusterScoped && !manifest.metadata.namespace) {
+          manifest.metadata.namespace = namespace;
+        }
+
+        // Use specific API for common resources (more reliable)
+        switch (manifest.kind) {
+          case 'Namespace':
+            await coreApi.createNamespace({
+              body: manifest as unknown as k8s.V1Namespace,
+            });
+            break;
+          case 'Deployment':
+            await k8sApi.createNamespacedDeployment({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1Deployment,
+            });
+            break;
+          case 'Service':
+            await coreApi.createNamespacedService({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1Service,
+            });
+            break;
+          case 'ConfigMap':
+            await coreApi.createNamespacedConfigMap({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1ConfigMap,
+            });
+            break;
+          case 'Secret':
+            await coreApi.createNamespacedSecret({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1Secret,
+            });
+            break;
+          case 'ServiceAccount':
+            await coreApi.createNamespacedServiceAccount({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1ServiceAccount,
+            });
+            break;
+          case 'Ingress':
+            await networkingApi.createNamespacedIngress({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1Ingress,
+            });
+            break;
+          case 'StatefulSet':
+            await k8sApi.createNamespacedStatefulSet({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1StatefulSet,
+            });
+            break;
+          case 'DaemonSet':
+            await k8sApi.createNamespacedDaemonSet({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1DaemonSet,
+            });
+            break;
+          case 'Job':
+            await batchApi.createNamespacedJob({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1Job,
+            });
+            break;
+          case 'CronJob':
+            await batchApi.createNamespacedCronJob({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1CronJob,
+            });
+            break;
+          case 'Role':
+            await rbacApi.createNamespacedRole({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1Role,
+            });
+            break;
+          case 'RoleBinding':
+            await rbacApi.createNamespacedRoleBinding({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1RoleBinding,
+            });
+            break;
+          case 'ClusterRole':
+            await rbacApi.createClusterRole({
+              body: manifest as unknown as k8s.V1ClusterRole,
+            });
+            break;
+          case 'ClusterRoleBinding':
+            await rbacApi.createClusterRoleBinding({
+              body: manifest as unknown as k8s.V1ClusterRoleBinding,
+            });
+            break;
+          case 'PersistentVolumeClaim':
+            await coreApi.createNamespacedPersistentVolumeClaim({
+              namespace: manifest.metadata.namespace || namespace,
+              body: manifest as unknown as k8s.V1PersistentVolumeClaim,
+            });
+            break;
+          case 'PersistentVolume':
+            await coreApi.createPersistentVolume({
+              body: manifest as unknown as k8s.V1PersistentVolume,
+            });
+            break;
+          default:
+            // For other resource types, use the generic KubernetesObjectApi
+            await objectApi.create(manifest as k8s.KubernetesObject);
+            break;
         }
 
         logger.info(
@@ -305,6 +417,124 @@ export const createKubernetesClient = (
       } catch (error) {
         logger.debug({ error }, 'Error checking for ingress controller');
         return false;
+      }
+    },
+
+    /**
+     * Ensure namespace exists (idempotent)
+     * Creates the namespace if it doesn't exist, otherwise does nothing
+     */
+    async ensureNamespace(namespace: string): Promise<Result<void>> {
+      try {
+        // Check if namespace already exists
+        const exists = await this.namespaceExists(namespace);
+        if (exists) {
+          logger.debug({ namespace }, 'Namespace already exists');
+          return Success(undefined);
+        }
+
+        // Create namespace
+        logger.debug({ namespace }, 'Creating namespace');
+        const namespaceManifest: K8sManifest = {
+          apiVersion: 'v1',
+          kind: 'Namespace',
+          metadata: {
+            name: namespace,
+          },
+        };
+
+        await coreApi.createNamespace({
+          body: namespaceManifest as unknown as k8s.V1Namespace,
+        });
+
+        logger.info({ namespace }, 'Namespace created successfully');
+        return Success(undefined);
+      } catch (error) {
+        const guidance = extractK8sErrorGuidance(error, 'ensure namespace');
+        const errorMessage = `Failed to ensure namespace exists: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            details: guidance.details,
+            namespace,
+          },
+          'Ensure namespace failed',
+        );
+
+        return Failure(errorMessage, guidance);
+      }
+    },
+
+    /**
+     * Wait for deployment to be ready with polling
+     */
+    async waitForDeploymentReady(
+      namespace: string,
+      name: string,
+      timeoutSeconds: number,
+    ): Promise<Result<DeploymentResult>> {
+      try {
+        const startTime = Date.now();
+        const pollInterval = 5000; // 5 seconds
+        const maxWaitTime = timeoutSeconds * 1000;
+
+        logger.debug({ namespace, name, timeoutSeconds }, 'Waiting for deployment to be ready');
+
+        while (Date.now() - startTime < maxWaitTime) {
+          const statusResult = await this.getDeploymentStatus(namespace, name);
+
+          if (statusResult.ok && statusResult.value?.ready) {
+            logger.info(
+              {
+                namespace,
+                name,
+                readyReplicas: statusResult.value.readyReplicas,
+                elapsedSeconds: Math.round((Date.now() - startTime) / 1000),
+              },
+              'Deployment is ready',
+            );
+            return statusResult;
+          }
+
+          // Wait before checking again
+          await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        }
+
+        // Timeout reached
+        const finalStatus = await this.getDeploymentStatus(namespace, name);
+        const errorMessage = `Deployment did not become ready within ${timeoutSeconds} seconds. Check pod status and logs to diagnose deployment issues.`;
+
+        logger.error(
+          {
+            namespace,
+            name,
+            timeoutSeconds,
+            currentStatus: finalStatus.ok ? finalStatus.value : undefined,
+          },
+          errorMessage,
+        );
+
+        return Failure(errorMessage);
+      } catch (error) {
+        const guidance = extractK8sErrorGuidance(error, 'wait for deployment ready');
+        const errorMessage = `Failed to wait for deployment: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            details: guidance.details,
+            namespace,
+            name,
+          },
+          'Wait for deployment failed',
+        );
+
+        return Failure(errorMessage, guidance);
       }
     },
   };
