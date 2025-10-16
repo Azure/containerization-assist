@@ -250,12 +250,10 @@ import { tool } from '@/types/tool';
 export default tool({
   name: 'build-image',
   description: 'Build Docker images from Dockerfiles with security analysis',
-  category: 'docker',
   version: '2.0.0',
   schema: buildImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: ['security-analysis'],
   },
   handler: handleBuildImage,
 });

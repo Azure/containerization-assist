@@ -102,18 +102,6 @@ jest.mock('@/lib/file-utils', () => ({
   deleteTempFile: jest.fn(),
 }));
 
-jest.mock('@/mcp/ai/sampling-runner', () => ({
-  sampleWithRerank: jest.fn(),
-}));
-
-jest.mock('@/ai/prompt-engine', () => ({
-  buildMessages: jest.fn(),
-}));
-
-jest.mock('@/mcp/ai/message-converter', () => ({
-  toMCPMessages: jest.fn(),
-}));
-
 jest.mock('node:child_process', () => ({
   exec: jest.fn(),
 }));

@@ -563,7 +563,6 @@ export default tool({
   schema: generateDockerfileSchema,
   metadata: {
     knowledgeEnhanced: true,
-    enhancementCapabilities: ['recommendations'],
   },
   handler: handleGenerateDockerfile,
 });

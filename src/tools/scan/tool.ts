@@ -12,6 +12,7 @@ import { createSecurityScanner } from '@/infra/security/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
+import type { MCPTool } from '@/types/tool';
 import { scanImageSchema, type ScanImageParams } from './schema';
 
 interface DockerScanResult {
@@ -252,7 +253,6 @@ export default tool({
   schema: scanImageSchema,
   metadata: {
     knowledgeEnhanced: true,
-    enhancementCapabilities: ['vulnerability-analysis', 'security-recommendations'],
   },
   handler: handleScanImage,
 });

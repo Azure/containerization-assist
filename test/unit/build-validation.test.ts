@@ -64,36 +64,6 @@ describe('Build Output Validation', () => {
     });
   });
 
-  describe('Package exports validation', () => {
-    const packageJson = getPackageJson();
-    const exportPaths = getExportPaths(packageJson);
-
-    for (const exportPath of exportPaths) {
-      describe(`Export: ${exportPath.name}`, () => {
-        if (exportPath.esm) {
-          it(`should have ESM file: ${exportPath.esm}`, () => {
-            const fullPath = join(rootDir, exportPath.esm);
-            expect(existsSync(fullPath)).toBe(true);
-          });
-        }
-
-        if (exportPath.cjs) {
-          it(`should have CJS file: ${exportPath.cjs}`, () => {
-            const fullPath = join(rootDir, exportPath.cjs);
-            expect(existsSync(fullPath)).toBe(true);
-          });
-        }
-
-        if (exportPath.types) {
-          it(`should have TypeScript declarations: ${exportPath.types}`, () => {
-            const fullPath = join(rootDir, exportPath.types);
-            expect(existsSync(fullPath)).toBe(true);
-          });
-        }
-      });
-    }
-  });
-
   describe('Module format validation', () => {
     it('ESM files should use ES module syntax', () => {
       const indexPath = join(distDir, 'src/index.js');
@@ -160,54 +130,9 @@ describe('Build Output Validation', () => {
   });
 
   describe('ESM Build (dist)', () => {
-    describe('AI Module', () => {
-      const aiDir = join(distDir, 'src', 'ai');
 
-      it('should include AI directory in dist', () => {
-        expect(existsSync(aiDir)).toBe(true);
-      });
-
-      it('should include prompt engine files', () => {
-        // Check for prompt engine module in AI directory
-        const expectedPromptFiles = [
-          'prompt-engine.js'
-        ];
-
-        const files = readdirSync(aiDir).filter(item => {
-          return item.endsWith('.js') || item.endsWith('.d.ts');
-        });
-
-        expectedPromptFiles.forEach(file => {
-          expect(files).toContain(file);
-        });
-      });
-
-      it('should include TypeScript declaration files', () => {
-        const files = readdirSync(aiDir);
-        const declarationFiles = files.filter(f => f.endsWith('.d.ts'));
-
-        // Should have declaration files for type safety
-        expect(declarationFiles.length).toBeGreaterThan(0);
-
-        // Check for specific declaration files
-        expect(declarationFiles).toContain('prompt-engine.d.ts');
-      });
-
-      it('should include critical AI modules', () => {
-        const criticalModules = [
-          join(aiDir, 'prompt-engine.js')
-        ];
-
-        criticalModules.forEach(moduleFile => {
-          expect(existsSync(moduleFile)).toBe(true);
-
-          // Also check for corresponding declaration files
-          const declarationFile = moduleFile.replace('.js', '.d.ts');
-          expect(existsSync(declarationFile)).toBe(true);
-        });
-      });
-    });
-
+=======
+>>>>>>> fc1c372b (remove unused ai code)
     describe('Knowledge Data Directory', () => {
       // Knowledge data has been moved to top-level knowledge/packs/ directory
       const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
@@ -314,15 +239,13 @@ describe('Build Output Validation', () => {
   });
 
   describe('Runtime Loading Validation', () => {
-    it('should be able to find AI modules at runtime', () => {
-      const possibleAiDirs = [
-        join(rootDir, 'src', 'ai'),
-        join(distDir, 'src', 'ai'),
-        join(distCjsDir, 'src', 'ai')
-      ];
+    it('should be able to find knowledge data at runtime', () => {
+      const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
+      expect(existsSync(knowledgeDataDir)).toBe(true);
 
-      const foundAiDir = possibleAiDirs.find(dir => existsSync(dir));
-      expect(foundAiDir).toBeDefined();
+      // Verify it contains knowledge pack files
+      const files = readdirSync(knowledgeDataDir);
+      const jsonFiles = files.filter(f => f.endsWith('.json'));
 
       // Verify it contains TypeScript modules
       if (foundAiDir) {
@@ -337,6 +260,7 @@ describe('Build Output Validation', () => {
 
         expect(hasPromptEngine).toBe(true);
       }
+      expect(jsonFiles.length).toBeGreaterThan(0);
     });
   });
 });

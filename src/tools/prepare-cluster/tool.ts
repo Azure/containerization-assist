@@ -512,7 +512,6 @@ export default tool({
   schema: prepareClusterSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handlePrepareCluster,
 });

@@ -222,7 +222,6 @@ export default tool({
   schema: opsToolSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handleOps,
 });

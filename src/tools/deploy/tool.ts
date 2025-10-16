@@ -13,6 +13,7 @@ import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 
 import { Success, Failure, type Result } from '@/types';
+import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
 
 // Type definitions for Kubernetes manifests
@@ -105,6 +106,8 @@ export interface DeployApplicationResult {
     }>;
   };
 }
+
+// Define the result schema for type safety
 
 /**
  * Parse YAML/JSON manifest content with validation
@@ -499,7 +502,6 @@ export default tool({
   schema: deployApplicationSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handleDeploy,
 });

@@ -39,7 +39,7 @@ async function discoverToolCapabilities(
       if (options.knowledgeEnhancedOnly && !tool.metadata.knowledgeEnhanced) continue;
       if (
         options.hasCapability &&
-        !tool.metadata.enhancementCapabilities.includes(options.hasCapability as any)
+        !tool.metadata.enhancementCapabilities?.includes(options.hasCapability as any)
       )
         continue;
 
@@ -76,9 +76,11 @@ async function getToolStatistics(): Promise<
 
   // Count enhancement capabilities
   for (const tool of tools) {
-    for (const capability of tool.metadata.enhancementCapabilities) {
-      stats.enhancementCapabilities[capability] =
-        (stats.enhancementCapabilities[capability] || 0) + 1;
+    if (tool.metadata.enhancementCapabilities) {
+      for (const capability of tool.metadata.enhancementCapabilities) {
+        stats.enhancementCapabilities[capability] =
+          (stats.enhancementCapabilities[capability] || 0) + 1;
+      }
     }
   }
 
@@ -158,9 +160,9 @@ Generated: ${new Date().toISOString()}
 
 - **Total Tools**: ${stats.total}
 - **Knowledge-Enhanced Tools**: ${stats.knowledgeEnhanced} (${Math.round((stats.knowledgeEnhanced / stats.total) * 100)}%)
-`;
 
-  report += `\n### Enhancement Capabilities\n`;
+### Enhancement Capabilities
+`;
   for (const [capability, count] of Object.entries(stats.enhancementCapabilities)) {
     report += `- **${capability}**: ${count} tools\n`;
   }
@@ -172,12 +174,12 @@ Generated: ${new Date().toISOString()}
 
   report += `\n## Tool Details\n\n`;
   for (const tool of capabilities) {
-    const validationSupport = hasValidationSupport(tool.metadata.enhancementCapabilities);
+    const validationSupport = hasValidationSupport(tool.metadata.enhancementCapabilities ?? []);
     report += `### ${tool.name}
 - **Description**: ${tool.description}
 - **Category**: ${tool.category || 'uncategorized'}
 - **Knowledge-Enhanced**: ${tool.metadata.knowledgeEnhanced ? '✅' : '❌'}
-- **Enhancement Capabilities**: ${tool.metadata.enhancementCapabilities.join(', ') || 'None'}
+- **Enhancement Capabilities**: ${tool.metadata.enhancementCapabilities?.join(', ') || 'None'}
 - **Validation Support**: ${validationSupport ? '✅' : '❌'}
 
 `;

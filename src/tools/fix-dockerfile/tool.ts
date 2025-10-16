@@ -400,7 +400,6 @@ export default tool({
   schema: fixDockerfileSchema,
   metadata: {
     knowledgeEnhanced: true,
-    enhancementCapabilities: ['validation', 'recommendations'],
   },
   handler: handleFixDockerfile,
 });

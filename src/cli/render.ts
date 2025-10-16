@@ -54,11 +54,15 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
 
     console.info(`│ ${name} │ ${category} │${ke}│`);
 
-    if (detailed && tool.metadata.enhancementCapabilities.length > 0) {
+    if (
+      detailed &&
+      tool.metadata.enhancementCapabilities &&
+      tool.metadata.enhancementCapabilities.length > 0
+    ) {
       const caps = tool.metadata.enhancementCapabilities.join(', ');
-      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 9);
+      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 6);
       for (const line of wrappedCaps) {
-        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 9)} │`);
+        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 6)} │`);
       }
     }
   }
@@ -73,10 +77,8 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
 function outputCSV(tools: Tool[]): void {
   console.info('Name,Category,Knowledge-Enhanced,Enhancement Capabilities');
   for (const tool of tools) {
-    const caps = tool.metadata.enhancementCapabilities.join(';');
-    console.info(
-      `${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},"${caps}"`,
-    );
+    const caps = tool.metadata.enhancementCapabilities?.join(';') ?? '';
+    console.info(`${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},${caps}`);
   }
 }
 

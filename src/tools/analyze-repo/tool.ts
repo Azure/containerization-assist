@@ -264,7 +264,6 @@ export default tool({
   schema: analyzeRepoSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: ['analysis'],
   },
   handler: handleAnalyzeRepo,
 });

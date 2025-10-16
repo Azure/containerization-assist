@@ -231,7 +231,6 @@ export default tool({
   schema: validateImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handleValidateDockerfile,
 });
