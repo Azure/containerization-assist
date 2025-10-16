@@ -347,7 +347,7 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
 /**
  * Core cluster preparation implementation
  */
-async function prepareClusterImpl(
+async function handlePrepareCluster(
   params: PrepareClusterParams,
   context: ToolContext,
 ): Promise<Result<PrepareClusterResult>> {
@@ -494,11 +494,11 @@ async function prepareClusterImpl(
   }
 }
 
-export const prepareCluster = prepareClusterImpl;
+export const prepareCluster = handlePrepareCluster;
 
-import type { MCPTool } from '@/types/tool';
+import { tool } from '@/types/tool';
 
-const tool: MCPTool<typeof prepareClusterSchema, PrepareClusterResult> = {
+export default tool({
   name: 'prepare-cluster',
   description: 'Prepare Kubernetes cluster for deployment',
   version: '2.0.0',
@@ -508,7 +508,5 @@ const tool: MCPTool<typeof prepareClusterSchema, PrepareClusterResult> = {
     samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
-  run: prepareClusterImpl,
-};
-
-export default tool;
+  handler: handlePrepareCluster,
+});

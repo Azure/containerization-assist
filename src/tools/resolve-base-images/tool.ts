@@ -15,7 +15,6 @@
 
 import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
 import {
   resolveBaseImagesSchema,
   type BaseImagePlan,
@@ -284,7 +283,7 @@ Base Image Planning Summary:
 });
 
 // Wrapper function to add validation
-async function run(
+async function handleResolveBaseImages(
   input: z.infer<typeof resolveBaseImagesSchema>,
   ctx: ToolContext,
 ): Promise<Result<BaseImagePlan>> {
@@ -297,7 +296,9 @@ async function run(
   return runPattern(input, ctx);
 }
 
-const tool: MCPTool<typeof resolveBaseImagesSchema, BaseImagePlan> = {
+import { tool } from '@/types/tool';
+
+export default tool({
   name,
   description,
   category: 'docker',
@@ -308,7 +309,5 @@ const tool: MCPTool<typeof resolveBaseImagesSchema, BaseImagePlan> = {
     samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
-  run,
-};
-
-export default tool;
+  handler: handleResolveBaseImages,
+});

@@ -16,7 +16,6 @@
 
 import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
 import {
   generateK8sManifestsSchema,
   type ManifestPlan,
@@ -60,6 +59,7 @@ const runPattern = createKnowledgeTool<
       environment: input.environment || 'production',
       language: input.language,
       framework: input.frameworks?.[0]?.name, // Use first framework if available
+      detectedDependencies: input.detectedDependencies,
     }),
   },
   categorization: {
@@ -181,7 +181,7 @@ Next Step: Use generate-${nextStepTool} to create manifests using these recommen
 });
 
 // Wrapper function to add validation
-async function run(
+async function handleGenerateK8sManifests(
   input: z.infer<typeof generateK8sManifestsSchema>,
   ctx: ToolContext,
 ): Promise<Result<ManifestPlan>> {
@@ -194,7 +194,9 @@ async function run(
   return runPattern(input, ctx);
 }
 
-const tool: MCPTool<typeof generateK8sManifestsSchema, ManifestPlan> = {
+import { tool } from '@/types/tool';
+
+export default tool({
   name,
   description,
   category: 'kubernetes',
@@ -205,7 +207,5 @@ const tool: MCPTool<typeof generateK8sManifestsSchema, ManifestPlan> = {
     samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
-  run,
-};
-
-export default tool;
+  handler: handleGenerateK8sManifests,
+});

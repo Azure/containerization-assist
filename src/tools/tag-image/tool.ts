@@ -12,7 +12,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/infra/docker/client';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
+import { tool } from '@/types/tool';
 import { tagImageSchema } from './schema';
 import { z } from 'zod';
 
@@ -27,9 +27,9 @@ export interface TagImageResult {
 }
 
 /**
- * Tag image implementation
+ * Tag image handler
  */
-async function run(
+async function handleTagImage(
   input: z.infer<typeof tagImageSchema>,
   ctx: ToolContext,
 ): Promise<Result<TagImageResult>> {
@@ -93,7 +93,7 @@ async function run(
 /**
  * Tag image tool conforming to Tool interface
  */
-const tool: MCPTool<typeof tagImageSchema, TagImageResult> = {
+export default tool({
   name: 'tag-image',
   description: 'Tag Docker images with version and registry information',
   version: '2.0.0',
@@ -103,7 +103,5 @@ const tool: MCPTool<typeof tagImageSchema, TagImageResult> = {
     samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
-  run,
-};
-
-export default tool;
+  handler: handleTagImage,
+});

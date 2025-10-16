@@ -63,7 +63,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         return Promise.reject(new Error('File not found'));
       });
 
-      const result = await analyzeTool.run(
+      const result = await analyzeTool.handler(
         {
           repositoryPath: '/test/repo',
         },
@@ -114,7 +114,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         return Promise.reject(new Error('File not found'));
       });
 
-      const result = await analyzeTool.run(
+      const result = await analyzeTool.handler(
         {
           repositoryPath: '/test/repo',
         },
@@ -171,7 +171,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         return Promise.reject(new Error('File not found'));
       });
 
-      const result = await analyzeTool.run(
+      const result = await analyzeTool.handler(
         {
           repositoryPath: '/test/repo',
         },
@@ -190,7 +190,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
     it('should use pre-provided modules without AI analysis', async () => {
       (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true });
 
-      const result = await analyzeTool.run(
+      const result = await analyzeTool.handler(
         {
           repositoryPath: '/test/repo',
           modules: [{
@@ -214,7 +214,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
     it('should fail if path is not a directory', async () => {
       (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => false });
 
-      const result = await analyzeTool.run(
+      const result = await analyzeTool.handler(
         {
           repositoryPath: '/test/file.txt',
         },
@@ -236,7 +236,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         ]);
       });
 
-      const result = await analyzeTool.run(
+      const result = await analyzeTool.handler(
         {
           repositoryPath: '/test/repo',
         },
@@ -252,7 +252,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
     it('should fail if repository does not exist', async () => {
       (fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT: no such file'));
 
-      const result = await analyzeTool.run(
+      const result = await analyzeTool.handler(
         {
           repositoryPath: '/nonexistent/repo',
         },

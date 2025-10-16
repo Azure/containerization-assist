@@ -446,7 +446,7 @@ async function deployManifest(
 /**
  * Core deployment implementation
  */
-async function deployApplicationImpl(
+async function handleDeploy(
   params: DeployApplicationParams,
   context: ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
@@ -762,12 +762,12 @@ async function deployApplicationImpl(
 /**
  * Export the deploy tool directly
  */
-export const deployApplication = deployApplicationImpl;
+export const deployApplication = handleDeploy;
 
 // New Tool interface export
-import type { MCPTool } from '@/types/tool';
+import { tool } from '@/types/tool';
 
-const tool: MCPTool<typeof deployApplicationSchema, DeployApplicationResult> = {
+export default tool({
   name: 'deploy',
   description: 'Deploy applications to Kubernetes clusters',
   version: '2.0.0',
@@ -781,7 +781,5 @@ const tool: MCPTool<typeof deployApplicationSchema, DeployApplicationResult> = {
       'optimization-recommendations',
     ],
   },
-  run: deployApplicationImpl,
-};
-
-export default tool;
+  handler: handleDeploy,
+});

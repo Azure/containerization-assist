@@ -10,7 +10,6 @@
 
 import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
 import {
   generateDockerfileSchema,
   type DockerfilePlan,
@@ -51,6 +50,7 @@ const runPattern = createKnowledgeTool<
       environment: input.environment || 'production',
       language: input.language || 'auto-detect',
       framework: input.framework,
+      detectedDependencies: input.detectedDependencies,
     }),
   },
   categorization: {
@@ -184,7 +184,7 @@ Dockerfile Planning Summary:
   },
 });
 
-async function run(
+async function handleGenerateDockerfile(
   input: z.infer<typeof generateDockerfileSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfilePlan>> {
@@ -197,7 +197,9 @@ async function run(
   return runPattern(input, ctx);
 }
 
-const tool: MCPTool<typeof generateDockerfileSchema, DockerfilePlan> = {
+import { tool } from '@/types/tool';
+
+export default tool({
   name,
   description,
   category: 'docker',
@@ -208,7 +210,5 @@ const tool: MCPTool<typeof generateDockerfileSchema, DockerfilePlan> = {
     samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
-  run,
-};
-
-export default tool;
+  handler: handleGenerateDockerfile,
+});

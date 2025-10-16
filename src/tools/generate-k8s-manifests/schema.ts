@@ -15,6 +15,12 @@ export const generateK8sManifestsSchema = z.object({
     .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
     .describe('Type of manifest to generate'),
   environment: environment.describe('Target environment (production, development, etc.)'),
+  detectedDependencies: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
+    ),
 });
 
 export type GenerateK8sManifestsParams = z.infer<typeof generateK8sManifestsSchema>;

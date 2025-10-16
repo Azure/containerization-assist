@@ -44,8 +44,9 @@ class CustomMCPServer {
     }
 
     console.log(`Executing tool: ${name}`);
-    // Note: In a real implementation, you'd need to create proper context
-    // return await tool.run(params, context);
+    // Note: In a real implementation, you'd need to:
+    // 1. Parse params: const typedInput = tool.parse(params);
+    // 2. Execute handler: return await tool.handler(typedInput, context);
     return { success: true, message: `Would execute ${name}` };
   }
 

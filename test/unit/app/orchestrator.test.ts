@@ -35,8 +35,11 @@ describe('Tool Orchestrator', () => {
       name: 'tool-a',
       description: 'Test tool A',
       schema: z.object({ input: z.string() }),
-      run: jest.fn().mockResolvedValue(Success({ result: 'A executed' })),
-    };
+      inputSchema: { input: z.string() },
+      parse: jest.fn((args: any) => args),
+      handler: jest.fn().mockResolvedValue(Success({ result: 'A executed' })),
+      metadata: { knowledgeEnhanced: false },
+    } as any;
     mockTools.set('tool-a', toolA);
 
     // Another simple tool
@@ -44,8 +47,11 @@ describe('Tool Orchestrator', () => {
       name: 'tool-b',
       description: 'Test tool B',
       schema: z.object({ value: z.number() }),
-      run: jest.fn().mockResolvedValue(Success({ result: 'B executed' })),
-    };
+      inputSchema: { value: z.number() },
+      parse: jest.fn((args: any) => args),
+      handler: jest.fn().mockResolvedValue(Success({ result: 'B executed' })),
+      metadata: { knowledgeEnhanced: false },
+    } as any;
     mockTools.set('tool-b', toolB);
 
     // Create orchestrator with mock server

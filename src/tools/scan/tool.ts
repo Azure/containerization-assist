@@ -17,7 +17,6 @@ import {
   ValidationSeverity,
   type ValidationResult,
 } from '@/validation/ai-enhancement';
-import type { MCPTool } from '@/types/tool';
 import { scanImageSchema, type ScanImageParams } from './schema';
 
 interface DockerScanResult {
@@ -76,9 +75,9 @@ export interface ScanImageResult {
 }
 
 /**
- * Scan image implementation - direct execution without wrapper
+ * Scan image handler - direct execution without wrapper
  */
-async function scanImageImpl(
+async function handleScanImage(
   params: ScanImageParams,
   context: ToolContext,
 ): Promise<Result<ScanImageResult>> {
@@ -353,10 +352,12 @@ export type ScanImageConfig = ScanImageParams;
 /**
  * Scan image tool
  */
-export const scanImage = scanImageImpl;
+export const scanImage = handleScanImage;
 
-// New Tool interface export
-const tool: MCPTool<typeof scanImageSchema, ScanImageResult> = {
+// Tool export using new helper
+import { tool } from '@/types/tool';
+
+export default tool({
   name: 'scan',
   description: 'Scan Docker images for security vulnerabilities',
   version: '2.0.0',
@@ -366,7 +367,5 @@ const tool: MCPTool<typeof scanImageSchema, ScanImageResult> = {
     samplingStrategy: 'single',
     enhancementCapabilities: ['vulnerability-analysis', 'security-suggestions', 'risk-assessment'],
   },
-  run: scanImageImpl,
-};
-
-export default tool;
+  handler: handleScanImage,
+});
