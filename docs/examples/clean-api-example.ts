@@ -4,8 +4,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { createApp } from 'containerization-assist-mcp';
-import { ALL_TOOLS } from 'containerization-assist-mcp/tools';
+import { createApp, ALL_TOOLS } from 'containerization-assist-mcp';
 
 /**
  * Example 1: Simple integration - register all tools

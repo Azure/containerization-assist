@@ -45,6 +45,17 @@ npx tsc mcp-integration.ts
 node mcp-integration.js
 ```
 
+## Build Requirements
+
+All examples must successfully compile with TypeScript before merging PRs:
+
+```bash
+# From the project root
+npx tsc --noEmit docs/examples/*.ts
+```
+
+This ensures examples remain valid and functional. The CI pipeline validates example compilation as part of the test suite.
+
 ## Testing with MCP Inspector
 
 You can test any of these examples with the MCP Inspector:
