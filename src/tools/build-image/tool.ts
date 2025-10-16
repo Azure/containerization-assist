@@ -280,9 +280,9 @@ function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, stri
 }
 
 /**
- * Build image implementation - direct execution with selective progress
+ * Build image handler - direct execution with selective progress
  */
-async function buildImageImpl(
+async function handleBuildImage(
   params: BuildImageParams,
   context: ToolContext,
 ): Promise<Result<BuildImageResult>> {
@@ -455,12 +455,12 @@ async function buildImageImpl(
 /**
  * Build image tool with selective progress reporting
  */
-export const buildImage = buildImageImpl;
+export const buildImage = handleBuildImage;
 
-// New Tool interface export
-import type { MCPTool } from '@/types/tool';
+// Tool export using new helper
+import { tool } from '@/types/tool';
 
-const tool: MCPTool<typeof buildImageSchema, BuildImageResult> = {
+export default tool({
   name: 'build-image',
   description: 'Build Docker images from Dockerfiles with AI-powered optimization suggestions',
   version: '2.0.0',
@@ -470,7 +470,5 @@ const tool: MCPTool<typeof buildImageSchema, BuildImageResult> = {
     samplingStrategy: 'single',
     enhancementCapabilities: ['optimization-suggestions', 'build-analysis', 'performance-insights'],
   },
-  run: buildImageImpl,
-};
-
-export default tool;
+  handler: handleBuildImage,
+});

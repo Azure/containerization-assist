@@ -62,7 +62,7 @@ describe('resolveBaseImagesTool', () => {
       };
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImagesTool.run(config, mockContext);
+      const result = await resolveBaseImagesTool.handler(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -92,7 +92,7 @@ describe('resolveBaseImagesTool', () => {
       };
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImagesTool.run(config, mockContext);
+      const result = await resolveBaseImagesTool.handler(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -112,7 +112,7 @@ describe('resolveBaseImagesTool', () => {
       };
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImagesTool.run(config, mockContext);
+      const result = await resolveBaseImagesTool.handler(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -128,7 +128,7 @@ describe('resolveBaseImagesTool', () => {
       const config = {} as ResolveBaseImagesParams;
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImagesTool.run(config, mockContext);
+      const result = await resolveBaseImagesTool.handler(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -146,7 +146,7 @@ describe('resolveBaseImagesTool', () => {
       };
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImagesTool.run(config, mockContext);
+      const result = await resolveBaseImagesTool.handler(config, mockContext);
 
       // Tool should still succeed with empty knowledge base
       expect(result.ok).toBe(true);
@@ -169,7 +169,7 @@ describe('resolveBaseImagesTool', () => {
       };
 
       const mockContext = createMockContext();
-      await resolveBaseImagesTool.run(config, mockContext);
+      await resolveBaseImagesTool.handler(config, mockContext);
 
       // Verify sampling was never called
       expect(mockContext.sampling.createMessage).not.toHaveBeenCalled();

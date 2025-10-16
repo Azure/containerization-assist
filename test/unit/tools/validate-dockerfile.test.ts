@@ -67,7 +67,7 @@ CMD ["npm", "start"]`;
         appConfig.validation.imageAllowlist = ['^node:.*-alpine$'];
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile },
           context,
         );
@@ -87,7 +87,7 @@ CMD ["npm", "start"]`;
         appConfig.validation.imageAllowlist = ['^alpine:.*'];
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile, strictMode: true },
           context,
         );
@@ -105,7 +105,7 @@ CMD ["npm", "start"]`;
         appConfig.validation.imageAllowlist = ['^alpine:.*'];
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile, strictMode: false },
           context,
         );
@@ -122,7 +122,7 @@ CMD ["npm", "start"]`;
         appConfig.validation.imageAllowlist = ['^python:.*', '^node:.*-alpine$', '^golang:.*'];
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile },
           context,
         );
@@ -143,7 +143,7 @@ CMD ["npm", "start"]`;
 CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: dockerfileWithLatest },
           context,
         );
@@ -167,7 +167,7 @@ CMD ["npm", "start"]`;
 CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: dockerfileWithLatest },
           context,
         );
@@ -187,7 +187,7 @@ CMD ["npm", "start"]`;
 CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: dockerfileWithRC },
           context,
         );
@@ -203,7 +203,7 @@ CMD ["npm", "start"]`;
         appConfig.validation.imageDenylist = ['.*:latest$', '^ubuntu:18\\.04$'];
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile },
           context,
         );
@@ -230,7 +230,7 @@ CMD ["npm", "start"]`;
 
         for (const dockerfile of validDockerfiles) {
           const context = createMockToolContext();
-          const result = await tool.run(
+          const result = await tool.handler(
             { dockerfile },
             context,
           );
@@ -252,7 +252,7 @@ CMD ["npm", "start"]`;
         for (const tag of deniedTags) {
           const dockerfile = `FROM node:${tag}`;
           const context = createMockToolContext();
-          const result = await tool.run(
+          const result = await tool.handler(
             { dockerfile },
             context,
           );
@@ -279,7 +279,7 @@ FROM nginx:1.24-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: multiStageDockerfile },
           context,
         );
@@ -305,7 +305,7 @@ FROM nginx:latest
 COPY --from=builder /app/dist /usr/share/nginx/html`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: multiStageDockerfile },
           context,
         );
@@ -324,7 +324,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html`;
     describe('edge cases', () => {
       it('should pass when no allowlist or denylist is configured', async () => {
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile },
           context,
         );
@@ -337,7 +337,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html`;
 
       it('should handle empty dockerfile gracefully', async () => {
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           {},
           context,
         );
@@ -354,7 +354,7 @@ COPY . .
 CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: dockerfileWithoutFrom },
           context,
         );
@@ -373,7 +373,7 @@ FROM node:latest
 WORKDIR /app`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile },
           context,
         );
@@ -396,7 +396,7 @@ FROM python:3.11
 FROM node:latest`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile, strictMode: true },
           context,
         );
@@ -414,7 +414,7 @@ FROM node:latest`;
     describe('workflow hints', () => {
       it('should suggest build-image when validation passes', async () => {
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile },
           context,
         );
@@ -432,7 +432,7 @@ FROM node:latest`;
         const dockerfile = `FROM node:latest`;
 
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile },
           context,
         );
@@ -448,7 +448,7 @@ FROM node:latest`;
     describe('session integration', () => {
       it('should include baseImages property in results when run with a valid Dockerfile and session', async () => {
         const context = createMockToolContext();
-        const result = await tool.run(
+        const result = await tool.handler(
           { dockerfile: sampleDockerfile },
           context,
         );

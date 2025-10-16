@@ -117,7 +117,7 @@ describe('push-image tool', () => {
   
   describe('success scenarios', () => {
     it('should push image successfully with digest', async () => {
-      const result = await pushImageTool.run({
+      const result = await pushImageTool.handler({
         imageId: 'myapp:v1.0.0'
       }, createMockContext());
       
@@ -135,7 +135,7 @@ describe('push-image tool', () => {
     });
     
     it('should tag and push to custom registry', async () => {
-      const result = await pushImageTool.run({
+      const result = await pushImageTool.handler({
         imageId: 'myapp:v1.0.0',
         registry: 'gcr.io/my-project'
       }, createMockContext());
@@ -154,7 +154,7 @@ describe('push-image tool', () => {
     });
     
     it('should handle image without tag (default to latest)', async () => {
-      const result = await pushImageTool.run({
+      const result = await pushImageTool.handler({
         imageId: 'myapp'
       }, createMockContext());
       
@@ -169,7 +169,7 @@ describe('push-image tool', () => {
   
   describe('failure scenarios', () => {
     it('should return error when imageId is missing', async () => {
-      const result = await pushImageTool.run({} as any, createMockContext());
+      const result = await pushImageTool.handler({} as any, createMockContext());
       
       expect(result.ok).toBe(false);
       expect(pushImageCalled).toBe(false);
@@ -180,7 +180,7 @@ describe('push-image tool', () => {
     });
     
     it('should return error when tag fails', async () => {
-      const result = await pushImageTool.run({
+      const result = await pushImageTool.handler({
         imageId: 'bad-image',
         registry: 'gcr.io/my-project'
       }, createMockContext());
@@ -195,7 +195,7 @@ describe('push-image tool', () => {
     });
     
     it('should return error when push fails after successful tag', async () => {
-      const result = await pushImageTool.run({
+      const result = await pushImageTool.handler({
         imageId: 'fail/repo:v1',
         registry: 'my-registry.io'
       }, createMockContext());
@@ -212,7 +212,7 @@ describe('push-image tool', () => {
   
   describe('edge cases', () => {
     it('should handle registry URL with protocol', async () => {
-      const result = await pushImageTool.run({
+      const result = await pushImageTool.handler({
         imageId: 'myapp:v1',
         registry: 'https://gcr.io/my-project/'
       }, createMockContext());
@@ -225,7 +225,7 @@ describe('push-image tool', () => {
     });
     
     it('should not double-prefix registry if already in imageId', async () => {
-      const result = await pushImageTool.run({
+      const result = await pushImageTool.handler({
         imageId: 'gcr.io/my-project/myapp:v1',
         registry: 'gcr.io/my-project'
       }, createMockContext());

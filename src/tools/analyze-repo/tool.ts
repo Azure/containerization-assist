@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import type { z } from 'zod';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
+import { tool } from '@/types/tool';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
 import {
   parsePackageJson,
@@ -182,7 +182,7 @@ async function analyzeRepositoryDeterministically(
 /**
  * Analyze repository structure and detect technologies deterministically
  */
-async function run(
+async function handleAnalyzeRepo(
   input: z.infer<typeof analyzeRepoSchema>,
   ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
@@ -256,7 +256,7 @@ async function run(
   }
 }
 
-const tool: MCPTool<typeof analyzeRepoSchema, RepositoryAnalysis> = {
+export default tool({
   name: 'analyze-repo',
   description: 'Analyze repository structure and detect technologies by parsing config files',
   version: '4.0.0',
@@ -266,7 +266,5 @@ const tool: MCPTool<typeof analyzeRepoSchema, RepositoryAnalysis> = {
     samplingStrategy: 'none',
     enhancementCapabilities: ['analysis'],
   },
-  run,
-};
-
-export default tool;
+  handler: handleAnalyzeRepo,
+});

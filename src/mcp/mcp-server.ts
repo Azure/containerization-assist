@@ -15,7 +15,6 @@ import {
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
-import { extractSchemaShape } from '@/lib/zod-utils';
 import type { MCPTool } from '@/types/tool';
 import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
@@ -187,12 +186,10 @@ export function registerToolsWithServer<TTool extends MCPTool>(
   const { server, tools, logger, transport, execute, outputFormat } = options;
 
   for (const tool of tools) {
-    const schemaShape = extractSchemaShape(tool.schema);
-
     server.tool(
       tool.name,
       tool.description,
-      schemaShape,
+      tool.inputSchema,
       async (rawParams: Record<string, unknown> | undefined, extra) => {
         const params = rawParams ?? {};
         logger.info({ tool: tool.name, transport }, 'Executing tool');
