@@ -40,11 +40,31 @@ jest.mock('../../../../src/lib/mutex', () => ({
   }))
 }));
 
+// Mock socket validation
+jest.mock('../../../../src/infra/docker/socket-validation', () => ({
+  autoDetectDockerSocket: jest.fn(() => '/var/run/docker.sock')
+}));
+
 describe('DockerClient with Mutex', () => {
   let logger: pino.Logger;
+  let mockDockerInstance: any;
 
   beforeEach(() => {
     logger = pino({ level: 'silent' });
+
+    // Setup mock Docker instance
+    mockDockerInstance = {
+      getImage: jest.fn(),
+      modem: {
+        followProgress: jest.fn((stream, onFinished, onProgress) => {
+          onFinished(null);
+        }),
+      },
+    };
+
+    // Mock the Docker constructor
+    const DockerMock = require('dockerode');
+    DockerMock.mockImplementation(() => mockDockerInstance);
   });
 
   afterEach(() => {

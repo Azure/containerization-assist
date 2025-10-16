@@ -1,13 +1,15 @@
 /**
  * Push Image Tool - Modernized Implementation
  *
- * Pushes Docker images to a registry with retry logic
+ * Pushes Docker images to a registry with authentication support
  * Follows the new Tool interface pattern
  *
  * This is a deterministic operational tool with no AI calls.
  */
 
+import Docker from 'dockerode';
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
+import { createDockerRegistry, type RegistryConfig } from '@/infra/docker/registry';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
@@ -72,6 +74,30 @@ async function handlePushImage(
       if (!repository.startsWith(registryHost)) {
         repository = `${registryHost}/${repository}`;
       }
+    }
+
+    // Handle registry authentication if credentials are provided
+    if (input.credentials) {
+      logger.info({ registry: input.registry }, 'Authenticating with registry');
+
+      // Create a Docker instance for the registry client
+      const docker = new Docker();
+      const registryClient = createDockerRegistry(docker, logger);
+
+      // Build registry config
+      const registryConfig: RegistryConfig = {
+        url: input.registry,
+        username: input.credentials.username,
+        password: input.credentials.password,
+      };
+
+      // Authenticate with the registry
+      const authResult = await registryClient.authenticate(registryConfig);
+      if (!authResult.ok) {
+        return Failure(`Registry authentication failed: ${authResult.error}`, authResult.guidance);
+      }
+
+      logger.info({ registry: input.registry }, 'Registry authentication successful');
     }
 
     // Tag image if registry was specified

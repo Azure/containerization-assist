@@ -332,8 +332,35 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
     },
 
     async inspectImage(imageId: string): Promise<Result<DockerImageInfo>> {
-      // Alias for getImage - delegates to the same implementation
-      return this.getImage(imageId);
+      // Alias for getImage - use the same implementation
+      try {
+        const image = docker.getImage(imageId);
+        const inspect = await image.inspect();
+
+        const imageInfo: DockerImageInfo = {
+          Id: inspect.Id,
+          RepoTags: inspect.RepoTags,
+          Size: inspect.Size,
+          Created: inspect.Created,
+        };
+
+        return Success(imageInfo);
+      } catch (error) {
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Failed to inspect image: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: details,
+            originalError: error,
+            imageId,
+          },
+          'Docker inspect image failed',
+        );
+
+        return Failure(errorMessage);
+      }
     },
 
     async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {

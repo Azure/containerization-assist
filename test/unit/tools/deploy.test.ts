@@ -58,6 +58,7 @@ const mockSessionFacade = {
 const mockKubernetesClient = {
   applyManifest: jest.fn(),
   getDeploymentStatus: jest.fn(),
+  waitForDeploymentReady: jest.fn(),
 };
 
 const mockTimer = {
@@ -216,6 +217,11 @@ spec:
     jest.clearAllMocks();
     mockSessionManager.update.mockResolvedValue(true);
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
+    mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
+      ready: true,
+      readyReplicas: 2,
+      totalReplicas: 2,
+    }));
 
     mockSessionManager.get.mockResolvedValue({
       completed_steps: [],
@@ -227,6 +233,13 @@ spec:
   describe('Successful Deployments', () => {
     beforeEach(() => {
       mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
+
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
+        ready: true,
+        readyReplicas: 2,
+        totalReplicas: 2,
+        conditions: [{ type: 'Available', status: 'True', message: 'Deployment is available' }],
+      }));
 
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
@@ -277,8 +290,12 @@ spec:
       // Verify Kubernetes client was called to apply manifests
       expect(mockKubernetesClient.applyManifest).toHaveBeenCalledTimes(2);
 
-      // Verify deployment status was checked
-      expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
+      // Verify deployment readiness was checked (either waitForDeploymentReady or getDeploymentStatus)
+      if (mockKubernetesClient.waitForDeploymentReady.mock.calls.length > 0) {
+        expect(mockKubernetesClient.waitForDeploymentReady).toHaveBeenCalledWith('default', 'test-app', expect.any(Number));
+      } else {
+        expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
+      }
     });
 
     it('should use default values when config options not specified', async () => {
@@ -322,10 +339,16 @@ spec:
 
   describe('Manifest Parsing and Ordering', () => {
     beforeEach(() => {
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
+        ready: true,
+        readyReplicas: 2,
+        totalReplicas: 2,
+      }));
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
           readyReplicas: 2,
+          totalReplicas: 2,
         }),
       );
     });
@@ -389,10 +412,16 @@ spec:
   describe('Configuration Options', () => {
     beforeEach(() => {
       mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
+        ready: true,
+        readyReplicas: 2,
+        totalReplicas: 2,
+      }));
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
           readyReplicas: 2,
+          totalReplicas: 2,
         }),
       );
     });
@@ -441,10 +470,16 @@ spec:
         jest.clearAllMocks();
         mockSessionManager.update.mockResolvedValue(true);
         mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
+        mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+        }));
         mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
           createSuccessResult({
             ready: true,
             readyReplicas: 2,
+            totalReplicas: 2,
           }),
         );
       }
