@@ -14,6 +14,12 @@ export function extractSchemaShape(schema: z.ZodTypeAny): ZodRawShape {
     return (schema as any).shape;
   }
 
+  // ZodEffects (from .refine(), .transform(), etc.) wraps the underlying schema
+  // Recursively extract the shape from the wrapped schema
+  if (schema._def && 'schema' in schema._def) {
+    return extractSchemaShape(schema._def.schema);
+  }
+
   // Other schemas may have ._def.shape() method
   if (schema._def && typeof schema._def.shape === 'function') {
     return schema._def.shape();

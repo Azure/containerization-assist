@@ -3,23 +3,58 @@
  */
 
 import { z } from 'zod';
-import { environment, repositoryPath as sharedPath } from '../shared/schemas';
-import { ModuleInfo, moduleInfo } from '../analyze-repo/schema';
+import { environment } from '../shared/schemas';
 
 export const generateK8sManifestsSchema = z
   .object({
-    ...moduleInfo.shape,
-    path: sharedPath
+    // Module info fields - required for repository mode, optional for ACA mode
+    name: z
+      .string()
+      .optional()
+      .describe('Module name. Required when generating from repository analysis.'),
+    modulePath: z
+      .string()
       .optional()
       .describe(
-        'Repository path (automatically normalized to forward slashes on all platforms). Required when generating from repository analysis.',
+        'Absolute path to module root. Required when generating from repository analysis. Paths are automatically normalized to forward slashes on all platforms.',
       ),
+    dockerfilePath: z.string().optional().describe('Path where the Dockerfile should be generated'),
+    language: z
+      .enum(['java', 'dotnet', 'javascript', 'typescript', 'python', 'rust', 'go', 'other'])
+      .optional()
+      .describe('Primary programming language used in the module'),
+    languageVersion: z.string().optional(),
+    frameworks: z
+      .array(
+        z.object({
+          name: z.string().describe('Framework name (e.g., Spring Boot, Express, Flask)'),
+          version: z.string().optional(),
+        }),
+      )
+      .optional(),
+    buildSystem: z
+      .object({
+        type: z.string().optional(),
+        configFile: z.string().optional(),
+      })
+      .optional()
+      .describe('Build system information'),
+    dependencies: z
+      .array(z.string())
+      .optional()
+      .describe('List of module dependencies including database drivers and system libraries'),
+    ports: z.array(z.number()).optional(),
+    entryPoint: z.string().optional(),
+
+    // ACA conversion field
     acaManifest: z
       .string()
       .optional()
       .describe(
-        'Azure Container Apps manifest content to convert (YAML or JSON). Required when converting from ACA manifest.',
+        'Azure Container Apps manifest content to convert (YAML or JSON). Required when converting from ACA manifest; omit when generating from repository analysis.',
       ),
+
+    // Common fields
     manifestType: z
       .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
       .describe('Type of manifest to generate'),
@@ -37,9 +72,43 @@ export const generateK8sManifestsSchema = z
       .describe('Add helpful comments in the output (primarily for ACA conversions)'),
     namespace: z.string().optional().describe('Target Kubernetes namespace'),
   })
-  .refine((data) => Boolean(data.path) !== Boolean(data.acaManifest), {
-    message:
-      'Provide either path (for repository analysis) or acaManifest (for ACA conversion), not both',
+  .superRefine((data, ctx) => {
+    const hasAcaManifest = !!data.acaManifest;
+    const hasModuleInfo = !!data.name && !!data.modulePath;
+
+    // Require exactly one mode: ACA conversion OR repository analysis
+    if (!hasAcaManifest && !hasModuleInfo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Either provide acaManifest (for ACA conversion) or name+modulePath (for repository analysis)',
+        path: ['acaManifest'],
+      });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Either provide acaManifest (for ACA conversion) or name+modulePath (for repository analysis)',
+        path: ['name'],
+      });
+    }
+
+    // Repository mode requires both name and modulePath
+    if (!hasAcaManifest) {
+      if (!data.name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'name is required when not using acaManifest',
+          path: ['name'],
+        });
+      }
+      if (!data.modulePath) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'modulePath is required when not using acaManifest',
+          path: ['modulePath'],
+        });
+      }
+    }
   });
 
 export type GenerateK8sManifestsParams = z.infer<typeof generateK8sManifestsSchema>;
@@ -54,8 +123,27 @@ export interface ManifestRequirement {
   matchScore: number;
 }
 
+export interface RepositoryInfo {
+  name: string | undefined;
+  modulePath: string | undefined;
+  dockerfilePath?: string | undefined;
+  language?: 'java' | 'dotnet' | 'javascript' | 'typescript' | 'python' | 'rust' | 'go' | 'other' | undefined;
+  languageVersion?: string | undefined;
+  frameworks?: Array<{
+    name: string;
+    version?: string;
+  }> | undefined;
+  buildSystem?: {
+    type?: string;
+    configFile?: string;
+  } | undefined;
+  dependencies?: string[] | undefined;
+  ports?: number[] | undefined;
+  entryPoint?: string | undefined;
+}
+
 export interface ManifestPlan {
-  repositoryInfo?: ModuleInfo;
+  repositoryInfo?: RepositoryInfo;
   acaAnalysis?: {
     containerApps: Array<{
       name: string;

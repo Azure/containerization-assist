@@ -21,6 +21,7 @@ import {
   type ManifestPlan,
   type ManifestRequirement,
   type GenerateK8sManifestsParams,
+  type RepositoryInfo,
 } from './schema';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
@@ -316,7 +317,7 @@ Next Step: Use generate-${nextStepTool} to create manifests using these recommen
           dependencies: input.dependencies,
           ports: input.ports,
           entryPoint: input.entryPoint,
-        },
+        } as RepositoryInfo,
         manifestType: input.manifestType,
         recommendations: {
           securityConsiderations: securityMatches,
