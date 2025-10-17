@@ -80,11 +80,8 @@ describe('Docker Client', () => {
         const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
         const content = readFileSync(clientPath, 'utf-8');
 
-        // Should import extractDockerErrorMessage (backward compat) or extractDockerErrorGuidance (new)
-        expect(
-          content.includes("extractDockerErrorMessage") ||
-          content.includes("extractDockerErrorGuidance")
-        ).toBe(true);
+        // Should import extractDockerErrorGuidance
+        expect(content).toContain("extractDockerErrorGuidance");
         expect(content).toContain("from './errors'");
       });
 
@@ -107,13 +104,15 @@ describe('Docker Client', () => {
         expect(content).toContain('return (');
       });
 
-      it('should have error message extraction function in errors module', () => {
+      it('should have error guidance extraction function in errors module', () => {
         const errorsPath = join(__dirname, '../../../../src/infra/docker/errors.ts');
         const content = readFileSync(errorsPath, 'utf-8');
 
-        expect(content).toContain('export function extractDockerErrorMessage');
-        expect(content).toContain('message: string;');
-        expect(content).toContain('details: Record<string, unknown>;');
+        expect(content).toContain('export function extractDockerErrorGuidance');
+        expect(content).toContain('message:');
+        expect(content).toContain('hint:');
+        expect(content).toContain('resolution:');
+        expect(content).toContain('details');
       });
     });
 
@@ -124,7 +123,9 @@ describe('Docker Client', () => {
 
         // Verify enhanced followProgress callback is implemented
         expect(content).toContain('Docker build followProgress error');
-        expect(content).toContain('errorDetails: details');
+        expect(content).toContain('errorDetails: guidance.details');
+        expect(content).toContain('hint: guidance.hint');
+        expect(content).toContain('resolution: guidance.resolution');
         expect(content).toContain('Docker build error event received');
       });
 

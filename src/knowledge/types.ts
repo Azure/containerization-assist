@@ -101,17 +101,3 @@ export interface CompilationStats {
   compilationErrors: number;
   avgCompilationTime: number;
 }
-
-export interface KnowledgeStats {
-  /** Total number of entries */
-  totalEntries: number;
-
-  /** Entries by category */
-  byCategory: Record<string, number>;
-
-  /** Entries by severity */
-  bySeverity: Record<string, number>;
-
-  /** Top tags */
-  topTags: Array<{ tag: string; count: number }>;
-}

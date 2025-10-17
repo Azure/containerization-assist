@@ -21,9 +21,9 @@ describe('Kubernetes Client', () => {
     it('should define proper interface types', () => {
       const clientPath = join(__dirname, '../../../../src/infra/kubernetes/client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('DeploymentResult');
-      expect(content).toContain('ClusterInfo');
+      expect(content).toContain('K8sManifest');
     });
 
     it('should use Result pattern for error handling', () => {

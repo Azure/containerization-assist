@@ -89,10 +89,3 @@ export enum ValidationCategory {
   COMPLIANCE = 'compliance',
   OPTIMIZATION = 'optimization',
 }
-
-export interface ValidationConfig {
-  enabled: boolean;
-  minScore: number;
-  severityThreshold: ValidationSeverity;
-  categories: ValidationCategory[];
-}

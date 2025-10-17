@@ -405,7 +405,7 @@ const createReport = (results: ValidationResult[]): ValidationReport => {
 /**
  * Validate Kubernetes YAML content
  */
-export const validateKubernetesContent = (yamlContent: string): ValidationReport => {
+const validateKubernetesContent = (yamlContent: string): ValidationReport => {
   try {
     try {
       parseYaml(yamlContent);
@@ -552,14 +552,14 @@ export const validateKubernetesContent = (yamlContent: string): ValidationReport
 /**
  * Get all Kubernetes validation rules
  */
-export const getKubernetesRules = (): KubernetesValidationRule[] => {
+const getKubernetesRules = (): KubernetesValidationRule[] => {
   return [...KUBERNETES_RULES];
 };
 
 /**
  * Get Kubernetes rules by category
  */
-export const getKubernetesRulesByCategory = (
+const getKubernetesRulesByCategory = (
   category: ValidationCategory,
 ): KubernetesValidationRule[] => {
   return KUBERNETES_RULES.filter((rule) => rule.category === category);
@@ -579,6 +579,3 @@ export const createKubernetesValidator = (): KubernetesValidatorInstance => {
 /**
  * Standalone validation function for simple use cases
  */
-export const validateKubernetes = (yamlContent: string): ValidationReport => {
-  return validateKubernetesContent(yamlContent);
-};

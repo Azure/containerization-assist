@@ -53,8 +53,6 @@ export const analyzeRepoSchema = z.object({
     .describe('Optional pre-analyzed modules. If not provided, AI will analyze the repository.'),
 });
 
-export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
-
 export interface RepositoryAnalysis {
   modules?: ModuleInfo[];
   isMonorepo?: boolean;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const KnowledgeCategorySchema = z.enum(['dockerfile', 'kubernetes', 'security', 'generic']);
+const KnowledgeCategorySchema = z.enum(['dockerfile', 'kubernetes', 'security', 'generic']);
 
 export const KnowledgeEntrySchema = z.object({
   id: z.string().min(1),
@@ -12,19 +12,6 @@ export const KnowledgeEntrySchema = z.object({
   tags: z.array(z.string()).optional(),
   description: z.string().optional(),
 });
-
-export const KnowledgeQuerySchema = z.object({
-  category: KnowledgeCategorySchema.optional(),
-  text: z.string().optional(),
-  language: z.string().optional(),
-  framework: z.string().optional(),
-  environment: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  limit: z.number().min(1).max(100).optional(),
-});
-
-export type ValidatedKnowledgeEntry = z.infer<typeof KnowledgeEntrySchema>;
-export type ValidatedKnowledgeQuery = z.infer<typeof KnowledgeQuerySchema>;
 
 /**
  * Weighted knowledge snippet for selective injection.

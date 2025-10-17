@@ -16,5 +16,3 @@ export const pushImageSchema = z.object({
     .optional()
     .describe('Registry credentials'),
 });
-
-export type PushImageParams = z.infer<typeof pushImageSchema>;

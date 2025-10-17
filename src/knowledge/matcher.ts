@@ -235,8 +235,9 @@ const evaluateSeverity = (entry: LoadedEntry): number => {
 
 /**
  * Evaluate how well an entry matches the query using pure scoring functions
+ * Internal function used by findKnowledgeMatches
  */
-export const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): KnowledgeMatch | null => {
+const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): KnowledgeMatch | null => {
   // Early exit for category mismatch
   if (query.category && entry.category !== query.category) {
     return null;

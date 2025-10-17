@@ -19,8 +19,6 @@ export const fixDockerfileSchema = z
 export type FixDockerfileParams = z.infer<typeof fixDockerfileSchema>;
 
 // Legacy export for compatibility
-export const fixDockerfilePlanSchema = fixDockerfileSchema;
-export type FixDockerfilePlanParams = FixDockerfileParams;
 
 /**
  * Validation issue with associated fix recommendations

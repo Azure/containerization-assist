@@ -16,14 +16,6 @@ export function extractErrorMessage(error: unknown): string {
 }
 
 /**
- * Creates a formatted error message with optional context
- */
-export function formatErrorMessage(context: string, error: unknown): string {
-  const message = extractErrorMessage(error);
-  return `${context}: ${message}`;
-}
-
-/**
  * Create error guidance with context
  */
 export function createErrorGuidance(

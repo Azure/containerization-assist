@@ -48,6 +48,13 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      collectCoverageFrom: [
+        'src/**/*.ts',
+        '!src/**/*.d.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        '!src/**/index.ts',
+      ],
       coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
       testPathIgnorePatterns: [
         '/node_modules/',
@@ -62,6 +69,14 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      collectCoverageFrom: [
+        'src/**/*.ts',
+        '!src/**/*.d.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        '!src/**/index.ts',
+      ],
+      coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
       testPathIgnorePatterns: [
         '/node_modules/',
         '/dist/',
@@ -78,6 +93,14 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      collectCoverageFrom: [
+        'src/**/*.ts',
+        '!src/**/*.d.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        '!src/**/index.ts',
+      ],
+      coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
       maxWorkers: 1,
     },
   ],

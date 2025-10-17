@@ -231,16 +231,10 @@ async function handleScanImage(
 }
 
 /**
- * Type alias for test compatibility
- */
-export type ScanImageConfig = ScanImageParams;
-
-/**
  * Scan image tool
  */
 export const scanImage = handleScanImage;
 
-// Tool export using new helper
 import { tool } from '@/types/tool';
 
 export default tool({

@@ -5,26 +5,16 @@ export type {
   KnowledgeEntry,
   KnowledgeQuery,
   KnowledgeMatch,
-  KnowledgeStats,
   LoadedEntry,
   CompilationStats,
 } from './types';
-export {
-  loadKnowledgeBase,
-  getEntryById,
-  getEntriesByCategory,
-  getEntriesByTag,
-  getAllEntries,
-  getCompilationStats,
-  isKnowledgeLoaded,
-} from './loader';
-export { findKnowledgeMatches } from './matcher';
 
 import { findKnowledgeMatches } from './matcher';
 import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded } from './loader';
-import type { KnowledgeQuery, KnowledgeMatch, KnowledgeStats } from './types';
+import type { KnowledgeQuery, KnowledgeMatch } from './types';
 
-export async function getKnowledgeRecommendations(
+// Internal helper - only used by getKnowledgeForCategory
+async function getKnowledgeRecommendations(
   query: KnowledgeQuery,
 ): Promise<KnowledgeMatch[]> {
   if (!isKnowledgeLoaded()) await loadKnowledgeBase();
@@ -45,14 +35,4 @@ export async function getKnowledgeForCategory(
     limit: 5,
   };
   return getKnowledgeRecommendations(query);
-}
-
-export async function getKnowledgeStats(): Promise<KnowledgeStats> {
-  if (!isKnowledgeLoaded()) await loadKnowledgeBase();
-  const { getKnowledgeStats: stats } = await import('./loader');
-  return stats();
-}
-
-export async function initializeKnowledge(): Promise<void> {
-  await loadKnowledgeBase();
 }

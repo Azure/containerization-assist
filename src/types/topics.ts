@@ -39,17 +39,3 @@ export const TOPICS = {
  * Type representing all valid topic values
  */
 export type Topic = (typeof TOPICS)[keyof typeof TOPICS];
-
-/**
- * Type guard to check if a string is a valid topic
- */
-export function isValidTopic(value: string): value is Topic {
-  return Object.values(TOPICS).includes(value as Topic);
-}
-
-/**
- * Get all available topics as an array
- */
-export function getAllTopics(): Topic[] {
-  return Object.values(TOPICS);
-}

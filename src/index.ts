@@ -9,7 +9,6 @@ export { createApp } from './app/index.js';
 /** @public */
 export type { TransportConfig } from './app/index.js';
 
-// New AppRuntime interface with precise typing
 /** @public */
 export type {
   AppRuntime,
@@ -20,7 +19,6 @@ export type {
   CreateAppRuntime,
 } from './types/runtime.js';
 
-// Core types
 /** @public */
 export type { MCPTool, Result, Success, Failure, ToolContext } from './types/index.js';
 
@@ -59,11 +57,9 @@ export {
   withErrorContext,
 } from './lib/result-utils.js';
 
-// Tool creation helper for external consumers
 /** @public */
 export { tool } from './types/tool.js';
 
-// All tools with new interface
 /** @public */
 export {
   ALL_TOOLS,
