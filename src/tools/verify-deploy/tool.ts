@@ -30,7 +30,7 @@ import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernete
 
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { Success, Failure, type Result } from '@/types';
-import { verifyDeploymentSchema, type VerifyDeploymentParams } from './schema';
+import { verifyDeploySchema, type VerifyDeployParams } from './schema';
 
 export interface VerifyDeploymentResult extends Record<string, unknown> {
   success: boolean;
@@ -147,7 +147,7 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
  * Deployment verification implementation - direct execution without wrapper
  */
 async function handleVerifyDeployment(
-  params: VerifyDeploymentParams,
+  params: VerifyDeployParams,
   context: ToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
   if (!params || typeof params !== 'object') {
@@ -267,7 +267,7 @@ export default tool({
   description: 'Verify Kubernetes deployment status',
   category: 'kubernetes',
   version: '2.0.0',
-  schema: verifyDeploymentSchema,
+  schema: verifyDeploySchema,
   metadata: {
     knowledgeEnhanced: false,
   },

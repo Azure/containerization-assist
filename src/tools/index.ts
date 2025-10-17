@@ -10,7 +10,7 @@ import pushImageTool from './push-image/tool';
 import scanImageTool from './scan-image/tool';
 import tagImageTool from './tag-image/tool';
 import validateDockerfileTool from './validate-dockerfile/tool';
-import verifyDeployTool from './verify-deployment/tool';
+import verifyDeployTool from './verify-deploy/tool';
 
 export const TOOL_NAME = {
   ANALYZE_REPO: 'analyze-repo',

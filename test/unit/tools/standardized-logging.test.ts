@@ -27,7 +27,7 @@ const ALL_TOOLS = [
   'scan-image',
   'tag-image',
   'validate-dockerfile',
-  'verify-deployment',
+  'verify-deploy',
 ] as const;
 
 describe('Standardized Logging Regression Tests', () => {
@@ -208,7 +208,7 @@ describe('Standardized Logging Regression Tests', () => {
         'push-image',
         'scan-image',
         'tag-image',
-        'verify-deployment',
+        'verify-deploy',
       ];
 
       expectedToolNames.forEach((toolName) => {
@@ -227,7 +227,7 @@ describe('Standardized Logging Regression Tests', () => {
         'tag-image',
         'push-image',
         'deploy',
-        'verify-deployment',
+        'verify-deploy',
       ];
 
       criticalTools.forEach((tool) => {

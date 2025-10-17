@@ -61,11 +61,11 @@ function createMockToolContext() {
 
 // Import these after mocks are set up
 import { default as verifyDeploymentTool } from '../../../src/tools/verify-deploy/tool';
-import type { VerifyDeployParams } from '../../../src/tools/verify-deploy/schema';
+import type { VerifyDeploymentParams } from '../../../src/tools/verify-deploy/schema';
 
 describe('verify-deploy', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
-  let config: VerifyDeployParams;
+  let config: VerifyDeploymentParams;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
@@ -110,6 +110,7 @@ describe('verify-deploy', () => {
         expect(result.value.status.readyReplicas).toBe(2);
         expect(result.value.status.totalReplicas).toBe(2);
         expect(result.value.healthCheck?.status).toBe('healthy');
+        expect(result.value.workflowHints?.nextStep).toBe('ops');
       }
     });
 
@@ -136,7 +137,7 @@ describe('verify-deploy', () => {
     });
 
     it('should handle minimal configuration', async () => {
-      const minimalConfig: VerifyDeployParams = {
+      const minimalConfig: VerifyDeploymentParams = {
         deploymentName: 'minimal-app',
       };
 
@@ -187,6 +188,7 @@ describe('verify-deploy', () => {
         expect(result.value.status.readyReplicas).toBe(1);
         expect(result.value.status.totalReplicas).toBe(3);
         expect(result.value.healthCheck?.status).toBe('unknown');
+        expect(result.value.workflowHints?.nextStep).toBe('fix-deployment-issues');
       }
     });
 
@@ -348,6 +350,38 @@ describe('verify-deploy', () => {
     });
   });
 
+  describe('Workflow Hints', () => {
+    it('should provide next steps for successful deployment', async () => {
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.workflowHints?.nextStep).toBe('ops');
+        expect(result.value.workflowHints?.message).toContain('successful');
+      }
+    });
+
+    it('should provide next steps for failed deployment', async () => {
+      mockK8sClient.waitForDeploymentReady.mockResolvedValue(
+        createSuccessResult({
+          ready: false,
+          readyReplicas: 0,
+          totalReplicas: 2,
+        }),
+      );
+
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.workflowHints?.nextStep).toBe('fix-deployment-issues');
+        expect(result.value.workflowHints?.message).toContain('found issues');
+      }
+    });
+  });
+
   describe('Endpoints', () => {
     it('should include endpoints in result', async () => {
       const mockContext = createMockToolContext();
@@ -401,9 +435,7 @@ describe('verify-deploy', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        const availableCondition = result.value.status.conditions.find(
-          (c) => c.type === 'Available',
-        );
+        const availableCondition = result.value.status.conditions.find((c) => c.type === 'Available');
         expect(availableCondition?.status).toBe('False');
       }
     });

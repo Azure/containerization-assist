@@ -131,7 +131,7 @@ This server is optimized for **one engineer containerizing one application at a 
 The server detects and supports monorepo structures with multiple independently deployable services:
 
 - **Automatic Detection**: `analyze-repo` identifies monorepo patterns (npm workspaces, services/, apps/ directories)
-- **Automated Multi-Module Generation**: `generate-dockerfile-plan` and `generate-k8s-manifests-plan` support multi-module workflows
+- **Automated Multi-Module Generation**: `generate-dockerfile` and `generate-k8s-manifests` support multi-module workflows
 - **Conservative Safeguards**: Excludes shared libraries and utility folders from containerization
 
 **Multi-Module Workflow Example:**
