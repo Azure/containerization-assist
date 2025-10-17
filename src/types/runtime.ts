@@ -126,9 +126,6 @@ export interface AppRuntimeConfig {
   /** Policy file path (static configuration) */
   policyPath?: string;
 
-  /** Policy environment (development/production) */
-  policyEnvironment?: string;
-
   /** Enable hints that suggest other tools to call next in tool responses */
   chainHintsMode?: 'enabled' | 'disabled';
 
