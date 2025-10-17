@@ -25,6 +25,7 @@ npm install -g containerization-assist-mcp
 
 - Node.js 20+
 - Docker or Docker Desktop
+- Optional: [Trivy](https://aquasecurity.github.io/trivy/) (for security scanning features)
 - Optional: Kubernetes (for deployment features)
 
 ## VS Code Setup
@@ -177,7 +178,7 @@ The server provides 13 MCP tools organized by functionality:
 | Tool | Description |
 |------|-------------|
 | `build-image` | Build Docker images from Dockerfiles with security analysis |
-| `scan-image` | Scan Docker images for security vulnerabilities with remediation guidance |
+| `scan-image` | Scan Docker images for security vulnerabilities with remediation guidance (uses Trivy CLI) |
 | `tag-image` | Tag Docker images with version and registry information |
 | `push-image` | Push Docker images to a registry |
 
