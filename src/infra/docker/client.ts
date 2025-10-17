@@ -7,7 +7,7 @@ import tar from 'tar-fs';
 import { createHash } from 'crypto';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
-import { extractDockerErrorMessage, extractDockerErrorGuidance } from './errors';
+import { extractDockerErrorGuidance } from './errors';
 import { createKeyedMutex, type KeyedMutexInstance } from '@/lib/mutex';
 import { autoDetectDockerSocket } from './socket-validation';
 
@@ -216,20 +216,22 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 
       return Success(imageInfo);
     } catch (error) {
-      const { message, details } = extractDockerErrorMessage(error);
-      const errorMessage = `Failed to get image: ${message}`;
+      const guidance = extractDockerErrorGuidance(error);
+      const errorMessage = `Failed to get image: ${guidance.message}`;
 
       logger.error(
         {
           error: errorMessage,
-          errorDetails: details,
+          hint: guidance.hint,
+          resolution: guidance.resolution,
+          errorDetails: guidance.details,
           originalError: error,
           imageId: id,
         },
         'Docker get image failed',
       );
 
-      return Failure(errorMessage);
+      return Failure(errorMessage, guidance);
     }
   };
 
@@ -269,11 +271,13 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             (err: Error | null, res: DockerBuildResponse[]) => {
               if (err) {
                 // Log detailed error information before rejecting
-                const { message, details } = extractDockerErrorMessage(err);
+                const guidance = extractDockerErrorGuidance(err);
                 logger.error(
                   {
-                    error: message,
-                    errorDetails: details,
+                    error: guidance.message,
+                    hint: guidance.hint,
+                    resolution: guidance.resolution,
+                    errorDetails: guidance.details,
                     originalError: err,
                     options,
                   },
@@ -354,13 +358,15 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         logger.info({ imageId, repository, tag }, 'Image tagged successfully');
         return Success(undefined);
       } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to tag image: ${message}`;
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Failed to tag image: ${guidance.message}`;
 
         logger.error(
           {
             error: errorMessage,
-            errorDetails: details,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
             originalError: error,
             imageId,
             repository,
@@ -369,7 +375,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
           'Docker tag image failed',
         );
 
-        return Failure(errorMessage);
+        return Failure(errorMessage, guidance);
       }
     },
 
@@ -405,11 +411,13 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             (err: Error | null) => {
               if (err) {
                 // Log detailed error information before rejecting
-                const { message, details } = extractDockerErrorMessage(err);
+                const guidance = extractDockerErrorGuidance(err);
                 logger.error(
                   {
-                    error: message,
-                    errorDetails: details,
+                    error: guidance.message,
+                    hint: guidance.hint,
+                    resolution: guidance.resolution,
+                    errorDetails: guidance.details,
                     originalError: err,
                     repository,
                     tag,
@@ -496,20 +504,22 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         logger.debug({ imageId }, 'Image removed');
         return Success(undefined);
       } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to remove image: ${message}`;
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Failed to remove image: ${guidance.message}`;
 
         logger.error(
           {
             error: errorMessage,
-            errorDetails: details,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
             originalError: error,
             imageId,
           },
           'Docker remove image failed',
         );
 
-        return Failure(errorMessage);
+        return Failure(errorMessage, guidance);
       }
     },
 
@@ -523,20 +533,22 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         logger.debug({ containerId }, 'Container removed');
         return Success(undefined);
       } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to remove container: ${message}`;
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Failed to remove container: ${guidance.message}`;
 
         logger.error(
           {
             error: errorMessage,
-            errorDetails: details,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
             originalError: error,
             containerId,
           },
           'Docker remove container failed',
         );
 
-        return Failure(errorMessage);
+        return Failure(errorMessage, guidance);
       }
     },
 
@@ -554,20 +566,22 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         );
         return Success(containers);
       } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to list containers: ${message}`;
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Failed to list containers: ${guidance.message}`;
 
         logger.error(
           {
             error: errorMessage,
-            errorDetails: details,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
             originalError: error,
             options,
           },
           'Docker list containers failed',
         );
 
-        return Failure(errorMessage);
+        return Failure(errorMessage, guidance);
       }
     },
   };

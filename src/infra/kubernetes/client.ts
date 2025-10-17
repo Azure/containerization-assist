@@ -16,12 +16,6 @@ export interface DeploymentResult {
   totalReplicas: number;
 }
 
-export interface ClusterInfo {
-  name: string;
-  version: string;
-  ready: boolean;
-}
-
 export interface K8sManifest {
   apiVersion: string;
   kind: string;
@@ -49,12 +43,6 @@ export interface KubernetesClient {
   namespaceExists: (namespace: string) => Promise<boolean>;
   checkPermissions: (namespace: string) => Promise<boolean>;
   checkIngressController: () => Promise<boolean>;
-}
-
-export interface KubernetesClientConfig {
-  logger: Logger;
-  kubeconfig?: string;
-  timeout?: number;
 }
 
 // Constants for deployment polling

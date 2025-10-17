@@ -60,11 +60,6 @@ export const Failure = <T>(error: string, guidance?: ErrorGuidance): Result<T> =
   return resultGuidance ? { ok: false, error, guidance: resultGuidance } : { ok: false, error };
 };
 
-/** Type guard to check if result is a failure */
-export const isFail = <T>(
-  result: Result<T>,
-): result is { ok: false; error: string; guidance?: ErrorGuidance } => !result.ok;
-
 /** Type guard to check if result is successful */
 export const isSuccess = <T>(result: Result<T>): result is { ok: true; value: T } => result.ok;
 
@@ -72,47 +67,3 @@ export const isSuccess = <T>(result: Result<T>): result is { ok: true; value: T 
 export const isFailure = <T>(
   result: Result<T>,
 ): result is { ok: false; error: string; guidance?: ErrorGuidance } => !result.ok;
-
-// ===== COMMON TOOL METADATA =====
-
-/**
- * Base metadata that all tool executions should have
- */
-export interface ToolExecutionMetadata {
-  executedAt: Date;
-  duration: number;
-}
-
-/**
- * Validation result structure used across tools
- */
-export interface ValidationResult {
-  valid: boolean;
-  issues: Array<{ severity: 'error' | 'warning'; message: string }>;
-}
-
-/**
- * Analysis capability for tools that perform repository/code analysis
- */
-export interface AnalysisCapability {
-  confidence: number;
-  detectionMethod: 'signature' | 'extension' | 'ai-enhanced' | 'fallback';
-}
-
-/**
- * Build capability for tools that create artifacts
- */
-export interface BuildCapability {
-  artifacts: string[];
-  size?: number;
-  digest?: string;
-}
-
-/**
- * Deployment capability for tools that handle deployments
- */
-export interface DeploymentCapability {
-  namespace?: string;
-  replicas?: number;
-  status?: 'pending' | 'running' | 'failed' | 'completed';
-}

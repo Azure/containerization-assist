@@ -102,7 +102,6 @@
   "devDependencies": {
     "@eslint/js": "^9.36.0",
     "@jest/globals": "^30.2.0",
-    "@types/ajv": "^1.0.4",
     "@types/dockerode": "^3.3.44",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",

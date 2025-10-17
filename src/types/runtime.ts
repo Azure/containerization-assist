@@ -144,13 +144,3 @@ export interface AppRuntimeConfig {
  * Factory function signature for creating AppRuntime instances
  */
 export type CreateAppRuntime = (config?: AppRuntimeConfig) => AppRuntime;
-
-/**
- * Utility type to extract tool names from the registry
- */
-export type ValidToolName = ToolName;
-
-/**
- * Utility type for tool execution results
- */
-export type ToolExecutionResult<T extends ToolName> = Promise<Result<ToolResultMap[T]>>;

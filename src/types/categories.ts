@@ -3,13 +3,6 @@
  * Provides strong typing for categories, environments, and quality metrics
  */
 
-import type { Environment } from '@/config/environment';
-
-/**
- * Content categories for scoring and validation
- */
-export type ContentCategory = 'dockerfile' | 'kubernetes' | 'security' | 'generic';
-
 /**
  * Tool categories for grouping and organization
  */
@@ -22,72 +15,9 @@ export type ToolCategory =
   | 'utility'; // General utilities and session management
 
 /**
- * Tool category metadata for enhanced organization
- */
-export interface ToolCategoryMetadata {
-  category: ToolCategory;
-  tags?: string[];
-}
-
-/**
  * Security/quality grade ratings
  */
 export type SecurityGrade = 'A' | 'B' | 'C' | 'D' | 'F';
-
-/**
- * Quality metrics for scored content
- */
-export interface QualityMetrics {
-  score: number;
-  grade: SecurityGrade;
-  breakdown: Record<string, number>;
-  issues: string[];
-  recommendations: string[];
-}
-
-/**
- * Supported programming languages
- */
-export type SupportedLanguage =
-  | 'javascript'
-  | 'typescript'
-  | 'python'
-  | 'java'
-  | 'go'
-  | 'rust'
-  | 'ruby'
-  | 'php'
-  | 'dotnet'
-  | 'unknown';
-
-/**
- * Supported frameworks
- */
-export type SupportedFramework =
-  | 'express'
-  | 'nestjs'
-  | 'nextjs'
-  | 'react'
-  | 'vue'
-  | 'angular'
-  | 'django'
-  | 'flask'
-  | 'fastapi'
-  | 'spring'
-  | 'rails'
-  | 'laravel'
-  | 'aspnet-core'
-  | 'blazor'
-  | 'minimal-api';
-
-/**
- * Base parameters common to all tools
- */
-export interface BaseToolParams {
-  sessionId?: string;
-  environment?: Environment;
-  includeDebugInfo?: boolean;
-}
 
 /**
  * Quality assessment result
@@ -98,22 +28,6 @@ export interface QualityAssessment {
   breakdown?: Record<string, number>;
   validationErrors?: string[];
 }
-
-/**
- * Scoring comparison for before/after states
- */
-export interface ScoringComparison {
-  before?: QualityAssessment;
-  after: QualityAssessment;
-  improvement?: number;
-  improvementPercentage?: number;
-}
-
-// Removed unused helper functions and constants:
-// - getQualityGrade - not used
-// - getSecurityGrade - not used
-// - ENVIRONMENT_PROFILES - not used
-// These were flagged by knip as unused exports
 
 /**
  * Tool category mappings for all available tools (internal use only)

@@ -244,7 +244,6 @@ async function handleBuildImage(
  */
 export const buildImage = handleBuildImage;
 
-// Tool export using new helper
 import { tool } from '@/types/tool';
 
 export default tool({

@@ -256,18 +256,3 @@ export function extractDockerErrorGuidance(error: unknown): ErrorGuidance {
     details,
   };
 }
-
-/**
- * Extract meaningful error message from dockerode errors
- * @deprecated Use extractDockerErrorGuidance instead
- */
-export function extractDockerErrorMessage(error: unknown): {
-  message: string;
-  details: Record<string, unknown>;
-} {
-  const guidance = extractDockerErrorGuidance(error);
-  return {
-    message: guidance.message,
-    details: guidance.details || {},
-  };
-}

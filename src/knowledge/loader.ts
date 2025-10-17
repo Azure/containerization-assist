@@ -1,5 +1,5 @@
 import { createLogger } from '@/lib/logger';
-import type { KnowledgeEntry, KnowledgeStats, LoadedEntry, CompilationStats } from './types';
+import type { KnowledgeEntry, LoadedEntry, CompilationStats } from './types';
 import { KnowledgeEntrySchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
@@ -248,44 +248,6 @@ export const getAllEntries = (): LoadedEntry[] => {
   return Array.from(knowledgeState.entries.values());
 };
 
-
-/**
- * Get knowledge base statistics
- */
-export const getKnowledgeStats = (): KnowledgeStats => {
-  const byCategory: Record<string, number> = {};
-  const bySeverity: Record<string, number> = {};
-  const tagCounts: Record<string, number> = {};
-
-  for (const entry of knowledgeState.entries.values()) {
-    // Count by category
-    byCategory[entry.category] = (byCategory[entry.category] || 0) + 1;
-
-    // Count by severity
-    const severity = entry.severity || 'medium';
-    bySeverity[severity] = (bySeverity[severity] || 0) + 1;
-
-    // Count tags
-    if (entry.tags) {
-      for (const tag of entry.tags) {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      }
-    }
-  }
-
-  // Get top tags
-  const topTags = Object.entries(tagCounts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 10)
-    .map(([tag, count]) => ({ tag, count }));
-
-  return {
-    totalEntries: knowledgeState.entries.size,
-    byCategory,
-    bySeverity,
-    topTags,
-  };
-};
 
 /**
  * Check if knowledge base is loaded

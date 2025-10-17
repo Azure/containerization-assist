@@ -37,11 +37,6 @@ export interface MCPTool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unk
   handler: (input: z.infer<TSchema>, context: ToolContext) => Promise<Result<TOut>>;
 }
 
-// Utility types for tool creation
-export type ToolInput<T> = T extends MCPTool<infer S, unknown> ? z.infer<S> : never;
-
-export type ToolOutput<T> = T extends MCPTool<z.ZodTypeAny, infer O> ? O : never;
-
 /**
  * Lightweight helper to create tools with reduced boilerplate
  * Automatically extracts inputSchema and creates parse method from Zod schema
