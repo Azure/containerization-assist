@@ -89,54 +89,19 @@ export function applyPolicy(
   const results: Array<{ rule: PolicyRule; matched: boolean }> = [];
 
   for (const rule of policy.rules) {
+    // Type assertion is safe here because:
+    // 1. Policy has been validated by PolicySchema via loadPolicy()
+    // 2. Zod uses z.unknown() for conditions since it can't express discriminated unions
+    // 3. Runtime validation ensures conditions are well-formed Matcher objects
+    const typedRule = rule as PolicyRule;
+
     // All conditions must match (AND logic)
     const matched =
-      rule.conditions.length > 0 &&
-      rule.conditions.every((condition) => evaluateMatcher(condition, input));
+      typedRule.conditions.length > 0 &&
+      typedRule.conditions.every((condition) => evaluateMatcher(condition, input));
 
-    results.push({ rule, matched });
+    results.push({ rule: typedRule, matched });
   }
 
   return results;
-}
-
-/**
- * Get all rule weights for optimization algorithms
- */
-export function getRuleWeights(policy: Policy): Map<string, number> {
-  const weights = new Map<string, number>();
-
-  for (const rule of policy.rules) {
-    weights.set(rule.id, rule.priority);
-  }
-
-  return weights;
-}
-
-/**
- * Select best strategy based on policy rules
- */
-export function selectStrategy(
-  policy: Policy,
-  candidates: Array<{ id: string; score: number }>,
-): string | null {
-  // Sort candidates by score
-  const sorted = [...candidates].sort((a, b) => b.score - a.score);
-
-  if (sorted.length === 0) {
-    return null;
-  }
-
-  // Apply policy rules to filter/adjust candidates
-  const weights = getRuleWeights(policy);
-
-  for (const candidate of sorted) {
-    const weight = weights.get(candidate.id) || 100;
-    candidate.score *= weight / 100;
-  }
-
-  // Re-sort after weight adjustment
-  sorted.sort((a, b) => b.score - a.score);
-
-  return sorted[0]?.id || null;
 }

@@ -24,98 +24,11 @@ export interface FunctionMatcher {
 }
 
 /**
- * Policy rule with priority and actions
- */
-export interface PolicyRule {
-  id: string;
-  category?: 'quality' | 'security' | 'performance' | 'compliance';
-  priority: number;
-  conditions: Matcher[];
-  actions: Record<string, unknown>;
-  description?: string;
-}
-
-/**
- * Environment-specific override
- */
-export interface EnvironmentOverride {
-  rule_id: string;
-  actions?: Record<string, unknown>;
-  priority?: number;
-  enabled?: boolean;
-}
-
-/**
  * Cache configuration
  */
 export interface CacheConfig {
   enabled: boolean;
   ttl: number;
-}
-
-/**
- * Typed environment defaults for data-driven constraint generation
- */
-export interface EnvironmentDefaults {
-  allowedBaseImages?: string[];
-  registries?: {
-    allowed?: string[];
-    blocked?: string[];
-  };
-  security?: {
-    scanners?: {
-      required?: boolean;
-      tools?: string[];
-    };
-    nonRootUser?: boolean;
-    minimizeSize?: boolean;
-  };
-  resources?: {
-    limits?: {
-      cpu?: string;
-      memory?: string;
-    };
-    requests?: {
-      cpu?: string;
-      memory?: string;
-    };
-  };
-  naming?: {
-    pattern?: string;
-    examples?: string[];
-  };
-}
-
-/**
- * Unified defaults that combines base and environment-specific fields
- */
-export interface UnifiedDefaults extends EnvironmentDefaults {
-  cache_ttl?: number;
-  enforcement?: 'strict' | 'lenient' | 'advisory';
-}
-
-/**
- * Policy structure
- */
-export interface Policy {
-  version: '2.0';
-  metadata?: {
-    name?: string;
-    created?: string;
-    author?: string;
-    description?: string;
-    category?: string;
-  };
-  defaults?: UnifiedDefaults;
-  rules: PolicyRule[];
-  environments?: Record<
-    string,
-    {
-      defaults?: UnifiedDefaults;
-      overrides?: EnvironmentOverride[];
-    }
-  >;
-  cache?: CacheConfig;
 }
 
 const PolicyRuleSchema = z.object({
@@ -125,13 +38,6 @@ const PolicyRuleSchema = z.object({
   conditions: z.array(z.unknown()),
   actions: z.record(z.string(), z.unknown()),
   description: z.string().optional(),
-});
-
-const EnvironmentOverrideSchema = z.object({
-  rule_id: z.string(),
-  actions: z.record(z.string(), z.unknown()).optional(),
-  priority: z.number().optional(),
-  enabled: z.boolean().optional(),
 });
 
 // Unified defaults schema that includes both base and environment-specific fields
@@ -195,15 +101,6 @@ export const PolicySchema = z.object({
     .optional(),
   defaults: UnifiedDefaultsSchema.optional(),
   rules: z.array(PolicyRuleSchema),
-  environments: z
-    .record(
-      z.string(),
-      z.object({
-        defaults: UnifiedDefaultsSchema.optional(),
-        overrides: z.array(EnvironmentOverrideSchema).optional(),
-      }),
-    )
-    .optional(),
   cache: z
     .object({
       enabled: z.boolean(),
@@ -211,3 +108,34 @@ export const PolicySchema = z.object({
     })
     .optional(),
 });
+
+/**
+ * Policy rule with priority and actions
+ * Derived from PolicyRuleSchema but with properly typed conditions
+ */
+export interface PolicyRule {
+  id: string;
+  category?: 'quality' | 'security' | 'performance' | 'compliance';
+  priority: number;
+  conditions: Matcher[];
+  actions: Record<string, unknown>;
+  description?: string;
+}
+
+/**
+ * Unified defaults that combines base and environment-specific fields
+ * Derived from UnifiedDefaultsSchema
+ */
+export type UnifiedDefaults = z.infer<typeof UnifiedDefaultsSchema>;
+
+/**
+ * Typed environment defaults for data-driven constraint generation
+ * Derived from UnifiedDefaults, excluding base-level fields
+ */
+export type EnvironmentDefaults = Omit<UnifiedDefaults, 'cache_ttl' | 'enforcement'>;
+
+/**
+ * Policy structure
+ * Derived from PolicySchema
+ */
+export type Policy = z.infer<typeof PolicySchema>;

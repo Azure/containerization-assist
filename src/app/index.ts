@@ -78,8 +78,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
   const orchestratorConfig: OrchestratorConfig = { chainHintsMode };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
-  if (config.policyEnvironment !== undefined)
-    orchestratorConfig.policyEnvironment = config.policyEnvironment;
 
   const toolList = Array.from(toolsMap.values());
 
