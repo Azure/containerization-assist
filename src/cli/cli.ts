@@ -19,6 +19,12 @@ import { createInspectToolsCommand } from './commands/inspect-tools';
 import { provideContextualGuidance } from './guidance';
 import { validateOptions } from './validation';
 import { OUTPUTFORMAT } from '@/mcp/mcp-server';
+import {
+  logStartup,
+  logStartupSuccess,
+  installShutdownHandlers,
+  logStartupFailure,
+} from '@/lib/runtime-logging';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -96,9 +102,7 @@ const command = program.args[0] ?? 'start';
  * 2. Environment variable
  * 3. Default value (undefined = auto-discover)
  */
-function resolvePolicyConfig(options: {
-  config?: string;
-}): { policyPath?: string } {
+function resolvePolicyConfig(options: { config?: string }): { policyPath?: string } {
   // Policy path: --config flag > env var > undefined (use defaults)
   const policyPath = options.config || process.env.CONTAINERIZATION_ASSIST_POLICY_PATH;
 
@@ -160,7 +164,6 @@ async function main(): Promise<void> {
       // Display policy configuration
       const policyConfig = resolvePolicyConfig(options);
       console.error(`  • Policy Path: ${policyConfig.policyPath ?? 'auto-discover'}`);
-
 
       // Test Docker connection
       {
@@ -268,10 +271,6 @@ async function main(): Promise<void> {
     };
 
     // Use shared startup logging
-    const { logStartup, logStartupSuccess, installShutdownHandlers } = await import(
-      '@/lib/runtime-logging'
-    );
-
     const health = await app.healthCheck();
     logStartup(
       {
@@ -294,7 +293,6 @@ async function main(): Promise<void> {
     // Install unified shutdown handlers
     installShutdownHandlers(app, getLogger(), !!process.env.MCP_QUIET);
   } catch (error) {
-    const { logStartupFailure } = await import('@/lib/runtime-logging');
     logStartupFailure(error as Error, getLogger(), !!process.env.MCP_QUIET);
 
     if (error instanceof Error) {

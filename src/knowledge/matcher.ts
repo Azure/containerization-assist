@@ -2,6 +2,7 @@ import { createLogger } from '@/lib/logger';
 import type { Topic } from '@/types/topics';
 import type { KnowledgeQuery, KnowledgeMatch, LoadedEntry, KnowledgeCategory } from './types';
 import type { KnowledgeSnippet } from './schemas';
+import { loadKnowledgeData } from './loader';
 
 const logger = createLogger().child({ module: 'knowledge-matcher' });
 
@@ -315,8 +316,6 @@ export async function getKnowledgeSnippets(
   options: KnowledgeSnippetOptions,
 ): Promise<KnowledgeSnippet[]> {
   try {
-    // Import loader dynamically to avoid circular dependencies
-    const { loadKnowledgeData } = await import('./loader');
     const knowledgeData = await loadKnowledgeData();
 
     const queryTextParts: string[] = [topic];

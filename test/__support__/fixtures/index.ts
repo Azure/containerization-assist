@@ -163,7 +163,10 @@ export {
  */
 
 import { TestScenario } from './parameterized-test-data';
-import { EnvironmentCapabilities } from '../utilities/environment-detector';
+import { EnvironmentCapabilities, detectEnvironment, createEnvironmentReport } from '../utilities/environment-detector';
+import { fixtureRegistry } from './fixture-registry';
+import { validateAllGoldenFiles } from './fixture-validation';
+import { ParameterizedTestFactory } from './parameterized-test-data';
 
 /**
  * Create a complete test environment setup
@@ -182,18 +185,15 @@ export async function createTestEnvironment(options: {
   } = {};
 
   if (detect) {
-    const { detectEnvironment } = await import('../utilities/environment-detector');
     setup.capabilities = await detectEnvironment();
   }
 
   if (loadFixtures) {
-    const { fixtureRegistry } = await import('./fixture-registry');
     await fixtureRegistry.initialize();
     setup.fixtures = fixtureRegistry;
   }
 
   if (validateFixtures) {
-    const { validateAllGoldenFiles } = await import('./fixture-validation');
     setup.validation = await validateAllGoldenFiles();
   }
 
@@ -211,7 +211,6 @@ export async function createToolTestScenarios<TInput, TExpected>(
     environment?: Array<keyof Omit<EnvironmentCapabilities, 'platform'>>;
   } = {}
 ): Promise<TestScenario<TInput, TExpected>[]> {
-  const { ParameterizedTestFactory } = await import('./parameterized-test-data');
   return ParameterizedTestFactory.createFromGoldenFiles(toolName, inputs, options);
 }
 
@@ -223,7 +222,6 @@ export async function findTestData(query: {
   category?: string;
   tags?: string[];
 }) {
-  const { fixtureRegistry } = await import('./fixture-registry');
   await fixtureRegistry.initialize();
   return fixtureRegistry.find(query);
 }
@@ -236,8 +234,6 @@ export async function checkTestEnvironment(): Promise<{
   capabilities: EnvironmentCapabilities;
   recommendations: string[];
 }> {
-  const { detectEnvironment, createEnvironmentReport } = await import('../utilities/environment-detector');
-  
   const capabilities = await detectEnvironment();
   const summary = createEnvironmentReport(capabilities);
   

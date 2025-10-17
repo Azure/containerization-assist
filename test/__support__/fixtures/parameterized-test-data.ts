@@ -4,7 +4,7 @@
  */
 
 import { goldenFileLoader, loadGoldenFile } from './golden-file-loader';
-import { EnvironmentCapabilities } from '../utilities/environment-detector';
+import { EnvironmentCapabilities, detectEnvironment } from '../utilities/environment-detector';
 
 export interface TestScenario<TInput, TExpected> {
   name: string;
@@ -355,7 +355,6 @@ export class ParameterizedTestRunner {
         let envCapabilities: EnvironmentCapabilities;
 
         beforeAll(async () => {
-          const { detectEnvironment } = await import('../utilities/environment-detector');
           envCapabilities = await detectEnvironment({ timeout: 3000 });
         });
 

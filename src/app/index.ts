@@ -26,6 +26,9 @@ import type {
   ExecutionMetadata,
 } from '@/types/runtime';
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
+import Docker from 'dockerode';
+import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
+import { createKubernetesClient } from '@/infra/kubernetes/client';
 
 /**
  * Timeout for Docker connection checks in milliseconds
@@ -216,9 +219,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         error?: string;
       } = await (async () => {
         try {
-          const Docker = (await import('dockerode')).default;
-          const { autoDetectDockerSocket } = await import('@/infra/docker/socket-validation');
-
           const socketPath = autoDetectDockerSocket();
           const docker = new Docker({ socketPath });
 
@@ -251,7 +251,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         error?: string;
       } = await (async () => {
         try {
-          const { createKubernetesClient } = await import('@/infra/kubernetes/client');
           const k8sClient = createKubernetesClient(logger);
 
           const connected = await k8sClient.ping();
