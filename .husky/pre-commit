@@ -2,6 +2,7 @@
 
 # Exit codes for better debugging
 readonly EXIT_LINT_STAGED_FAILED=1
+readonly EXIT_EXAMPLES_FAILED=2
 
 # Enable strict error handling
 set -eu
@@ -15,6 +16,13 @@ main() {
     if ! npx lint-staged; then
         echo "❌ Lint-staged checks failed"
         exit $EXIT_LINT_STAGED_FAILED
+    fi
+
+    # Validate TypeScript examples
+    echo "📚 Validating TypeScript examples..."
+    if ! node scripts/validate-examples.js; then
+        echo "❌ Examples validation failed"
+        exit $EXIT_EXAMPLES_FAILED
     fi
 
     echo "✅ Pre-commit checks passed!"
