@@ -13,15 +13,7 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with AI-powered suggestions
 - ✨ **Smart Analysis**: Context-aware recommendations
 
-## Installation
-
-### Install from npm
-
-```bash
-npm install -g containerization-assist-mcp
-```
-
-### System Requirements
+## System Requirements
 
 - Node.js 20+
 - Docker or Docker Desktop
@@ -30,30 +22,24 @@ npm install -g containerization-assist-mcp
 
 ## VS Code Setup
 
-### Using the npm Package
+Add the following to your VS Code settings or create `.vscode/mcp.json` in your project:
 
-1. Install the MCP server globally:
-   ```bash
-   npm install -g containerization-assist-mcp
-   ```
+```json
+{
+  "servers": {
+    "containerization-assist": {
+      "command": "npx",
+      "args": ["-y", "containerization-assist-mcp", "start"],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
 
-2. Configure VS Code to use the MCP server. Add to your VS Code settings or create `.vscode/mcp.json` in your project:
-   ```json
-   {
-     "servers": {
-       "containerization-assist": {
-         "command": "containerization-assist-mcp",
-         "args": ["start"],
-         "env": {
-           "DOCKER_SOCKET": "/var/run/docker.sock",
-           "LOG_LEVEL": "info"
-         }
-       }
-     }
-   }
-   ```
-
-3. Restart VS Code to enable the MCP server in GitHub Copilot.
+Restart VS Code to enable the MCP server in GitHub Copilot.
 
 ### Windows Users
 
@@ -276,14 +262,14 @@ This provides comprehensive coverage out-of-the-box.
 **Use a Specific Policy File:**
 ```bash
 # Use only the security baseline policy file (disables auto-merging)
-containerization-assist-mcp start --config ./policies/security-baseline.yaml
+npx -y containerization-assist-mcp start --config ./policies/security-baseline.yaml
 
 # Or specify in VS Code MCP configuration
 {
   "servers": {
     "containerization-assist": {
-      "command": "containerization-assist-mcp",
-      "args": ["start", "--config", "./policies/security-baseline.yaml"]
+      "command": "npx",
+      "args": ["-y", "containerization-assist-mcp", "start", "--config", "./policies/security-baseline.yaml"]
     }
   }
 }
@@ -292,10 +278,10 @@ containerization-assist-mcp start --config ./policies/security-baseline.yaml
 **Environment-Specific Configuration:**
 ```bash
 # Use development mode (less strict policy enforcement)
-containerization-assist-mcp start --dev
+npx -y containerization-assist-mcp start --dev
 
 # Production mode is the default
-containerization-assist-mcp start
+npx -y containerization-assist-mcp start
 ```
 
 ### MCP Inspector (Testing)
@@ -324,8 +310,8 @@ ls -la /var/run/docker.sock
 # Test with MCP Inspector
 npx @modelcontextprotocol/inspector containerization-assist-mcp start
 
-# Check logs
-containerization-assist-mcp start --log-level debug
+# Check logs with debug level
+npx -y containerization-assist-mcp start --log-level debug
 ```
 
 ### Kubernetes Connection Issues
@@ -392,143 +378,6 @@ kubectl config use-context <context-name>
 # View current configuration
 kubectl config view
 ```
-
-## Documentation
-
-- **[Contributing Guidelines](./CONTRIBUTING.md)** - How to contribute
-- **[Examples](./docs/examples/)** - Code examples and usage patterns
-
-## External Telemetry Integration
-
-Container Assist tools expose a clean, idiomatic API for external telemetry wrapping. This enables teams to track tool usage, performance metrics, and user behavior without modifying the core tool implementations.
-
-### Tool Interface Properties
-
-Each tool exposes the following properties for telemetry integration:
-
-```typescript
-import { buildImageTool } from 'containerization-assist-mcp';
-
-// Access tool properties for telemetry
-const {
-  name,         // string: Tool identifier
-  description,  // string: Human-readable description
-  inputSchema,  // ZodRawShape: For MCP SDK registration
-  parse,        // (args: unknown) => TypedInput: Zod validation
-  handler,      // (input: TypedInput, context: ToolContext) => Promise<Result>
-  metadata      // ToolMetadata: Knowledge enhancement info
-} = buildImageTool;
-```
-
-### Telemetry Wrapper Pattern
-
-Wrap tools with your telemetry layer while maintaining type safety:
-
-```typescript
-import { Server as McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { buildImageTool } from 'containerization-assist-mcp';
-
-// Wrap with your telemetry
-server.tool(
-  buildImageTool.name,
-  buildImageTool.description,
-  buildImageTool.inputSchema,
-  async (args, extra) => {
-    const startTime = Date.now();
-
-    try {
-      // Step 1: Parse & validate with Zod
-      const typedInput = buildImageTool.parse(args);
-
-      // Step 2: Record telemetry with typed properties
-      recordTelemetry({
-        tool: buildImageTool.name,
-        parameters: typedInput,
-        timestamp: startTime
-      });
-
-      // Step 3: Execute tool handler
-      const result = await buildImageTool.handler(typedInput, context);
-
-      // Step 4: Record result metrics
-      recordResult({
-        tool: buildImageTool.name,
-        success: result.ok,
-        duration: Date.now() - startTime
-      });
-
-      return formatResponse(result);
-    } catch (error) {
-      recordError(error);
-      throw error;
-    }
-  }
-);
-```
-
-### Complete Example
-
-See [docs/examples/app-mod-telemetry.ts](./docs/examples/app-mod-telemetry.ts) for a complete example showing:
-- Full telemetry wrapper implementation
-- Error tracking and metrics collection
-- Type-safe parameter extraction
-- Integration with all Container Assist tools
-
-### Benefits
-
-- **Type Safety**: Parse method provides strongly-typed input for handlers
-- **Clean Separation**: Validation and execution are clearly separated
-- **Flexible Integration**: Wrap with any telemetry system (Application Insights, DataDog, etc.)
-- **No Modifications**: Zero changes needed to core tool implementations
-- **Metadata Access**: Tool capabilities and enhancement info available for categorization
-
-## For Developers
-
-If you want to contribute or run from source:
-
-### Development Setup
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Build the project: `npm run build` (ESM + CJS dual build)
-4. Run validation: `npm run validate` (lint + typecheck + unit tests)
-5. Auto-fix issues: `npm run fix` (lint:fix + format)
-
-**Essential Commands:**
-- `npm run validate` - **Single validation command** for lint, typecheck, and tests (used locally and in CI)
-- `npm run fix` - Auto-fix linting issues and format code
-- `npm run build` - Full clean + ESM + CJS build
-- `npm run build:esm` - ESM-only build (dist/)
-- `npm run build:cjs` - CJS-only build (dist-cjs/)
-- `npm run build:watch` - Watch mode for development
-- `npm test` - Run all tests
-- `npm run test:unit` - Run unit tests only
-
-### Testing the Full Workflow
-
-To verify the end-to-end containerization workflow works correctly, run the smoke test:
-
-```bash
-npm run smoke:journey
-```
-
-**What it does:**
-This command executes the complete single-app workflow using real tool implementations:
-
-- **Analyze repository** - Detects language and framework
-- **Generate Dockerfile** - Creates optimized container configuration
-- **Build Docker image** - Compiles the application
-- **Tag image** - Applies version tags
-- **Prepare Kubernetes cluster** - Sets up namespace (if K8s available)
-- **Deploy to Kubernetes** - Deploys the application (if K8s available)
-- **Verify deployment** - Confirms health and readiness (if K8s available)
-
-**Requirements for smoke test:**
-- Docker daemon running
-- Kubernetes cluster optional (K8s steps will be skipped if unavailable)
-- Test fixture: `test/__support__/fixtures/python-flask` directory
-
-The smoke test validates that the sequential workflow functions as expected and provides logs for debugging.
 
 ## License
 
