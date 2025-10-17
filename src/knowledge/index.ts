@@ -5,7 +5,6 @@ export type {
   KnowledgeEntry,
   KnowledgeQuery,
   KnowledgeMatch,
-  KnowledgeStats,
   LoadedEntry,
   CompilationStats,
 } from './types';

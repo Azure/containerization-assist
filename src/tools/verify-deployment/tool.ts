@@ -270,11 +270,6 @@ async function handleVerifyDeployment(
   }
 }
 
-/**
- * Verify deployment tool
- */
-export const verifyDeployment = handleVerifyDeployment;
-
 import { tool } from '@/types/tool';
 
 export default tool({

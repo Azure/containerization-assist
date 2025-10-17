@@ -6,11 +6,6 @@
 import { z } from 'zod';
 
 /**
- * Standard environment types supported across all tools
- */
-export type Environment = 'development' | 'staging' | 'production' | 'testing';
-
-/**
  * Zod schema for environment validation
  */
 export const environmentSchema = z

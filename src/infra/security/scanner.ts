@@ -2,47 +2,6 @@ import type { Logger } from 'pino';
 import { Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 
-export interface VulnerabilityFinding {
-  id: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNKNOWN';
-  package: string;
-  version?: string;
-  fixedVersion?: string;
-  title?: string;
-  description?: string;
-}
-
-export interface SecurityScanResult {
-  vulnerabilities: VulnerabilityFinding[];
-  summary: {
-    total: number;
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    unknown: number;
-  };
-  passed: boolean;
-}
-
-export interface SecretFinding {
-  type: string;
-  severity: string;
-  line: number;
-  content: string;
-  file?: string;
-}
-
-export interface SecretScanResult {
-  secrets: SecretFinding[];
-  summary: {
-    total: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
-}
-
 interface SecurityScanner {
   scanImage: (imageId: string) => Promise<Result<BasicScanResult>>;
   ping: () => Promise<Result<boolean>>;

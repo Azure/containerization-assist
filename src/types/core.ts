@@ -60,10 +60,3 @@ export const Failure = <T>(error: string, guidance?: ErrorGuidance): Result<T> =
   return resultGuidance ? { ok: false, error, guidance: resultGuidance } : { ok: false, error };
 };
 
-/** Type guard to check if result is successful */
-export const isSuccess = <T>(result: Result<T>): result is { ok: true; value: T } => result.ok;
-
-/** Type guard to check if result is a failure */
-export const isFailure = <T>(
-  result: Result<T>,
-): result is { ok: false; error: string; guidance?: ErrorGuidance } => !result.ok;

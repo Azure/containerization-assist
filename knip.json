@@ -2,7 +2,6 @@
     "$schema": "https://unpkg.com/knip@5/schema.json",
     "entry": [
         "src/index.ts",
-        "src/exports/tools.ts",
         "src/mcp/mcp-server.ts",
         "src/cli/cli.ts",
         "docs/examples/**/*.{ts,js}",
@@ -15,7 +14,10 @@
     "ignore": [
         "**/*.test.ts",
         "**/*.spec.ts",
-        "scripts/**/*.js"
+        "scripts/**/*.js",
+        "docs/examples/**/*.ts",
+        "src/lib/param-defaults.ts",
+        "src/lib/result-utils.ts"
     ],
     "ignoreExportsUsedInFile": {
         "interface": true,
@@ -23,9 +25,10 @@
     },
     "ignoreDependencies": [
         "tsc-alias",
+        "husky",
         "@kubernetes-models/apimachinery",
         "dockerfilelint",
         "kubernetes-models"
     ],
-    "includeEntryExports": true
+    "includeEntryExports": false
 }
