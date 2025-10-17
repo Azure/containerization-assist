@@ -95,6 +95,8 @@ describe('scanImage', () => {
           highCount: 1,
           mediumCount: 0,
           lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
           scanDate: new Date('2023-01-01T12:00:00Z'),
         }) as any,
       );
@@ -254,6 +256,8 @@ describe('scanImage', () => {
           highCount: 2,
           mediumCount: 1,
           lowCount: 1,
+          negligibleCount: 0,
+          unknownCount: 0,
           totalVulnerabilities: 5,
           scanDate: new Date('2023-01-01T12:00:00Z'),
           imageId: 'sha256:mock-image-id',
@@ -270,6 +274,7 @@ describe('scanImage', () => {
           high: 2,
           medium: 1,
           low: 1,
+          negligible: 0,
           unknown: 0,
           total: 5,
         });
