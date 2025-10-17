@@ -43,6 +43,8 @@ export interface KubernetesClient {
   namespaceExists: (namespace: string) => Promise<boolean>;
   checkPermissions: (namespace: string) => Promise<boolean>;
   checkIngressController: () => Promise<boolean>;
+  listServices: (namespace: string) => Promise<Result<k8s.V1Service[]>>;
+  listIngresses: (namespace: string) => Promise<Result<k8s.V1Ingress[]>>;
 }
 
 // Constants for deployment polling
@@ -568,6 +570,70 @@ export const createKubernetesClient = (
             name,
           },
           'Wait for deployment failed',
+        );
+
+        return Failure(errorMessage, guidance);
+      }
+    },
+
+    /**
+     * List services in namespace
+     * Retrieves all services in the specified namespace
+     *
+     * @param namespace - Kubernetes namespace to list services from
+     * @returns Result with array of services on success
+     */
+    async listServices(namespace: string): Promise<Result<k8s.V1Service[]>> {
+      try {
+        logger.debug({ namespace }, 'Listing services');
+        const response = await coreApi.listNamespacedService({ namespace });
+        logger.debug({ namespace, count: response.items.length }, 'Services listed');
+        return Success(response.items);
+      } catch (error) {
+        const guidance = extractK8sErrorGuidance(error, 'list services');
+        const errorMessage = `Failed to list services: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            details: guidance.details,
+            namespace,
+          },
+          'List services failed',
+        );
+
+        return Failure(errorMessage, guidance);
+      }
+    },
+
+    /**
+     * List ingresses in namespace
+     * Retrieves all ingresses in the specified namespace
+     *
+     * @param namespace - Kubernetes namespace to list ingresses from
+     * @returns Result with array of ingresses on success
+     */
+    async listIngresses(namespace: string): Promise<Result<k8s.V1Ingress[]>> {
+      try {
+        logger.debug({ namespace }, 'Listing ingresses');
+        const response = await networkingApi.listNamespacedIngress({ namespace });
+        logger.debug({ namespace, count: response.items.length }, 'Ingresses listed');
+        return Success(response.items);
+      } catch (error) {
+        const guidance = extractK8sErrorGuidance(error, 'list ingresses');
+        const errorMessage = `Failed to list ingresses: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            details: guidance.details,
+            namespace,
+          },
+          'List ingresses failed',
         );
 
         return Failure(errorMessage, guidance);

@@ -110,6 +110,191 @@ async function checkDeploymentHealth(
 }
 
 /**
+ * Discover service endpoints
+ */
+async function discoverServiceEndpoints(
+  k8sClient: KubernetesClient,
+  namespace: string,
+  logger: ReturnType<typeof getToolLogger>,
+  options: { includeClusterIP?: boolean } = {},
+): Promise<
+  Result<Array<{ type: 'internal' | 'external'; url: string; port: number; serviceName: string }>>
+> {
+  const endpoints: Array<{
+    type: 'internal' | 'external';
+    url: string;
+    port: number;
+    serviceName: string;
+  }> = [];
+
+  try {
+    const servicesResult = await k8sClient.listServices(namespace);
+
+    if (!servicesResult.ok) {
+      return servicesResult;
+    }
+
+    for (const service of servicesResult.value) {
+      const serviceName = service.metadata?.name;
+      const serviceType = service.spec?.type || 'ClusterIP';
+
+      if (!serviceName) continue;
+
+      // Handle different service types
+      switch (serviceType) {
+        case 'LoadBalancer': {
+          const lbIngress = service.status?.loadBalancer?.ingress || [];
+          for (const ing of lbIngress) {
+            if (ing.ip) {
+              const ports = service.spec?.ports || [];
+              for (const port of ports) {
+                if (port.port) {
+                  endpoints.push({
+                    type: 'external',
+                    url: `http://${ing.ip}`,
+                    port: port.port,
+                    serviceName,
+                  });
+                }
+              }
+            } else if (ing.hostname) {
+              const ports = service.spec?.ports || [];
+              for (const port of ports) {
+                if (port.port) {
+                  endpoints.push({
+                    type: 'external',
+                    url: `http://${ing.hostname}`,
+                    port: port.port,
+                    serviceName,
+                  });
+                }
+              }
+            }
+          }
+          break;
+        }
+
+        case 'NodePort': {
+          const ports = service.spec?.ports || [];
+          for (const port of ports) {
+            if (port.nodePort) {
+              endpoints.push({
+                type: 'external',
+                url: '<node-ip>',
+                port: port.nodePort,
+                serviceName,
+              });
+            }
+          }
+          break;
+        }
+
+        case 'ClusterIP': {
+          if (options.includeClusterIP) {
+            const clusterIP = service.spec?.clusterIP;
+            const ports = service.spec?.ports || [];
+            for (const port of ports) {
+              if (clusterIP && clusterIP !== 'None' && port.port) {
+                endpoints.push({
+                  type: 'internal',
+                  url: `http://${clusterIP}`,
+                  port: port.port,
+                  serviceName,
+                });
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    logger.debug({ count: endpoints.length }, 'Service endpoints discovered');
+    return Success(endpoints);
+  } catch (error) {
+    return Failure(`Failed to discover service endpoints: ${extractErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Discover ingress endpoints
+ */
+async function discoverIngressEndpoints(
+  k8sClient: KubernetesClient,
+  namespace: string,
+  logger: ReturnType<typeof getToolLogger>,
+): Promise<
+  Result<Array<{ type: 'internal' | 'external'; url: string; port: number; ingressName: string }>>
+> {
+  const endpoints: Array<{
+    type: 'internal' | 'external';
+    url: string;
+    port: number;
+    ingressName: string;
+  }> = [];
+
+  try {
+    const ingressesResult = await k8sClient.listIngresses(namespace);
+
+    if (!ingressesResult.ok) {
+      return ingressesResult;
+    }
+
+    for (const ingress of ingressesResult.value) {
+      const ingressName = ingress.metadata?.name || 'unknown';
+      const rules = ingress.spec?.rules || [];
+
+      for (const rule of rules) {
+        const host = rule.host || '<host>';
+        const paths = rule.http?.paths || [];
+
+        for (const path of paths) {
+          const pathStr = path.path || '/';
+
+          // Check if TLS is configured
+          const tls = ingress.spec?.tls || [];
+          const hasTLS = tls.some((t) => t.hosts?.includes(host));
+          const protocol = hasTLS ? 'https' : 'http';
+          const port = hasTLS ? 443 : 80;
+
+          endpoints.push({
+            type: 'external',
+            url: `${protocol}://${host}${pathStr}`,
+            port,
+            ingressName,
+          });
+        }
+      }
+
+      // Also check load balancer status
+      const lbIngress = ingress.status?.loadBalancer?.ingress || [];
+      for (const ing of lbIngress) {
+        if (ing.ip) {
+          endpoints.push({
+            type: 'external',
+            url: `http://${ing.ip}`,
+            port: 80,
+            ingressName,
+          });
+        } else if (ing.hostname) {
+          endpoints.push({
+            type: 'external',
+            url: `http://${ing.hostname}`,
+            port: 80,
+            ingressName,
+          });
+        }
+      }
+    }
+
+    logger.debug({ count: endpoints.length }, 'Ingress endpoints discovered');
+    return Success(endpoints);
+  } catch (error) {
+    return Failure(`Failed to discover ingress endpoints: ${extractErrorMessage(error)}`);
+  }
+}
+
+/**
  * Check endpoint health
  */
 async function checkEndpointHealth(url: string): Promise<boolean> {
@@ -187,6 +372,49 @@ async function handleVerifyDeployment(
     // Check deployment health
     const health = await checkDeploymentHealth(k8sClient, namespace, deploymentName, timeout);
 
+    // Discover service endpoints if requested
+    if (checks.includes('services')) {
+      logger.info('Discovering service endpoints...');
+      const serviceEndpointsResult = await discoverServiceEndpoints(
+        k8sClient,
+        namespace,
+        logger,
+        { includeClusterIP: true },
+      );
+
+      if (serviceEndpointsResult.ok) {
+        for (const endpoint of serviceEndpointsResult.value) {
+          endpoints.push({
+            type: endpoint.type,
+            url: endpoint.url,
+            port: endpoint.port,
+          });
+        }
+        logger.info({ count: serviceEndpointsResult.value.length }, 'Service endpoints discovered');
+      } else {
+        logger.warn({ error: serviceEndpointsResult.error }, 'Failed to discover service endpoints');
+      }
+    }
+
+    // Discover ingress endpoints if requested
+    if (checks.includes('ingress')) {
+      logger.info('Discovering ingress endpoints...');
+      const ingressEndpointsResult = await discoverIngressEndpoints(k8sClient, namespace, logger);
+
+      if (ingressEndpointsResult.ok) {
+        for (const endpoint of ingressEndpointsResult.value) {
+          endpoints.push({
+            type: endpoint.type,
+            url: endpoint.url,
+            port: endpoint.port,
+          });
+        }
+        logger.info({ count: ingressEndpointsResult.value.length }, 'Ingress endpoints discovered');
+      } else {
+        logger.warn({ error: ingressEndpointsResult.error }, 'Failed to discover ingress endpoints');
+      }
+    }
+
     // Initialize health checks
     const healthChecks: Array<{ name: string; status: 'pass' | 'fail'; message?: string }> = [];
 
@@ -194,12 +422,25 @@ async function handleVerifyDeployment(
     if (checks.includes('health')) {
       for (const endpoint of endpoints) {
         if (endpoint.type === 'external') {
-          const isHealthy = await checkEndpointHealth(endpoint.url);
+          // Construct full URL with port if not already included
+          let fullUrl = endpoint.url;
+          if (
+            !fullUrl.includes('<node-ip>') &&
+            !fullUrl.includes('<host>') &&
+            !fullUrl.match(/:\d+$/)
+          ) {
+            // Add port if not default HTTP/HTTPS port
+            if (endpoint.port !== 80 && endpoint.port !== 443) {
+              fullUrl = `${endpoint.url}:${endpoint.port}`;
+            }
+          }
+
+          const isHealthy = await checkEndpointHealth(fullUrl);
           endpoint.healthy = isHealthy;
           healthChecks.push({
             name: `${endpoint.type}-endpoint`,
             status: isHealthy ? 'pass' : 'fail',
-            message: `${endpoint.url}:${endpoint.port}`,
+            message: fullUrl,
           });
         }
       }

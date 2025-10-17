@@ -37,6 +37,7 @@ const mockK8sClient = {
   waitForDeploymentReady: jest.fn(),
   getDeploymentStatus: jest.fn(),
   listServices: jest.fn(),
+  listIngresses: jest.fn(),
   getService: jest.fn(),
 };
 
@@ -383,6 +384,12 @@ describe('verify-deployment', () => {
   });
 
   describe('Endpoints', () => {
+    beforeEach(() => {
+      // Default to empty services and ingresses
+      mockK8sClient.listServices.mockResolvedValue(createSuccessResult([]));
+      mockK8sClient.listIngresses.mockResolvedValue(createSuccessResult([]));
+    });
+
     it('should include endpoints in result', async () => {
       const mockContext = createMockToolContext();
       const result = await verifyDeploymentTool.handler(config, mockContext);
@@ -402,6 +409,379 @@ describe('verify-deployment', () => {
       if (result.ok) {
         expect(result.value.endpoints).toEqual([]);
       }
+    });
+
+    describe('Service Discovery', () => {
+      it('should discover LoadBalancer service endpoints with IP', async () => {
+        config.checks = ['services'];
+        mockK8sClient.listServices.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-service' },
+              spec: {
+                type: 'LoadBalancer',
+                ports: [{ port: 8080 }],
+              },
+              status: {
+                loadBalancer: {
+                  ingress: [{ ip: '203.0.113.1' }],
+                },
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(1);
+          expect(result.value.endpoints[0]).toMatchObject({
+            type: 'external',
+            url: 'http://203.0.113.1',
+            port: 8080,
+          });
+        }
+      });
+
+      it('should discover LoadBalancer service endpoints with hostname', async () => {
+        config.checks = ['services'];
+        mockK8sClient.listServices.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-service' },
+              spec: {
+                type: 'LoadBalancer',
+                ports: [{ port: 80 }],
+              },
+              status: {
+                loadBalancer: {
+                  ingress: [{ hostname: 'example.com' }],
+                },
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(1);
+          expect(result.value.endpoints[0]).toMatchObject({
+            type: 'external',
+            url: 'http://example.com',
+            port: 80,
+          });
+        }
+      });
+
+      it('should discover NodePort service endpoints', async () => {
+        config.checks = ['services'];
+        mockK8sClient.listServices.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-service' },
+              spec: {
+                type: 'NodePort',
+                ports: [{ port: 8080, nodePort: 30080 }],
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(1);
+          expect(result.value.endpoints[0]).toMatchObject({
+            type: 'external',
+            url: '<node-ip>',
+            port: 30080,
+          });
+        }
+      });
+
+      it('should discover ClusterIP service endpoints when includeClusterIP is enabled', async () => {
+        config.checks = ['services'];
+        mockK8sClient.listServices.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-service' },
+              spec: {
+                type: 'ClusterIP',
+                clusterIP: '10.0.0.1',
+                ports: [{ port: 8080 }],
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(1);
+          expect(result.value.endpoints[0]).toMatchObject({
+            type: 'internal',
+            url: 'http://10.0.0.1',
+            port: 8080,
+          });
+        }
+      });
+
+      it('should discover multiple service endpoints', async () => {
+        config.checks = ['services'];
+        mockK8sClient.listServices.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'service-1' },
+              spec: {
+                type: 'LoadBalancer',
+                ports: [{ port: 80 }],
+              },
+              status: {
+                loadBalancer: {
+                  ingress: [{ ip: '203.0.113.1' }],
+                },
+              },
+            },
+            {
+              metadata: { name: 'service-2' },
+              spec: {
+                type: 'NodePort',
+                ports: [{ port: 8080, nodePort: 30080 }],
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(2);
+        }
+      });
+
+      it('should handle service discovery errors gracefully', async () => {
+        config.checks = ['services'];
+        mockK8sClient.listServices.mockResolvedValue(
+          createFailureResult('Failed to list services'),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toEqual([]);
+        }
+      });
+    });
+
+    describe('Ingress Discovery', () => {
+      it('should discover HTTP ingress endpoints', async () => {
+        config.checks = ['ingress'];
+        mockK8sClient.listIngresses.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-ingress' },
+              spec: {
+                rules: [
+                  {
+                    host: 'example.com',
+                    http: {
+                      paths: [{ path: '/api' }],
+                    },
+                  },
+                ],
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(1);
+          expect(result.value.endpoints[0]).toMatchObject({
+            type: 'external',
+            url: 'http://example.com/api',
+            port: 80,
+          });
+        }
+      });
+
+      it('should discover HTTPS ingress endpoints with TLS', async () => {
+        config.checks = ['ingress'];
+        mockK8sClient.listIngresses.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-ingress' },
+              spec: {
+                tls: [
+                  {
+                    hosts: ['example.com'],
+                  },
+                ],
+                rules: [
+                  {
+                    host: 'example.com',
+                    http: {
+                      paths: [{ path: '/' }],
+                    },
+                  },
+                ],
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(1);
+          expect(result.value.endpoints[0]).toMatchObject({
+            type: 'external',
+            url: 'https://example.com/',
+            port: 443,
+          });
+        }
+      });
+
+      it('should discover ingress endpoints with LoadBalancer IP', async () => {
+        config.checks = ['ingress'];
+        mockK8sClient.listIngresses.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-ingress' },
+              spec: {
+                rules: [],
+              },
+              status: {
+                loadBalancer: {
+                  ingress: [{ ip: '203.0.113.1' }],
+                },
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(1);
+          expect(result.value.endpoints[0]).toMatchObject({
+            type: 'external',
+            url: 'http://203.0.113.1',
+            port: 80,
+          });
+        }
+      });
+
+      it('should discover multiple ingress endpoints', async () => {
+        config.checks = ['ingress'];
+        mockK8sClient.listIngresses.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'ingress-1' },
+              spec: {
+                rules: [
+                  {
+                    host: 'example.com',
+                    http: {
+                      paths: [{ path: '/api' }, { path: '/v2' }],
+                    },
+                  },
+                ],
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(2);
+        }
+      });
+
+      it('should handle ingress discovery errors gracefully', async () => {
+        config.checks = ['ingress'];
+        mockK8sClient.listIngresses.mockResolvedValue(
+          createFailureResult('Failed to list ingresses'),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toEqual([]);
+        }
+      });
+    });
+
+    describe('Combined Service and Ingress Discovery', () => {
+      it('should discover both service and ingress endpoints', async () => {
+        config.checks = ['services', 'ingress'];
+        mockK8sClient.listServices.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-service' },
+              spec: {
+                type: 'LoadBalancer',
+                ports: [{ port: 8080 }],
+              },
+              status: {
+                loadBalancer: {
+                  ingress: [{ ip: '203.0.113.1' }],
+                },
+              },
+            },
+          ]),
+        );
+        mockK8sClient.listIngresses.mockResolvedValue(
+          createSuccessResult([
+            {
+              metadata: { name: 'test-ingress' },
+              spec: {
+                rules: [
+                  {
+                    host: 'example.com',
+                    http: {
+                      paths: [{ path: '/' }],
+                    },
+                  },
+                ],
+              },
+            },
+          ]),
+        );
+
+        const mockContext = createMockToolContext();
+        const result = await verifyDeploymentTool.handler(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.endpoints).toHaveLength(2);
+        }
+      });
     });
   });
 
