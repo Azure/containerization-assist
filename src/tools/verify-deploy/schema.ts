@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const verifyDeploymentSchema = z.object({
+export const verifyDeploySchema = z.object({
   deploymentName: z.string().describe('Deployment name to verify (required)'),
   namespace: z.string().optional().describe('Kubernetes namespace'),
   checks: z
@@ -9,4 +9,4 @@ export const verifyDeploymentSchema = z.object({
     .describe('Checks to perform'),
 });
 
-export type VerifyDeploymentParams = z.infer<typeof verifyDeploymentSchema>;
+export type VerifyDeployParams = z.infer<typeof verifyDeploySchema>;

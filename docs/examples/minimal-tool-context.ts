@@ -34,7 +34,7 @@ function createMinimalToolContext(): ToolContext {
                 : '';
             console.log(`⏳ ${message}${progressStr}`);
         },
-    };
+    } as ToolContext;
 }
 
 export { createMinimalToolContext };

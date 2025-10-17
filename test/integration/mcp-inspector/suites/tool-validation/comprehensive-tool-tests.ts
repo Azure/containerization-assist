@@ -369,7 +369,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
     },
 
     {
-      name: 'deploy-application-tool',
+      name: 'deploy-tool',
       category: 'tool-validation',
       description: 'Test application deployment functionality',
       tags: ['tools', 'deployment', 'kubernetes'],
@@ -428,7 +428,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
     },
 
     {
-      name: 'verify-deployment-tool',
+      name: 'verify-deploy-tool',
       category: 'tool-validation',
       description: 'Test deployment verification functionality',
       tags: ['tools', 'verification', 'kubernetes'],
@@ -437,7 +437,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
         const start = performance.now();
 
         const result = await client.callTool({
-          name: 'verify-deployment',
+          name: 'verify-deploy',
           arguments: {
             deploymentName: 'test-deployment',
             namespace: 'default',
