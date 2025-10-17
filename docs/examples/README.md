@@ -81,8 +81,8 @@ import { configureTools } from 'containerization-assist-mcp';
 configureTools({ server });
 ```
 
-**AI Determinism:**
-All AI-powered tools use deterministic sampling (`count: 1`) to ensure reproducible outputs. Each generation includes scoring metadata for quality validation.
+**AI Features:**
+Tools provide deterministic outputs through built-in prompt engineering.
 
 **Progress Notifications:**
 Long-running operations (build, deploy, scan-image) emit MCP notifications that clients can subscribe to for real-time progress updates.
@@ -94,8 +94,6 @@ All Container Assist tools require a ToolContext with these properties:
 ```typescript
 interface ToolContext {
   logger: Logger;                    // Pino-compatible logger (required)
-  sampling: SamplingCapabilities;    // AI capabilities for MCP protocol
-  getPrompt: PromptFunction;         // Access to prompt registry  
   signal?: AbortSignal;              // Optional cancellation signal
   progress?: ProgressReporter;       // Optional progress reporting
 }
@@ -104,8 +102,33 @@ interface ToolContext {
 **Quick Setup Options:**
 
 1. **Minimal Implementation** - See [minimal-tool-context.ts](./minimal-tool-context.ts)
-2. **Full Example** - See [app-mod-telemetry.ts](./app-mod-telemetry.ts) `createExampleToolContext()`
-3. **Production** - Use actual Pino logger and MCP server capabilities
+   ```typescript
+   const context: ToolContext = {
+     logger: pino({ level: 'info' }),
+     signal: undefined,
+     progress: async (msg) => console.log(msg),
+   };
+   ```
+
+2. **With Real Pino Logger** - Production setup
+   ```typescript
+   import pino from 'pino';
+
+   const context: ToolContext = {
+     logger: pino({
+       name: 'containerization-assist',
+       level: 'info',
+       transport: {
+         target: 'pino-pretty',
+         options: { colorize: true }
+       }
+     }),
+     signal: undefined,
+     progress: async (message, current, total) => {
+       console.log(`Progress: ${message} (${current}/${total})`);
+     },
+   };
+   ```
 
 **Logger Requirements:**
 The logger must implement Pino's interface with methods: debug, info, warn, error, fatal, trace, silent, child, and a level property.

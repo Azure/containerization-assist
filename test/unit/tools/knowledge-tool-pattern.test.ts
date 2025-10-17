@@ -32,7 +32,6 @@ describe('Knowledge Tool Pattern', () => {
         fatal: jest.fn(),
         child: jest.fn().mockReturnThis(),
       },
-      sampling: {} as any,
     } as unknown as ToolContext;
   }
 

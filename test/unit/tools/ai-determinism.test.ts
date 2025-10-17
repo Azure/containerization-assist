@@ -1,6 +1,6 @@
 /**
  * AI Determinism Tests
- * Verifies that all AI-driven tools use deterministic single-candidate sampling
+ * Verifies that all AI-driven tools use consistent configuration
  */
 
 import { describe, it, expect } from '@jest/globals';
@@ -15,7 +15,7 @@ describe('AI Determinism Configuration', () => {
       expect(SAMPLING_CONFIG.PRIORITIES.INTELLIGENCE).toBeGreaterThan(0);
     });
 
-    it('should enforce deterministic single-candidate sampling', () => {
+    it('should enforce consistent generation limits', () => {
       expect(SAMPLING_CONFIG.LIMITS).toBeDefined();
     });
   });
@@ -27,8 +27,8 @@ describe('AI Determinism Configuration', () => {
     });
   });
 
-  describe('Sampling Determinism', () => {
-    it('should use single-candidate deterministic sampling across all tools', () => {
+  describe('Generation Determinism', () => {
+    it('should use consistent generation across all tools', () => {
       expect(SAMPLING_CONFIG).not.toHaveProperty('CANDIDATES');
     });
 
@@ -41,7 +41,7 @@ describe('AI Determinism Configuration', () => {
       });
     });
 
-    it('should enforce deterministic single-candidate behavior', () => {
+    it('should enforce deterministic generation behavior', () => {
       expect(SAMPLING_CONFIG).not.toHaveProperty('CANDIDATES');
       expect(SAMPLING_CONFIG).not.toHaveProperty('DEFAULTS');
       expect(SAMPLING_CONFIG).toBeDefined();

@@ -44,8 +44,6 @@ export const generateK8sManifestsSchema = z
 
 export type GenerateK8sManifestsParams = z.infer<typeof generateK8sManifestsSchema>;
 
-// Legacy export for compatibility
-
 export interface ManifestRequirement {
   id: string;
   category: string;

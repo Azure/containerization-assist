@@ -1,6 +1,6 @@
 /**
  * Minimal ToolContext Example
- * 
+ *
  * This shows the absolute minimum required to implement ToolContext
  * for use with Container Assist tools.
  */
@@ -20,44 +20,14 @@ function createMinimalToolContext(): ToolContext {
         error: (msg: any, ...args: any[]) => console.error('❌', msg, ...args),
         fatal: (msg: any, ...args: any[]) => console.error('💀', msg, ...args),
         trace: (msg: any, ...args: any[]) => console.trace('🔎', msg, ...args),
-        silent: () => { }, // No-op for silent logging
+        silent: () => { },
         level: 'info',
-        child: (bindings?: any) => logger, // Return self for simplicity
+        child: (bindings?: any) => logger,
     };
 
     return {
-        // Required: Logger for debugging and error tracking
         logger,
-
-        // Required: AI sampling capabilities (can be mock for simple cases)
-        sampling: {
-            createMessage: async (request) => {
-                // Mock implementation - replace with actual MCP client
-                return {
-                    role: 'assistant' as const,
-                    content: [{ type: 'text' as const, text: 'Mock response' }],
-                };
-            },
-        },
-
-        // Required: Prompt registry access (can be mock for simple cases)
-        getPrompt: async (name: string, args?: Record<string, unknown>) => {
-            // Mock implementation - replace with actual prompt registry
-            return {
-                description: `Prompt: ${name}`,
-                messages: [
-                    {
-                        role: 'user' as const,
-                        content: [{ type: 'text' as const, text: `Prompt for ${name}` }],
-                    },
-                ],
-            };
-        },
-
-        // Optional: Cancellation signal
         signal: undefined,
-
-        // Optional: Progress reporting
         progress: async (message: string, current?: number, total?: number) => {
             const progressStr = current !== undefined && total !== undefined
                 ? ` (${current}/${total})`
