@@ -25,7 +25,7 @@ npm install -g containerization-assist-mcp
 
 - Node.js 20+
 - Docker or Docker Desktop
-- Optional: [Trivy](https://aquasecurity.github.io/trivy/) (for security scanning features)
+- Optional: [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) (for security scanning features)
 - Optional: Kubernetes (for deployment features)
 
 ## VS Code Setup

@@ -7,28 +7,54 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import type { Logger } from 'pino';
 
-// Create a module-level mock that will be accessed by the mock factory
+// Create module-level mocks that will be accessed by the mock factory
 let mockExecAsync: jest.MockedFunction<
   (command: string, options?: unknown) => Promise<{ stdout: string; stderr: string }>
 >;
+let mockExecFileAsync: jest.MockedFunction<
+  (
+    file: string,
+    args: string[],
+    options?: unknown,
+  ) => Promise<{ stdout: string; stderr: string }>
+>;
+
+// Store promisified function references
+const promisifiedFunctions = new Map<Function, 'exec' | 'execFile'>();
 
 // Mock node:child_process
-jest.mock('node:child_process', () => ({
-  exec: jest.fn(),
-}));
+jest.mock('node:child_process', () => {
+  const mockExecFn = jest.fn();
+  const mockExecFileFn = jest.fn();
+  promisifiedFunctions.set(mockExecFn, 'exec');
+  promisifiedFunctions.set(mockExecFileFn, 'execFile');
+  return {
+    exec: mockExecFn,
+    execFile: mockExecFileFn,
+  };
+});
 
-// Mock node:util to return our mock
+// Mock node:util to return our mocks
 jest.mock('node:util', () => {
   const actual = jest.requireActual<typeof import('node:util')>('node:util');
   return {
     ...actual,
-    promisify: () => {
-      // Return a function that will resolve to our mock when called
+    promisify: (fn: Function) => {
+      const fnType = promisifiedFunctions.get(fn);
+      // Return wrapper that delegates to our module-level mocks
       return (...args: unknown[]) => {
-        if (!mockExecAsync) {
-          throw new Error('mockExecAsync not initialized');
+        // Check if this is execFile or exec based on what was promisified
+        if (fnType === 'execFile') {
+          if (!mockExecFileAsync) {
+            throw new Error('mockExecFileAsync not initialized');
+          }
+          return mockExecFileAsync(...(args as [string, string[], unknown?]));
+        } else {
+          if (!mockExecAsync) {
+            throw new Error('mockExecAsync not initialized');
+          }
+          return mockExecAsync(...(args as [string, unknown?]));
         }
-        return mockExecAsync(...(args as [string, unknown?]));
       };
     },
   };
@@ -41,9 +67,16 @@ describe('Trivy Scanner', () => {
   let mockLogger: Logger;
 
   beforeEach(() => {
-    // Initialize the mock function
+    // Initialize the mock functions
     mockExecAsync = jest.fn<
       (command: string, options?: unknown) => Promise<{ stdout: string; stderr: string }>
+    >();
+    mockExecFileAsync = jest.fn<
+      (
+        file: string,
+        args: string[],
+        options?: unknown,
+      ) => Promise<{ stdout: string; stderr: string }>
     >();
 
     // Create a mock logger
@@ -148,16 +181,15 @@ describe('Trivy Scanner', () => {
         ],
       };
 
-      // Mock version check and scan
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify(mockTrivyOutput),
-          stderr: '',
-        });
+      // Mock version check (uses execAsync) and scan (uses execFileAsync)
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
 
       const result = await scanImageWithTrivy('test-image:latest', mockLogger);
 
@@ -169,6 +201,8 @@ describe('Trivy Scanner', () => {
         expect(result.value.highCount).toBe(1);
         expect(result.value.mediumCount).toBe(0);
         expect(result.value.lowCount).toBe(0);
+        expect(result.value.negligibleCount).toBe(0);
+        expect(result.value.unknownCount).toBe(0);
         expect(result.value.vulnerabilities).toHaveLength(2);
 
         // Check first vulnerability
@@ -189,15 +223,14 @@ describe('Trivy Scanner', () => {
         Results: [],
       };
 
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify(mockTrivyOutput),
-          stderr: '',
-        });
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
 
       const result = await scanImageWithTrivy('safe-image:latest', mockLogger);
 
@@ -266,15 +299,14 @@ describe('Trivy Scanner', () => {
         ],
       };
 
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify(mockTrivyOutput),
-          stderr: '',
-        });
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
 
       const result = await scanImageWithTrivy('test-image:latest', mockLogger);
 
@@ -283,7 +315,10 @@ describe('Trivy Scanner', () => {
         expect(result.value.criticalCount).toBe(1);
         expect(result.value.highCount).toBe(1);
         expect(result.value.mediumCount).toBe(1);
-        expect(result.value.lowCount).toBe(3); // LOW + NEGLIGIBLE + UNKNOWN
+        expect(result.value.lowCount).toBe(1);
+        expect(result.value.negligibleCount).toBe(1);
+        expect(result.value.unknownCount).toBe(1);
+        expect(result.value.totalVulnerabilities).toBe(6);
       }
     });
 
@@ -302,12 +337,11 @@ describe('Trivy Scanner', () => {
     });
 
     it('should handle Trivy scan execution errors', async () => {
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockRejectedValueOnce(new Error('Image not found'));
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockRejectedValueOnce(new Error('Image not found'));
 
       const result = await scanImageWithTrivy('nonexistent:latest', mockLogger);
 
@@ -320,15 +354,14 @@ describe('Trivy Scanner', () => {
     });
 
     it('should handle invalid JSON output from Trivy', async () => {
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: 'Not valid JSON{{{',
-          stderr: '',
-        });
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: 'Not valid JSON{{{',
+        stderr: '',
+      });
 
       const result = await scanImageWithTrivy('test-image:latest', mockLogger);
 
@@ -348,15 +381,14 @@ describe('Trivy Scanner', () => {
         Results: [],
       };
 
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify(mockTrivyOutput),
-          stderr: 'Warning: Database may be outdated',
-        });
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: 'Warning: Database may be outdated',
+      });
 
       const result = await scanImageWithTrivy('test-image:latest', mockLogger);
 
@@ -390,15 +422,14 @@ describe('Trivy Scanner', () => {
         ],
       };
 
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify(mockTrivyOutput),
-          stderr: '',
-        });
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
 
       const result = await scanImageWithTrivy('test-image:latest', mockLogger);
 
@@ -412,7 +443,7 @@ describe('Trivy Scanner', () => {
       }
     });
 
-    it('should include correct command in logs', async () => {
+    it('should include correct args in logs', async () => {
       const mockTrivyOutput = {
         SchemaVersion: 2,
         ArtifactName: 'test-image:latest',
@@ -420,20 +451,19 @@ describe('Trivy Scanner', () => {
         Results: [],
       };
 
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify(mockTrivyOutput),
-          stderr: '',
-        });
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
 
       await scanImageWithTrivy('test-image:latest', mockLogger);
 
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.objectContaining({ command: expect.stringContaining('trivy image') }),
+        expect.objectContaining({ args: expect.arrayContaining(['image', 'test-image:latest']) }),
         'Executing Trivy command',
       );
     });
@@ -450,15 +480,14 @@ describe('Trivy Scanner', () => {
         Results: [],
       };
 
-      mockExecAsync
-        .mockResolvedValueOnce({
-          stdout: 'Version: 0.48.0\n',
-          stderr: '',
-        })
-        .mockResolvedValueOnce({
-          stdout: JSON.stringify(mockTrivyOutput),
-          stderr: '',
-        });
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
 
       const scanner = createSecurityScanner(mockLogger, 'trivy');
       const result = await scanner.scanImage('test:latest');
@@ -494,6 +523,88 @@ describe('Trivy Scanner', () => {
       const result = await scanner.ping();
 
       expect(result.ok).toBe(false);
+    });
+  });
+
+  describe('ImageId Validation', () => {
+    it('should reject imageId with shell metacharacters', async () => {
+      mockExecAsync.mockResolvedValue({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+
+      const result = await scanImageWithTrivy('test-image; rm -rf /', mockLogger);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Invalid imageId format');
+        expect(result.guidance?.hint).toContain('ImageId must contain only alphanumeric');
+      }
+    });
+
+    it('should reject imageId with quotes', async () => {
+      mockExecAsync.mockResolvedValue({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+
+      const result = await scanImageWithTrivy('test"image', mockLogger);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Invalid imageId format');
+      }
+    });
+
+    it('should accept valid imageId with registry, namespace, and tag', async () => {
+      const mockTrivyOutput = {
+        SchemaVersion: 2,
+        ArtifactName: 'registry.example.com/namespace/image:v1.0.0',
+        ArtifactType: 'container_image',
+        Results: [],
+      };
+
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
+
+      const result = await scanImageWithTrivy(
+        'registry.example.com/namespace/image:v1.0.0',
+        mockLogger,
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should accept valid imageId with digest', async () => {
+      const mockTrivyOutput = {
+        SchemaVersion: 2,
+        ArtifactName:
+          'myimage@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ArtifactType: 'container_image',
+        Results: [],
+      };
+
+      mockExecAsync.mockResolvedValueOnce({
+        stdout: 'Version: 0.48.0\n',
+        stderr: '',
+      });
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify(mockTrivyOutput),
+        stderr: '',
+      });
+
+      const result = await scanImageWithTrivy(
+        'myimage@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        mockLogger,
+      );
+
+      expect(result.ok).toBe(true);
     });
   });
 });

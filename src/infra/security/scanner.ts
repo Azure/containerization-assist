@@ -12,7 +12,7 @@ export interface BasicScanResult {
   imageId: string;
   vulnerabilities: Array<{
     id: string;
-    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'NEGLIGIBLE' | 'UNKNOWN';
     package: string;
     version: string;
     fixedVersion?: string;
@@ -23,6 +23,8 @@ export interface BasicScanResult {
   highCount: number;
   mediumCount: number;
   lowCount: number;
+  negligibleCount: number;
+  unknownCount: number;
   scanDate: Date;
 }
 
@@ -64,6 +66,8 @@ function createStubScanner(logger: Logger): SecurityScanner {
           highCount: 0,
           mediumCount: 0,
           lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
           scanDate: new Date(),
         };
 

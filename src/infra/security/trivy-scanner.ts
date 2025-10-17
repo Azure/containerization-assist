@@ -7,7 +7,7 @@
  * @see https://aquasecurity.github.io/trivy/
  */
 
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Logger } from 'pino';
 
@@ -16,6 +16,7 @@ import { Result, Success, Failure } from '@/types';
 import type { BasicScanResult } from './scanner';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // Trivy JSON output structures
 interface TrivyVulnerability {
@@ -51,10 +52,12 @@ interface TrivyOutput {
 
 /**
  * Map Trivy severity to our standardized severity levels
+ * Preserves UNKNOWN and NEGLIGIBLE as separate levels to maintain fidelity
+ * between uncertain severity (UNKNOWN) and low-risk findings (NEGLIGIBLE)
  */
 function mapTrivySeverity(
   trivySeverity: string,
-): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
+): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'NEGLIGIBLE' | 'UNKNOWN' {
   const severity = trivySeverity.toUpperCase();
   switch (severity) {
     case 'CRITICAL':
@@ -64,11 +67,13 @@ function mapTrivySeverity(
     case 'MEDIUM':
       return 'MEDIUM';
     case 'LOW':
+      return 'LOW';
     case 'NEGLIGIBLE':
+      return 'NEGLIGIBLE';
     case 'UNKNOWN':
-      return 'LOW';
+      return 'UNKNOWN';
     default:
-      return 'LOW';
+      return 'UNKNOWN';
   }
 }
 
@@ -81,6 +86,8 @@ function parseTrivyOutput(trivyOutput: TrivyOutput, imageId: string): BasicScanR
   let highCount = 0;
   let mediumCount = 0;
   let lowCount = 0;
+  let negligibleCount = 0;
+  let unknownCount = 0;
 
   // Iterate through all results and their vulnerabilities
   for (const result of trivyOutput.Results || []) {
@@ -100,6 +107,12 @@ function parseTrivyOutput(trivyOutput: TrivyOutput, imageId: string): BasicScanR
           break;
         case 'LOW':
           lowCount++;
+          break;
+        case 'NEGLIGIBLE':
+          negligibleCount++;
+          break;
+        case 'UNKNOWN':
+          unknownCount++;
           break;
       }
 
@@ -129,8 +142,19 @@ function parseTrivyOutput(trivyOutput: TrivyOutput, imageId: string): BasicScanR
     highCount,
     mediumCount,
     lowCount,
+    negligibleCount,
+    unknownCount,
     scanDate: new Date(),
   };
+}
+
+/**
+ * Validate imageId against allowlist pattern to prevent command injection
+ * Allows: alphanumeric, dots, colons, slashes, at-signs, underscores, and hyphens
+ */
+function validateImageId(imageId: string): boolean {
+  const allowedPattern = /^[a-zA-Z0-9._:/@-]+$/;
+  return allowedPattern.test(imageId);
 }
 
 /**
@@ -138,13 +162,25 @@ function parseTrivyOutput(trivyOutput: TrivyOutput, imageId: string): BasicScanR
  * @throws Error if Trivy is not installed or execution fails
  */
 async function getTrivyVersion(logger: Logger): Promise<string | undefined> {
-  const { stdout } = await execAsync('trivy --version');
-  // Trivy version output format: "Version: X.Y.Z"
-  const match = stdout.match(/Version:\s*([^\s\n]+)/);
-  if (!match) {
-    logger.debug({ stdout }, 'Could not parse Trivy version from output');
+  try {
+    const { stdout } = await execAsync('trivy --version', { timeout: 15000 });
+    // Trivy version output format: "Version: X.Y.Z"
+    const match = stdout.match(/Version:\s*([^\s\n]+)/);
+    if (!match) {
+      logger.debug({ stdout }, 'Could not parse Trivy version from output');
+    }
+    return match ? match[1] : undefined;
+  } catch (error: unknown) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'ETIMEDOUT') {
+      logger.error(
+        { error },
+        'Trivy version check timed out. The trivy process may be unresponsive or misconfigured.',
+      );
+      return undefined;
+    }
+    throw error;
   }
-  return match ? match[1] : undefined;
 }
 
 /**
@@ -179,6 +215,16 @@ export async function scanImageWithTrivy(
   imageId: string,
   logger: Logger,
 ): Promise<Result<BasicScanResult>> {
+  // Validate imageId to prevent command injection
+  if (!validateImageId(imageId)) {
+    return Failure('Invalid imageId format', {
+      message: 'ImageId contains invalid characters',
+      hint: 'ImageId must contain only alphanumeric characters, dots, colons, slashes, at-signs, underscores, and hyphens',
+      resolution: 'Verify the imageId is a valid Docker image identifier',
+      details: { imageId },
+    });
+  }
+
   // Check if Trivy is available
   const availabilityCheck = await checkTrivyAvailability(logger);
   if (!availabilityCheck.ok) {
@@ -189,14 +235,14 @@ export async function scanImageWithTrivy(
   logger.info({ trivyVersion, imageId }, 'Starting Trivy scan');
 
   try {
-    // Run Trivy scan with JSON output
-    // --quiet: suppress progress output
+    // Run Trivy scan with JSON output using execFile to prevent command injection
     // --format json: output in JSON format
+    // --quiet: suppress progress output
     // --timeout 5m: set timeout to 5 minutes
-    const command = `trivy image --format json --quiet --timeout 5m "${imageId}"`;
-    logger.debug({ command }, 'Executing Trivy command');
+    const args = ['image', '--format', 'json', '--quiet', '--timeout', '5m', imageId];
+    logger.debug({ args }, 'Executing Trivy command');
 
-    const { stdout, stderr } = await execAsync(command, {
+    const { stdout, stderr } = await execFileAsync('trivy', args, {
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large scan results
     });
 
