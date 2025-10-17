@@ -23,7 +23,6 @@ import type {
 import type { Logger } from 'pino';
 import type { MCPTool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
-import { TOOL_NAME, ToolName } from '@/tools';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 
 // ===== Types =====
@@ -322,17 +321,17 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     if (result.ok) {
       let valueWithMessages = result.value;
 
-      if (env.config.chainHintsMode === 'enabled') {
-        const hint = getChainHint(tool.name as ToolName, result.ok ? 'success' : 'failure');
-        if (hint) {
-          valueWithMessages = {
-            ...valueWithMessages,
-            nextSteps: hint,
-          };
-        }
+      if (env.config.chainHintsMode === 'enabled' && tool.chainHints) {
+        valueWithMessages = {
+          ...valueWithMessages,
+          nextSteps: tool.chainHints.success,
+        };
       }
 
       result.value = valueWithMessages;
+    } else if (result.guidance && tool.chainHints) {
+      // Add failure hint to error guidance
+      result.guidance.hint = tool.chainHints.failure;
     }
     tracker.complete({});
     return result;
@@ -352,87 +351,6 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     return Failure(errorMessage);
   }
 }
-
-type outputState = 'success' | 'failure';
-function getChainHint(toolName: ToolName, outputState: outputState): string {
-  const stateToHints = chainHintMap.get(toolName);
-  if (!stateToHints) {
-    return '';
-  }
-
-  const hint = stateToHints[outputState];
-  return hint || '';
-}
-
-const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
-  [
-    TOOL_NAME.ANALYZE_REPO,
-    {
-      success: `Repository analysis completed successfully. Continue by calling the ${TOOL_NAME.GENERATE_DOCKERFILE} or ${TOOL_NAME.FIX_DOCKERFILE} tools to create or fix your Dockerfile.`,
-      failure: 'Repository analysis failed. Please check the logs for details.',
-    },
-  ],
-  [
-    TOOL_NAME.VALIDATE_DOCKERFILE,
-    {
-      success: `Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the ${TOOL_NAME.GENERATE_K8S_MANIFESTS} tool to proceed with containerization.`,
-      failure:
-        'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
-    },
-  ],
-  [
-    TOOL_NAME.BUILD_IMAGE,
-    {
-      success: `Image built successfully. Next: Call ${TOOL_NAME.SCAN_IMAGE} to check for security vulnerabilities.`,
-      failure: `Image build failed. Use ${TOOL_NAME.FIX_DOCKERFILE} to resolve issues, then retry ${TOOL_NAME.BUILD_IMAGE}.`,
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_K8S_MANIFESTS,
-    {
-      success: `Kubernetes manifests generated successfully. Next: Call ${TOOL_NAME.PREPARE_CLUSTER} to create a kind cluster to deploy to.`,
-      failure: 'Manifest generation failed. Ensure you have a valid image and try again.',
-    },
-  ],
-  [
-    TOOL_NAME.DEPLOY,
-    {
-      success: `Application deployed successfully. Use ${TOOL_NAME.VERIFY_DEPLOY} to check deployment health and status.`,
-      failure:
-        'Deployment failed. Check cluster connectivity, manifests validity, and pod status with kubectl.',
-    },
-  ],
-  [
-    TOOL_NAME.FIX_DOCKERFILE,
-    {
-      success: `Dockerfile fixes applied successfully. Next: Call ${TOOL_NAME.BUILD_IMAGE} to test the fixed Dockerfile.`,
-      failure: 'Dockerfile fix failed. Review validation errors and try manual fixes.',
-    },
-  ],
-  [
-    TOOL_NAME.PUSH_IMAGE,
-    {
-      success: `Image pushed successfully. Review AI optimization insights for push improvements.`,
-      failure:
-        'Image push failed. Check registry credentials, network connectivity, and image tag format.',
-    },
-  ],
-  [
-    TOOL_NAME.SCAN_IMAGE,
-    {
-      success: `Security scan passed! Proceed with ${TOOL_NAME.PUSH_IMAGE} to push to a registry, or continue with deployment preparation.`,
-      failure: `Security scan found vulnerabilities. Use ${TOOL_NAME.FIX_DOCKERFILE} to address security issues in your base images and dependencies.`,
-    },
-  ],
-  [
-    TOOL_NAME.PREPARE_CLUSTER,
-    {
-      success: `Cluster preparation successful. Next: Call ${TOOL_NAME.DEPLOY} to deploy to the kind cluster.`,
-      failure:
-        'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
-    },
-  ],
-]);
 
 /**
  * Validate parameters against schema using safeParse

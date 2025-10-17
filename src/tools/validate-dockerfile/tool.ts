@@ -221,5 +221,11 @@ export default tool({
   metadata: {
     knowledgeEnhanced: false,
   },
+  chainHints: {
+    success:
+      'Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the generate-k8s-manifests tool to proceed with containerization.',
+    failure:
+      'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
+  },
   handler: handleValidateDockerfile,
 });

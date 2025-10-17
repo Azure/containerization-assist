@@ -28,7 +28,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
 
-import { DEFAULT_TIMEOUTS } from '@/config/defaults';
+import { DEFAULT_TIMEOUTS } from '@/config/constants';
 import { Success, Failure, type Result } from '@/types';
 import { verifyDeploySchema, type VerifyDeployParams } from './schema';
 

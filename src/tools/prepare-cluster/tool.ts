@@ -24,7 +24,11 @@ import { setupToolContext } from '@/lib/tool-context-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/mcp/context';
-import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
+import {
+  createKubernetesClient,
+  type K8sManifest,
+  type KubernetesClient,
+} from '@/infra/kubernetes/client';
 import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-utils';
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
@@ -92,7 +96,7 @@ async function setupRbac(
   logger: pino.Logger,
 ): Promise<void> {
   try {
-    const serviceAccount = {
+    const serviceAccount: K8sManifest = {
       apiVersion: 'v1',
       kind: 'ServiceAccount',
       metadata: {
@@ -461,6 +465,11 @@ export default tool({
   schema: prepareClusterSchema,
   metadata: {
     knowledgeEnhanced: false,
+  },
+  chainHints: {
+    success: 'Cluster preparation successful. Next: Call deploy to deploy to the kind cluster.',
+    failure:
+      'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
   },
   handler: handlePrepareCluster,
 });

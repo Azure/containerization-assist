@@ -360,5 +360,10 @@ export default tool({
   metadata: {
     knowledgeEnhanced: true,
   },
+  chainHints: {
+    success:
+      'Kubernetes manifests generated successfully. Next: Call prepare-cluster to create a kind cluster to deploy to.',
+    failure: 'Manifest generation failed. Ensure you have a valid image and try again.',
+  },
   handler: handleGenerateK8sManifests,
 });

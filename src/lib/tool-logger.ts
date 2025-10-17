@@ -33,7 +33,11 @@ export function createToolLogEntry(toolName: string, input: unknown): ToolLogEnt
 let logFileName: string | null = null;
 
 function isToolLoggingEnabled(): boolean {
-  return config.toolLogging.enabled && !!config.toolLogging.dirPath;
+  return (
+    !!config.toolLogging.enabled &&
+    typeof config.toolLogging.dirPath === 'string' &&
+    config.toolLogging.dirPath.trim() !== ''
+  );
 }
 
 export function getLogFilePath(): string {

@@ -26,14 +26,7 @@ import type {
   ExecutionMetadata,
 } from '@/types/runtime';
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
-import Docker from 'dockerode';
-import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
-import { createKubernetesClient } from '@/infra/kubernetes/client';
-
-/**
- * Timeout for Docker connection checks in milliseconds
- */
-const DOCKER_CONNECTION_TIMEOUT_MS = 3000;
+import { checkDockerHealth, checkKubernetesHealth } from '@/lib/health-checks';
 
 /**
  * Apply tool aliases to create renamed versions of tools
@@ -212,67 +205,11 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     healthCheck: async () => {
       const toolCount = toolsMap.size;
 
-      // Check Docker connectivity
-      const dockerStatus: {
-        available: boolean;
-        version?: string;
-        error?: string;
-      } = await (async () => {
-        try {
-          const socketPath = autoDetectDockerSocket();
-          const docker = new Docker({ socketPath });
-
-          const versionInfo = await Promise.race([
-            docker.version(),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new Error('Docker connection timeout')),
-                DOCKER_CONNECTION_TIMEOUT_MS,
-              ),
-            ),
-          ]);
-
-          return {
-            available: true,
-            version: versionInfo.Version,
-          };
-        } catch (error) {
-          return {
-            available: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      })();
-
-      // Check Kubernetes connectivity
-      const k8sStatus: {
-        available: boolean;
-        version?: string;
-        error?: string;
-      } = await (async () => {
-        try {
-          const k8sClient = createKubernetesClient(logger);
-
-          const connected = await k8sClient.ping();
-
-          if (connected) {
-            return {
-              available: true,
-              version: 'connected',
-            };
-          } else {
-            return {
-              available: false,
-              error: 'Unable to connect to cluster',
-            };
-          }
-        } catch (error) {
-          return {
-            available: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      })();
+      // Check Docker and Kubernetes connectivity in parallel
+      const [dockerStatus, k8sStatus] = await Promise.all([
+        checkDockerHealth(logger),
+        checkKubernetesHealth(logger),
+      ]);
 
       const hasIssues = !dockerStatus.available || !k8sStatus.available;
       const status: 'healthy' | 'unhealthy' = hasIssues ? 'unhealthy' : 'healthy';

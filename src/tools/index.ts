@@ -12,7 +12,7 @@ import tagImageTool from './tag-image/tool';
 import validateDockerfileTool from './validate-dockerfile/tool';
 import verifyDeployTool from './verify-deploy/tool';
 
-export const TOOL_NAME = {
+const TOOL_NAME = {
   ANALYZE_REPO: 'analyze-repo',
   BUILD_IMAGE: 'build-image',
   DEPLOY: 'deploy',

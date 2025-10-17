@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { environmentSchema } from '@/config/environment';
+import { environmentSchema } from '@/config/constants';
 
 // Paths
 export const repositoryPath = z
@@ -26,7 +26,6 @@ export const buildArgs = z.record(z.string(), z.string()).describe('Build argume
 // Application basics
 export const replicas = z.number().optional().describe('Number of replicas');
 export const port = z.number().optional().describe('Application port');
-
 
 // Service types
 
