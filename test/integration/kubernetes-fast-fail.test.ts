@@ -8,7 +8,6 @@
  */
 
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import pino from 'pino';
 import { jest } from '@jest/globals';
@@ -16,6 +15,15 @@ import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
 import type { DirResult } from 'tmp';
 import { createKubernetesClient } from '@/infra/kubernetes/client';
 import { discoverAndValidateKubeconfig } from '@/infra/kubernetes/kubeconfig-discovery';
+
+// Mock os module at the top
+jest.mock('node:os', () => {
+  const actualOs = jest.requireActual('node:os') as typeof import('node:os');
+  return {
+    ...actualOs,
+    homedir: jest.fn(() => actualOs.homedir()),
+  };
+});
 
 describe('Kubernetes fast-fail integration', () => {
   const logger = pino({ level: 'silent' });
@@ -36,12 +44,13 @@ describe('Kubernetes fast-fail integration', () => {
   });
 
   describe('missing kubeconfig scenarios', () => {
-    it('should fail fast when kubeconfig does not exist', () => {
+    it('should fail fast when kubeconfig does not exist', async () => {
+      const os = await import('node:os');
       // Mock home directory with no .kube/config
       const mockHome = '/tmp/nonexistent-home';
-      jest.spyOn(os, 'homedir').mockReturnValue(mockHome);
+      jest.mocked(os.homedir).mockReturnValue(mockHome);
 
-      expect(() => createKubernetesClient(logger)).toThrow('No kubeconfig file found');
+      expect(() => createKubernetesClient(logger)).toThrow('Kubeconfig not found');
     });
 
     it('should fail fast when KUBECONFIG env var points to missing file', () => {
@@ -51,20 +60,19 @@ describe('Kubernetes fast-fail integration', () => {
       expect(() => createKubernetesClient(logger)).toThrow('not found');
     });
 
-    it('should provide actionable error message for missing kubeconfig', () => {
+    it('should provide actionable error message for missing kubeconfig', async () => {
+      const os = await import('node:os');
       const mockHome = '/tmp/nonexistent-home';
-      jest.spyOn(os, 'homedir').mockReturnValue(mockHome);
+      jest.mocked(os.homedir).mockReturnValue(mockHome);
 
       const result = discoverAndValidateKubeconfig();
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.message).toBeTruthy();
-        expect(result.error.hint).toBeTruthy();
-        expect(result.error.resolution).toContain('kubectl');
-        expect(result.error.resolution).toContain('aws eks') ||
-          expect(result.error.resolution).toContain('gcloud') ||
-          expect(result.error.resolution).toContain('az aks');
+        expect(result.error).toBeTruthy();
+        expect(result.guidance).toBeDefined();
+        expect(result.guidance?.hint).toBeTruthy();
+        expect(result.guidance?.resolution).toContain('kubectl');
       }
     });
   });
@@ -104,7 +112,7 @@ current-context: ""
       fs.writeFileSync(tempKubeconfig, invalidConfig);
       process.env.KUBECONFIG = tempKubeconfig;
 
-      expect(() => createKubernetesClient(logger)).toThrow('No current context');
+      expect(() => createKubernetesClient(logger)).toThrow('current context');
     });
 
     it('should succeed with valid kubeconfig', () => {

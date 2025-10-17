@@ -5,7 +5,7 @@
  */
 
 import * as yaml from 'js-yaml';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { validateNamespace } from '@/lib/validation';
@@ -246,8 +246,7 @@ async function handleDeploy(
   params: DeployApplicationParams,
   context: ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
-  const logger = getToolLogger(context, 'deploy');
-  const timer = createToolTimer(logger, 'deploy');
+  const { logger, timer } = setupToolContext(context, 'deploy');
 
   const {
     namespace = DEPLOYMENT_CONFIG.DEFAULT_NAMESPACE,

@@ -7,7 +7,7 @@
  * This is a deterministic operational tool with no AI calls.
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/infra/docker/client';
 import { validateImageName, validateDockerTag } from '@/lib/validation';
@@ -30,8 +30,7 @@ async function handleTagImage(
   input: z.infer<typeof tagImageSchema>,
   ctx: ToolContext,
 ): Promise<Result<TagImageResult>> {
-  const logger = getToolLogger(ctx, 'tag-image');
-  const timer = createToolTimer(logger, 'tag-image');
+  const { logger, timer } = setupToolContext(ctx, 'tag-image');
 
   const { tag } = input;
 

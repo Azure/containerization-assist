@@ -6,6 +6,9 @@ import { createLogger, createTimer, type Logger, type Timer } from './logger.js'
 import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
 
+// Re-export Timer type for use by consumers
+export type { Timer };
+
 /**
  * Gets or creates a logger for a tool.
  * Consolidates the pattern: context.logger || createLogger({ name: 'tool-name' })

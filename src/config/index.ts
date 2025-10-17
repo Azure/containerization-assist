@@ -5,6 +5,7 @@
  * Simple, focused configuration without complex validation overhead.
  */
 import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
+import { parseIntEnv, parseStringEnv, parseListEnv } from './env-utils';
 
 // Export unified environment module
 export * from './environment';
@@ -14,43 +15,30 @@ export * from './constants';
 
 export const config = {
   server: {
-    logLevel: process.env.LOG_LEVEL || 'info',
-    port: parseInt(process.env.PORT || '3000'),
+    logLevel: parseStringEnv('LOG_LEVEL', 'info'),
+    port: parseIntEnv('PORT', 3000),
   },
 
   workspace: {
-    workspaceDir: process.env.WORKSPACE_DIR || process.cwd(),
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760'),
+    workspaceDir: parseStringEnv('WORKSPACE_DIR', process.cwd()),
+    maxFileSize: parseIntEnv('MAX_FILE_SIZE', 10485760),
   },
 
   docker: {
-    socketPath: process.env.DOCKER_SOCKET || autoDetectDockerSocket(),
-    timeout: parseInt(process.env.DOCKER_TIMEOUT || '60000'),
+    socketPath: parseStringEnv('DOCKER_SOCKET', autoDetectDockerSocket()),
+    timeout: parseIntEnv('DOCKER_TIMEOUT', 60000),
   },
 
-  mutex: {
-    defaultTimeout: parseInt(process.env.MUTEX_DEFAULT_TIMEOUT || '30000'),
-    dockerBuildTimeout: parseInt(process.env.MUTEX_DOCKER_TIMEOUT || '300000'),
-    monitoringEnabled: process.env.MUTEX_MONITORING !== 'false',
+  toolLogging: {
+    dirPath: parseStringEnv('CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH', ''),
+    get enabled() {
+      return this.dirPath.trim().length > 0;
+    },
   },
-
-  toolLogging: (() => {
-    const logDir = process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH ?? '';
-    return {
-      enabled: logDir.trim().length > 0,
-      dirPath: logDir,
-    };
-  })(),
 
   validation: {
-    imageAllowlist:
-      process.env.CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST?.split(',')
-        .map((s) => s.trim())
-        .filter(Boolean) || [],
-    imageDenylist:
-      process.env.CONTAINERIZATION_ASSIST_IMAGE_DENYLIST?.split(',')
-        .map((s) => s.trim())
-        .filter(Boolean) || [],
+    imageAllowlist: parseListEnv('CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST'),
+    imageDenylist: parseListEnv('CONTAINERIZATION_ASSIST_IMAGE_DENYLIST'),
   },
 } as const;
 

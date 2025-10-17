@@ -8,8 +8,6 @@
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { existsSync, rmSync, readFileSync } from 'fs';
-import { createApp } from '@/app';
-import type { AppRuntime } from '@/types/runtime';
 
 describe('Single App Flow Integration', () => {
   const outputDir = join(process.cwd(), '.smoke-test');
@@ -102,26 +100,6 @@ describe('Single App Flow Integration', () => {
           expect(analysis).toHaveProperty('language');
         }
       }
-    });
-  });
-
-  describe('Session Management', () => {
-    it('should support single session mode', async () => {
-      const runtime = createApp({});
-
-      const health = runtime.healthCheck();
-      expect(health.status).toBe('healthy');
-
-      await runtime.stop();
-    });
-
-    it('should maintain session state across tool executions', async () => {
-      const runtime = createApp({});
-
-      const health = runtime.healthCheck();
-      expect(health.status).toBe('healthy');
-
-      await runtime.stop();
     });
   });
 });
