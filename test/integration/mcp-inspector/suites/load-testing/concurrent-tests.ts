@@ -39,11 +39,10 @@ export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] =>
         const concurrentCount = 10;
         
         // Create operations for concurrent execution
-        const operations = Array.from({ length: concurrentCount }, (_, i) => 
+        const operations = Array.from({ length: concurrentCount }, (_, i) =>
           () => client.callTool({
             name: 'ops',
             arguments: {
-              sessionId: `concurrent-test-${i}`,
               operation: 'status'
             }
           })
@@ -97,11 +96,10 @@ export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] =>
         const start = performance.now();
         const concurrentCount = 5; // Fewer concurrent for heavier operations
         
-        const operations = Array.from({ length: concurrentCount }, (_, i) => 
+        const operations = Array.from({ length: concurrentCount }, (_, i) =>
           () => client.callTool({
             name: 'analyze-repo',
             arguments: {
-              sessionId: `analysis-concurrent-${i}`,
               repoPath: './test/__support__/fixtures/node-express',
               depth: 2
             }
@@ -166,7 +164,6 @@ export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] =>
             await client.callTool({
               name: 'ops',
               arguments: {
-                sessionId: `memory-test-${i}`,
                 operation: 'ping'
               }
             });
@@ -239,7 +236,6 @@ export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] =>
               const result = await client.callTool({
                 name: 'ops',
                 arguments: {
-                  sessionId: `stress-test-${i}`,
                   operation: 'ping'
                 }
               });
@@ -301,11 +297,10 @@ export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] =>
         const start = performance.now();
         const heavyOperations = 3; // Fewer heavy operations
         
-        const operations = Array.from({ length: heavyOperations }, (_, i) => 
+        const operations = Array.from({ length: heavyOperations }, (_, i) =>
           () => client.callTool({
             name: 'generate-dockerfile',
             arguments: {
-              sessionId: `heavy-load-${i}`,
               baseImage: 'node:18-alpine',
               optimization: true,
               multistage: true,

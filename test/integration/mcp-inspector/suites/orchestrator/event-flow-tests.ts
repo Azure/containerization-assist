@@ -18,14 +18,12 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       timeout: 120000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `event-test-${Date.now()}`;
-        
+
         try {
           // Execute workflow
           const result = await client.callTool({
             name: 'workflow',
             arguments: {
-              sessionId,
               workflowType: 'containerization',
               params: {
                 repoPath: './test/__support__/fixtures/node-express'
@@ -58,14 +56,12 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       timeout: 60000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `sampling-event-${Date.now()}`;
-        
+
         try {
           // Trigger sampling via dockerfile generation
           const result = await client.callTool({
             name: 'generate-dockerfile',
             arguments: {
-              sessionId,
               optimization: true,
               multistage: true
             }
@@ -99,16 +95,14 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       timeout: 90000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `timing-test-${Date.now()}`;
-        
+
         try {
           const testStart = Date.now();
-          
+
           // Execute workflow and measure total time
           const result = await client.callTool({
             name: 'workflow',
             arguments: {
-              sessionId,
               workflowType: 'containerization',
               params: {
                 repoPath: './test/__support__/fixtures/node-express'
@@ -144,14 +138,12 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       timeout: 30000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `error-event-${Date.now()}`;
-        
+
         try {
           // Trigger an expected error by using invalid path
           const result = await client.callTool({
             name: 'workflow',
             arguments: {
-              sessionId,
               workflowType: 'containerization',
               params: {
                 repoPath: './test/__support__/fixtures/nonexistent-path'

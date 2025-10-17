@@ -106,7 +106,6 @@ describe('createApp AppRuntime interface', () => {
     const health = await app.healthCheck();
     expect(health).toHaveProperty('status');
     expect(health).toHaveProperty('tools');
-    expect(health).toHaveProperty('sessions');
     expect(health).toHaveProperty('message');
     expect(health.status).toMatch(/^(healthy|unhealthy)$/);
     expect(health.tools).toBe(1);

@@ -18,14 +18,12 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       timeout: 30000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `gate-test-${Date.now()}`;
-        
+
         try {
           // Try to analyze a non-existent repo (should fail)
           const result = await client.callTool({
             name: 'analyze-repo',
             arguments: {
-              sessionId,
               repoPath: './test/__support__/fixtures/nonexistent-repo'
             }
           });
@@ -60,14 +58,12 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       timeout: 60000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `scan-gate-${Date.now()}`;
-        
+
         try {
           // First, we need an image to scan
           const dockerfileResult = await client.callTool({
             name: 'generate-dockerfile',
             arguments: {
-              sessionId,
               optimization: false // Less secure dockerfile
             }
           });
@@ -85,7 +81,6 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
           const buildResult = await client.callTool({
             name: 'build-image',
             arguments: {
-              sessionId,
               contextPath: '.',
               dockerfilePath: 'Dockerfile'
             }
@@ -104,7 +99,6 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
           const scanResult = await client.callTool({
             name: 'scan-image',
             arguments: {
-              sessionId,
               imageId: 'test-image:latest'
             }
           });
@@ -137,14 +131,12 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       timeout: 60000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `size-gate-${Date.now()}`;
-        
+
         try {
           // Generate a dockerfile
           const dockerfileResult = await client.callTool({
             name: 'generate-dockerfile',
             arguments: {
-              sessionId,
               optimization: true,
               multistage: true
             }
@@ -154,7 +146,6 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
           const buildResult = await client.callTool({
             name: 'build-image',
             arguments: {
-              sessionId,
               contextPath: '.',
               dockerfilePath: 'Dockerfile'
             }
@@ -187,14 +178,12 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       timeout: 90000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `health-gate-${Date.now()}`;
-        
+
         try {
           // Generate K8s manifests
           const manifestResult = await client.callTool({
             name: 'generate-k8s-manifests',
             arguments: {
-              sessionId,
               appName: 'test-app',
               imageTag: 'test:latest'
             }
@@ -204,7 +193,6 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
           const deployResult = await client.callTool({
             name: 'deploy',
             arguments: {
-              sessionId,
               manifestPaths: ['deployment.yaml', 'service.yaml'],
               namespace: 'default'
             }
@@ -239,14 +227,12 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       timeout: 30000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `suggestion-gate-${Date.now()}`;
-        
+
         try {
           // Try to analyze an empty directory
           const result = await client.callTool({
             name: 'analyze-repo',
             arguments: {
-              sessionId,
               repoPath: '/tmp/empty-dir-that-does-not-exist'
             }
           });
@@ -279,14 +265,12 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       timeout: 30000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
-        const sessionId = `metrics-gate-${Date.now()}`;
-        
+
         try {
           // Execute a simple analysis that should succeed
           const result = await client.callTool({
             name: 'analyze-repo',
             arguments: {
-              sessionId,
               repoPath: './test/__support__/fixtures/node-express'
             }
           });

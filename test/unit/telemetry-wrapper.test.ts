@@ -20,17 +20,6 @@ function createMockToolContext(): ToolContext {
       fatal: jest.fn(),
       child: jest.fn().mockReturnThis(),
     },
-    sessionManager: {
-      create: jest.fn(),
-      get: jest.fn(),
-      update: jest.fn(),
-    },
-    session: {
-      id: 'test-session-123',
-      get: jest.fn(),
-      set: jest.fn(),
-      pushStep: jest.fn(),
-    },
   } as any;
 }
 

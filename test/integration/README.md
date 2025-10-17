@@ -122,7 +122,7 @@ describe('Test Suite', () => {
   it('should test workflow', async () => {
     const result = await runtime.execute('tool-name', {
       // parameters
-    }, { sessionId: 'test-session' });
+    });
 
     expect(result.ok).toBe(true);
     // assertions
@@ -220,8 +220,7 @@ When adding new integration tests:
 3. Include proper cleanup in `afterAll` hooks
 4. Add graceful skipping when dependencies unavailable
 5. Document any special prerequisites
-6. Use meaningful session IDs for debugging
-7. Set appropriate test timeouts
+6. Set appropriate test timeouts
 
 ## Related Documentation
 

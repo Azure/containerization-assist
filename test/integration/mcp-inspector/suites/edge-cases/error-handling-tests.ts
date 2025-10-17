@@ -18,27 +18,26 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
       timeout: 10000,
       execute: async () => {
         const start = performance.now();
-        
-        // Test analyze-repo without sessionId
+
+        // Test analyze-repo with minimal required parameters
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
             repoPath: './test/__support__/fixtures/node-express'
-            // Missing sessionId
           }
         });
 
         const responseTime = performance.now() - start;
 
-        // We expect this to either fail gracefully or handle missing sessionId
+        // We expect this to work normally now (no sessionId needed)
         if (result.isError) {
           return {
-            success: true,
+            success: false,
             duration: responseTime,
-            message: 'Tool correctly handles missing required parameters with error',
+            message: 'Tool failed unexpectedly with minimal parameters',
             details: {
               error: result.error?.message,
-              handledGracefully: true
+              handledGracefully: false
             },
             performance: {
               responseTime,
@@ -47,7 +46,7 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
           };
         }
 
-        // If it didn't error, check if it handled it gracefully
+        // Check if it succeeded with expected data
         let responseData: any = {};
         for (const content of result.content) {
           if (content.type === 'text' && content.text) {
@@ -60,15 +59,15 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
           }
         }
 
-        const handledGracefully = responseData.warning || responseData.error || 
-                                 responseData.sessionId || responseData.success === false;
+        const hasValidData = responseData.framework || responseData.language ||
+                             responseData.dependencies || responseData.textContent;
 
         return {
-          success: handledGracefully,
+          success: hasValidData,
           duration: responseTime,
-          message: handledGracefully 
-            ? 'Tool handled missing parameters gracefully'
-            : 'Tool may not properly validate required parameters',
+          message: hasValidData
+            ? 'Tool works correctly with minimal required parameters'
+            : 'Tool returned unexpected response',
           details: responseData,
           performance: {
             responseTime,
@@ -90,7 +89,6 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
-            sessionId: 'invalid-path-test',
             repoPath: '/this/path/definitely/does/not/exist'
           }
         });
@@ -157,7 +155,6 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
-            sessionId: 'type-test',
             repoPath: './test/__support__/fixtures/node-express',
             depth: 'invalid-number', // Should be number
             includeTests: 'not-a-boolean' // Should be boolean
@@ -225,7 +222,6 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
         const result = await client.callTool({
           name: 'ops',
           arguments: {
-            sessionId: '', // Empty string
             operation: 'status'
           }
         });
@@ -234,12 +230,12 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
 
         if (result.isError) {
           return {
-            success: true,
+            success: false,
             duration: responseTime,
-            message: 'Tool correctly handles empty values with error',
+            message: 'Tool failed unexpectedly',
             details: {
               error: result.error?.message,
-              validation: 'proper'
+              validation: 'unexpected-error'
             },
             performance: {
               responseTime,
@@ -248,7 +244,7 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
           };
         }
 
-        // Check if it handled empty sessionId gracefully
+        // Check if it responded normally
         let responseData: any = {};
         for (const content of result.content) {
           if (content.type === 'text' && content.text) {
@@ -266,9 +262,9 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
         return {
           success: !!hasResponse,
           duration: responseTime,
-          message: hasResponse 
-            ? 'Tool handled empty sessionId (possibly generated default)'
-            : 'Tool behavior unclear with empty values',
+          message: hasResponse
+            ? 'Tool responded normally'
+            : 'Tool behavior unclear',
           details: responseData,
           performance: {
             responseTime,
@@ -279,21 +275,19 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
     },
 
     {
-      name: 'concurrent-same-session',
+      name: 'concurrent-same-operation',
       category: 'load-testing',
-      description: 'Test behavior with multiple concurrent calls using same sessionId',
-      tags: ['concurrency', 'sessions', 'edge-cases'],
+      description: 'Test behavior with multiple concurrent calls of the same operation',
+      tags: ['concurrency', 'edge-cases'],
       timeout: 20000,
       execute: async () => {
         const start = performance.now();
-        const sessionId = 'concurrent-session-test';
-        
-        // Make multiple concurrent calls with same sessionId
+
+        // Make multiple concurrent calls with same operation
         const promises = Array.from({ length: 5 }, () =>
           client.callTool({
             name: 'ops',
             arguments: {
-              sessionId,
               operation: 'ping'
             }
           })
@@ -309,12 +303,12 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
           return {
             success: successCount >= 3, // At least 60% success rate
             duration: responseTime,
-            message: `Concurrent same-session calls: ${successCount}/${results.length} successful`,
+            message: `Concurrent operations: ${successCount}/${results.length} successful`,
             details: {
               totalCalls: results.length,
               successful: successCount,
               errors: errorCount,
-              sessionHandling: successCount >= 3 ? 'good' : 'issues-detected'
+              concurrencyHandling: successCount >= 3 ? 'good' : 'issues-detected'
             },
             performance: {
               responseTime,
@@ -326,7 +320,7 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
           return {
             success: false,
             duration: performance.now() - start,
-            message: `Concurrent session test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            message: `Concurrent operations test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
           };
         }
       }
@@ -347,7 +341,6 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
         const result = await client.callTool({
           name: 'ops',
           arguments: {
-            sessionId: 'large-payload-test',
             operation: 'status',
             largeData: largeString // Extra parameter with large data
           }
@@ -420,7 +413,6 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
         const result = await client.callTool({
           name: 'ops',
           arguments: {
-            sessionId: 'special-chars-test-🚀-∑∂∆-"quotes"-&<>',
             operation: 'ping',
             specialData: '{"json": "with quotes", "unicode": "🔥💯", "xml": "<tag>content</tag>"}'
           }

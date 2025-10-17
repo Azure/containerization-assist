@@ -57,28 +57,6 @@ describe('Legacy Configuration Removal', () => {
     });
   });
 
-  describe('SessionConfig Interface Validation', () => {
-    it('should preserve necessary session configuration properties', () => {
-      const testConfig: SessionConfig = {
-        ttl: 3600,
-        maxSessions: 100,
-        cleanupIntervalMs: 300000,
-      };
-
-      // SessionConfig intentionally retains these properties for session management
-      expect(testConfig.ttl).toBeDefined();
-      expect(testConfig.maxSessions).toBeDefined();
-      expect(testConfig.cleanupIntervalMs).toBeDefined();
-    });
-
-    it('should work with empty configuration', () => {
-      const testConfig: SessionConfig = {};
-
-      expect(testConfig).toBeDefined();
-      expect(Object.keys(testConfig)).toHaveLength(0);
-    });
-  });
-
   describe('Main Configuration Object', () => {
     it('should not contain legacy top-level properties', () => {
       expect((config as any).legacyMode).toBeUndefined();

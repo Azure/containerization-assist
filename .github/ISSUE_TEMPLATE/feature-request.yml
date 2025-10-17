@@ -43,7 +43,6 @@ body:
         - Kubernetes Integration
         - Security & Scanning
         - AI/LLM Integration
-        - Session Management
         - Developer Experience
         - Documentation
         - Performance

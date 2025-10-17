@@ -166,7 +166,7 @@ async function main() {
   });
 
   // Create tool context
-  // You'll need to provide appropriate logger and session manager
+  // You'll need to provide appropriate logger
   const context: ToolContext = {
     logger: {
       info: (msg: any) => console.log('ℹ️', msg),
@@ -177,8 +177,6 @@ async function main() {
       fatal: (msg: any) => console.error('💀', msg),
       child: () => context.logger,
     } as any,
-    sessionManager: undefined as any, // Replace with actual implementation
-    session: undefined as any, // Replace with actual implementation
   };
 
   // Register all Container Assist tools with telemetry wrapper
@@ -207,7 +205,7 @@ async function main() {
  */
 async function demonstratePattern() {
   console.log('\n📚 Telemetry Pattern Demonstration\n');
-  console.log('=' .repeat(60));
+  console.log('='.repeat(60));
 
   // Example: Build Image Tool
   const buildTool = buildImageTool;

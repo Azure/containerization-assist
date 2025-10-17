@@ -301,7 +301,7 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
   const tracker = createStandardizedToolTracker(tool.name, {}, logger);
 
   const startTime = Date.now();
-  const logEntry = createToolLogEntry(tool.name, undefined, validatedParams);
+  const logEntry = createToolLogEntry(tool.name, validatedParams);
 
   // Execute tool directly (single attempt)
   try {

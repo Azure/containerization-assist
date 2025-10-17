@@ -343,19 +343,6 @@ describe('tagImage', () => {
     });
   });
 
-  describe('Session State Management', () => {
-    it('should succeed with valid parameters', async () => {
-      const result = await tagImageTool.handler(config, createMockToolContext());
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.success).toBe(true);
-        expect(result.value.imageId).toBe('sha256:mock-image-id');
-        expect(result.value.tags).toEqual(['myapp:v1.0']);
-      }
-    });
-  });
-
   describe('Multiple Tagging Scenarios', () => {
     it('should handle tagging with different configurations', async () => {
       const configurations = [

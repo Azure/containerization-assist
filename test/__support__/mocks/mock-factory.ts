@@ -32,10 +32,6 @@ export interface MockScenario {
  * Mock Factory - Single source for all mocking needs
  */
 export class MockFactory {
-  constructor() {
-    // Factory is stateless - no session tracking needed
-  }
-
   /**
    * Create Docker client mock
    */
@@ -87,10 +83,10 @@ export class MockFactory {
         break;
 
       case 'timeout':
-        mock.buildImage.mockImplementation(() => new Promise((_, reject) => 
+        mock.buildImage.mockImplementation(() => new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Build timeout')), 100)
         ));
-        mock.pushImage.mockImplementation(() => new Promise((_, reject) => 
+        mock.pushImage.mockImplementation(() => new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Push timeout')), 100)
         ));
         break;
@@ -165,15 +161,15 @@ export class MockFactory {
         case 'critical':
           baseFindings.summary = { total: 5, critical: 2, high: 2, medium: 1, low: 0 };
           baseFindings.vulnerabilities = [
-            { 
-              id: 'CVE-2023-1234', 
+            {
+              id: 'CVE-2023-1234',
               severity: 'CRITICAL',
               title: 'Remote Code Execution in library',
               description: 'Critical security vulnerability'
             },
             {
               id: 'CVE-2023-5678',
-              severity: 'HIGH', 
+              severity: 'HIGH',
               title: 'SQL Injection vulnerability',
               description: 'High severity security issue'
             }
@@ -198,7 +194,7 @@ export class MockFactory {
     };
 
     const findings = generateFindings(findingsLevel);
-    
+
     mock.scanImage.mockResolvedValue(Success(findings));
     mock.scanFilesystem.mockResolvedValue(Success(findings));
     mock.scanRepository.mockResolvedValue(Success(findings));
@@ -230,8 +226,8 @@ export class MockFactory {
         mock.validate.mockResolvedValue(Failure('Validation failed'));
         break;
       case 'timeout':
-        mock.execute.mockImplementation(() => 
-          new Promise((_, reject) => 
+        mock.execute.mockImplementation(() =>
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error(`${toolName} timeout`)), scenario.delay || 100)
           )
         );
@@ -333,8 +329,8 @@ export class MockFactory {
       return {
         step,
         status: outcome === 'success' ? 'completed' : 'failed',
-        result: outcome === 'success' 
-          ? Success({ step, completed: true }) 
+        result: outcome === 'success'
+          ? Success({ step, completed: true })
           : Failure(`Step ${step} failed`)
       };
     });
@@ -354,14 +350,14 @@ export class MockFactory {
    */
   createEnvironmentalMock(capabilities: EnvironmentCapabilities) {
     return {
-      docker: capabilities.docker.available 
+      docker: capabilities.docker.available
         ? this.createDockerMock('success')
         : this.createDockerMock('failure'),
-      
+
       kubernetes: capabilities.kubernetes.available
         ? this.createKubernetesMock(capabilities.kubernetes.type as any)
         : this.createKubernetesMock('unavailable'),
-        
+
       trivy: capabilities.trivy.available
         ? this.createTrivyMock('none')
         : this.createTrivyMock('none'), // Mock still works, just returns empty results
@@ -379,7 +375,7 @@ export class MockFactory {
    * Create mock with delay for testing timeouts/async behavior
    */
   createDelayedMock<T>(data: T, delay: number = 100) {
-    return jest.fn().mockImplementation(() => 
+    return jest.fn().mockImplementation(() =>
       new Promise(resolve => setTimeout(() => resolve(Success(data)), delay))
     );
   }

@@ -343,7 +343,7 @@ spec:
     });
   });
 
-  describe('Service and Ingress Endpoint Detection', () => {});
+  describe('Service and Ingress Endpoint Detection', () => { });
 
   describe('Error Handling', () => {
     it('should handle Kubernetes client failures gracefully', async () => {
@@ -358,84 +358,9 @@ spec:
       expect(result.error).toContain('All manifest deployments failed');
     });
 
-    it('should handle session update failures', async () => {
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
-        createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-        }),
-      );
-
-      const mockContext = createMockToolContext();
-      const result = await deployApplicationTool(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.success).toBe(true);
-      }
-    });
-  });
-
-  describe('Configuration Options', () => {
-    beforeEach(() => {
-      mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
-      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-        totalReplicas: 2,
-      }));
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
-        createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-          totalReplicas: 2,
-        }),
-      );
-    });
-
-    it('should handle different cluster configurations', async () => {
-      config.cluster = 'production-cluster';
-
-      const mockContext = createMockToolContext();
-      const result = await deployApplicationTool(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      // Cluster configuration affects how the Kubernetes client is created
-      // This verifies the function accepts the parameter correctly
-    });
-
-    it('should handle custom timeout values', async () => {
-      config.timeout = 600; // 10 minutes
-
-      const mockContext = createMockToolContext();
-      const result = await deployApplicationTool(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      // Custom timeout affects the deployment readiness wait logic
-    });
-
-    it('should handle boolean configuration options correctly', async () => {
-      const testConfigs = [
-        { dryRun: true, wait: false },
-        { dryRun: false, wait: true },
-        { dryRun: true, wait: true },
-        { dryRun: false, wait: false },
-      ];
-
-      for (const testConfig of testConfigs) {
-        const configWithOptions = { ...config, ...testConfig };
-        const mockContext = createMockToolContext();
-        const result = await deployApplicationTool(configWithOptions, mockContext);
-
-        expect(result.ok).toBe(true);
-        if (result.ok) {
-          // Different combinations should all succeed
-          expect(result.value.success).toBe(true);
-        }
-
-        // Reset mocks between tests
-        jest.clearAllMocks();
-        mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
+    describe('Configuration Options', () => {
+      beforeEach(() => {
+        mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
         mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
           ready: true,
           readyReplicas: 2,
@@ -448,7 +373,64 @@ spec:
             totalReplicas: 2,
           }),
         );
-      }
+      });
+
+      it('should handle different cluster configurations', async () => {
+        config.cluster = 'production-cluster';
+
+        const mockContext = createMockToolContext();
+        const result = await deployApplicationTool(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        // Cluster configuration affects how the Kubernetes client is created
+        // This verifies the function accepts the parameter correctly
+      });
+
+      it('should handle custom timeout values', async () => {
+        config.timeout = 600; // 10 minutes
+
+        const mockContext = createMockToolContext();
+        const result = await deployApplicationTool(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        // Custom timeout affects the deployment readiness wait logic
+      });
+
+      it('should handle boolean configuration options correctly', async () => {
+        const testConfigs = [
+          { dryRun: true, wait: false },
+          { dryRun: false, wait: true },
+          { dryRun: true, wait: true },
+          { dryRun: false, wait: false },
+        ];
+
+        for (const testConfig of testConfigs) {
+          const configWithOptions = { ...config, ...testConfig };
+          const mockContext = createMockToolContext();
+          const result = await deployApplicationTool(configWithOptions, mockContext);
+
+          expect(result.ok).toBe(true);
+          if (result.ok) {
+            // Different combinations should all succeed
+            expect(result.value.success).toBe(true);
+          }
+
+          // Reset mocks between tests
+          jest.clearAllMocks();
+          mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
+          mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
+            ready: true,
+            readyReplicas: 2,
+            totalReplicas: 2,
+          }));
+          mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
+            createSuccessResult({
+              ready: true,
+              readyReplicas: 2,
+              totalReplicas: 2,
+            }),
+          );
+        }
+      });
     });
   });
-});

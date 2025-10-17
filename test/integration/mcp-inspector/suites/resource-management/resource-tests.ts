@@ -24,7 +24,6 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
-            sessionId: 'resource-size-test',
             repoPath: './test/__support__/fixtures/node-express',
             depth: 5, // Deep analysis might produce larger results
             includeTests: true
@@ -112,7 +111,6 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
         const result = await client.callTool({
           name: 'generate-dockerfile',
           arguments: {
-            sessionId: 'resource-access-test',
             baseImage: 'node:18-alpine',
             optimization: true
           }
@@ -192,7 +190,6 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
-            sessionId: 'mime-type-test',
             repoPath: './test/__support__/fixtures/node-express'
           }
         });
@@ -266,14 +263,11 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
       timeout: 10000,
       execute: async () => {
         const start = performance.now();
-        
+
         // Make the same request twice to test caching
-        const sessionId = 'caching-test-' + Date.now();
-        
         const result1 = await client.callTool({
           name: 'ops',
           arguments: {
-            sessionId,
             operation: 'status'
           }
         });
@@ -292,7 +286,6 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
         const result2 = await client.callTool({
           name: 'ops',
           arguments: {
-            sessionId,
             operation: 'status'
           }
         });
@@ -344,7 +337,6 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
-            sessionId: 'uri-scheme-test',
             repoPath: './test/__support__/fixtures/node-express'
           }
         });

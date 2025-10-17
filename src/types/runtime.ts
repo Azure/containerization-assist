@@ -34,9 +34,6 @@ export type ToolResultMap = {
  * Tool execution context metadata
  */
 export interface ExecutionMetadata {
-  /** Session ID for the execution */
-  sessionId?: string;
-
   /** Transport type (stdio, http, programmatic) */
   transport?: string;
 
@@ -86,7 +83,6 @@ export interface AppRuntime {
   healthCheck(): Promise<{
     status: 'healthy' | 'unhealthy';
     tools: number;
-    sessions?: number;
     message: string;
     dependencies?: {
       docker?: {

@@ -27,7 +27,6 @@ describe('Error Guidance Propagation', () => {
 
       // Execute build-image with mocked failure
       const result = await runtime.execute('build-image', {
-        sessionId: 'test-session',
         imageName: 'test-image',
         dockerfilePath: '/nonexistent/Dockerfile',
         context: '/tmp',
@@ -49,7 +48,6 @@ describe('Error Guidance Propagation', () => {
 
       // This will likely fail with guidance if Docker is available
       const result = await runtime.execute('push-image', {
-        sessionId: 'test-session',
         imageId: 'nonexistent-image-id',
         registry: 'private.registry.example.com',
         tag: 'v1.0.0',
@@ -75,7 +73,6 @@ describe('Error Guidance Propagation', () => {
       const runtime = createApp({ logger });
 
       const result = await runtime.execute('tag-image', {
-        sessionId: 'test-session',
         source: 'nonexistent-source-image',
         tag: 'my-registry.com/app:v1.0.0',
       });
@@ -102,7 +99,6 @@ describe('Error Guidance Propagation', () => {
 
       // Create a session with invalid manifests
       const result = await runtime.execute('deploy', {
-        sessionId: 'test-session-deploy',
         namespace: 'test-namespace',
         wait: false,
       });

@@ -76,7 +76,6 @@ body:
         - Docker Integration
         - Kubernetes Integration
         - Security Scanning
-        - Session Management
         - CLI Interface
         - Documentation
         - Other

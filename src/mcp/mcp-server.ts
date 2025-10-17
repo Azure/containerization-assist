@@ -195,7 +195,7 @@ export function registerToolsWithServer<TTool extends MCPTool>(
         logger.info({ tool: tool.name, transport }, 'Executing tool');
 
         try {
-          const { sanitizedParams, sessionId, metadata } = prepareExecutionPayload(
+          const { sanitizedParams, metadata } = prepareExecutionPayload(
             tool.name,
             params,
             transport,
@@ -205,7 +205,6 @@ export function registerToolsWithServer<TTool extends MCPTool>(
           const result = await execute({
             toolName: tool.name,
             params: sanitizedParams,
-            ...(sessionId && { sessionId }),
             metadata,
           });
 
@@ -244,11 +243,9 @@ function prepareExecutionPayload(
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
 ): {
   sanitizedParams: Record<string, unknown>;
-  sessionId?: string;
   metadata: ExecuteMetadata;
 } {
   const meta = extractMeta(params);
-  const sessionId = extractSessionId(meta);
 
   // Wrap sendNotification to accept unknown and cast to ServerNotification
   const wrappedSendNotification = extra.sendNotification
@@ -274,7 +271,6 @@ function prepareExecutionPayload(
 
   return {
     sanitizedParams: sanitizeParams(params),
-    ...(sessionId && { sessionId }),
     metadata,
   };
 }
@@ -285,12 +281,6 @@ function extractMeta(params: Record<string, unknown>): Record<string, unknown> |
     return meta as Record<string, unknown>;
   }
   return undefined;
-}
-
-function extractSessionId(meta: Record<string, unknown> | undefined): string | undefined {
-  if (!meta) return undefined;
-  const sessionId = meta.sessionId;
-  return typeof sessionId === 'string' ? sessionId : undefined;
 }
 
 function sanitizeParams(params: Record<string, unknown>): Record<string, unknown> {
