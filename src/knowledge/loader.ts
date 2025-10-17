@@ -15,7 +15,7 @@ interface KnowledgeState {
   compilationStats: CompilationStats;
 }
 
-const knowledgeState: KnowledgeState = {
+let knowledgeState: KnowledgeState = {
   entries: new Map(),
   byCategory: new Map(),
   byTag: new Map(),

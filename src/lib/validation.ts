@@ -108,7 +108,7 @@ export function validateImageName(imageName: string): Result<string> {
       '(?::[a-zA-Z0-9][a-zA-Z0-9._-]*)?$',
   );
 
-  if (imageName?.trim().length === 0) {
+  if (!imageName?.trim()) {
     return Failure('Image name cannot be empty', {
       message: 'Image name cannot be empty',
       hint: 'Docker image names must contain at least a repository name',
@@ -163,7 +163,7 @@ export function validateK8sName(name: string): Result<string> {
   // - Max 253 characters
   const namePattern = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
-  if (name?.trim().length === 0) {
+  if (!name?.trim()) {
     return Failure('Kubernetes name cannot be empty', {
       message: 'Kubernetes name cannot be empty',
       hint: 'Kubernetes resource names must contain at least one character',
@@ -216,7 +216,7 @@ export function validateEnvName(name: string): Result<string> {
   // - Must start with letter or underscore
   const envPattern = /^[A-Z_][A-Z0-9_]*$/;
 
-  if (name?.trim().length === 0) {
+  if (!name?.trim()) {
     return Failure('Environment variable name cannot be empty', {
       message: 'Environment variable name cannot be empty',
       hint: 'Environment variable names must contain at least one character',
@@ -294,7 +294,7 @@ export function validatePort(port: number): Result<number> {
 export function validateNamespace(namespace: string): Result<string> {
   const namePattern = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
-  if (namespace?.trim().length === 0) {
+  if (!namespace?.trim()) {
     return Failure('Namespace cannot be empty', {
       message: 'Namespace cannot be empty',
       hint: 'Kubernetes namespaces must contain at least one character',
@@ -348,7 +348,7 @@ export function validateDockerTag(tag: string): Result<string> {
   // - Cannot start with period or hyphen
   const tagPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
-  if (tag?.trim().length === 0) {
+  if (!tag?.trim()) {
     return Failure('Docker tag cannot be empty', {
       message: 'Docker tag cannot be empty',
       hint: 'Docker tags must contain at least one character',

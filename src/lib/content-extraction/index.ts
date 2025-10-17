@@ -110,7 +110,7 @@ export function extractJsonContent(text: string): object | null {
  */
 export function extractYamlContent(text: string): object | null {
   // Return null for empty input
-  if (text?.trim().length === 0) {
+  if (!text?.trim()) {
     return null;
   }
 
@@ -357,7 +357,7 @@ export function extractContent(
   text: string,
   contentType?: string,
 ): ExtractionResult<string | object | object[] | Record<string, string>> {
-  if (text?.trim().length === 0) {
+  if (!text?.trim()) {
     return {
       success: false,
       error: 'Empty input text',

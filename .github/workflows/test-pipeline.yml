@@ -88,6 +88,38 @@ jobs:
             echo "Check if test:coverage script is running with --coverage flag"
           fi
 
+      - name: Extract coverage metrics
+        id: coverage
+        continue-on-error: true
+        run: |
+          # Initialize variables
+          OVERALL="N/A"
+          BRANCHES="N/A"
+          COVERAGE_AVAILABLE="false"
+
+          # Debug: Check if coverage directory and file exist
+          echo "Checking for coverage files..."
+          ls -la coverage/ 2>/dev/null || echo "Coverage directory not found"
+
+          if [ -f "coverage/coverage-summary.json" ]; then
+            echo "Found coverage-summary.json, extracting metrics..."
+            OVERALL=$(jq -r '.total.statements.pct // "N/A"' coverage/coverage-summary.json 2>/dev/null || echo "N/A")
+            BRANCHES=$(jq -r '.total.branches.pct // "N/A"' coverage/coverage-summary.json 2>/dev/null || echo "N/A")
+            COVERAGE_AVAILABLE="true"
+            echo "Coverage metrics: overall=$OVERALL%, branches=$BRANCHES%"
+          else
+            echo "Coverage file not found, coverage will be marked as N/A"
+          fi
+
+          # Debug: Show what we're setting
+          echo "Setting outputs: overall_coverage=$OVERALL, branch_coverage=$BRANCHES, coverage_available=$COVERAGE_AVAILABLE"
+
+          echo "overall_coverage=$OVERALL" >> $GITHUB_OUTPUT
+          echo "branch_coverage=$BRANCHES" >> $GITHUB_OUTPUT
+          echo "coverage_available=$COVERAGE_AVAILABLE" >> $GITHUB_OUTPUT
+
+          echo "Outputs written to GITHUB_OUTPUT"
+
       - name: Verify build artifacts
         run: |
           echo "Verifying ESM build artifacts..."
@@ -236,30 +268,6 @@ jobs:
           echo "warning_gates<<EOF" >> $GITHUB_OUTPUT
           echo "$WARNING_GATES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Extract coverage metrics
-        id: coverage
-        continue-on-error: true
-        run: |
-          # Debug: Check if coverage directory and file exist
-          echo "Checking for coverage files..."
-          ls -la coverage/ 2>/dev/null || echo "Coverage directory not found"
-
-          if [ -f "coverage/coverage-summary.json" ]; then
-            echo "Found coverage-summary.json, extracting metrics..."
-            OVERALL=$(jq -r '.total.statements.pct // "N/A"' coverage/coverage-summary.json 2>/dev/null || echo "N/A")
-            BRANCHES=$(jq -r '.total.branches.pct // "N/A"' coverage/coverage-summary.json 2>/dev/null || echo "N/A")
-            COVERAGE_AVAILABLE="true"
-            echo "Coverage metrics: overall=$OVERALL%, branches=$BRANCHES%"
-          else
-            echo "Coverage file not found, coverage will be marked as N/A"
-            OVERALL="N/A"
-            BRANCHES="N/A"
-            COVERAGE_AVAILABLE="false"
-          fi
-          echo "overall_coverage=$OVERALL" >> $GITHUB_OUTPUT
-          echo "branch_coverage=$BRANCHES" >> $GITHUB_OUTPUT
-          echo "coverage_available=$COVERAGE_AVAILABLE" >> $GITHUB_OUTPUT
 
       - name: Upload build artifacts for reuse
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
