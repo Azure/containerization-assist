@@ -1,5 +1,12 @@
 # Containerization Assist MCP Server
 
+[![Test Pipeline](https://github.com/Azure/containerization-assist/workflows/Test%20Pipeline/badge.svg)](https://github.com/Azure/containerization-assist/actions/workflows/test-pipeline.yml)
+[![Version](https://img.shields.io/badge/version-0.0.1-orange.svg)](https://github.com/Azure/containerization-assist/blob/main/package.json)
+[![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.17.3-blueviolet.svg)](https://github.com/modelcontextprotocol/sdk)
+[![Node Version](https://img.shields.io/node/v/containerization-assist-mcp?color=brightgreen)](https://nodejs.org)
+
+<!-- When repo is public, use dynamic version: [![Version](https://img.shields.io/github/package-json/v/Azure/containerization-assist?color=orange)](https://github.com/Azure/containerization-assist/blob/main/package.json) -->
+
 An AI-powered containerization assistant that helps you build, scan, and deploy Docker containers through VS Code and other MCP-compatible tools.
 
 ## Features
