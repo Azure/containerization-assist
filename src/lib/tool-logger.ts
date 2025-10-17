@@ -8,7 +8,6 @@ import type { ErrorGuidance } from '@/types';
 export interface ToolLogEntry {
   timestamp: string;
   toolName: string;
-  sessionId?: string;
   input: unknown;
   output: unknown;
   success: boolean;
@@ -18,11 +17,7 @@ export interface ToolLogEntry {
   params?: unknown; // Alias for input
 }
 
-export function createToolLogEntry(
-  toolName: string,
-  sessionId: string | undefined,
-  input: unknown,
-): ToolLogEntry {
+export function createToolLogEntry(toolName: string, input: unknown): ToolLogEntry {
   const entry: ToolLogEntry = {
     timestamp: Date.now().toString(),
     toolName,
@@ -31,10 +26,6 @@ export function createToolLogEntry(
     output: undefined,
     success: false,
   };
-
-  if (sessionId !== undefined) {
-    entry.sessionId = sessionId;
-  }
 
   return entry;
 }

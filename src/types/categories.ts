@@ -12,5 +12,4 @@ export type ToolCategory =
   | 'azure' // Azure-specific tools (ACA)
   | 'analysis' // Repository and code analysis
   | 'security' // Security scanning and validation
-  | 'utility'; // General utilities and session management
-
+  | 'utility'; // General utilities

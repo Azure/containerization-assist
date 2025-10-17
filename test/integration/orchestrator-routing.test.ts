@@ -47,8 +47,7 @@ describe('Orchestrator Routing Integration', () => {
         // Execute a simple tool that should work without external dependencies
         const result = await orchestrator.execute({
           toolName: 'ops',
-          params: { operation: 'ping' },
-          sessionId: 'test-session'
+          params: { operation: 'ping' }
         });
 
         // Verify the execution happened and returned expected structure
@@ -74,11 +73,10 @@ describe('Orchestrator Routing Integration', () => {
       });
 
       try {
-        // Execute with a custom session ID to test session management
+        // Execute with custom configuration
         const result = await orchestrator.execute({
           toolName: 'ops',
-          params: { operation: 'ping' },
-          sessionId: 'test-session-123'
+          params: { operation: 'ping' }
         });
 
         expect(result.ok).toBe(true);
@@ -98,17 +96,15 @@ describe('Orchestrator Routing Integration', () => {
       });
 
       try {
-        // Execute the same tool multiple times with different session IDs
+        // Execute the same tool multiple times with different parameters
         const [result1, result2] = await Promise.all([
           orchestrator.execute({
             toolName: 'ops',
-            params: { operation: 'ping' },
-            sessionId: 'session-1'
+            params: { operation: 'ping' }
           }),
           orchestrator.execute({
             toolName: 'ops',
-            params: { operation: 'status' },
-            sessionId: 'session-2'
+            params: { operation: 'status' }
           })
         ]);
 
@@ -186,11 +182,10 @@ describe('Orchestrator Routing Integration', () => {
         config: { maxRetries: 1 }
       });
 
-      // Execute something to create session state
+      // Execute something to create state
       await orchestrator.execute({
         toolName: 'ops',
-        params: {},
-        sessionId: 'cleanup-test'
+        params: {}
       });
 
       // Should not throw when closing
@@ -211,8 +206,7 @@ describe('Orchestrator Routing Integration', () => {
         const promises = Array.from({ length: 3 }, (_, i) =>
           orchestrator.execute({
             toolName: 'ops',
-            params: { operation: i % 2 === 0 ? 'ping' : 'status' },
-            sessionId: `concurrent-${i}`
+            params: { operation: i % 2 === 0 ? 'ping' : 'status' }
           })
         );
 

@@ -136,7 +136,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       orchestratedExecute({
         toolName: toolName as string,
         params,
-        ...(metadata?.sessionId && { sessionId: metadata.sessionId }),
         metadata: {
           loggerContext: {
             transport: metadata?.transport || 'programmatic',
@@ -286,7 +285,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       return {
         status,
         tools: toolCount,
-        sessions: 0, // Session count not available in current implementation
         message: hasIssues
           ? `${toolCount} tools loaded, but some dependencies are unavailable`
           : `${toolCount} tools loaded`,

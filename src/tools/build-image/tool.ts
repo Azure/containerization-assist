@@ -202,14 +202,12 @@ async function handleBuildImage(
     if (!buildResult.ok) {
       const errorMessage = buildResult.error ?? 'Unknown error';
 
-      // Session storage is handled by orchestrator (for both success and failure)
       // Propagate Docker error guidance from infrastructure layer
       return Failure(`Failed to build image: ${errorMessage}`, buildResult.guidance);
     }
 
     const buildTime = Date.now() - startTime;
 
-    // Progress: Finalizing build results and updating session
     if (progress) await progress('FINALIZING');
 
     // Prepare the result

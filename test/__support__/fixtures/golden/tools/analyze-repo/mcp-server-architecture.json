@@ -3,8 +3,13 @@
   "framework": "mcp-server",
   "packageManager": "npm",
   "nodeVersion": "18.0.0",
-  "ports": [8080, 3000],
-  "required_ports": [8080],
+  "ports": [
+    8080,
+    3000
+  ],
+  "required_ports": [
+    8080
+  ],
   "dependencies": [
     "@modelcontextprotocol/sdk",
     "pino",
@@ -40,14 +45,13 @@
         "name": "Type Consolidation",
         "status": "completed",
         "components": [
-          "src/domain/types/session.ts",
-          "src/domain/types/errors.ts", 
+          "src/domain/types/errors.ts",
           "src/domain/types/result.ts",
           "src/domain/types/docker.ts"
         ]
       },
       "infrastructure": {
-        "name": "Infrastructure Standardization", 
+        "name": "Infrastructure Standardization",
         "status": "completed",
         "components": [
           "src/infrastructure/core/logger-types.ts",
@@ -57,9 +61,8 @@
       },
       "services": {
         "name": "Service Layer Organization",
-        "status": "completed", 
+        "status": "completed",
         "components": [
-          "src/service/session/manager.ts",
           "src/service/workflow/manager.ts",
           "src/service/tools/registry.ts"
         ]

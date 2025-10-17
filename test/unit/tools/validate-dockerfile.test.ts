@@ -34,18 +34,9 @@ import { createLogger } from '../../../src/lib/logger';
 
 const mockLogger = (createLogger as jest.Mock)();
 
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  storeResult: jest.fn(),
-  pushStep: jest.fn(),
-};
-
 function createMockToolContext() {
   return {
     logger: mockLogger,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -447,8 +438,8 @@ FROM node:latest`;
       });
     });
 
-    describe('session integration', () => {
-      it('should include baseImages property in results when run with a valid Dockerfile and session', async () => {
+    describe('baseImages property', () => {
+      it('should include baseImages property in results when run with a valid Dockerfile', async () => {
         const context = createMockToolContext();
         const result = await tool.handler(
           { dockerfile: sampleDockerfile },

@@ -366,7 +366,6 @@ The policy system provides runtime configuration and constraint enforcement.
 - Type-safe with Zod schemas
 - Stateless evaluation
 - Environment-aware overrides
-- Session-compatible
 
 **Testing**:
 - Unit tests validate policy application and loading

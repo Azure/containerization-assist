@@ -5,11 +5,10 @@
  * No lifecycle management, registry patterns, or configuration methods.
  */
 
-import { 
-  setupMockFactories, 
-  setupFailureMocks, 
+import {
+  setupMockFactories,
+  setupFailureMocks,
   setupNetworkErrorMocks,
-  mockSession,
   mockLogger,
 } from '../mocks/mock-factories';
 
@@ -18,11 +17,9 @@ import {
  */
 export const setupTest = () => {
   const mocks = setupMockFactories();
-  const session = mockSession();
-  
+
   return {
     mocks,
-    session,
     // Simple cleanup - no complex registry management
     cleanup: () => {
       // Jest automatically resets mocks between tests
@@ -36,9 +33,8 @@ export const setupTest = () => {
  */
 export const setupFailureTest = () => {
   const mocks = setupFailureMocks();
-  const session = mockSession();
-  
-  return { mocks, session };
+
+  return { mocks };
 };
 
 /**
@@ -46,9 +42,8 @@ export const setupFailureTest = () => {
  */
 export const setupNetworkErrorTest = () => {
   const mocks = setupNetworkErrorMocks();
-  const session = mockSession();
-  
-  return { mocks, session };
+
+  return { mocks };
 };
 
 /**
@@ -56,5 +51,4 @@ export const setupNetworkErrorTest = () => {
  */
 export const setupUnitTest = () => ({
   logger: mockLogger(),
-  session: mockSession(),
 });

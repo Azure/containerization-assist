@@ -20,7 +20,6 @@ export const createBasicToolTests = (testRunner: MCPTestRunner): TestCase[] => {
         const result = await client.callTool({
           name: 'ops',
           arguments: {
-            sessionId: 'test-session-ping',
             operation: 'ping'
           }
         });
@@ -70,7 +69,6 @@ export const createBasicToolTests = (testRunner: MCPTestRunner): TestCase[] => {
         const result = await client.callTool({
           name: 'ops',
           arguments: {
-            sessionId: 'test-session-status',
             operation: 'status'
           }
         });
@@ -132,7 +130,6 @@ export const createBasicToolTests = (testRunner: MCPTestRunner): TestCase[] => {
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
-            sessionId: 'test-session-analyze',
             repoPath: './test/__support__/fixtures/node-express'
           }
         });
@@ -219,8 +216,8 @@ export const createBasicToolTests = (testRunner: MCPTestRunner): TestCase[] => {
       tags: ['performance', 'baseline'],
       execute: async () => {
         const toolTests = [
-          { name: 'ops', args: { sessionId: 'test-perf-ping', operation: 'ping' } },
-          { name: 'ops', args: { sessionId: 'test-perf-status', operation: 'status' } }
+          { name: 'ops', args: { operation: 'ping' } },
+          { name: 'ops', args: { operation: 'status' } }
         ];
 
         const results = [];

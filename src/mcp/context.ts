@@ -178,7 +178,6 @@ export interface ContextOptions {
  * @example
  * ```typescript
  * const context = createToolContext(server, logger, {
- *   sessionManager: mySessionManager,
  *   progress: request, // Will auto-extract progress token
  * });
  * ```

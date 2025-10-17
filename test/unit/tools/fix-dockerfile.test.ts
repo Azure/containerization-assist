@@ -68,12 +68,6 @@ jest.mock('../../../src/knowledge', () => ({
 }));
 
 // Mock lib modules
-const mockSessionManager = {
-  create: jest.fn(),
-  get: jest.fn(),
-  update: jest.fn(),
-};
-
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({
     end: jest.fn(),
@@ -82,19 +76,9 @@ jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
-// Mock the session helpers
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
-
 function createMockToolContext() {
   return {
     logger: createMockLogger(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -136,24 +120,6 @@ describe('fix-dockerfile', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
-
-    mockSessionManager.get.mockResolvedValue({
-      ok: true,
-      value: {
-        completed_steps: [],
-        createdAt: new Date('2025-09-08T11:12:40.362Z'),
-        updatedAt: new Date('2025-09-08T11:12:40.362Z'),
-      },
-    });
-
-    mockSessionManager.update.mockResolvedValue({
-      ok: true,
-      value: {
-        completed_steps: ['fix-dockerfile'],
-        createdAt: new Date('2025-09-08T11:12:40.362Z'),
-        updatedAt: new Date(),
-      },
-    });
 
     // Default knowledge matches
     mockGetKnowledgeForCategory.mockReturnValue([

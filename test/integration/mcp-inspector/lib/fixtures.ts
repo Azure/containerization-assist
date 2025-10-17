@@ -197,8 +197,8 @@ export class ProjectFixtures {
   /**
    * Get Kubernetes manifest fixtures
    */
-  static getK8sManifestPath(sessionId: string = 'default'): string {
-    return join(this.FIXTURES_BASE, 'k8s', sessionId);
+  static getK8sManifestPath(scenario: string = 'default'): string {
+    return join(this.FIXTURES_BASE, 'k8s', scenario);
   }
 
   /**

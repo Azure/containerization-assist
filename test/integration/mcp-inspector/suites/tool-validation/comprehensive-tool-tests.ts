@@ -18,11 +18,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 30000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'build-image',
           arguments: {
-            sessionId: 'build-test-123',
             contextPath: './test/__support__/fixtures/node-express',
             noCache: true
           }
@@ -51,13 +50,13 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasBuildResult = buildInfo.success !== undefined || buildInfo.imageId || 
-                              buildInfo.textContent || buildInfo.buildOutput;
+        const hasBuildResult = buildInfo.success !== undefined || buildInfo.imageId ||
+          buildInfo.textContent || buildInfo.buildOutput;
 
         return {
           success: !!hasBuildResult,
           duration: responseTime,
-          message: hasBuildResult 
+          message: hasBuildResult
             ? 'Build image tool responding correctly'
             : 'Build image tool response unclear',
           details: buildInfo,
@@ -77,11 +76,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 45000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'scan-image',
           arguments: {
-            sessionId: 'scan-test-123',
             imageId: 'node:18-alpine',
             severity: 'medium'
           }
@@ -110,14 +108,14 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasScanResults = scanResults.vulnerabilities !== undefined || 
-                              scanResults.critical !== undefined || 
-                              scanResults.findings || scanResults.textContent;
+        const hasScanResults = scanResults.vulnerabilities !== undefined ||
+          scanResults.critical !== undefined ||
+          scanResults.findings || scanResults.textContent;
 
         return {
           success: !!hasScanResults,
           duration: responseTime,
-          message: hasScanResults 
+          message: hasScanResults
             ? 'Image scan tool working correctly'
             : 'Image scan results not found',
           details: scanResults,
@@ -137,11 +135,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 15000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'tag-image',
           arguments: {
-            sessionId: 'tag-test-123',
             imageId: 'test-image',
             tags: ['v1.0.0', 'latest']
           }
@@ -170,13 +167,13 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasTagResults = tagResults.success !== undefined || tagResults.tags || 
-                             tagResults.tagged || tagResults.textContent;
+        const hasTagResults = tagResults.success !== undefined || tagResults.tags ||
+          tagResults.tagged || tagResults.textContent;
 
         return {
           success: !!hasTagResults,
           duration: responseTime,
-          message: hasTagResults 
+          message: hasTagResults
             ? 'Tag tool working correctly'
             : 'Tag results not clear',
           details: tagResults,
@@ -196,11 +193,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 20000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'push-image',
           arguments: {
-            sessionId: 'push-test-123',
             imageId: 'test-image:latest',
             registry: 'localhost:5000',
             tag: 'test'
@@ -230,13 +226,13 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasPushResults = pushResults.success !== undefined || pushResults.pushed || 
-                              pushResults.registry || pushResults.textContent;
+        const hasPushResults = pushResults.success !== undefined || pushResults.pushed ||
+          pushResults.registry || pushResults.textContent;
 
         return {
           success: !!hasPushResults,
           duration: responseTime,
-          message: hasPushResults 
+          message: hasPushResults
             ? 'Push tool responding correctly'
             : 'Push results not clear',
           details: pushResults,
@@ -256,11 +252,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 30000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'generate-k8s-manifests',
           arguments: {
-            sessionId: 'k8s-test-123',
             deploymentName: 'test-app',
             image: 'nginx:alpine',
             namespace: 'default',
@@ -282,7 +277,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
         // Extract manifest results
         let manifestResults: any = {};
         let resourceCount = 0;
-        
+
         for (const content of result.content) {
           if (content.type === 'text' && content.text) {
             try {
@@ -296,14 +291,14 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasManifests = manifestResults.manifests || manifestResults.yaml || 
-                            manifestResults.kubernetes || resourceCount > 0 || 
-                            manifestResults.textContent;
+        const hasManifests = manifestResults.manifests || manifestResults.yaml ||
+          manifestResults.kubernetes || resourceCount > 0 ||
+          manifestResults.textContent;
 
         return {
           success: !!hasManifests,
           duration: responseTime,
-          message: hasManifests 
+          message: hasManifests
             ? `K8s manifest generation working (${resourceCount} resources)`
             : 'K8s manifest generation results unclear',
           details: { ...manifestResults, resourceCount },
@@ -323,11 +318,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 20000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'prepare-cluster',
           arguments: {
-            sessionId: 'cluster-test-123',
             namespace: 'test-namespace',
             createNamespace: true
           }
@@ -356,13 +350,13 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasClusterResults = clusterResults.success !== undefined || clusterResults.prepared || 
-                                 clusterResults.namespace || clusterResults.textContent;
+        const hasClusterResults = clusterResults.success !== undefined || clusterResults.prepared ||
+          clusterResults.namespace || clusterResults.textContent;
 
         return {
           success: !!hasClusterResults,
           duration: responseTime,
-          message: hasClusterResults 
+          message: hasClusterResults
             ? 'Cluster preparation tool working'
             : 'Cluster preparation results unclear',
           details: clusterResults,
@@ -382,11 +376,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 30000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'deploy',
           arguments: {
-            sessionId: 'deploy-test-123',
             namespace: 'default',
             wait: false,
             timeout: 300
@@ -416,13 +409,13 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasDeployResults = deployResults.success !== undefined || deployResults.deployed || 
-                                deployResults.status || deployResults.textContent;
+        const hasDeployResults = deployResults.success !== undefined || deployResults.deployed ||
+          deployResults.status || deployResults.textContent;
 
         return {
           success: !!hasDeployResults,
           duration: responseTime,
-          message: hasDeployResults 
+          message: hasDeployResults
             ? 'Deployment tool responding correctly'
             : 'Deployment results unclear',
           details: deployResults,
@@ -442,11 +435,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 25000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'verify-deployment',
           arguments: {
-            sessionId: 'verify-test-123',
             deploymentName: 'test-deployment',
             namespace: 'default',
             timeout: 300
@@ -476,13 +468,13 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasVerifyResults = verifyResults.success !== undefined || verifyResults.ready || 
-                                verifyResults.status || verifyResults.textContent;
+        const hasVerifyResults = verifyResults.success !== undefined || verifyResults.ready ||
+          verifyResults.status || verifyResults.textContent;
 
         return {
           success: !!hasVerifyResults,
           duration: responseTime,
-          message: hasVerifyResults 
+          message: hasVerifyResults
             ? 'Verification tool working correctly'
             : 'Verification results unclear',
           details: verifyResults,
@@ -502,11 +494,10 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       timeout: 60000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
           name: 'workflow',
           arguments: {
-            sessionId: 'workflow-test-123',
             workflowType: 'containerization',
             params: {
               repoPath: './test/__support__/fixtures/node-express'
@@ -537,13 +528,13 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasWorkflowResults = workflowResults.success !== undefined || workflowResults.steps || 
-                                  workflowResults.completed || workflowResults.textContent;
+        const hasWorkflowResults = workflowResults.success !== undefined || workflowResults.steps ||
+          workflowResults.completed || workflowResults.textContent;
 
         return {
           success: !!hasWorkflowResults,
           duration: responseTime,
-          message: hasWorkflowResults 
+          message: hasWorkflowResults
             ? 'Workflow tool executing correctly'
             : 'Workflow results unclear',
           details: workflowResults,

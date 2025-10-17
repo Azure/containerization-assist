@@ -33,33 +33,11 @@ function createMockLogger() {
   } as any;
 }
 
-// Mock lib modules following analyze-repo pattern
-const mockSessionManager = {
-  create: jest.fn().mockResolvedValue({
-    workflow_state: {},
-    metadata: {},
-    completed_steps: [],
-    errors: {},
-
-    createdAt: '2025-09-08T11:12:40.362Z',
-    updatedAt: '2025-09-08T11:12:40.362Z',
-  }),
-  get: jest.fn(),
-  update: jest.fn(),
-};
-
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
-
 const mockKubernetesClient = {
   applyManifest: jest.fn(),
   getDeploymentStatus: jest.fn(),
   waitForDeploymentReady: jest.fn(),
-};
+} as any;
 
 const mockTimer = {
   end: jest.fn(),
@@ -120,7 +98,7 @@ jest.mock('js-yaml', () => ({
   }),
 }));
 
-
+// Mock lib modules
 jest.mock('@/lib/tool-helpers', () => ({
   getToolLogger: jest.fn(() => createMockLogger()),
   createToolTimer: jest.fn(() => mockTimer),
@@ -128,7 +106,7 @@ jest.mock('@/lib/tool-helpers', () => ({
     complete: jest.fn(),
     fail: jest.fn(),
   })),
-  storeToolResults: jest.fn().mockResolvedValue({ ok: true, value: undefined }),
+  storeToolResults: jest.fn(),
 }));
 
 // Mock MCP helper modules
@@ -159,16 +137,12 @@ function createMockToolContext(): ToolContext {
   return {
     logger: createMockLogger(),
     progressReporter: jest.fn(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   };
 }
 
 describe('deployApplication', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
   let config: DeployApplicationParams;
-  let mockEnsureSession: jest.Mock;
-  let mockUseSessionSlice: jest.Mock;
 
   // Sample K8s manifests for testing
   const sampleManifests = `
@@ -204,8 +178,7 @@ spec:
   ports:
   - port: 80
     targetPort: 3000
-  type: ClusterIP
-`;
+  type: ClusterIP`;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
@@ -215,32 +188,27 @@ spec:
     };
 
     jest.clearAllMocks();
-    mockSessionManager.update.mockResolvedValue(true);
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
-    mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-      ready: true,
-      readyReplicas: 2,
-      totalReplicas: 2,
-    }));
-
-    mockSessionManager.get.mockResolvedValue({
-      completed_steps: [],
-      createdAt: '2025-09-08T11:12:40.362Z',
-      updatedAt: '2025-09-08T11:12:40.362Z',
-    });
+    mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+      createSuccessResult({
+        ready: true,
+        readyReplicas: 2,
+        totalReplicas: 2,
+      }),
+    );
   });
 
   describe('Successful Deployments', () => {
     beforeEach(() => {
       mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
-
-      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-        totalReplicas: 2,
-        conditions: [{ type: 'Available', status: 'True', message: 'Deployment is available' }],
-      }));
-
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+          conditions: [{ type: 'Available', status: 'True', message: 'Deployment is available' }],
+        }),
+      );
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
@@ -292,9 +260,16 @@ spec:
 
       // Verify deployment readiness was checked (either waitForDeploymentReady or getDeploymentStatus)
       if (mockKubernetesClient.waitForDeploymentReady.mock.calls.length > 0) {
-        expect(mockKubernetesClient.waitForDeploymentReady).toHaveBeenCalledWith('default', 'test-app', expect.any(Number));
+        expect(mockKubernetesClient.waitForDeploymentReady).toHaveBeenCalledWith(
+          'default',
+          'test-app',
+          expect.any(Number),
+        );
       } else {
-        expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
+        expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith(
+          'default',
+          'test-app',
+        );
       }
     });
 
@@ -339,11 +314,13 @@ spec:
 
   describe('Manifest Parsing and Ordering', () => {
     beforeEach(() => {
-      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-        totalReplicas: 2,
-      }));
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+        }),
+      );
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
@@ -376,7 +353,34 @@ spec:
     });
   });
 
-  describe('Service and Ingress Endpoint Detection', () => {});
+  describe('Service and Ingress Endpoint Detection', () => {
+    beforeEach(() => {
+      mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+        }),
+      );
+    });
+
+    it('should detect ClusterIP service endpoints correctly', async () => {
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.endpoints).toEqual([
+          {
+            type: 'internal',
+            url: 'http://test-app.default.svc.cluster.local',
+            port: 80,
+          },
+        ]);
+      }
+    });
+  });
 
   describe('Error Handling', () => {
     it('should handle Kubernetes client failures gracefully', async () => {
@@ -391,90 +395,18 @@ spec:
       expect(result.error).toContain('All manifest deployments failed');
     });
 
-    it('should handle session update failures', async () => {
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
-        createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-        }),
-      );
-
-      const mockContext = createMockToolContext();
-      const result = await deployApplicationTool(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.success).toBe(true);
-      }
-    });
-  });
-
-  describe('Configuration Options', () => {
-    beforeEach(() => {
-      mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
-      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-        totalReplicas: 2,
-      }));
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
-        createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-          totalReplicas: 2,
-        }),
-      );
-    });
-
-    it('should handle different cluster configurations', async () => {
-      config.cluster = 'production-cluster';
-
-      const mockContext = createMockToolContext();
-      const result = await deployApplicationTool(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      // Cluster configuration affects how the Kubernetes client is created
-      // This verifies the function accepts the parameter correctly
-    });
-
-    it('should handle custom timeout values', async () => {
-      config.timeout = 600; // 10 minutes
-
-      const mockContext = createMockToolContext();
-      const result = await deployApplicationTool(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      // Custom timeout affects the deployment readiness wait logic
-    });
-
-    it('should handle boolean configuration options correctly', async () => {
-      const testConfigs = [
-        { dryRun: true, wait: false },
-        { dryRun: false, wait: true },
-        { dryRun: true, wait: true },
-        { dryRun: false, wait: false },
-      ];
-
-      for (const testConfig of testConfigs) {
-        const configWithOptions = { ...config, ...testConfig };
-        const mockContext = createMockToolContext();
-        const result = await deployApplicationTool(configWithOptions, mockContext);
-
-        expect(result.ok).toBe(true);
-        if (result.ok) {
-          // Different combinations should all succeed
-          expect(result.value.success).toBe(true);
-        }
-
-        // Reset mocks between tests
-        jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
-        mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
-        mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-          totalReplicas: 2,
-        }));
+    describe('Configuration Options', () => {
+      beforeEach(() => {
+        mockKubernetesClient.applyManifest.mockResolvedValue(
+          createSuccessResult({ applied: true }),
+        );
+        mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+          createSuccessResult({
+            ready: true,
+            readyReplicas: 2,
+            totalReplicas: 2,
+          }),
+        );
         mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
           createSuccessResult({
             ready: true,
@@ -482,7 +414,67 @@ spec:
             totalReplicas: 2,
           }),
         );
-      }
+      });
+
+      it('should handle different cluster configurations', async () => {
+        config.cluster = 'production-cluster';
+
+        const mockContext = createMockToolContext();
+        const result = await deployApplicationTool(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        // Cluster configuration affects how the Kubernetes client is created
+        // This verifies the function accepts the parameter correctly
+      });
+
+      it('should handle custom timeout values', async () => {
+        config.timeout = 600; // 10 minutes
+
+        const mockContext = createMockToolContext();
+        const result = await deployApplicationTool(config, mockContext);
+
+        expect(result.ok).toBe(true);
+        // Custom timeout affects the deployment readiness wait logic
+      });
+
+      it('should handle boolean configuration options correctly', async () => {
+        const testConfigs = [
+          { dryRun: true, wait: false },
+          { dryRun: false, wait: true },
+          { dryRun: true, wait: true },
+          { dryRun: false, wait: false },
+        ];
+
+        for (const testConfig of testConfigs) {
+          const configWithOptions = { ...config, ...testConfig };
+          const mockContext = createMockToolContext();
+          const result = await deployApplicationTool(configWithOptions, mockContext);
+
+          expect(result.ok).toBe(true);
+          if (result.ok) {
+            // Different combinations should all succeed
+            expect(result.value.success).toBe(true);
+          }
+
+          // Reset mocks between tests
+          jest.clearAllMocks();
+          mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
+          mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+            createSuccessResult({
+              ready: true,
+              readyReplicas: 2,
+              totalReplicas: 2,
+            }),
+          );
+          mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
+            createSuccessResult({
+              ready: true,
+              readyReplicas: 2,
+              totalReplicas: 2,
+            }),
+          );
+        }
+      });
     });
   });
 });

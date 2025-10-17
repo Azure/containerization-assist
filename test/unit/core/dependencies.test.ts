@@ -18,7 +18,6 @@ describe('Service Dependencies', () => {
     // Test the expected structure of dependencies after refactor
     const expectedDependencies = {
       logger: expect.any(Object),
-      sessionService: expect.any(Object),
       progressEmitter: expect.any(Object),
       dockerClient: expect.any(Object),
       repositoryAnalyzer: expect.any(Object),
@@ -34,7 +33,6 @@ describe('Service Dependencies', () => {
     // Mock dependency structure
     const mockDependencies = {
       logger: mockLogger,
-      sessionService: { get: jest.fn(), create: jest.fn() },
       progressEmitter: { emit: jest.fn() },
       dockerClient: { build: jest.fn(), scan: jest.fn() },
       repositoryAnalyzer: { analyze: jest.fn() },
@@ -58,18 +56,8 @@ describe('Service Dependencies', () => {
     // Test that dependencies work with consolidated types
     const mockDeps = {
       logger: mockLogger,
-      sessionService: {
-        get: jest.fn().mockResolvedValue({
-          id: 'test-session',
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          repo_path: '/test/repo'
-        })
-      }
     };
 
-    expect(mockDeps.sessionService.get).toBeDefined();
     expect(mockDeps.logger).toBeDefined();
   });
 
@@ -102,16 +90,10 @@ describe('Service Dependencies', () => {
         startWorkflow: jest.fn(),
         getStatus: jest.fn()
       },
-      sessionManager: {
-        createSession: jest.fn(),
-        getSession: jest.fn(),
-        updateSession: jest.fn()
-      }
     };
 
     expect(serviceDeps.toolRegistry.register).toBeDefined();
     expect(serviceDeps.workflowOrchestrator.startWorkflow).toBeDefined();
-    expect(serviceDeps.sessionManager.createSession).toBeDefined();
   });
 
   test('should validate dependency injection patterns', () => {
@@ -119,25 +101,18 @@ describe('Service Dependencies', () => {
     class TestService {
       constructor(
         private logger: Logger,
-        private sessionService: any,
-        private config: any
-      ) {}
+      ) { }
 
       async testOperation() {
         this.logger.info('Test operation started');
-        const session = await this.sessionService.get('test-id');
-        return { success: true, session };
+        return { success: true };
       }
     }
 
-    const mockSessionService = {
-      get: jest.fn().mockResolvedValue({ id: 'test-id', status: 'active' })
-    };
-    
     const mockConfig = { workspaceDir: '/test' };
-    
-    const service = new TestService(mockLogger, mockSessionService, mockConfig);
-    
+
+    const service = new TestService(mockLogger, mockConfig);
+
     expect(service).toBeDefined();
     expect(service.testOperation).toBeDefined();
   });
@@ -147,23 +122,21 @@ describe('Service Dependencies', () => {
     const integratedDeps = {
       // Consolidated type system
       types: {
-        session: expect.any(Object),
         result: expect.any(Object),
         errors: expect.any(Object)
       },
-      
+
       // Infrastructure standardization
       infrastructure: {
         logger: mockLogger,
         docker: { service: jest.fn() },
         messaging: { publisher: jest.fn() }
       },
-      
+
       // Service organization
       services: {
         toolRegistry: { register: jest.fn() },
         workflowManager: { start: jest.fn() },
-        sessionManager: { create: jest.fn() }
       }
     };
 
@@ -171,7 +144,7 @@ describe('Service Dependencies', () => {
     expect(integratedDeps.types).toBeDefined();
     expect(integratedDeps.infrastructure).toBeDefined();
     expect(integratedDeps.services).toBeDefined();
-    
+
     expect(integratedDeps.infrastructure.logger).toBeDefined();
     expect(integratedDeps.services.toolRegistry).toBeDefined();
   });
@@ -181,11 +154,6 @@ describe('Service Dependencies', () => {
     const testDeps = {
       logger: mockLogger,
       mockServices: {
-        sessionService: {
-          get: jest.fn(),
-          create: jest.fn(),
-          update: jest.fn()
-        },
         dockerService: {
           build: jest.fn().mockResolvedValue({ success: true }),
           scan: jest.fn().mockResolvedValue({ success: true })
@@ -198,7 +166,6 @@ describe('Service Dependencies', () => {
     };
 
     expect(testDeps.logger.child).toBeDefined();
-    expect(testDeps.mockServices.sessionService.get).toBeDefined();
     expect(testDeps.mockServices.dockerService.build).toBeDefined();
     expect(testDeps.testConfig.mockMode).toBe(true);
   });
@@ -223,11 +190,6 @@ describe('Dependency Configuration Validation', () => {
   test('should validate configuration structure for consolidated architecture', () => {
     const configStructure = {
       workspaceDir: '/tmp/workspace',
-      session: {
-        store: 'memory',
-        ttl: 3600,
-        maxSessions: 100
-      },
       docker: {
         socketPath: '/var/run/docker.sock'
       },
@@ -240,10 +202,8 @@ describe('Dependency Configuration Validation', () => {
     };
 
     expect(configStructure.workspaceDir).toBeDefined();
-    expect(configStructure.session).toBeDefined();
     expect(configStructure.docker).toBeDefined();
     expect(configStructure.kubernetes).toBeDefined();
-    expect(typeof configStructure.session.ttl).toBe('number');
   });
 
   test('should validate environment-specific configuration', () => {

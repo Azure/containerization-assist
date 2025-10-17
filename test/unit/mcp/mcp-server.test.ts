@@ -58,7 +58,7 @@ describe('registerToolsWithServer', () => {
 
     const params = {
       foo: 'value',
-      _meta: { sessionId: 'abc', progressToken: 'tok' },
+      _meta: { progressToken: 'tok' },
     } as Record<string, unknown>;
 
     const extra = {
@@ -73,7 +73,6 @@ describe('registerToolsWithServer', () => {
     expect(executeMock).toHaveBeenCalledWith({
       toolName: tool.name,
       params: { foo: 'value' },
-      sessionId: 'abc',
       metadata: expect.objectContaining({
         progress: expect.objectContaining({ _meta: expect.objectContaining({ progressToken: 'tok' }) }),
         loggerContext: expect.objectContaining({ transport: 'stdio' }),
