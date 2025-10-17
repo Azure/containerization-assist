@@ -38,7 +38,7 @@ function putCached(file: string, policy: Policy, ttlSec: number): void {
 /** Validate policy via Zod and return Result */
 export function validatePolicy(p: unknown): Result<Policy> {
   try {
-    return Success(PolicySchema.parse(p) as Policy);
+    return Success(PolicySchema.parse(p));
   } catch (e) {
     if (e instanceof z.ZodError) {
       const issues = e.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
