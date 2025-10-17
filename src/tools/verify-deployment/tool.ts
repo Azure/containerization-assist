@@ -245,7 +245,12 @@ async function discoverIngressEndpoints(
       const rules = ingress.spec?.rules || [];
 
       for (const rule of rules) {
-        const host = rule.host || '<host>';
+        // Skip rules without a valid host
+        if (!rule.host) {
+          continue;
+        }
+
+        const host = rule.host;
         const paths = rule.http?.paths || [];
 
         for (const path of paths) {
@@ -267,19 +272,14 @@ async function discoverIngressEndpoints(
       }
 
       // Also check load balancer status
+      // Note: LB ingress endpoints don't have specific TLS info, default to HTTP/80
       const lbIngress = ingress.status?.loadBalancer?.ingress || [];
       for (const ing of lbIngress) {
-        if (ing.ip) {
+        const address = ing.ip || ing.hostname;
+        if (address) {
           endpoints.push({
             type: 'external',
-            url: `http://${ing.ip}`,
-            port: 80,
-            ingressName,
-          });
-        } else if (ing.hostname) {
-          endpoints.push({
-            type: 'external',
-            url: `http://${ing.hostname}`,
+            url: `http://${address}`,
             port: 80,
             ingressName,
           });
@@ -424,15 +424,16 @@ async function handleVerifyDeployment(
         if (endpoint.type === 'external') {
           // Construct full URL with port if not already included
           let fullUrl = endpoint.url;
-          if (
-            !fullUrl.includes('<node-ip>') &&
-            !fullUrl.includes('<host>') &&
-            !fullUrl.match(/:\d+$/)
-          ) {
+          if (!fullUrl.match(/:\d+$/)) {
             // Add port if not default HTTP/HTTPS port
             if (endpoint.port !== 80 && endpoint.port !== 443) {
               fullUrl = `${endpoint.url}:${endpoint.port}`;
             }
+          }
+
+          // Skip health check for placeholder endpoints (e.g., NodePort without node IP)
+          if (fullUrl.includes('<')) {
+            continue;
           }
 
           const isHealthy = await checkEndpointHealth(fullUrl);
