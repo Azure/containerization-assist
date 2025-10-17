@@ -37,7 +37,7 @@ const mockKubernetesClient = {
   applyManifest: jest.fn(),
   getDeploymentStatus: jest.fn(),
   waitForDeploymentReady: jest.fn(),
-};
+} as any;
 
 const mockTimer = {
   end: jest.fn(),
@@ -106,7 +106,7 @@ jest.mock('@/lib/tool-helpers', () => ({
     complete: jest.fn(),
     fail: jest.fn(),
   })),
-  storeToolResults: jest.fn().mockResolvedValue({ ok: true, value: undefined }),
+  storeToolResults: jest.fn(),
 }));
 
 // Mock MCP helper modules
@@ -145,8 +145,7 @@ describe('deployApplication', () => {
   let config: DeployApplicationParams;
 
   // Sample K8s manifests for testing
-  const sampleManifests = `
-apiVersion: apps/v1
+  const sampleManifests = `apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: test-app
@@ -178,8 +177,7 @@ spec:
   ports:
   - port: 80
     targetPort: 3000
-  type: ClusterIP
-`;
+  type: ClusterIP`;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
@@ -190,24 +188,26 @@ spec:
 
     jest.clearAllMocks();
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
-    mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-      ready: true,
-      readyReplicas: 2,
-      totalReplicas: 2,
-    }));
+    mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+      createSuccessResult({
+        ready: true,
+        readyReplicas: 2,
+        totalReplicas: 2,
+      }),
+    );
   });
 
   describe('Successful Deployments', () => {
     beforeEach(() => {
       mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
-
-      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-        totalReplicas: 2,
-        conditions: [{ type: 'Available', status: 'True', message: 'Deployment is available' }],
-      }));
-
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+          conditions: [{ type: 'Available', status: 'True', message: 'Deployment is available' }],
+        }),
+      );
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
@@ -259,9 +259,16 @@ spec:
 
       // Verify deployment readiness was checked (either waitForDeploymentReady or getDeploymentStatus)
       if (mockKubernetesClient.waitForDeploymentReady.mock.calls.length > 0) {
-        expect(mockKubernetesClient.waitForDeploymentReady).toHaveBeenCalledWith('default', 'test-app', expect.any(Number));
+        expect(mockKubernetesClient.waitForDeploymentReady).toHaveBeenCalledWith(
+          'default',
+          'test-app',
+          expect.any(Number),
+        );
       } else {
-        expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
+        expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith(
+          'default',
+          'test-app',
+        );
       }
     });
 
@@ -306,11 +313,13 @@ spec:
 
   describe('Manifest Parsing and Ordering', () => {
     beforeEach(() => {
-      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-        totalReplicas: 2,
-      }));
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+        }),
+      );
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
@@ -343,7 +352,34 @@ spec:
     });
   });
 
-  describe('Service and Ingress Endpoint Detection', () => { });
+  describe('Service and Ingress Endpoint Detection', () => {
+    beforeEach(() => {
+      mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
+      mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+        }),
+      );
+    });
+
+    it('should detect ClusterIP service endpoints correctly', async () => {
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.endpoints).toEqual([
+          {
+            type: 'internal',
+            url: 'http://test-app.default.svc.cluster.local',
+            port: 80,
+          },
+        ]);
+      }
+    });
+  });
 
   describe('Error Handling', () => {
     it('should handle Kubernetes client failures gracefully', async () => {
@@ -360,12 +396,16 @@ spec:
 
     describe('Configuration Options', () => {
       beforeEach(() => {
-        mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
-        mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-          totalReplicas: 2,
-        }));
+        mockKubernetesClient.applyManifest.mockResolvedValue(
+          createSuccessResult({ applied: true }),
+        );
+        mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+          createSuccessResult({
+            ready: true,
+            readyReplicas: 2,
+            totalReplicas: 2,
+          }),
+        );
         mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
           createSuccessResult({
             ready: true,
@@ -418,11 +458,13 @@ spec:
           // Reset mocks between tests
           jest.clearAllMocks();
           mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
-          mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
-            ready: true,
-            readyReplicas: 2,
-            totalReplicas: 2,
-          }));
+          mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(
+            createSuccessResult({
+              ready: true,
+              readyReplicas: 2,
+              totalReplicas: 2,
+            }),
+          );
           mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
             createSuccessResult({
               ready: true,
@@ -434,3 +476,4 @@ spec:
       });
     });
   });
+});
