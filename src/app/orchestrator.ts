@@ -180,7 +180,7 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
     // Load all policies
     const loadedPolicies: Policy[] = [];
     for (const policyPath of policyPaths) {
-      const policyResult = loadPolicy(policyPath, config.policyEnvironment);
+      const policyResult = loadPolicy(policyPath);
       if (policyResult.ok) {
         loadedPolicies.push(policyResult.value);
         logger.debug({ policyPath }, 'Policy loaded successfully');

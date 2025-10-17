@@ -76,11 +76,12 @@ For detailed documentation, see: README.md
 For examples and tutorials, see: docs/examples/
 
 Environment Variables:
-  LOG_LEVEL                 Logging level (debug, info, warn, error)
-  WORKSPACE_DIR            Working directory for operations
-  DOCKER_SOCKET            Docker daemon socket path
-  K8S_NAMESPACE            Default Kubernetes namespace
-  NODE_ENV                 Environment (development, production)
+  LOG_LEVEL                                    Logging level (debug, info, warn, error)
+  WORKSPACE_DIR                                Working directory for operations
+  DOCKER_SOCKET                                Docker daemon socket path
+  K8S_NAMESPACE                                Default Kubernetes namespace
+  CONTAINERIZATION_ASSIST_POLICY_PATH          Policy file path (overridden by --config)
+  NODE_ENV                                     Environment (development, production)
 `,
   );
 
@@ -88,6 +89,25 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
+
+/**
+ * Resolve policy configuration with priority:
+ * 1. CLI flag (highest priority)
+ * 2. Environment variable
+ * 3. Default value (undefined = auto-discover)
+ */
+function resolvePolicyConfig(options: {
+  config?: string;
+}): { policyPath?: string } {
+  // Policy path: --config flag > env var > undefined (use defaults)
+  const policyPath = options.config || process.env.CONTAINERIZATION_ASSIST_POLICY_PATH;
+
+  // Only include policyPath if it has a value (for exactOptionalPropertyTypes)
+  if (policyPath) {
+    return { policyPath };
+  }
+  return {};
+}
 
 async function main(): Promise<void> {
   try {
@@ -137,6 +157,11 @@ async function main(): Promise<void> {
       console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE ?? 'default'}`);
       console.error(`  • Environment: ${process.env.NODE_ENV ?? 'production'}`);
 
+      // Display policy configuration
+      const policyConfig = resolvePolicyConfig(options);
+      console.error(`  • Policy Path: ${policyConfig.policyPath ?? 'auto-discover'}`);
+
+
       // Test Docker connection
       {
         console.error('\n🐳 Testing Docker connection...');
@@ -171,11 +196,13 @@ async function main(): Promise<void> {
     // Set MCP mode to redirect logs to stderr
     process.env.MCP_MODE = 'true';
 
+    // Resolve policy configuration from CLI flags and environment variables
+    const policyConfig = resolvePolicyConfig(options);
+
     // Create the application
     const app = createApp({
       logger: getLogger(),
-      policyPath: options.config || 'config/policy.yaml',
-      policyEnvironment: options.dev ? 'development' : 'production',
+      ...policyConfig,
       outputFormat: OUTPUTFORMAT.MARKDOWN,
     });
 

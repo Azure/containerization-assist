@@ -14,24 +14,25 @@ import { policyData } from './policy-data';
 
 const log = createLogger().child({ module: 'policy-io' });
 
-type CacheKey = `${string}:${string}`;
+// Cache key is the resolved absolute file path (simplified after PR-019 removed environment parameter)
+type CacheKey = string;
 type CacheVal = { value: Policy; expiresAt: number };
 const CACHE = new Map<CacheKey, CacheVal>();
 
-const k = (file: string, env?: string): CacheKey => `${path.resolve(file)}:${env ?? 'default'}`;
+const createCacheKey = (file: string): CacheKey => path.resolve(file);
 const now = (): number => Date.now();
 
-function getCached(file: string, env?: string): Policy | null {
-  const v = CACHE.get(k(file, env));
-  if (!v) return null;
-  if (v.expiresAt <= now()) {
-    CACHE.delete(k(file, env));
+function getCached(file: string): Policy | null {
+  const cacheEntry = CACHE.get(createCacheKey(file));
+  if (!cacheEntry) return null;
+  if (cacheEntry.expiresAt <= now()) {
+    CACHE.delete(createCacheKey(file));
     return null;
   }
-  return v.value;
+  return cacheEntry.value;
 }
-function putCached(file: string, env: string | undefined, policy: Policy, ttlSec: number): void {
-  CACHE.set(k(file, env), { value: policy, expiresAt: now() + ttlSec * 1000 });
+function putCached(file: string, policy: Policy, ttlSec: number): void {
+  CACHE.set(createCacheKey(file), { value: policy, expiresAt: now() + ttlSec * 1000 });
 }
 
 /** Validate policy via Zod and return Result */
@@ -47,37 +48,12 @@ export function validatePolicy(p: unknown): Result<Policy> {
   }
 }
 
-/** Resolve environment overrides and keep rules sorted by priority desc */
-export function resolveEnvironment(policy: Policy, env: string): Policy {
-  const cfg = policy.environments?.[env];
-  const out: Policy = JSON.parse(JSON.stringify(policy));
-
-  if (cfg?.defaults) out.defaults = { ...out.defaults, ...cfg.defaults };
-  if (cfg?.overrides?.length) {
-    for (const ov of cfg.overrides) {
-      const idx = out.rules.findIndex((r) => r.id === ov.rule_id);
-      if (idx === -1) continue;
-      if (ov.enabled === false) {
-        out.rules.splice(idx, 1);
-      } else {
-        const r = out.rules[idx];
-        if (r) {
-          if (ov.priority !== undefined) r.priority = ov.priority;
-          if (ov.actions) r.actions = { ...r.actions, ...ov.actions };
-        }
-      }
-    }
-  }
-  out.rules.sort((a, b) => b.priority - a.priority);
-  return out;
-}
-
-/** Load + cache policy; optional env application */
-export function loadPolicy(file: string, env?: string): Result<Policy> {
+/** Load + cache policy */
+export function loadPolicy(file: string): Result<Policy> {
   try {
-    const cached = getCached(file, env);
+    const cached = getCached(file);
     if (cached) {
-      log.debug({ file, env }, 'Using cached policy');
+      log.debug({ file }, 'Using cached policy');
       return Success(cached);
     }
 
@@ -107,21 +83,13 @@ export function loadPolicy(file: string, env?: string): Result<Policy> {
 
     if (!base.ok) return base;
 
-    const resolved = env ? resolveEnvironment(base.value, env) : base.value;
-
     // Sort rules by priority descending
-    resolved.rules.sort((a, b) => b.priority - a.priority);
+    base.value.rules.sort((a, b) => b.priority - a.priority);
 
-    const final = validatePolicy(resolved);
-    if (!final.ok) return final;
-
-    const ttl = final.value.cache?.ttl ?? 300;
-    putCached(file, env, final.value, ttl);
-    log.debug(
-      { file, env, rulesCount: final.value.rules.length },
-      'Policy loaded and cached successfully',
-    );
-    return final;
+    const ttl = base.value.cache?.ttl ?? 300;
+    putCached(file, base.value, ttl);
+    log.debug({ file, rulesCount: base.value.rules.length }, 'Policy loaded and cached successfully');
+    return base;
   } catch (err) {
     return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(extractErrorMessage(err)));
   }
