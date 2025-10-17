@@ -70,10 +70,10 @@ export function parseImageName(imageName: string): Result<ParsedImageName> {
     // Port pattern: :5000/... or :8080/...
     const afterColon = imageName.substring(colonIndex + 1);
     const hasPathAfterColon = afterColon.includes('/');
-    // Checks for 'registry:port/path' format: digits followed by a slash
-    const hasPortAndPath = /^\d+\//.test(afterColon);
+    // Validate that the segment before the slash is actually numeric (port number)
+    const isPort = /^\d+\//.test(afterColon);
 
-    if (hasPathAfterColon && hasPortAndPath) {
+    if (hasPathAfterColon && isPort) {
       // This is a port number, not a tag (e.g., registry.io:5000/image)
       imagePath = imageName;
       tag = 'latest';

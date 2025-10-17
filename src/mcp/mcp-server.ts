@@ -305,20 +305,6 @@ function createLoggerContext(
 }
 
 /**
- * Creates a type-safe notification adapter that wraps the MCP SDK sendNotification
- * @param mcpSendNotification - The MCP SDK sendNotification function
- * @returns Type-safe notification sender
- */
-function createNotificationAdapter(
-  mcpSendNotification: (notification: ServerNotification) => Promise<void>,
-): (notification: unknown) => Promise<void> {
-  return async (notification: unknown) => {
-    // Assume the caller provides the correct type, or add runtime validation here if needed
-    return mcpSendNotification(notification as ServerNotification);
-  };
-}
-
-/**
  * Creates execution metadata from parameters and request context
  * @param toolName - Name of the tool being executed
  * @param params - Tool parameters
@@ -338,7 +324,7 @@ function createExecuteMetadata(
     progress: params,
     loggerContext: createLoggerContext(toolName, transport, meta),
     ...(extra.sendNotification && {
-      sendNotification: createNotificationAdapter(extra.sendNotification),
+      sendNotification: extra.sendNotification as (notification: unknown) => Promise<void>,
     }),
   };
 }
@@ -388,6 +374,9 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
 
 /**
  * Format tool output based on requested format
+ * @param output - The output value to format
+ * @param format - Desired output format (json, markdown, or text)
+ * @returns Formatted string representation of the output
  */
 export function formatOutput(output: unknown, format: OutputFormat): string {
   switch (format) {

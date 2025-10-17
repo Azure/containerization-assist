@@ -212,26 +212,17 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     if (result.ok) {
       let valueWithMessages = result.value;
 
-      // Look up chain hints from application-level registry
-      // If tool name is an alias, resolve to original name
-      const toolNameForHints = env.config.aliasToOriginalMap?.[tool.name] || tool.name;
-      const chainHints = env.config.chainHints?.[toolNameForHints];
-      if (env.config.chainHintsMode === 'enabled' && chainHints) {
+      if (env.config.chainHintsMode === 'enabled' && tool.chainHints) {
         valueWithMessages = {
           ...valueWithMessages,
-          nextSteps: chainHints.success,
+          nextSteps: tool.chainHints.success,
         };
       }
 
       result.value = valueWithMessages;
-    } else if (result.guidance) {
-      // Add failure hint to error guidance from application-level registry
-      // If tool name is an alias, resolve to original name
-      const toolNameForHints = env.config.aliasToOriginalMap?.[tool.name] || tool.name;
-      const chainHints = env.config.chainHints?.[toolNameForHints];
-      if (chainHints) {
-        result.guidance.hint = chainHints.failure;
-      }
+    } else if (result.guidance && tool.chainHints) {
+      // Add failure hint to error guidance
+      result.guidance.hint = tool.chainHints.failure;
     }
     tracker.complete({});
     return result;

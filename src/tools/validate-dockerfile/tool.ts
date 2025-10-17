@@ -295,9 +295,9 @@ export default tool({
   },
   chainHints: {
     success:
-      'Dockerfile validated against policies. If violations exist, fix them before building. Continue by building the Dockerfile with build-image, then proceed with generate-k8s-manifests.',
+      'Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the generate-k8s-manifests tool to proceed with containerization.',
     failure:
-      'Dockerfile validation failed. Review the policy violations and update the Dockerfile to comply with organizational policies.',
+      'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
   },
   handler: handleValidateDockerfile,
 });

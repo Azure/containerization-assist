@@ -5,7 +5,7 @@
  * Simple, focused configuration without complex validation overhead.
  */
 import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
-import { parseIntEnv, parseStringEnv } from './env-utils';
+import { parseIntEnv, parseStringEnv, parseListEnv } from './env-utils';
 
 // Export consolidated constants (includes environment schema and defaults)
 export * from './constants';
@@ -26,11 +26,17 @@ export const config = {
     timeout: parseIntEnv('DOCKER_TIMEOUT', 60000),
   },
 
-  toolLogging: {
-    dirPath: parseStringEnv('CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH', ''),
-    get enabled() {
-      return this.dirPath.trim().length > 0;
-    },
+  toolLogging: (() => {
+    const dirPath = parseStringEnv('CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH', '');
+    return {
+      dirPath,
+      enabled: dirPath.trim().length > 0,
+    };
+  })(),
+
+  validation: {
+    imageAllowlist: parseListEnv('CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST'),
+    imageDenylist: parseListEnv('CONTAINERIZATION_ASSIST_IMAGE_DENYLIST'),
   },
 } as const;
 
