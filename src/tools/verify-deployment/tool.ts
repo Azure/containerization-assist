@@ -63,10 +63,6 @@ export interface VerifyDeploymentResult extends Record<string, unknown> {
       message?: string;
     }>;
   };
-  workflowHints?: {
-    nextStep: string;
-    message: string;
-  };
 }
 
 /**
@@ -246,12 +242,6 @@ async function handleVerifyDeployment(
         status: overallStatus,
         message: health.message,
         ...(healthChecks.length > 0 && { checks: healthChecks }),
-      },
-      workflowHints: {
-        nextStep: isSuccessful ? 'ops' : 'fix-deployment-issues',
-        message: isSuccessful
-          ? `Deployment verification successful. Use "ops" for operational tasks, or review the deployment status.`
-          : `Deployment verification found issues. Check deployment status and pod logs to diagnose issues.`,
       },
     };
 

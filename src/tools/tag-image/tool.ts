@@ -21,10 +21,6 @@ export interface TagImageResult {
   success: boolean;
   tags: string[];
   imageId: string;
-  workflowHints?: {
-    nextStep: string;
-    message: string;
-  };
 }
 
 /**
@@ -88,10 +84,6 @@ async function handleTagImage(
       success: true,
       tags,
       imageId: source,
-      workflowHints: {
-        nextStep: 'push-image',
-        message: `Image tagged successfully as ${tag}. Use "push-image" to push the tagged image to a registry.`,
-      },
     };
 
     timer.end({ tags });

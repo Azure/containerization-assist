@@ -30,8 +30,4 @@ export interface ValidateImageResult {
     unknownImages: number;
   };
   violations: string[];
-  workflowHints?: {
-    nextStep: string;
-    message: string;
-  };
 }

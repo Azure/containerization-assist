@@ -185,16 +185,6 @@ async function handleValidateDockerfile(
 
   const passed = violations.length === 0;
 
-  const workflowHints = passed
-    ? {
-        nextStep: 'build-image',
-        message: 'All base images validated successfully. Ready to build.',
-      }
-    : {
-        nextStep: 'fix-dockerfile',
-        message: `Image validation failed with ${violations.length} violation(s). Update base images to match policy.`,
-      };
-
   const result: ValidateImageResult = {
     success: true,
     passed,
@@ -206,7 +196,6 @@ async function handleValidateDockerfile(
       unknownImages: unknownImages.length,
     },
     violations,
-    workflowHints,
   };
 
   logger.info(

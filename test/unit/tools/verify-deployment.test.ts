@@ -110,7 +110,6 @@ describe('verify-deployment', () => {
         expect(result.value.status.readyReplicas).toBe(2);
         expect(result.value.status.totalReplicas).toBe(2);
         expect(result.value.healthCheck?.status).toBe('healthy');
-        expect(result.value.workflowHints?.nextStep).toBe('ops');
       }
     });
 
@@ -188,7 +187,6 @@ describe('verify-deployment', () => {
         expect(result.value.status.readyReplicas).toBe(1);
         expect(result.value.status.totalReplicas).toBe(3);
         expect(result.value.healthCheck?.status).toBe('unknown');
-        expect(result.value.workflowHints?.nextStep).toBe('fix-deployment-issues');
       }
     });
 
@@ -346,38 +344,6 @@ describe('verify-deployment', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.healthCheck?.status).toBe('unknown');
-      }
-    });
-  });
-
-  describe('Workflow Hints', () => {
-    it('should provide next steps for successful deployment', async () => {
-      const mockContext = createMockToolContext();
-      const result = await verifyDeploymentTool.handler(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.workflowHints?.nextStep).toBe('ops');
-        expect(result.value.workflowHints?.message).toContain('successful');
-      }
-    });
-
-    it('should provide next steps for failed deployment', async () => {
-      mockK8sClient.waitForDeploymentReady.mockResolvedValue(
-        createSuccessResult({
-          ready: false,
-          readyReplicas: 0,
-          totalReplicas: 2,
-        }),
-      );
-
-      const mockContext = createMockToolContext();
-      const result = await verifyDeploymentTool.handler(config, mockContext);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.workflowHints?.nextStep).toBe('fix-deployment-issues');
-        expect(result.value.workflowHints?.message).toContain('found issues');
       }
     });
   });

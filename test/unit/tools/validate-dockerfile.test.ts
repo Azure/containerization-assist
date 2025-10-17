@@ -404,40 +404,6 @@ FROM node:latest`;
       });
     });
 
-    describe('workflow hints', () => {
-      it('should suggest build-image when validation passes', async () => {
-        const context = createMockToolContext();
-        const result = await tool.handler(
-          { dockerfile: sampleDockerfile },
-          context,
-        );
-
-        expect(result.ok).toBe(true);
-        if (result.ok && result.value.workflowHints) {
-          expect(result.value.workflowHints.nextStep).toBe('build-image');
-          expect(result.value.workflowHints.message).toContain('validated successfully');
-        }
-      });
-
-      it('should suggest fix-dockerfile when validation fails', async () => {
-        mockConfig.validation.imageDenylist = ['.*:latest$'];
-
-        const dockerfile = `FROM node:latest`;
-
-        const context = createMockToolContext();
-        const result = await tool.handler(
-          { dockerfile },
-          context,
-        );
-
-        expect(result.ok).toBe(true);
-        if (result.ok && result.value.workflowHints) {
-          expect(result.value.workflowHints.nextStep).toBe('fix-dockerfile');
-          expect(result.value.workflowHints.message).toContain('validation failed');
-        }
-      });
-    });
-
     describe('baseImages property', () => {
       it('should include baseImages property in results when run with a valid Dockerfile', async () => {
         const context = createMockToolContext();

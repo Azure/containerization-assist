@@ -71,7 +71,7 @@
     "format:check": "prettier --check 'src/**/*.ts'",
     "typecheck": "tsc --noEmit",
     "validate-api": "tsx scripts/validate-public-api.ts",
-    "validate": "npm run lint && npm run typecheck && npm run test:unit",
+    "validate": "npm run lint && npm run typecheck && npm run test:unit && node scripts/validate-examples.js",
     "fix": "npm run lint:fix && npm run format",
     "quality:gates": "tsx scripts/quality-gates.ts",
     "prepack": "node scripts/prepare-cjs-package.cjs",

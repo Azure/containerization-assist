@@ -485,66 +485,6 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
         };
       }
     },
-
-    {
-      name: 'workflow-tool',
-      category: 'tool-validation',
-      description: 'Test workflow orchestration tool',
-      tags: ['tools', 'workflow', 'orchestration'],
-      timeout: 60000,
-      execute: async () => {
-        const start = performance.now();
-
-        const result = await client.callTool({
-          name: 'workflow',
-          arguments: {
-            workflowType: 'containerization',
-            params: {
-              repoPath: './test/__support__/fixtures/node-express'
-            }
-          }
-        });
-
-        const responseTime = performance.now() - start;
-
-        if (result.isError) {
-          return {
-            success: false,
-            duration: responseTime,
-            message: `Workflow execution failed: ${result.error?.message || 'Unknown error'}`
-          };
-        }
-
-        // Extract workflow results
-        let workflowResults: any = {};
-        for (const content of result.content) {
-          if (content.type === 'text' && content.text) {
-            try {
-              const parsed = JSON.parse(content.text);
-              workflowResults = { ...workflowResults, ...parsed };
-            } catch {
-              workflowResults.textContent = content.text;
-            }
-          }
-        }
-
-        const hasWorkflowResults = workflowResults.success !== undefined || workflowResults.steps ||
-          workflowResults.completed || workflowResults.textContent;
-
-        return {
-          success: !!hasWorkflowResults,
-          duration: responseTime,
-          message: hasWorkflowResults
-            ? 'Workflow tool executing correctly'
-            : 'Workflow results unclear',
-          details: workflowResults,
-          performance: {
-            responseTime,
-            memoryUsage: 0,
-          }
-        };
-      }
-    }
   ];
 
   return tests;

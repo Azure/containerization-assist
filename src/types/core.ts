@@ -19,6 +19,8 @@ export interface ErrorGuidance {
   details?: Record<string, unknown>;
 }
 
+// ===== WORKFLOW GUIDANCE SYSTEM =====
+
 /**
  * Result type for functional error handling
  *
@@ -59,4 +61,3 @@ export const Failure = <T>(error: string, guidance?: ErrorGuidance): Result<T> =
   const resultGuidance = guidance ? { ...guidance, message: guidance.message || error } : undefined;
   return resultGuidance ? { ok: false, error, guidance: resultGuidance } : { ok: false, error };
 };
-

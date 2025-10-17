@@ -1,12 +1,10 @@
 import {
-  WorkflowState,
   AnalysisResult,
   DockerBuildResult,
   DockerfileResult,
   ScanResult,
   K8sManifestResult,
   DeploymentResult,
-  WorkflowStep,
 } from '../../../src/types';
 
 import type { Logger } from '../../../src/lib/logger';
@@ -359,9 +357,6 @@ export function createMockConfig(overrides?: Partial<AppConfig>): AppConfig {
     },
     logging: {
       level: 'error',
-    },
-    workflow: {
-      mode: 'batch',
     },
     cache: {
       ttl: 3600,
