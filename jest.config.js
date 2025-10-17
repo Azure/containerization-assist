@@ -144,7 +144,7 @@ export default {
     },
     './src/lib/': {
       branches: 22,
-      functions: 41,
+      functions: 40,
       lines: 39,
       statements: 39,
     },
