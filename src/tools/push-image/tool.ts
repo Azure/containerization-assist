@@ -178,5 +178,10 @@ export default tool({
   metadata: {
     knowledgeEnhanced: false,
   },
+  chainHints: {
+    success: 'Image pushed successfully. Review AI optimization insights for push improvements.',
+    failure:
+      'Image push failed. Check registry credentials, network connectivity, and image tag format.',
+  },
   handler: handlePushImage,
 });

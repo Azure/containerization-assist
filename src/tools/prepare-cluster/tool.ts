@@ -466,5 +466,10 @@ export default tool({
   metadata: {
     knowledgeEnhanced: false,
   },
+  chainHints: {
+    success: 'Cluster preparation successful. Next: Call deploy to deploy to the kind cluster.',
+    failure:
+      'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
+  },
   handler: handlePrepareCluster,
 });

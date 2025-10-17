@@ -35,6 +35,7 @@ let logFileName: string | null = null;
 function isToolLoggingEnabled(): boolean {
   return (
     !!config.toolLogging.enabled &&
+    typeof config.toolLogging.dirPath === 'string' &&
     config.toolLogging.dirPath.trim() !== ''
   );
 }
