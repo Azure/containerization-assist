@@ -3,7 +3,6 @@
  */
 
 export * from './core-types';
-export type { ValidationFunction, Validator } from './pipeline';
 
 export {
   createKubernetesValidator,
