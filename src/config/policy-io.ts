@@ -14,7 +14,7 @@ import { policyData } from './policy-data';
 
 const log = createLogger().child({ module: 'policy-io' });
 
-// Cache key is the resolved absolute file path (simplified after PR-019 removed environment parameter)
+// Cache key is the resolved absolute file path
 type CacheKey = string;
 type CacheVal = { value: Policy; expiresAt: number };
 const CACHE = new Map<CacheKey, CacheVal>();
