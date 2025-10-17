@@ -1,0 +1,78 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": [
+      "ES2022"
+    ],
+    "rootDir": "./",
+    "outDir": "./dist-cjs",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ],
+      "@types": [
+        "src/types/index.ts"
+      ],
+      "@/ai/*": [
+        "src/ai/*"
+      ],
+      "@/config/*": [
+        "src/config/*"
+      ],
+      "@/infra/*": [
+        "src/infra/*"
+      ],
+      "@/lib/*": [
+        "src/lib/*"
+      ],
+      "@/mcp/*": [
+        "src/mcp/*"
+      ],
+      "@/tools/*": [
+        "src/tools/*"
+      ],
+      "@/knowledge/*": [
+        "src/knowledge/*"
+      ],
+      "@/validation/*": [
+        "src/validation/*"
+      ]
+    },
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowJs": false,
+    "checkJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "downlevelIteration": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
+  },
+  "include": [
+    "src/**/*",
+    "apps/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-cjs",
+    "test",
+    "**/*.test.ts",
+    "src/cli/cli.ts",
+    "src/cli/server.ts"
+  ]
+}

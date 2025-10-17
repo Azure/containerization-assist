@@ -1,0 +1,610 @@
+{
+  "name": "DotNet Background Jobs Pack",
+  "description": "Comprehensive containerization patterns for .NET background job processing using Hangfire, Quartz.NET, and other scheduling frameworks",
+  "version": "1.0.0",
+  "triggers": {
+    "frameworks": ["aspnet-core", "dotnet-core", "worker-service"],
+    "packages": ["Hangfire", "Quartz", "Quartz.Extensions.Hosting", "Microsoft.Extensions.Hosting"],
+    "files": ["Jobs/", "BackgroundServices/", "Schedulers/"],
+    "patterns": ["IJob", "BackgroundService", "IHostedService", "RecurringJob"]
+  },
+  "rules": [
+    {
+      "id": "hangfire-basic-setup",
+      "description": "Basic Hangfire background job processing",
+      "conditions": {
+        "packages": ["Hangfire", "Hangfire.SqlServer"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "base_image": "mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+          "build_stage": "mcr.microsoft.com/dotnet/sdk:8.0-alpine",
+          "layers": [
+            "# Hangfire Background Jobs Application",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Hangfire configuration",
+            "ENV Hangfire__Dashboard__Enabled=\"true\"",
+            "ENV Hangfire__Dashboard__Path=\"/hangfire\"",
+            "ENV Hangfire__WorkerCount=\"5\"",
+            "ENV Hangfire__MaxRetryAttempts=\"3\"",
+            "",
+            "# Database configuration",
+            "ENV ConnectionStrings__HangfireConnection=\"Server=db;Database=HangfireJobs;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Job configuration",
+            "ENV Jobs__EnableAutomaticRetry=\"true\"",
+            "ENV Jobs__DefaultTimeout=\"00:30:00\"",
+            "ENV Jobs__EnableLogging=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"HangfireApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "hangfire-distributed-processing",
+      "description": "Distributed Hangfire processing with multiple servers",
+      "conditions": {
+        "packages": ["Hangfire", "Hangfire.Redis"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Distributed Hangfire Processing",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Distributed Hangfire configuration",
+            "ENV Hangfire__Storage=\"Redis\"",
+            "ENV ConnectionStrings__Redis=\"redis:6379\"",
+            "ENV Hangfire__Redis__Database=\"0\"",
+            "ENV Hangfire__Redis__Prefix=\"hangfire:\"",
+            "",
+            "# Server configuration",
+            "ENV Hangfire__ServerName=\"${HOSTNAME}\"",
+            "ENV Hangfire__WorkerCount=\"10\"",
+            "ENV Hangfire__Queues=\"default,critical,normal,low\"",
+            "",
+            "# Heartbeat and monitoring",
+            "ENV Hangfire__HeartbeatInterval=\"00:00:30\"",
+            "ENV Hangfire__ServerCheckInterval=\"00:05:00\"",
+            "ENV Hangfire__ServerTimeout=\"00:05:00\"",
+            "",
+            "# Performance tuning",
+            "ENV Hangfire__SchedulePollingInterval=\"00:00:15\"",
+            "ENV Hangfire__QueuePollInterval=\"00:00:05\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"DistributedHangfire.dll\"]"
+          ]
+        },
+        "kubernetes": {
+          "deployment": {
+            "replicas": 3,
+            "resources": {
+              "requests": {
+                "cpu": "200m",
+                "memory": "256Mi"
+              },
+              "limits": {
+                "cpu": "1000m",
+                "memory": "1Gi"
+              }
+            }
+          },
+          "service": {
+            "type": "ClusterIP",
+            "ports": [
+              {
+                "port": 80,
+                "targetPort": 8080
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "quartz-scheduler",
+      "description": "Quartz.NET job scheduling with persistence",
+      "conditions": {
+        "packages": ["Quartz", "Quartz.Extensions.Hosting"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Quartz.NET Scheduler",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Quartz configuration",
+            "ENV Quartz__Scheduler__InstanceName=\"QuartzScheduler\"",
+            "ENV Quartz__Scheduler__InstanceId=\"AUTO\"",
+            "ENV Quartz__ThreadPool__Type=\"Quartz.Simpl.SimpleThreadPool, Quartz\"",
+            "ENV Quartz__ThreadPool__ThreadCount=\"10\"",
+            "",
+            "# Job store configuration",
+            "ENV Quartz__JobStore__Type=\"Quartz.Impl.AdoJobStore.JobStoreTX, Quartz\"",
+            "ENV Quartz__JobStore__UseProperties=\"true\"",
+            "ENV Quartz__JobStore__DataSource=\"default\"",
+            "ENV Quartz__JobStore__TablePrefix=\"QRTZ_\"",
+            "",
+            "# Data source configuration",
+            "ENV Quartz__DataSource__default__ConnectionString=\"Server=db;Database=QuartzJobs;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "ENV Quartz__DataSource__default__Provider=\"SqlServer\"",
+            "",
+            "# Clustering configuration",
+            "ENV Quartz__JobStore__IsClustered=\"true\"",
+            "ENV Quartz__JobStore__ClusterCheckinInterval=\"20000\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"QuartzApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "background-service-worker",
+      "description": ".NET Worker Service for background processing",
+      "conditions": {
+        "packages": ["Microsoft.Extensions.Hosting"],
+        "patterns": ["BackgroundService", "Worker"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Background Worker Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/runtime:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "# Create non-root user",
+            "RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup",
+            "",
+            "COPY --from=build /app/publish .",
+            "RUN chown -R appuser:appgroup /app",
+            "",
+            "USER appuser",
+            "",
+            "# Worker configuration",
+            "ENV Worker__ProcessingInterval=\"00:01:00\"",
+            "ENV Worker__BatchSize=\"100\"",
+            "ENV Worker__MaxConcurrency=\"5\"",
+            "ENV Worker__EnableMetrics=\"true\"",
+            "",
+            "# Health check configuration",
+            "ENV HealthCheck__Enabled=\"true\"",
+            "ENV HealthCheck__Port=\"8080\"",
+            "ENV HealthCheck__Endpoint=\"/health\"",
+            "",
+            "# Graceful shutdown",
+            "ENV Shutdown__TimeoutSeconds=\"30\"",
+            "ENV Shutdown__ForceKillAfterSeconds=\"60\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"WorkerService.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "message-queue-processor",
+      "description": "Message queue processing with RabbitMQ/Azure Service Bus",
+      "conditions": {
+        "packages": ["RabbitMQ.Client", "Azure.Messaging.ServiceBus"],
+        "patterns": ["MessageProcessor", "QueueConsumer"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Message Queue Processor",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/runtime:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Message queue configuration",
+            "ENV MessageQueue__Provider=\"RabbitMQ\"",
+            "ENV MessageQueue__RabbitMQ__Host=\"rabbitmq\"",
+            "ENV MessageQueue__RabbitMQ__Port=\"5672\"",
+            "ENV MessageQueue__RabbitMQ__Username=\"guest\"",
+            "ENV MessageQueue__RabbitMQ__Password=\"guest\"",
+            "ENV MessageQueue__RabbitMQ__VirtualHost=\"/\"",
+            "",
+            "# Processing configuration",
+            "ENV Processing__QueueName=\"background-jobs\"",
+            "ENV Processing__PrefetchCount=\"10\"",
+            "ENV Processing__MaxRetryAttempts=\"3\"",
+            "ENV Processing__RetryDelay=\"00:01:00\"",
+            "ENV Processing__DeadLetterQueue=\"background-jobs-dlq\"",
+            "",
+            "# Azure Service Bus (alternative)",
+            "ENV MessageQueue__ServiceBus__ConnectionString=\"Endpoint=sb://your-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key\"",
+            "ENV MessageQueue__ServiceBus__QueueName=\"background-jobs\"",
+            "",
+            "# Performance tuning",
+            "ENV Processing__MaxConcurrentCalls=\"10\"",
+            "ENV Processing__MaxAutoRenewDuration=\"00:05:00\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"MessageProcessor.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "cron-job-scheduler",
+      "description": "Cron-based job scheduling with NCrontab",
+      "conditions": {
+        "packages": ["NCrontab"],
+        "patterns": ["CronScheduler", "CronJob"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Cron Job Scheduler",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/runtime:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Cron scheduler configuration",
+            "ENV CronScheduler__TimeZone=\"UTC\"",
+            "ENV CronScheduler__MaxConcurrentJobs=\"5\"",
+            "ENV CronScheduler__MissedJobThreshold=\"00:05:00\"",
+            "",
+            "# Job definitions",
+            "ENV Jobs__DataSync__Schedule=\"0 */5 * * * *\"",
+            "ENV Jobs__DataSync__Enabled=\"true\"",
+            "ENV Jobs__ReportGeneration__Schedule=\"0 0 6 * * *\"",
+            "ENV Jobs__ReportGeneration__Enabled=\"true\"",
+            "ENV Jobs__Cleanup__Schedule=\"0 0 2 * * *\"",
+            "ENV Jobs__Cleanup__Enabled=\"true\"",
+            "",
+            "# Monitoring configuration",
+            "ENV Monitoring__EnableJobMetrics=\"true\"",
+            "ENV Monitoring__LogJobExecution=\"true\"",
+            "ENV Monitoring__AlertOnJobFailure=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"CronScheduler.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "batch-processing",
+      "description": "Large-scale batch processing with parallel execution",
+      "conditions": {
+        "patterns": ["BatchProcessor", "ParallelProcessing", "DataPipeline"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Batch Processing Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/runtime:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Batch processing configuration",
+            "ENV Batch__ChunkSize=\"1000\"",
+            "ENV Batch__MaxParallelism=\"8\"",
+            "ENV Batch__ProcessingTimeout=\"01:00:00\"",
+            "ENV Batch__EnableCheckpointing=\"true\"",
+            "",
+            "# Memory management",
+            "ENV DOTNET_gcServer=1",
+            "ENV DOTNET_GCHighMemPercent=75",
+            "ENV DOTNET_GCRetainVM=1",
+            "",
+            "# Resource limits",
+            "ENV Processing__MaxMemoryUsage=\"2GB\"",
+            "ENV Processing__MemoryPressureThreshold=\"1.5GB\"",
+            "ENV Processing__GCPressureThreshold=\"85\"",
+            "",
+            "# Data source configuration",
+            "ENV DataSource__Type=\"Database\"",
+            "ENV ConnectionStrings__DataSource=\"Server=db;Database=BatchData;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Output configuration",
+            "ENV Output__Type=\"FileSystem\"",
+            "ENV Output__Path=\"/app/output\"",
+            "ENV Output__FileFormat=\"CSV\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"BatchProcessor.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "event-driven-processing",
+      "description": "Event-driven background processing with MediatR",
+      "conditions": {
+        "packages": ["MediatR", "Microsoft.Extensions.Hosting"],
+        "patterns": ["DomainEvent", "EventHandler"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Event-Driven Processing Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/runtime:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Event processing configuration",
+            "ENV EventProcessing__MaxConcurrentEvents=\"20\"",
+            "ENV EventProcessing__EventTimeout=\"00:10:00\"",
+            "ENV EventProcessing__RetryPolicy=\"Exponential\"",
+            "ENV EventProcessing__MaxRetryAttempts=\"5\"",
+            "",
+            "# Event store configuration",
+            "ENV EventStore__Type=\"Database\"",
+            "ENV ConnectionStrings__EventStore=\"Server=db;Database=EventStore;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Event bus configuration",
+            "ENV EventBus__Provider=\"InMemory\"",
+            "ENV EventBus__EnablePersistence=\"true\"",
+            "ENV EventBus__BatchSize=\"50\"",
+            "",
+            "# Dead letter queue",
+            "ENV DeadLetter__Enabled=\"true\"",
+            "ENV DeadLetter__MaxRetentionDays=\"30\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"EventProcessor.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "job-monitoring-dashboard",
+      "description": "Job monitoring and management dashboard",
+      "conditions": {
+        "packages": ["Hangfire", "AspNetCore"],
+        "patterns": ["JobDashboard", "JobMonitoring"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Job Monitoring Dashboard",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Dashboard configuration",
+            "ENV Dashboard__Enabled=\"true\"",
+            "ENV Dashboard__Path=\"/jobs\"",
+            "ENV Dashboard__Authentication=\"Basic\"",
+            "ENV Dashboard__Username=\"admin\"",
+            "ENV Dashboard__Password=\"admin123\"",
+            "",
+            "# Monitoring configuration",
+            "ENV Monitoring__RefreshInterval=\"00:00:30\"",
+            "ENV Monitoring__JobHistoryLimit=\"1000\"",
+            "ENV Monitoring__MetricsRetentionDays=\"30\"",
+            "",
+            "# Alerting configuration",
+            "ENV Alerts__FailedJobThreshold=\"5\"",
+            "ENV Alerts__QueueBacklogThreshold=\"100\"",
+            "ENV Alerts__EmailNotifications=\"true\"",
+            "ENV Alerts__SlackWebhook=\"https://hooks.slack.com/services/your/slack/webhook\"",
+            "",
+            "# API configuration",
+            "ENV Api__Enabled=\"true\"",
+            "ENV Api__Authentication=\"Bearer\"",
+            "ENV Api__RateLimit=\"100\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"JobDashboard.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "job-performance-optimization",
+      "description": "Performance-optimized background job processing",
+      "conditions": {
+        "patterns": ["PerformanceOptimization", "JobTuning"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Performance Optimized Job Processing",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "# Enable ReadyToRun and optimizations",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish \\",
+            "    --runtime linux-x64 \\",
+            "    --self-contained false \\",
+            "    -p:PublishReadyToRun=true \\",
+            "    -p:PublishTrimmed=false",
+            "",
+            "FROM mcr.microsoft.com/dotnet/runtime:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Performance optimizations",
+            "ENV DOTNET_TieredPGO=1",
+            "ENV DOTNET_TC_QuickJitForLoops=1",
+            "ENV DOTNET_ReadyToRun=1",
+            "",
+            "# GC optimizations",
+            "ENV DOTNET_gcServer=1",
+            "ENV DOTNET_gcConcurrent=1",
+            "ENV DOTNET_GCHighMemPercent=75",
+            "ENV DOTNET_GCRetainVM=1",
+            "",
+            "# Thread pool tuning",
+            "ENV DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=70",
+            "ENV DOTNET_System_Threading_ThreadPool_UnfairSemaphoreSpinLimit=70",
+            "",
+            "# Job performance configuration",
+            "ENV Jobs__EnableParallelProcessing=\"true\"",
+            "ENV Jobs__OptimizeMemoryUsage=\"true\"",
+            "ENV Jobs__UseConnectionPooling=\"true\"",
+            "ENV Jobs__EnableAsyncProcessing=\"true\"",
+            "",
+            "# Database optimization",
+            "ENV Database__ConnectionPoolSize=\"100\"",
+            "ENV Database__CommandTimeout=\"300\"",
+            "ENV Database__EnableConnectionMultiplexing=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"OptimizedJobProcessor.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "job-security-isolation",
+      "description": "Secure job processing with isolation and sandboxing",
+      "conditions": {
+        "patterns": ["JobSecurity", "Sandboxing", "IsolatedProcessing"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Secure Job Processing with Isolation",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/runtime:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "# Security: Create non-root user and group",
+            "RUN addgroup -g 1001 -S jobgroup && adduser -u 1001 -S jobuser -G jobgroup",
+            "",
+            "# Security: Remove unnecessary packages",
+            "RUN apk del --purge \\",
+            "    && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Security: Set proper file permissions",
+            "RUN chown -R jobuser:jobgroup /app \\",
+            "    && chmod -R 550 /app \\",
+            "    && find /app -type f -name \"*.dll\" -exec chmod 444 {} \\;",
+            "",
+            "# Security: Create secure temp directory",
+            "RUN mkdir -p /app/temp && chown jobuser:jobgroup /app/temp && chmod 750 /app/temp",
+            "",
+            "USER jobuser",
+            "",
+            "# Security configuration",
+            "ENV Security__EnableSandboxing=\"true\"",
+            "ENV Security__RestrictFileAccess=\"true\"",
+            "ENV Security__AllowedDirectories=\"/app/temp,/app/data\"",
+            "ENV Security__MaxExecutionTime=\"00:30:00\"",
+            "",
+            "# Resource limits",
+            "ENV Limits__MaxMemoryMB=\"512\"",
+            "ENV Limits__MaxCpuPercent=\"50\"",
+            "ENV Limits__MaxDiskSpaceMB=\"100\"",
+            "",
+            "# Audit logging",
+            "ENV Audit__LogAllJobExecutions=\"true\"",
+            "ENV Audit__LogSecurityEvents=\"true\"",
+            "ENV Audit__LogResourceUsage=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"SecureJobProcessor.dll\"]"
+          ]
+        }
+      }
+    }
+  ]
+}

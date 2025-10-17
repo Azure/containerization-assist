@@ -1,0 +1,131 @@
+version: '2.0'
+metadata:
+  name: Container Best Practices
+  description: Docker and container best practices for production readiness
+  category: quality
+  author: containerization-assist
+
+defaults:
+  enforcement: advisory
+
+rules:
+  - id: require-healthcheck
+    category: quality
+    priority: 75
+    description: Recommend HEALTHCHECK for production containers
+    conditions:
+      - kind: function
+        name: hasPattern
+        args: ['^HEALTHCHECK', 'im']
+    actions:
+      warn: true
+      message: 'HEALTHCHECK directive is recommended for production containers.'
+
+  - id: require-workdir
+    category: quality
+    priority: 60
+    description: Recommend WORKDIR instead of cd commands
+    conditions:
+      - kind: regex
+        pattern: 'RUN\s+cd\s+/'
+        flags: im
+    actions:
+      warn: true
+      message: 'Use WORKDIR directive instead of cd commands for better readability.'
+
+  - id: avoid-apt-upgrade
+    category: quality
+    priority: 65
+    description: Avoid apt-get upgrade in Dockerfile
+    conditions:
+      - kind: regex
+        pattern: 'apt-get\s+(upgrade|dist-upgrade)'
+        flags: im
+    actions:
+      warn: true
+      message: 'Avoid apt-get upgrade in Dockerfile. Use specific package versions instead.'
+
+  - id: excessive-run-commands
+    category: performance
+    priority: 55
+    description: Detect excessive RUN commands
+    conditions:
+      - kind: regex
+        pattern: '^RUN\s+'
+        flags: im
+        count_threshold: 6
+    actions:
+      suggest: true
+      message: 'Consider combining RUN commands with && to reduce layers and image size.'
+
+  - id: apt-cleanup-missing
+    category: performance
+    priority: 60
+    description: Recommend apt cache cleanup
+    conditions:
+      - kind: regex
+        pattern: 'apt-get\s+install'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Clean apt cache after installation: RUN apt-get update && apt-get install -y <packages> && rm -rf /var/lib/apt/lists/*'
+
+  - id: avoid-sudo
+    category: security
+    priority: 80
+    description: Avoid using sudo in containers
+    conditions:
+      - kind: regex
+        pattern: '\bsudo\b'
+        flags: im
+    actions:
+      warn: true
+      message: 'Avoid using sudo in containers. Run as non-root user instead.'
+
+  - id: recommend-multistage
+    category: performance
+    priority: 65
+    description: Recommend multi-stage builds for compiled languages
+    conditions:
+      - kind: regex
+        pattern: '(mvn|gradle|npm\s+run\s+build|go\s+build|cargo\s+build)'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Consider using multi-stage builds to reduce final image size.'
+
+  - id: recommend-expose
+    category: quality
+    priority: 45
+    description: Recommend EXPOSE directive
+    conditions:
+      - kind: regex
+        pattern: '(PORT|LISTEN|:808|:300|:500)'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Use EXPOSE directive to document which ports your application listens on.'
+
+  - id: recommend-npm-ci
+    category: quality
+    priority: 70
+    description: Recommend npm ci over npm install
+    conditions:
+      - kind: regex
+        pattern: 'npm\s+install(?!\s+-g)'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Use "npm ci" instead of "npm install" for reproducible builds.'
+
+  - id: apk-no-cache
+    category: performance
+    priority: 60
+    description: Recommend --no-cache with apk add
+    conditions:
+      - kind: regex
+        pattern: 'apk\s+add(?!\s+--no-cache)'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Use apk add --no-cache to avoid caching package indexes.'

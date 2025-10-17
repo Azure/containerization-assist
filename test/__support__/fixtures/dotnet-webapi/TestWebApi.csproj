@@ -1,0 +1,16 @@
+&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;AssemblyName&gt;TestWebApi&lt;/AssemblyName&gt;
+    &lt;RootNamespace&gt;TestWebApi&lt;/RootNamespace&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" /&gt;
+    &lt;PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" /&gt;
+  &lt;/ItemGroup&gt;
+
+&lt;/Project&gt;

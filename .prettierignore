@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+*.log
+*.md
+*.json
+.env*
+.git
+.vscode
+docs
+*.yml
+*.yaml

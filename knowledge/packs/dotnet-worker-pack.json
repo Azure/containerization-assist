@@ -1,0 +1,202 @@
+[
+  {
+    "id": "worker-service-base-configuration",
+    "category": "dockerfile",
+    "pattern": "BackgroundService|IHostedService",
+    "recommendation": "Configure Worker Service applications for optimal container performance",
+    "example": "FROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY . .\n# Worker services don't need HTTP ports\n# Configure logging to stdout\nENV Logging__Console__FormatterName=json",
+    "severity": "high",
+    "tags": ["worker-service", "background-service", "hosted-service"],
+    "description": "Worker Services require specific configuration for containerized background processing"
+  },
+  {
+    "id": "worker-service-graceful-shutdown",
+    "category": "dockerfile",
+    "pattern": "CancellationToken|StoppingToken",
+    "recommendation": "Implement proper cancellation handling for graceful shutdown in containers",
+    "example": "public class MyWorkerService : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            try\n            {\n                await DoWork(stoppingToken);\n                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);\n            }\n            catch (OperationCanceledException)\n            {\n                // Expected when cancellation is requested\n                break;\n            }\n        }\n    }\n}",
+    "severity": "high",
+    "tags": ["worker-service", "cancellation", "graceful-shutdown", "reliability"],
+    "description": "Proper cancellation handling ensures worker services shut down gracefully in containers"
+  },
+  {
+    "id": "worker-service-health-checks",
+    "category": "dockerfile",
+    "pattern": "Worker.*Health|BackgroundService.*Health",
+    "recommendation": "Implement health checks for Worker Service applications",
+    "example": "// In Program.cs\nbuilder.Services.AddHealthChecks()\n    .AddCheck<WorkerHealthCheck>(\"worker\");\n\n// Add HTTP server for health checks\nbuilder.Services.Configure<KestrelServerOptions>(options =>\n{\n    options.ListenAnyIP(8080); // Health check port\n});\n\nvar app = builder.Build();\napp.MapHealthChecks(\"/health\");\n\n// Docker health check\nHEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:8080/health || exit 1",
+    "severity": "high",
+    "tags": ["worker-service", "health-checks", "monitoring", "http"],
+    "description": "Health checks enable container orchestrators to monitor worker service status"
+  },
+  {
+    "id": "worker-service-message-queue-configuration",
+    "category": "dockerfile",
+    "pattern": "RabbitMQ|ServiceBus|Kafka|SQS",
+    "recommendation": "Configure message queue connections with proper retry and resilience patterns",
+    "example": "// Configure message queue with retry\nbuilder.Services.Configure<MessageQueueOptions>(options =>\n{\n    options.ConnectionString = builder.Configuration.GetConnectionString(\"MessageQueue\");\n    options.RetryAttempts = 3;\n    options.RetryDelay = TimeSpan.FromSeconds(5);\n});\n\n// Add resilience patterns\nbuilder.Services.AddHttpClient(\"MessageQueue\")\n    .AddPolicyHandler(GetRetryPolicy());\n\nstatic IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()\n{\n    return HttpPolicyExtensions\n        .HandleTransientHttpError()\n        .WaitAndRetryAsync(3, retryAttempt =>\n            TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));\n}",
+    "severity": "high",
+    "tags": ["worker-service", "message-queue", "retry", "resilience"],
+    "description": "Message queue configuration should include retry patterns for container reliability"
+  },
+  {
+    "id": "worker-service-periodic-timer",
+    "category": "dockerfile",
+    "pattern": "PeriodicTimer|Timer",
+    "recommendation": "Use PeriodicTimer for efficient periodic background tasks",
+    "example": "public class PeriodicWorkerService : BackgroundService\n{\n    private readonly PeriodicTimer _timer = new(TimeSpan.FromMinutes(5));\n    private readonly ILogger<PeriodicWorkerService> _logger;\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        try\n        {\n            while (await _timer.WaitForNextTickAsync(stoppingToken))\n            {\n                await ProcessBatch(stoppingToken);\n            }\n        }\n        catch (OperationCanceledException)\n        {\n            // Expected when cancellation is requested\n        }\n    }\n\n    public override void Dispose()\n    {\n        _timer?.Dispose();\n        base.Dispose();\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "periodic-timer", "scheduling", "performance"],
+    "description": "PeriodicTimer provides more efficient timing for periodic worker tasks"
+  },
+  {
+    "id": "worker-service-dependency-injection",
+    "category": "dockerfile",
+    "pattern": "IServiceScope|ServiceProvider",
+    "recommendation": "Use scoped services properly in long-running worker services",
+    "example": "public class ScopedWorkerService : BackgroundService\n{\n    private readonly IServiceProvider _serviceProvider;\n    private readonly ILogger<ScopedWorkerService> _logger;\n\n    public ScopedWorkerService(IServiceProvider serviceProvider, ILogger<ScopedWorkerService> logger)\n    {\n        _serviceProvider = serviceProvider;\n        _logger = logger;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            using var scope = _serviceProvider.CreateScope();\n            var scopedService = scope.ServiceProvider.GetRequiredService<IMyScopedService>();\n            \n            await scopedService.ProcessAsync(stoppingToken);\n            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);\n        }\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "dependency-injection", "scoped-services", "memory"],
+    "description": "Proper scope management prevents memory leaks in long-running worker services"
+  },
+  {
+    "id": "worker-service-configuration-hot-reload",
+    "category": "dockerfile",
+    "pattern": "IOptionsMonitor|IConfiguration",
+    "recommendation": "Use IOptionsMonitor for configuration that can change during container runtime",
+    "example": "public class ConfigurableWorkerService : BackgroundService\n{\n    private readonly IOptionsMonitor<WorkerOptions> _options;\n    private readonly ILogger<ConfigurableWorkerService> _logger;\n\n    public ConfigurableWorkerService(\n        IOptionsMonitor<WorkerOptions> options,\n        ILogger<ConfigurableWorkerService> logger)\n    {\n        _options = options;\n        _logger = logger;\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            var currentOptions = _options.CurrentValue;\n            _logger.LogInformation(\"Processing with interval: {Interval}\", currentOptions.Interval);\n            \n            await DoWork(currentOptions, stoppingToken);\n            await Task.Delay(currentOptions.Interval, stoppingToken);\n        }\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "configuration", "hot-reload", "monitoring"],
+    "description": "IOptionsMonitor enables configuration updates without container restarts"
+  },
+  {
+    "id": "worker-service-error-handling-resilience",
+    "category": "dockerfile",
+    "pattern": "try.*catch|Exception",
+    "recommendation": "Implement comprehensive error handling and resilience patterns",
+    "example": "public class ResilientWorkerService : BackgroundService\n{\n    private readonly ILogger<ResilientWorkerService> _logger;\n    private readonly IAsyncPolicy _retryPolicy;\n\n    public ResilientWorkerService(ILogger<ResilientWorkerService> logger)\n    {\n        _logger = logger;\n        _retryPolicy = Policy\n            .Handle<Exception>(ex => !(ex is OperationCanceledException))\n            .WaitAndRetryAsync(\n                retryCount: 3,\n                sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),\n                onRetry: (outcome, timespan, retryCount, context) =>\n                {\n                    _logger.LogWarning(\"Retry {RetryCount} after {Delay}s\", retryCount, timespan.TotalSeconds);\n                });\n    }\n\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            try\n            {\n                await _retryPolicy.ExecuteAsync(async () =>\n                {\n                    await ProcessWork(stoppingToken);\n                });\n            }\n            catch (Exception ex)\n            {\n                _logger.LogError(ex, \"Work processing failed after all retries\");\n            }\n            \n            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);\n        }\n    }\n}",
+    "severity": "high",
+    "tags": ["worker-service", "error-handling", "resilience", "retry"],
+    "description": "Resilience patterns prevent worker service failures from stopping the container"
+  },
+  {
+    "id": "worker-service-metrics-telemetry",
+    "category": "dockerfile",
+    "pattern": "Metrics|Telemetry|OpenTelemetry",
+    "recommendation": "Implement metrics and telemetry for worker service monitoring",
+    "example": "// In Program.cs\nbuilder.Services.AddOpenTelemetry()\n    .WithTracing(tracing => tracing\n        .AddSource(\"MyWorkerService\")\n        .AddJaegerExporter())\n    .WithMetrics(metrics => metrics\n        .AddMeter(\"MyWorkerService\")\n        .AddPrometheusExporter());\n\n// In worker service\npublic class TelemetryWorkerService : BackgroundService\n{\n    private static readonly ActivitySource ActivitySource = new(\"MyWorkerService\");\n    private static readonly Meter Meter = new(\"MyWorkerService\");\n    private static readonly Counter<int> ProcessedItems = Meter.CreateCounter<int>(\"processed_items_total\");\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            using var activity = ActivitySource.StartActivity(\"ProcessBatch\");\n            \n            var itemsProcessed = await ProcessBatch(stoppingToken);\n            ProcessedItems.Add(itemsProcessed);\n            \n            activity?.SetTag(\"items.processed\", itemsProcessed);\n        }\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "metrics", "telemetry", "opentelemetry"],
+    "description": "Telemetry enables proper monitoring and observability of worker services"
+  },
+  {
+    "id": "worker-service-memory-optimization",
+    "category": "dockerfile",
+    "pattern": "GC|Memory|OutOfMemory",
+    "recommendation": "Optimize memory usage for long-running worker services",
+    "example": "// Configure GC settings for worker services\nENV DOTNET_gcServer=1\nENV DOTNET_GCHeapCount=2\nENV DOTNET_GCConserveMemory=5\n\n// In code - implement proper disposal\npublic class MemoryOptimizedWorkerService : BackgroundService, IDisposable\n{\n    private readonly SemaphoreSlim _semaphore = new(Environment.ProcessorCount);\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            await _semaphore.WaitAsync(stoppingToken);\n            try\n            {\n                await ProcessBatch(stoppingToken);\n                \n                // Force GC periodically for long-running services\n                if (DateTime.UtcNow.Hour == 2 && DateTime.UtcNow.Minute < 5)\n                {\n                    GC.Collect(2, GCCollectionMode.Optimized);\n                }\n            }\n            finally\n            {\n                _semaphore.Release();\n            }\n        }\n    }\n    \n    public override void Dispose()\n    {\n        _semaphore?.Dispose();\n        base.Dispose();\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "memory", "gc", "optimization"],
+    "description": "Memory optimization is crucial for long-running worker services in containers"
+  },
+  {
+    "id": "worker-service-file-processing",
+    "category": "dockerfile",
+    "pattern": "File.*Process|Directory.*Watch",
+    "recommendation": "Configure file processing worker services with proper volume mounting",
+    "example": "FROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY . .\n\n# Create directories for file processing\nRUN mkdir -p /app/input /app/output /app/error\n\n# Set permissions\nRUN chmod 755 /app/input /app/output /app/error\n\n# Configure file watcher service\nENV FileWatcher__InputPath=/app/input\nENV FileWatcher__OutputPath=/app/output\nENV FileWatcher__ErrorPath=/app/error\n\n# In docker-compose or k8s, mount volumes:\n# volumes:\n#   - ./input:/app/input\n#   - ./output:/app/output",
+    "severity": "medium",
+    "tags": ["worker-service", "file-processing", "volumes", "filesystem"],
+    "description": "File processing worker services need proper volume configuration and permissions"
+  },
+  {
+    "id": "worker-service-database-connection-management",
+    "category": "dockerfile",
+    "pattern": "DbContext|Database|SQL",
+    "recommendation": "Manage database connections efficiently in worker services",
+    "example": "public class DatabaseWorkerService : BackgroundService\n{\n    private readonly IServiceProvider _serviceProvider;\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            // Create new scope for each batch to avoid long-lived DbContext\n            using var scope = _serviceProvider.CreateScope();\n            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n            \n            // Process batch with timeout\n            using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);\n            cts.CancelAfter(TimeSpan.FromMinutes(5));\n            \n            await ProcessDatabaseBatch(dbContext, cts.Token);\n            \n            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);\n        }\n    }\n    \n    private async Task ProcessDatabaseBatch(AppDbContext context, CancellationToken cancellationToken)\n    {\n        var items = await context.WorkItems\n            .Where(x => !x.Processed)\n            .Take(100)\n            .ToListAsync(cancellationToken);\n            \n        foreach (var item in items)\n        {\n            cancellationToken.ThrowIfCancellationRequested();\n            item.Processed = true;\n        }\n        \n        await context.SaveChangesAsync(cancellationToken);\n    }\n}",
+    "severity": "high",
+    "tags": ["worker-service", "database", "entity-framework", "connection-management"],
+    "description": "Proper database connection management prevents leaks in long-running worker services"
+  },
+  {
+    "id": "worker-service-parallel-processing",
+    "category": "dockerfile",
+    "pattern": "Parallel|Task\\.Run|Concurrent",
+    "recommendation": "Implement controlled parallel processing in worker services",
+    "example": "public class ParallelWorkerService : BackgroundService\n{\n    private readonly SemaphoreSlim _semaphore;\n    private readonly ILogger<ParallelWorkerService> _logger;\n    \n    public ParallelWorkerService(IConfiguration config, ILogger<ParallelWorkerService> logger)\n    {\n        var maxConcurrency = config.GetValue<int>(\"Worker:MaxConcurrency\", Environment.ProcessorCount);\n        _semaphore = new SemaphoreSlim(maxConcurrency);\n        _logger = logger;\n    }\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        var tasks = new List<Task>();\n        \n        while (!stoppingToken.IsCancellationRequested)\n        {\n            var workItems = await GetWorkItems(stoppingToken);\n            \n            foreach (var item in workItems)\n            {\n                await _semaphore.WaitAsync(stoppingToken);\n                \n                var task = ProcessItemAsync(item, stoppingToken)\n                    .ContinueWith(_ => _semaphore.Release(), TaskScheduler.Default);\n                    \n                tasks.Add(task);\n            }\n            \n            // Clean up completed tasks\n            tasks.RemoveAll(t => t.IsCompleted);\n            \n            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);\n        }\n        \n        // Wait for all tasks to complete\n        await Task.WhenAll(tasks);\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "parallel", "concurrency", "performance"],
+    "description": "Controlled parallel processing improves throughput while managing resource usage"
+  },
+  {
+    "id": "worker-service-distributed-locking",
+    "category": "dockerfile",
+    "pattern": "DistributedLock|Redis.*Lock",
+    "recommendation": "Use distributed locking for worker services in multi-instance deployments",
+    "example": "public class DistributedWorkerService : BackgroundService\n{\n    private readonly IDistributedLockProvider _lockProvider;\n    private readonly ILogger<DistributedWorkerService> _logger;\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            await using var @lock = await _lockProvider.AcquireLockAsync(\n                \"worker-service-lock\",\n                TimeSpan.FromMinutes(5),\n                stoppingToken);\n                \n            if (@lock != null)\n            {\n                _logger.LogInformation(\"Acquired distributed lock, processing work\");\n                await ProcessExclusiveWork(stoppingToken);\n            }\n            else\n            {\n                _logger.LogDebug(\"Could not acquire lock, skipping this cycle\");\n            }\n            \n            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);\n        }\n    }\n}\n\n// In Program.cs\nbuilder.Services.AddStackExchangeRedisCache(options =>\n{\n    options.Configuration = builder.Configuration.GetConnectionString(\"Redis\");\n});\nbuilder.Services.AddSingleton<IDistributedLockProvider, RedisDistributedLockProvider>();",
+    "severity": "high",
+    "tags": ["worker-service", "distributed-lock", "redis", "multi-instance"],
+    "description": "Distributed locking prevents multiple worker instances from processing the same work"
+  },
+  {
+    "id": "worker-service-circuit-breaker",
+    "category": "dockerfile",
+    "pattern": "CircuitBreaker|Polly",
+    "recommendation": "Implement circuit breaker pattern for external service calls",
+    "example": "public class CircuitBreakerWorkerService : BackgroundService\n{\n    private readonly HttpClient _httpClient;\n    private readonly IAsyncPolicy<HttpResponseMessage> _circuitBreakerPolicy;\n    \n    public CircuitBreakerWorkerService(HttpClient httpClient)\n    {\n        _httpClient = httpClient;\n        _circuitBreakerPolicy = Policy\n            .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)\n            .CircuitBreakerAsync(\n                handledEventsAllowedBeforeBreaking: 3,\n                durationOfBreak: TimeSpan.FromMinutes(1),\n                onBreak: (result, timespan) => \n                {\n                    // Log circuit breaker opened\n                },\n                onReset: () => \n                {\n                    // Log circuit breaker closed\n                });\n    }\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            try\n            {\n                var response = await _circuitBreakerPolicy.ExecuteAsync(async () =>\n                {\n                    return await _httpClient.GetAsync(\"/api/external\", stoppingToken);\n                });\n                \n                await ProcessResponse(response, stoppingToken);\n            }\n            catch (CircuitBreakerOpenException)\n            {\n                // Circuit breaker is open, skip this cycle\n                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);\n                continue;\n            }\n            \n            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);\n        }\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "circuit-breaker", "resilience", "external-services"],
+    "description": "Circuit breaker pattern protects worker services from cascading failures"
+  },
+  {
+    "id": "worker-service-startup-delay",
+    "category": "dockerfile",
+    "pattern": "Startup.*Delay|InitialDelay",
+    "recommendation": "Implement startup delays to prevent thundering herd problems",
+    "example": "public class StaggeredWorkerService : BackgroundService\n{\n    private readonly IConfiguration _configuration;\n    private readonly ILogger<StaggeredWorkerService> _logger;\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        // Add random startup delay to prevent thundering herd\n        var startupDelay = _configuration.GetValue<int>(\"Worker:StartupDelaySeconds\", 0);\n        if (startupDelay > 0)\n        {\n            var randomDelay = Random.Shared.Next(0, startupDelay);\n            _logger.LogInformation(\"Delaying startup by {Delay} seconds\", randomDelay);\n            await Task.Delay(TimeSpan.FromSeconds(randomDelay), stoppingToken);\n        }\n        \n        _logger.LogInformation(\"Worker service starting processing\");\n        \n        while (!stoppingToken.IsCancellationRequested)\n        {\n            await ProcessWork(stoppingToken);\n            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);\n        }\n    }\n}\n\n# In appsettings.json\n{\n  \"Worker\": {\n    \"StartupDelaySeconds\": 60\n  }\n}",
+    "severity": "low",
+    "tags": ["worker-service", "startup-delay", "thundering-herd", "scaling"],
+    "description": "Startup delays prevent multiple worker instances from overwhelming external resources"
+  },
+  {
+    "id": "worker-service-signal-handling",
+    "category": "dockerfile",
+    "pattern": "SIGTERM|SIGINT|Signal",
+    "recommendation": "Handle container signals properly for graceful worker service shutdown",
+    "example": "// In Program.cs\nvar builder = Host.CreateApplicationBuilder(args);\n\n// Configure shutdown timeout\nbuilder.Services.Configure<HostOptions>(options =>\n{\n    options.ShutdownTimeout = TimeSpan.FromSeconds(30);\n});\n\nvar host = builder.Build();\n\n// Handle signals gracefully\nvar lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();\nlifetime.ApplicationStopping.Register(() =>\n{\n    // Log shutdown initiation\n    var logger = host.Services.GetRequiredService<ILogger<Program>>();\n    logger.LogInformation(\"Graceful shutdown initiated\");\n});\n\nawait host.RunAsync();\n\n// In worker service\npublic class SignalAwareWorkerService : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        stoppingToken.Register(() => \n        {\n            // Cleanup logic when cancellation is requested\n            _logger.LogInformation(\"Shutdown signal received, cleaning up\");\n        });\n        \n        while (!stoppingToken.IsCancellationRequested)\n        {\n            try\n            {\n                await ProcessWork(stoppingToken);\n            }\n            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)\n            {\n                // Expected during shutdown\n                break;\n            }\n        }\n    }\n}",
+    "severity": "high",
+    "tags": ["worker-service", "signals", "graceful-shutdown", "container"],
+    "description": "Proper signal handling ensures worker services shut down gracefully in container environments"
+  },
+  {
+    "id": "worker-service-kubernetes-probes",
+    "category": "dockerfile",
+    "pattern": "Kubernetes|Readiness|Liveness",
+    "recommendation": "Configure Kubernetes probes for worker service health monitoring",
+    "example": "// Add HTTP endpoint for probes\nbuilder.Services.Configure<KestrelServerOptions>(options =>\n{\n    options.ListenAnyIP(8080); // Probe port\n});\n\nvar app = builder.Build();\n\n// Readiness probe - worker is ready to process\napp.MapGet(\"/ready\", (IServiceProvider services) =>\n{\n    var hostedServices = services.GetServices<IHostedService>();\n    var isReady = hostedServices.All(s => s is BackgroundService);\n    return isReady ? Results.Ok(\"Ready\") : Results.Problem(\"Not ready\");\n});\n\n// Liveness probe - worker is running\napp.MapGet(\"/alive\", () => Results.Ok(\"Alive\"));\n\n# Kubernetes deployment configuration\napiVersion: apps/v1\nkind: Deployment\nspec:\n  template:\n    spec:\n      containers:\n      - name: worker\n        image: myworker:latest\n        ports:\n        - containerPort: 8080\n        livenessProbe:\n          httpGet:\n            path: /alive\n            port: 8080\n          initialDelaySeconds: 30\n          periodSeconds: 10\n        readinessProbe:\n          httpGet:\n            path: /ready\n            port: 8080\n          initialDelaySeconds: 5\n          periodSeconds: 5",
+    "severity": "medium",
+    "tags": ["worker-service", "kubernetes", "probes", "health-monitoring"],
+    "description": "Kubernetes probes enable proper lifecycle management of worker service pods"
+  },
+  {
+    "id": "worker-service-resource-limits",
+    "category": "dockerfile",
+    "pattern": "Memory.*Limit|CPU.*Limit",
+    "recommendation": "Configure appropriate resource limits for worker service containers",
+    "example": "# Dockerfile optimization for worker services\nFROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY . .\n\n# Configure runtime for limited resources\nENV DOTNET_GCHeapHardLimit=200000000  # 200MB\nENV DOTNET_GCHeapCount=2\nENV DOTNET_GCConserveMemory=5\n\n# Kubernetes resource configuration\napiVersion: apps/v1\nkind: Deployment\nspec:\n  template:\n    spec:\n      containers:\n      - name: worker\n        image: myworker:latest\n        resources:\n          requests:\n            memory: \"128Mi\"\n            cpu: \"100m\"\n          limits:\n            memory: \"256Mi\"\n            cpu: \"500m\"",
+    "severity": "medium",
+    "tags": ["worker-service", "resources", "memory", "cpu", "limits"],
+    "description": "Resource limits prevent worker services from consuming excessive container resources"
+  },
+  {
+    "id": "worker-service-batch-processing",
+    "category": "dockerfile",
+    "pattern": "Batch.*Process|Bulk.*Process",
+    "recommendation": "Optimize batch processing for efficient worker service performance",
+    "example": "public class BatchWorkerService : BackgroundService\n{\n    private readonly IServiceProvider _serviceProvider;\n    private readonly IConfiguration _configuration;\n    \n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        var batchSize = _configuration.GetValue<int>(\"Worker:BatchSize\", 100);\n        \n        while (!stoppingToken.IsCancellationRequested)\n        {\n            using var scope = _serviceProvider.CreateScope();\n            var repository = scope.ServiceProvider.GetRequiredService<IWorkItemRepository>();\n            \n            var batch = await repository.GetPendingItemsAsync(batchSize, stoppingToken);\n            \n            if (batch.Any())\n            {\n                await ProcessBatch(batch, stoppingToken);\n                \n                // Mark as processed in batch\n                await repository.MarkAsProcessedAsync(batch.Select(b => b.Id), stoppingToken);\n            }\n            else\n            {\n                // No items to process, wait longer\n                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);\n            }\n        }\n    }\n    \n    private async Task ProcessBatch(IEnumerable<WorkItem> batch, CancellationToken cancellationToken)\n    {\n        var tasks = batch.Select(async item =>\n        {\n            using var scope = _serviceProvider.CreateScope();\n            var processor = scope.ServiceProvider.GetRequiredService<IItemProcessor>();\n            return await processor.ProcessAsync(item, cancellationToken);\n        });\n        \n        await Task.WhenAll(tasks);\n    }\n}",
+    "severity": "medium",
+    "tags": ["worker-service", "batch-processing", "performance", "throughput"],
+    "description": "Batch processing improves throughput and reduces overhead in worker services"
+  }
+]

@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Data
+data/
+!src/knowledge/data/
+*.db
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+dist-cjs/
+!dist-cjs/package.json
+build/
+!src/application/tools/build/
+.tsbuildinfo*
+*.tgz
+
+# Test
+coverage/
+.nyc_output/
+WEEK5_PERFORMANCE_*.json
+
+# Test-generated fixture files
+test/__support__/fixtures/*/Dockerfile
+test/__support__/fixtures/*/Dockerfile.*
+!test/__support__/fixtures/*/Dockerfile.template
+
+# Temporary
+tmp/
+temp/
+*.tmp
+*.backup.*
+
+# TypeScript
+*.tsbuildinfo
+
+# NPM
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+CLAUDE.md
+.claude
+plans
+docs/development/claude-guide.md
+backups
+k8s
+
+knip-deadcode-output.txt
+quality-gates-test.txt

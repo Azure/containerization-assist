@@ -1,0 +1,152 @@
+{
+  "name": "containerization-assist-mcp",
+  "version": "0.0.1-dev.5",
+  "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./dist-cjs/src/index.js",
+      "default": "./dist/src/index.js"
+    },
+    "./server": {
+      "types": "./dist/src/mcp/mcp-server.d.ts",
+      "import": "./dist/src/mcp/mcp-server.js",
+      "require": "./dist-cjs/src/mcp/mcp-server.js",
+      "default": "./dist/src/mcp/mcp-server.js"
+    },
+    "./tools": {
+      "types": "./dist/src/tools/index.d.ts",
+      "import": "./dist/src/tools/index.js",
+      "require": "./dist-cjs/src/tools/index.js",
+      "default": "./dist/src/tools/index.js"
+    },
+    "./types": {
+      "types": "./dist/src/types/index.d.ts",
+      "import": "./dist/src/types/index.js",
+      "require": "./dist-cjs/src/types/index.js",
+      "default": "./dist/src/types/index.js"
+    },
+    "./config": {
+      "types": "./dist/src/config/index.d.ts",
+      "import": "./dist/src/config/index.js",
+      "require": "./dist-cjs/src/config/index.js",
+      "default": "./dist/src/config/index.js"
+    }
+  },
+  "bin": {
+    "containerization-assist-mcp": "./dist/src/cli/cli.js",
+    "ca-mcp": "./dist/src/cli/cli.js"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-cjs/**/*",
+    "policies/**/*.yaml",
+    "knowledge/**/*.json",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist dist-cjs coverage .tsbuildinfo*",
+    "build": "npm run clean && npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json --resolve-full-paths && chmod +x dist/src/cli/cli.js",
+    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json",
+    "build:watch": "tsc --project tsconfig.json --watch",
+    "build:verify": "tsx scripts/verify-build.ts",
+    "dev": "tsx watch src/cli/cli.ts",
+    "start": "node dist/src/cli/cli.js",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
+    "typecheck": "tsc --noEmit",
+    "validate-api": "tsx scripts/validate-public-api.ts",
+    "validate": "npm run lint && npm run typecheck && npm run test:unit && node scripts/validate-examples.js",
+    "fix": "npm run lint:fix && npm run format",
+    "quality:gates": "tsx scripts/quality-gates.ts",
+    "prepack": "node scripts/prepare-cjs-package.cjs",
+    "postpack": "node scripts/restore-package.cjs",
+    "prepublishOnly": "npm run validate && npm run build",
+    "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
+    "smoke:journey": "tsx scripts/smoke-journey.ts"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5",
+    "@kubernetes-models/apimachinery": "^2.2.0",
+    "@kubernetes/client-node": "^1.3.0",
+    "@modelcontextprotocol/sdk": "1.17.3",
+    "@types/xml2js": "^0.4.14",
+    "commander": "^14.0.1",
+    "docker-file-parser": "^1.0.7",
+    "dockerfile-ast": "^0.7.1",
+    "dockerfilelint": "^1.8.0",
+    "dockerode": "^4.0.9",
+    "js-yaml": "^4.1.0",
+    "kubernetes-models": "^4.5.1",
+    "pino": "^9.12.0",
+    "validate-dockerfile": "^1.8.1",
+    "xml2js": "^0.6.2",
+    "yaml": "^2.8.1",
+    "zod": "^3.25.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@jest/globals": "^30.2.0",
+    "@types/dockerode": "^3.3.44",
+    "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.6.0",
+    "@types/tar-fs": "^2.0.4",
+    "@types/tmp": "^0.2.6",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
+    "eslint": "^9.36.0",
+    "husky": "^9.1.7",
+    "jest": "^30.2.0",
+    "lint-staged": "^16.2.3",
+    "prettier": "^3.6.2",
+    "tmp": "^0.2.5",
+    "ts-jest": "^29.4.4",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.45.0"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix --max-warnings 0",
+      "prettier --write"
+    ]
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "containerization",
+    "docker",
+    "kubernetes",
+    "ai-assisted",
+    "devops",
+    "java",
+    "spring-boot",
+    "maven",
+    "gradle"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/azure/containerization-assist"
+  },
+  "bugs": {
+    "url": "https://github.com/azure/containerization-assist/issues"
+  },
+  "homepage": "https://github.com/azure/containerization-assist#readme"
+}

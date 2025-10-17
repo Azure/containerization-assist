@@ -1,0 +1,187 @@
+{
+  "testName": "node-express-basic",
+  "repositoryType": "web-api",
+  "expectedFiles": [
+    {
+      "path": "Dockerfile",
+      "type": "dockerfile",
+      "required": true,
+      "contentRules": [
+        {
+          "name": "uses-node-base-image",
+          "description": "Should use Node.js base image",
+          "type": "dockerfile",
+          "validator": "content.includes('FROM node:')",
+          "required": true,
+          "severity": "error"
+        },
+        {
+          "name": "sets-working-directory",
+          "description": "Should set working directory",
+          "type": "dockerfile", 
+          "validator": "content.includes('WORKDIR /app')",
+          "severity": "warning"
+        },
+        {
+          "name": "copies-package-files",
+          "description": "Should copy package.json files first",
+          "type": "dockerfile",
+          "validator": "content.includes('COPY package*.json')",
+          "severity": "warning"
+        },
+        {
+          "name": "runs-npm-install",
+          "description": "Should install dependencies",
+          "type": "dockerfile",
+          "validator": "content.includes('RUN npm') && (content.includes('npm install') || content.includes('npm ci'))",
+          "required": true,
+          "severity": "error"
+        },
+        {
+          "name": "exposes-port-3000",
+          "description": "Should expose port 3000",
+          "type": "dockerfile",
+          "validator": "content.includes('EXPOSE 3000')",
+          "severity": "warning"
+        },
+        {
+          "name": "uses-non-root-user",
+          "description": "Should create and use non-root user",
+          "type": "dockerfile",
+          "validator": "content.includes('adduser') && content.includes('USER')",
+          "severity": "info"
+        },
+        {
+          "name": "has-startup-command",
+          "description": "Should specify startup command",
+          "type": "dockerfile",
+          "validator": "content.includes('CMD') || content.includes('ENTRYPOINT')",
+          "required": true,
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "path": "k8s/deployment.yaml",
+      "type": "k8s-manifest",
+      "required": true,
+      "contentRules": [
+        {
+          "name": "is-deployment-manifest",
+          "description": "Should be a Deployment manifest",
+          "type": "k8s",
+          "validator": "content.kind === 'Deployment'",
+          "required": true,
+          "severity": "error"
+        },
+        {
+          "name": "has-app-metadata",
+          "description": "Should have app metadata and labels",
+          "type": "k8s",
+          "validator": "content.metadata?.name && content.metadata?.labels?.app",
+          "severity": "warning"
+        },
+        {
+          "name": "specifies-replicas",
+          "description": "Should specify replica count",
+          "type": "k8s",
+          "validator": "typeof content.spec?.replicas === 'number' && content.spec.replicas > 0",
+          "severity": "info"
+        },
+        {
+          "name": "has-container-spec",
+          "description": "Should have container specification",
+          "type": "k8s",
+          "validator": "Array.isArray(content.spec?.template?.spec?.containers) && content.spec.template.spec.containers.length > 0",
+          "required": true,
+          "severity": "error"
+        },
+        {
+          "name": "exposes-container-port",
+          "description": "Should expose container port 3000",
+          "type": "k8s",
+          "validator": "content.spec?.template?.spec?.containers?.[0]?.ports?.some(p => p.containerPort === 3000)",
+          "severity": "warning"
+        },
+        {
+          "name": "has-health-probes",
+          "description": "Should include liveness and readiness probes",
+          "type": "k8s",
+          "validator": "content.spec?.template?.spec?.containers?.[0]?.livenessProbe && content.spec?.template?.spec?.containers?.[0]?.readinessProbe",
+          "severity": "info"
+        },
+        {
+          "name": "has-resource-limits",
+          "description": "Should specify resource limits",
+          "type": "k8s",
+          "validator": "content.spec?.template?.spec?.containers?.[0]?.resources?.limits",
+          "severity": "warning"
+        }
+      ]
+    },
+    {
+      "path": "k8s/service.yaml",
+      "type": "k8s-manifest", 
+      "required": true,
+      "contentRules": [
+        {
+          "name": "is-service-manifest",
+          "description": "Should be a Service manifest",
+          "type": "k8s",
+          "validator": "content.kind === 'Service'",
+          "required": true,
+          "severity": "error"
+        },
+        {
+          "name": "has-port-mapping",
+          "description": "Should map port 3000",
+          "type": "k8s",
+          "validator": "Array.isArray(content.spec?.ports) && content.spec.ports.some(p => p.port === 3000 || p.targetPort === 3000)",
+          "severity": "warning"
+        },
+        {
+          "name": "has-selector",
+          "description": "Should have app selector",
+          "type": "k8s", 
+          "validator": "content.spec?.selector?.app",
+          "required": true,
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "path": "k8s/configmap.yaml",
+      "type": "k8s-manifest",
+      "required": false,
+      "contentRules": [
+        {
+          "name": "is-configmap-manifest",
+          "description": "Should be a ConfigMap manifest if present",
+          "type": "k8s",
+          "validator": "content.kind === 'ConfigMap'",
+          "severity": "error"
+        }
+      ]
+    }
+  ],
+  "validationRules": [
+    {
+      "name": "dockerfile-security-best-practices",
+      "description": "Dockerfile follows security best practices",
+      "type": "custom",
+      "validator": "validateDockerfileSecurity",
+      "severity": "warning"
+    },
+    {
+      "name": "k8s-manifests-consistency", 
+      "description": "Kubernetes manifests are consistent",
+      "type": "custom",
+      "validator": "validateK8sConsistency",
+      "severity": "error"
+    }
+  ],
+  "customValidators": {
+    "validateDockerfileSecurity": "function(outputPath) { return checkDockerfileSecurity(outputPath); }",
+    "validateK8sConsistency": "function(outputPath) { return checkK8sLabelConsistency(outputPath); }"
+  }
+}

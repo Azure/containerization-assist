@@ -1,0 +1,212 @@
+[
+  {
+    "id": "multistage-build-advanced",
+    "category": "dockerfile",
+    "pattern": "FROM.*AS",
+    "recommendation": "Use multi-stage builds to separate build dependencies from runtime, reducing final image size by 70-90%",
+    "example": "# Build stage\nFROM node:20-alpine AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\n# Production stage\nFROM node:20-alpine AS production\nWORKDIR /app\nCOPY --from=builder /app/dist ./dist\nCOPY package*.json ./\nRUN npm ci --only=production\nUSER node\nCMD [\"node\", \"dist/index.js\"]",
+    "severity": "high",
+    "tags": ["multistage", "optimization", "size-reduction", "best-practices"],
+    "description": "Multi-stage builds dramatically reduce image size by excluding build tools from final image"
+  },
+  {
+    "id": "layer-caching-optimization",
+    "category": "dockerfile",
+    "pattern": "COPY",
+    "recommendation": "Order Dockerfile instructions from least to most frequently changing to maximize layer cache efficiency",
+    "example": "FROM python:3.11-slim\n\n# System dependencies (rarely change)\nRUN apt-get update && apt-get install -y --no-install-recommends \\\n    gcc \\\n    && rm -rf /var/lib/apt/lists/*\n\n# Application dependencies (change occasionally)\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\n# Application code (changes frequently)\nCOPY . .\n\nCMD [\"python\", \"app.py\"]",
+    "severity": "high",
+    "tags": ["caching", "optimization", "layer-ordering", "build-speed"],
+    "description": "Proper layer ordering can reduce build time from minutes to seconds during development"
+  },
+  {
+    "id": "dockerignore-comprehensive",
+    "category": "dockerfile",
+    "pattern": "COPY.*\\.",
+    "recommendation": "Create comprehensive .dockerignore to exclude unnecessary files and reduce build context size",
+    "example": "# .dockerignore\n# Version control\n.git\n.gitignore\n.gitattributes\n\n# Dependencies\nnode_modules\n__pycache__\n*.pyc\n.pytest_cache\ntarget/\nvendor/\n\n# IDE\n.vscode\n.idea\n*.swp\n*.swo\n\n# Documentation\nREADME.md\nDOCS.md\n*.md\n\n# CI/CD\n.github\n.gitlab-ci.yml\nJenkinsfile\n\n# Logs and temp files\n*.log\n*.tmp\n.DS_Store\n\n# Docker files\nDockerfile*\ndocker-compose*.yml\n.dockerignore",
+    "severity": "high",
+    "tags": ["dockerignore", "optimization", "build-context", "security"],
+    "description": "Comprehensive .dockerignore reduces build context size and prevents leaking sensitive files"
+  },
+  {
+    "id": "minimal-base-image-distroless",
+    "category": "dockerfile",
+    "pattern": "FROM",
+    "recommendation": "Use distroless or scratch images for minimal attack surface in production",
+    "example": "# Multi-stage with distroless\nFROM golang:1.21-alpine AS builder\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .\n\n# Distroless final stage\nFROM gcr.io/distroless/static-debian11:nonroot\nCOPY --from=builder /app/main /main\nUSER nonroot:nonroot\nENTRYPOINT [\"/main\"]",
+    "severity": "high",
+    "tags": ["distroless", "security", "minimal", "attack-surface", "golang", "production"],
+    "description": "Distroless images contain only runtime dependencies, eliminating shell and package managers"
+  },
+  {
+    "id": "security-scanner-integration",
+    "category": "dockerfile",
+    "pattern": "FROM",
+    "recommendation": "Integrate vulnerability scanning into build process to catch security issues early",
+    "example": "# In Dockerfile or CI/CD pipeline\n# Scan base image\nFROM node:20-alpine@sha256:abc123... AS base\n\n# Build stage\nFROM base AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm audit --audit-level=high && npm ci\nCOPY . .\nRUN npm run build\n\n# Scan final image with Trivy\n# docker build -t myapp:latest .\n# docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image myapp:latest",
+    "severity": "high",
+    "tags": ["security", "scanning", "vulnerabilities", "ci-cd", "trivy"],
+    "description": "Automated vulnerability scanning prevents deploying images with known CVEs"
+  },
+  {
+    "id": "security-nonroot-user-advanced",
+    "category": "dockerfile",
+    "pattern": "USER",
+    "recommendation": "Create dedicated non-root user with specific UID/GID for enhanced security",
+    "example": "FROM node:20-alpine\n\n# Create app user with specific UID/GID\nRUN addgroup -g 1001 -S nodejs && \\\n    adduser -S nodejs -u 1001 -G nodejs\n\n# Set up app directory with proper ownership\nWORKDIR /app\nRUN chown -R nodejs:nodejs /app\n\n# Install dependencies as root\nCOPY --chown=nodejs:nodejs package*.json ./\nRUN npm ci --only=production && \\\n    npm cache clean --force\n\n# Switch to non-root user\nUSER nodejs\n\n# Copy application code\nCOPY --chown=nodejs:nodejs . .\n\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]",
+    "severity": "high",
+    "tags": ["security", "nonroot", "user", "permissions", "hardening"],
+    "description": "Specific UID/GID ensures consistent permissions across environments and clusters"
+  },
+  {
+    "id": "layer-squashing-optimization",
+    "category": "dockerfile",
+    "pattern": "RUN",
+    "recommendation": "Combine related RUN commands into single layer to reduce image size and layers",
+    "example": "# Bad: Multiple layers\nRUN apt-get update\nRUN apt-get install -y curl\nRUN apt-get install -y vim\nRUN rm -rf /var/lib/apt/lists/*\n\n# Good: Single layer with cleanup\nRUN apt-get update && \\\n    apt-get install -y --no-install-recommends \\\n        curl \\\n        vim \\\n    && rm -rf /var/lib/apt/lists/* \\\n    && apt-get clean",
+    "severity": "medium",
+    "tags": ["optimization", "layers", "size-reduction", "best-practices"],
+    "description": "Combining commands reduces layer count and ensures cleanup happens in same layer"
+  },
+  {
+    "id": "buildkit-secrets-mount",
+    "category": "dockerfile",
+    "pattern": "RUN.*--mount=type=secret",
+    "recommendation": "Use BuildKit secret mounts to handle credentials during build without exposing them in image layers",
+    "example": "# syntax=docker/dockerfile:1.4\nFROM node:20-alpine\n\nWORKDIR /app\n\n# Use secret mount for npm token\nRUN --mount=type=secret,id=npm_token \\\n    npm config set //registry.npmjs.org/:_authToken=$(cat /run/secrets/npm_token) && \\\n    npm ci --only=production && \\\n    npm config delete //registry.npmjs.org/:_authToken\n\nCOPY . .\nUSER node\nCMD [\"node\", \"index.js\"]\n\n# Build with: docker build --secret id=npm_token,src=.npmrc -t myapp .",
+    "severity": "high",
+    "tags": ["buildkit", "secrets", "security", "credentials", "npm"],
+    "description": "Secret mounts prevent credentials from being stored in image layers or history"
+  },
+  {
+    "id": "buildkit-cache-mounts",
+    "category": "dockerfile",
+    "pattern": "RUN.*--mount=type=cache",
+    "recommendation": "Use BuildKit cache mounts to persist package manager caches across builds for faster rebuilds",
+    "example": "# syntax=docker/dockerfile:1.4\nFROM golang:1.21-alpine AS builder\n\nWORKDIR /app\nCOPY go.mod go.sum ./\n\n# Use cache mount for Go modules\nRUN --mount=type=cache,target=/go/pkg/mod \\\n    go mod download\n\nCOPY . .\n\n# Use cache mount for build cache\nRUN --mount=type=cache,target=/root/.cache/go-build \\\n    --mount=type=cache,target=/go/pkg/mod \\\n    CGO_ENABLED=0 go build -o main .\n\nFROM scratch\nCOPY --from=builder /app/main /main\nENTRYPOINT [\"/main\"]",
+    "severity": "medium",
+    "tags": ["buildkit", "caching", "optimization", "golang", "build-speed"],
+    "description": "Cache mounts can reduce build time by 50-80% for dependency-heavy projects"
+  },
+  {
+    "id": "healthcheck-advanced",
+    "category": "dockerfile",
+    "pattern": "HEALTHCHECK",
+    "recommendation": "Implement comprehensive health checks with appropriate timeouts and intervals",
+    "example": "FROM node:20-alpine\n\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\n\n# Install curl for healthcheck\nRUN apk add --no-cache curl\n\nEXPOSE 3000\n\n# Comprehensive healthcheck\nHEALTHCHECK --interval=30s \\\n    --timeout=10s \\\n    --start-period=40s \\\n    --retries=3 \\\n    CMD curl -f http://localhost:3000/health || exit 1\n\nUSER node\nCMD [\"node\", \"server.js\"]",
+    "severity": "medium",
+    "tags": ["healthcheck", "monitoring", "reliability", "best-practices"],
+    "description": "Proper health checks enable automatic container restart and load balancer integration"
+  },
+  {
+    "id": "arg-env-optimization",
+    "category": "dockerfile",
+    "pattern": "ARG|ENV",
+    "recommendation": "Use ARG for build-time variables and ENV for runtime variables to optimize flexibility",
+    "example": "FROM node:20-alpine\n\n# Build-time arguments (not in final image unless used in ENV)\nARG NODE_VERSION=20\nARG BUILD_DATE\nARG VCS_REF\n\n# Runtime environment variables\nENV NODE_ENV=production \\\n    PORT=3000 \\\n    LOG_LEVEL=info\n\n# Labels using build args\nLABEL org.opencontainers.image.created=\"${BUILD_DATE}\" \\\n      org.opencontainers.image.revision=\"${VCS_REF}\"\n\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\n\nUSER node\nEXPOSE ${PORT}\nCMD [\"node\", \"server.js\"]",
+    "severity": "medium",
+    "tags": ["args", "env", "optimization", "configuration", "metadata"],
+    "description": "ARG vs ENV distinction enables build-time customization without bloating runtime environment"
+  },
+  {
+    "id": "copy-ownership-chown",
+    "category": "dockerfile",
+    "pattern": "COPY",
+    "recommendation": "Use COPY --chown to set file ownership efficiently without extra layer",
+    "example": "FROM node:20-alpine\n\n# Create user\nRUN addgroup -g 1001 -S appgroup && \\\n    adduser -S appuser -u 1001 -G appgroup\n\nWORKDIR /app\n\n# Bad: Extra layer for ownership change\n# COPY package*.json ./\n# RUN chown -R appuser:appgroup /app\n\n# Good: Set ownership during copy\nCOPY --chown=appuser:appgroup package*.json ./\nRUN npm ci --only=production\nCOPY --chown=appuser:appgroup . .\n\nUSER appuser\nCMD [\"node\", \"server.js\"]",
+    "severity": "medium",
+    "tags": ["optimization", "permissions", "ownership", "layers"],
+    "description": "COPY --chown eliminates need for separate RUN chown command, saving a layer"
+  },
+  {
+    "id": "java-jlink-optimization",
+    "category": "dockerfile",
+    "pattern": "FROM.*java|openjdk",
+    "recommendation": "Use jlink to create custom Java runtime with only required modules for minimal image size",
+    "example": "FROM eclipse-temurin:17-jdk-alpine AS jre-builder\n\n# Create custom JRE with only required modules\nRUN $JAVA_HOME/bin/jlink \\\n    --add-modules java.base,java.logging,java.xml,java.sql,java.naming,java.management \\\n    --strip-debug \\\n    --no-man-pages \\\n    --no-header-files \\\n    --compress=2 \\\n    --output /custom-jre\n\nFROM alpine:latest\n\n# Copy custom JRE\nENV JAVA_HOME=/opt/java/openjdk\nENV PATH=\"${JAVA_HOME}/bin:${PATH}\"\nCOPY --from=jre-builder /custom-jre $JAVA_HOME\n\n# Copy application\nCOPY --chown=1001:1001 app.jar /app/app.jar\n\nUSER 1001\nEXPOSE 8080\nENTRYPOINT [\"java\", \"-jar\", \"/app/app.jar\"]",
+    "severity": "medium",
+    "tags": ["java", "jlink", "optimization", "size-reduction", "custom-runtime"],
+    "description": "jlink can reduce Java runtime size from 200MB+ to under 50MB with only needed modules"
+  },
+  {
+    "id": "python-wheel-optimization",
+    "category": "dockerfile",
+    "pattern": "FROM.*python",
+    "recommendation": "Build Python wheels in separate stage to avoid installing build dependencies in final image",
+    "example": "# Build stage\nFROM python:3.11-slim AS builder\n\nWORKDIR /app\n\n# Install build dependencies\nRUN apt-get update && apt-get install -y --no-install-recommends \\\n    gcc \\\n    g++ \\\n    && rm -rf /var/lib/apt/lists/*\n\n# Build wheels\nCOPY requirements.txt .\nRUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt\n\n# Runtime stage\nFROM python:3.11-slim\n\nWORKDIR /app\n\n# Install wheels (no build dependencies needed)\nCOPY --from=builder /app/wheels /wheels\nCOPY requirements.txt .\nRUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt && \\\n    rm -rf /wheels\n\nCOPY . .\n\nRUN adduser --disabled-password --gecos '' appuser\nUSER appuser\n\nCMD [\"python\", \"app.py\"]",
+    "severity": "medium",
+    "tags": ["python", "wheels", "optimization", "multistage", "build-dependencies"],
+    "description": "Pre-built wheels eliminate need for compilers in final image, reducing size by 200-500MB"
+  },
+  {
+    "id": "dotnet-runtime-optimization",
+    "category": "dockerfile",
+    "pattern": "FROM.*dotnet",
+    "recommendation": "Use multi-stage builds with SDK for build and runtime-only image for production",
+    "example": "# Build stage\nFROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build\nWORKDIR /src\n\n# Restore dependencies\nCOPY [\"MyApp.csproj\", \"./\"]\nRUN dotnet restore \"MyApp.csproj\"\n\n# Build and publish\nCOPY . .\nRUN dotnet publish \"MyApp.csproj\" \\\n    -c Release \\\n    -o /app/publish \\\n    --no-restore \\\n    --self-contained false\n\n# Runtime stage\nFROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine\nWORKDIR /app\n\n# Create non-root user\nRUN addgroup -g 1001 -S appgroup && \\\n    adduser -S appuser -u 1001 -G appgroup\n\nCOPY --from=build --chown=appuser:appgroup /app/publish .\n\nUSER appuser\nEXPOSE 8080\nENTRYPOINT [\"dotnet\", \"MyApp.dll\"]",
+    "severity": "high",
+    "tags": ["dotnet", "csharp", "multistage", "optimization", "runtime"],
+    "description": "Separating SDK and runtime reduces .NET image size from 700MB+ to under 100MB"
+  },
+  {
+    "id": "static-binary-scratch",
+    "category": "dockerfile",
+    "pattern": "FROM scratch",
+    "recommendation": "For statically compiled binaries, use scratch image for absolute minimal size",
+    "example": "FROM golang:1.21-alpine AS builder\n\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\n\nCOPY . .\nRUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \\\n    -a -installsuffix cgo \\\n    -ldflags='-w -s -extldflags \"-static\"' \\\n    -o /app/main .\n\n# Use scratch for absolute minimal image\nFROM scratch\n\n# Copy CA certificates for HTTPS\nCOPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/\n\n# Copy binary\nCOPY --from=builder /app/main /main\n\n# Non-root user (numeric ID only in scratch)\nUSER 65534\n\nEXPOSE 8080\nENTRYPOINT [\"/main\"]",
+    "severity": "medium",
+    "tags": ["scratch", "golang", "minimal", "static-binary", "size-reduction"],
+    "description": "Scratch images with static binaries can be as small as 5-10MB for complete applications"
+  },
+  {
+    "id": "label-metadata-standards",
+    "category": "dockerfile",
+    "pattern": "LABEL",
+    "recommendation": "Use OCI standard labels for comprehensive image metadata and traceability",
+    "example": "FROM node:20-alpine\n\n# OCI standard labels\nLABEL org.opencontainers.image.title=\"My Application\" \\\n      org.opencontainers.image.description=\"Production web application\" \\\n      org.opencontainers.image.version=\"1.0.0\" \\\n      org.opencontainers.image.authors=\"team@example.com\" \\\n      org.opencontainers.image.url=\"https://example.com\" \\\n      org.opencontainers.image.source=\"https://github.com/org/repo\" \\\n      org.opencontainers.image.revision=\"${VCS_REF}\" \\\n      org.opencontainers.image.created=\"${BUILD_DATE}\" \\\n      org.opencontainers.image.licenses=\"MIT\"\n\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\n\nUSER node\nCMD [\"node\", \"server.js\"]",
+    "severity": "low",
+    "tags": ["labels", "metadata", "oci", "documentation", "traceability"],
+    "description": "OCI labels provide standardized metadata for image tracking, auditing, and automation"
+  },
+  {
+    "id": "signal-handling-init",
+    "category": "dockerfile",
+    "pattern": "ENTRYPOINT|CMD",
+    "recommendation": "Use tini or dumb-init for proper signal handling and zombie process reaping",
+    "example": "FROM node:20-alpine\n\n# Install tini for signal handling\nRUN apk add --no-cache tini\n\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\n\nRUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001 -G nodejs\nUSER nodejs\n\nEXPOSE 3000\n\n# Use tini as entrypoint for signal handling\nENTRYPOINT [\"/sbin/tini\", \"--\"]\nCMD [\"node\", \"server.js\"]",
+    "severity": "medium",
+    "tags": ["signals", "init", "tini", "process-management", "node"],
+    "description": "Init systems ensure graceful shutdowns and prevent zombie processes in containers"
+  },
+  {
+    "id": "security-scanning-layers",
+    "category": "dockerfile",
+    "pattern": "FROM",
+    "recommendation": "Minimize layers and avoid storing sensitive data in any layer to improve security",
+    "example": "FROM node:20-alpine\n\nWORKDIR /app\n\n# Bad: Secret in layer (even if deleted later)\n# RUN echo \"secret\" > /tmp/secret && use_secret && rm /tmp/secret\n\n# Good: Use build secrets or multi-stage to avoid secrets in layers\nRUN --mount=type=secret,id=api_key \\\n    export API_KEY=$(cat /run/secrets/api_key) && \\\n    npm config set registry https://registry.npmjs.org/ && \\\n    npm ci --only=production && \\\n    npm cache clean --force\n\nCOPY . .\nUSER node\nCMD [\"node\", \"server.js\"]",
+    "severity": "high",
+    "tags": ["security", "layers", "secrets", "image-history"],
+    "description": "Data in any layer persists in image history even if deleted in later layers"
+  },
+  {
+    "id": "rust-cargo-optimization",
+    "category": "dockerfile",
+    "pattern": "FROM.*rust",
+    "recommendation": "Use cargo chef for better caching of Rust dependencies in Docker builds",
+    "example": "FROM rust:1.74-alpine AS chef\nRUN cargo install cargo-chef\nWORKDIR /app\n\nFROM chef AS planner\nCOPY . .\nRUN cargo chef prepare --recipe-path recipe.json\n\nFROM chef AS builder\nCOPY --from=planner /app/recipe.json recipe.json\n# Build dependencies (cached)\nRUN cargo chef cook --release --recipe-path recipe.json\n# Build application\nCOPY . .\nRUN cargo build --release\n\nFROM alpine:latest\nRUN apk add --no-cache ca-certificates\nCOPY --from=builder /app/target/release/myapp /usr/local/bin/myapp\nRUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup\nUSER appuser\nCMD [\"myapp\"]",
+    "severity": "medium",
+    "tags": ["rust", "cargo", "optimization", "caching", "dependencies"],
+    "description": "cargo-chef dramatically improves Rust build caching, reducing rebuild time from minutes to seconds"
+  },
+  {
+    "id": "alpine-timezone-support",
+    "category": "dockerfile",
+    "pattern": "FROM.*alpine",
+    "recommendation": "Add timezone data to Alpine images if application needs timezone support",
+    "example": "FROM node:20-alpine\n\n# Install timezone data\nRUN apk add --no-cache tzdata\n\n# Set timezone (optional)\nENV TZ=America/New_York\n\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\n\nUSER node\nCMD [\"node\", \"server.js\"]",
+    "severity": "low",
+    "tags": ["alpine", "timezone", "localization", "configuration"],
+    "description": "Alpine images don't include timezone data by default, causing issues with time-sensitive applications"
+  }
+]

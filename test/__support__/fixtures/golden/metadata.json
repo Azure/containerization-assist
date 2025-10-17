@@ -1,0 +1,107 @@
+{
+  "version": "1.0.0",
+  "description": "Golden file registry and metadata for regression testing",
+  "lastUpdated": "2025-09-09",
+  "structure": {
+    "tools/": "Expected outputs for individual tools",
+    "workflows/": "Expected outputs for end-to-end workflows", 
+    "variants/": "Alternative configurations and edge cases",
+    "legacy/": "Backward compatibility (analyze/, dockerfiles/, workflow/)"
+  },
+  "tools": {
+    "analyze-repo": {
+      "description": "Repository analysis outputs",
+      "variants": ["basic", "security-focused", "multi-language"],
+      "fixtures": ["java-spring-boot-maven", "node-express", "dotnet-webapi", "python-flask"]
+    },
+    "build-image": {
+      "description": "Docker image build results and logs",
+      "variants": ["success", "failure", "multi-stage"],
+      "fixtures": ["dockerfile-basic", "dockerfile-security", "dockerfile-multi-stage"]
+    },
+    "deploy": {
+      "description": "Deployment execution results",
+      "variants": ["kubernetes", "docker-compose", "local"],
+      "fixtures": ["k8s-basic", "k8s-complex", "compose-stack"]
+    },
+    "fix-dockerfile": {
+      "description": "Dockerfile fixes and recommendations",
+      "variants": ["security-fixes", "optimization", "best-practices"],
+      "fixtures": ["dockerfile-vulnerable", "dockerfile-unoptimized"]
+    },
+    "generate-dockerfile": {
+      "description": "Generated Dockerfile outputs",
+      "variants": ["basic", "security-hardened", "multi-stage", "distroless"],
+      "fixtures": ["java-maven", "node-npm", "dotnet-core", "python-pip"]
+    },
+    "generate-k8s-manifests": {
+      "description": "Kubernetes manifest generation",
+      "variants": ["basic", "production", "multi-environment"],
+      "fixtures": ["web-app", "microservices", "database-app"]
+    },
+    "ops": {
+      "description": "Operations and maintenance outputs",
+      "variants": ["logs", "metrics", "health-checks"],
+      "fixtures": ["container-logs", "deployment-status"]
+    },
+    "prepare-cluster": {
+      "description": "Cluster preparation and setup",
+      "variants": ["kind", "minikube", "cloud"],
+      "fixtures": ["local-cluster", "production-cluster"]
+    },
+    "push-image": {
+      "description": "Image registry push results",
+      "variants": ["success", "failure", "multi-tag"],
+      "fixtures": ["registry-local", "registry-cloud"]
+    },
+    "resolve-base-images": {
+      "description": "Base image resolution and recommendations",
+      "variants": ["security-focused", "minimal", "lts"],
+      "fixtures": ["java-images", "node-images", "python-images"]
+    },
+    "scan-image": {
+      "description": "Security vulnerability scan results",
+      "variants": ["clean", "low-severity", "high-severity", "critical"],
+      "fixtures": ["image-clean", "image-vulnerable", "dockerfile-issues"]
+    },
+    "tag-image": {
+      "description": "Image tagging results",
+      "variants": ["semantic", "git-based", "custom"],
+      "fixtures": ["version-tags", "environment-tags"]
+    },
+    "verify-deploy": {
+      "description": "Deployment verification results",
+      "variants": ["success", "partial", "failure"],
+      "fixtures": ["k8s-healthy", "k8s-unhealthy", "service-checks"]
+    },
+    "workflow": {
+      "description": "Multi-tool workflow orchestration",
+      "variants": ["full-pipeline", "security-first", "minimal"],
+      "fixtures": ["containerization-complete", "deployment-pipeline", "ci-cd-flow"]
+    }
+  },
+  "workflows": {
+    "containerization-full": {
+      "description": "Complete containerization workflow",
+      "steps": ["analyze-repo", "generate-dockerfile", "build-image", "scan-image", "push-image"],
+      "fixtures": ["spring-boot-complete", "node-express-complete"]
+    },
+    "deployment-pipeline": {
+      "description": "End-to-end deployment workflow",
+      "steps": ["analyze-repo", "generate-k8s-manifests", "prepare-cluster", "deploy", "verify-deploy"],
+      "fixtures": ["web-app-deployment", "microservices-deployment"]
+    },
+    "security-scanning": {
+      "description": "Security-focused workflow",
+      "steps": ["scan-image", "fix-dockerfile", "build-image", "scan-image"],
+      "fixtures": ["security-hardening", "vulnerability-remediation"]
+    }
+  },
+  "migration": {
+    "legacy_paths": {
+      "analyze/": "Moved to tools/analyze-repo/",
+      "dockerfiles/": "Moved to tools/generate-dockerfile/",
+      "workflow/": "Moved to workflows/"
+    }
+  }
+}
