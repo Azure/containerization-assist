@@ -82,13 +82,8 @@ function createStubScanner(logger: Logger): SecurityScanner {
     },
 
     async ping(): Promise<Result<boolean>> {
-      try {
-        logger.debug('Checking stub scanner availability');
-        return Success(true);
-      } catch (error) {
-        const errorMessage = extractErrorMessage(error);
-        return Failure(errorMessage);
-      }
+      logger.debug('Checking stub scanner availability');
+      return Success(true);
     },
   };
 }

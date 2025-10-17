@@ -5,27 +5,47 @@
  */
 
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { scanImageWithTrivy, checkTrivyAvailability } from '@/infra/security/trivy-scanner';
 import type { Logger } from 'pino';
 
-// Mock the promisified exec
-const mockExecAsync = jest.fn<
+// Create a module-level mock that will be accessed by the mock factory
+let mockExecAsync: jest.MockedFunction<
   (command: string, options?: unknown) => Promise<{ stdout: string; stderr: string }>
->();
+>;
 
-// Mock node:child_process and node:util
+// Mock node:child_process
 jest.mock('node:child_process', () => ({
   exec: jest.fn(),
 }));
 
-jest.mock('node:util', () => ({
-  promisify: jest.fn(() => mockExecAsync),
-}));
+// Mock node:util to return our mock
+jest.mock('node:util', () => {
+  const actual = jest.requireActual<typeof import('node:util')>('node:util');
+  return {
+    ...actual,
+    promisify: () => {
+      // Return a function that will resolve to our mock when called
+      return (...args: unknown[]) => {
+        if (!mockExecAsync) {
+          throw new Error('mockExecAsync not initialized');
+        }
+        return mockExecAsync(...(args as [string, unknown?]));
+      };
+    },
+  };
+});
+
+// Now import after mocks are set up
+import { scanImageWithTrivy, checkTrivyAvailability } from '@/infra/security/trivy-scanner';
 
 describe('Trivy Scanner', () => {
   let mockLogger: Logger;
 
   beforeEach(() => {
+    // Initialize the mock function
+    mockExecAsync = jest.fn<
+      (command: string, options?: unknown) => Promise<{ stdout: string; stderr: string }>
+    >();
+
     // Create a mock logger
     mockLogger = {
       info: jest.fn(),
@@ -39,7 +59,8 @@ describe('Trivy Scanner', () => {
   });
 
   afterEach(() => {
-    jest.resetAllMocks();
+    // Use clearAllMocks to preserve mock implementations (resetAllMocks removes them)
+    jest.clearAllMocks();
   });
 
   describe('checkTrivyAvailability', () => {

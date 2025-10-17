@@ -135,17 +135,16 @@ function parseTrivyOutput(trivyOutput: TrivyOutput, imageId: string): BasicScanR
 
 /**
  * Get Trivy version
+ * @throws Error if Trivy is not installed or execution fails
  */
 async function getTrivyVersion(logger: Logger): Promise<string | undefined> {
-  try {
-    const { stdout } = await execAsync('trivy --version');
-    // Trivy version output format: "Version: X.Y.Z"
-    const match = stdout.match(/Version:\s*([^\s\n]+)/);
-    return match ? match[1] : undefined;
-  } catch (error) {
-    logger.debug({ error: extractErrorMessage(error) }, 'Failed to get Trivy version');
-    return undefined;
+  const { stdout } = await execAsync('trivy --version');
+  // Trivy version output format: "Version: X.Y.Z"
+  const match = stdout.match(/Version:\s*([^\s\n]+)/);
+  if (!match) {
+    logger.debug({ stdout }, 'Could not parse Trivy version from output');
   }
+  return match ? match[1] : undefined;
 }
 
 /**
