@@ -1,5 +1,5 @@
 /**
- * Tests for ToolContext bridge implementation
+ * Tests for ToolContext implementation
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
@@ -11,7 +11,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 // Mock server and logger
 const createMockServer = (): Server =>
   ({
-    createMessage: jest.fn(),
+    sendNotification: jest.fn(),
   }) as any;
 
 const createMockLogger = (): Logger =>
@@ -23,7 +23,7 @@ const createMockLogger = (): Logger =>
     child: jest.fn(() => createMockLogger()),
   }) as any;
 
-describe('ToolContext Bridge', () => {
+describe('ToolContext', () => {
   let mockServer: Server;
   let mockLogger: Logger;
 
@@ -34,150 +34,27 @@ describe('ToolContext Bridge', () => {
   });
 
   describe('createToolContext', () => {
-    test('creates valid ToolContext with sampling capability', async () => {
-      const mockResponse = {
-        content: { type: 'text', text: 'AI generated response' },
-      };
-      (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
+    test('creates valid ToolContext with required properties', () => {
+      const context = createToolContext(mockLogger);
 
-      const context = createToolContext(mockServer, mockLogger);
-
-      expect(context).toHaveProperty('sampling');
-      expect(context).toHaveProperty('getPrompt');
+      expect(context).toHaveProperty('logger');
       expect(context).toHaveProperty('signal');
       expect(context).toHaveProperty('progress');
-    });
-
-    test('sampling.createMessage works correctly', async () => {
-      const mockResponse = {
-        content: { type: 'text', text: 'AI generated response' },
-      };
-      (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
-
-      const context = createToolContext(mockServer, mockLogger);
-      const result = await context.sampling.createMessage({
-        messages: [
-          {
-            role: 'user',
-            content: [{ type: 'text', text: 'Test prompt' }],
-          },
-        ],
-      });
-
-      expect(result).toEqual({
-        role: 'assistant',
-        content: [{ type: 'text', text: 'AI generated response' }],
-        metadata: {
-          finishReason: 'stop',
-        },
-      });
-
-      // Verify the server was called with correct format
-      expect(mockServer.createMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: [
-            {
-              role: 'user',
-              content: {
-                type: 'text',
-                text: 'Test prompt',
-              },
-            },
-          ],
-          maxTokens: 2048,
-          stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
-          includeContext: 'thisServer',
-        }),
-      );
-    });
-
-    test('handles empty AI response', async () => {
-      const mockResponse = {
-        content: { type: 'text', text: '' },
-      };
-      (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
-
-      const context = createToolContext(mockServer, mockLogger);
-
-      await expect(
-        context.sampling.createMessage({
-          messages: [
-            {
-              role: 'user',
-              content: [{ type: 'text', text: 'Test prompt' }],
-            },
-          ],
-        }),
-      ).rejects.toThrow('Empty response from sampling after processing');
-    });
-
-    test('handles invalid response format', async () => {
-      const mockResponse = {
-        content: { type: 'image', data: 'base64...' },
-      };
-      (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse as any);
-
-      const context = createToolContext(mockServer, mockLogger);
-
-      await expect(
-        context.sampling.createMessage({
-          messages: [
-            {
-              role: 'user',
-              content: [{ type: 'text', text: 'Test prompt' }],
-            },
-          ],
-        }),
-      ).rejects.toThrow('Empty or invalid response from sampling - no text content found');
-    });
-
-    test('getPrompt returns error response when no prompt registry available', async () => {
-      const context = createToolContext(mockServer, mockLogger);
-
-      const result = await context.getPrompt('test-prompt');
-
-      expect(result).toEqual({
-        description: 'Prompt not available - no registry',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: "Error: No prompt registry available for prompt 'test-prompt'",
-              },
-            ],
-          },
-        ],
-      });
-    });
-
-    test('getPrompt returns fallback message without prompt registry', async () => {
-      const context = createToolContext(mockServer, mockLogger, {});
-
-      const result = await context.getPrompt('test-prompt', { arg1: 'value1' });
-
-      expect(result).toEqual({
-        description: 'Prompt not available - no registry',
-        messages: [
-          {
-            role: 'user',
-            content: [{ type: 'text', text: "Error: No prompt registry available for prompt 'test-prompt'" }],
-          },
-        ],
-      });
+      expect(context.logger).toBe(mockLogger);
+      expect(context.signal).toBeUndefined();
+      expect(context.progress).toBeUndefined();
     });
 
     test('forwards abort signal', () => {
       const abortController = new AbortController();
-      const context = createToolContext(mockServer, mockLogger, { signal: abortController.signal });
+      const context = createToolContext(mockLogger, { signal: abortController.signal });
 
       expect(context.signal).toBe(abortController.signal);
     });
 
     test('includes progress reporter if provided', () => {
       const mockProgressReporter = jest.fn();
-      const context = createToolContext(mockServer, mockLogger, { progress: mockProgressReporter });
+      const context = createToolContext(mockLogger, { progress: mockProgressReporter });
 
       expect(context.progress).toBe(mockProgressReporter);
     });
@@ -224,20 +101,20 @@ describe('ToolContext Bridge', () => {
 
   describe('createProgressReporter', () => {
     test('returns undefined when no progress token provided', () => {
-      const reporter = createProgressReporter(mockServer, undefined, mockLogger);
+      const reporter = createProgressReporter(undefined, mockLogger);
       expect(reporter).toBeUndefined();
     });
 
     test('creates progress reporter when token provided', () => {
-      const reporter = createProgressReporter(mockServer, 'test-token', mockLogger);
+      const reporter = createProgressReporter('test-token', mockLogger);
       expect(reporter).toBeInstanceOf(Function);
     });
 
-    test('progress reporter logs progress', () => {
-      const reporter = createProgressReporter(mockServer, 'test-token', mockLogger);
+    test('progress reporter logs progress', async () => {
+      const reporter = createProgressReporter('test-token', mockLogger);
 
       if (reporter) {
-        reporter('Processing...', 50, 100);
+        await reporter('Processing...', 50, 100);
         expect(mockLogger.debug).toHaveBeenCalledWith(
           expect.objectContaining({
             progressToken: 'test-token',
@@ -262,7 +139,7 @@ describe('ToolContext Bridge', () => {
         },
       };
 
-      const context = createToolContext(mockServer, mockLogger, {
+      const context = createToolContext(mockLogger, {
         progress: request,
       });
 
@@ -273,7 +150,7 @@ describe('ToolContext Bridge', () => {
     test('creates context without progress when no token', () => {
       const request = { params: {} };
 
-      const context = createToolContext(mockServer, mockLogger, {
+      const context = createToolContext(mockLogger, {
         progress: request,
       });
 
@@ -283,88 +160,8 @@ describe('ToolContext Bridge', () => {
   });
 
   describe('error handling and logging', () => {
-    test('logs sampling request start and completion', async () => {
-      const mockResponse = {
-        content: { type: 'text', text: 'Response' },
-      };
-      (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
-
-      const context = createToolContext(mockServer, mockLogger);
-      await context.sampling.createMessage({
-        messages: [
-          {
-            role: 'user',
-            content: [{ type: 'text', text: 'Test' }],
-          },
-        ],
-      });
-
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messageCount: 1,
-          maxTokens: 2048,
-          includeContext: 'thisServer',
-        }),
-        'Making sampling request',
-      );
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'sampling/createMessage',
-          hasServer: true,
-        }),
-        'About to call createMessage',
-      );
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hasResponse: true,
-          hasContent: true,
-          contentType: 'text',
-          textLength: 8, // 'Response' length
-        }),
-        'Received sampling response',
-      );
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({
-          duration: expect.any(Number),
-          responseLength: 8, // 'Response' length
-          preview: 'Response',
-        }),
-        'Sampling request completed',
-      );
-    });
-
-    test('logs sampling errors', async () => {
-      const mockError = new Error('Sampling failed');
-      (mockServer.createMessage as jest.Mock).mockRejectedValue(mockError);
-
-      const context = createToolContext(mockServer, mockLogger);
-
-      await expect(
-        context.sampling.createMessage({
-          messages: [
-            {
-              role: 'user',
-              content: [{ type: 'text', text: 'Test' }],
-            },
-          ],
-        }),
-      ).rejects.toThrow('Sampling failed: Sampling failed');
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          duration: expect.any(Number),
-          error: 'Sampling failed',
-          messageCount: 1,
-        }),
-        'Sampling request failed',
-      );
-    });
-
-    test('handles progress reporting errors gracefully', () => {
-      const reporter = createProgressReporter(mockServer, 'test-token', mockLogger);
+    test('handles progress reporting errors gracefully', async () => {
+      const reporter = createProgressReporter('test-token', mockLogger);
 
       // Mock logger methods to throw
       (mockLogger.debug as jest.Mock).mockImplementation(() => {
@@ -373,7 +170,7 @@ describe('ToolContext Bridge', () => {
 
       if (reporter) {
         // Should not throw despite logger error
-        expect(() => reporter('test', 50, 100)).not.toThrow();
+        await expect(reporter('test', 50, 100)).resolves.not.toThrow();
       }
     });
   });

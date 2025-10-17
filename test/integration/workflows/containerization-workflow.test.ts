@@ -39,14 +39,6 @@ describe('Complete Containerization Workflow Integration', () => {
     logger,
     signal: undefined,
     progress: undefined,
-    sampling: {
-      createMessage: async () => {
-        throw new Error('AI sampling not available in test context');
-      },
-    },
-    getPrompt: async () => {
-      throw new Error('Prompts not available in test context');
-    },
   };
 
   const fixtureBasePath = join(process.cwd(), 'test', '__support__', 'fixtures');

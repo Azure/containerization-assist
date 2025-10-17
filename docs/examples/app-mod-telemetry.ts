@@ -15,17 +15,8 @@
  * TOOL CONTEXT REQUIREMENTS:
  * The ToolContext interface requires these properties:
  * - `logger`: Pino-compatible logger with debug/info/warn/error/fatal/trace/child methods
- * - `sampling`: AI capabilities for MCP protocol communication
- * - `getPrompt`: Access to prompt registry
  * - `signal`: Optional AbortSignal for cancellation
  * - `progress`: Optional progress reporting function
- *
- * UPDATED: This example now provides two implementation options:
- * 1. createExampleToolContext() - Simple console-based mock for testing/examples
- * 2. createProductionToolContext() - Production-ready version with real Pino logger
- *
- * The example properly implements all required ToolContext interface properties
- * with correct types for SamplingResponse and PromptWithMessages.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -99,49 +90,6 @@ function createSimpleLogger() {
   return logger;
 }
 
-/**
- * Create a production-ready ToolContext using real Pino logger
- * Uncomment and use this for production scenarios
- */
-/*
-import pino from 'pino';
-
-function createProductionToolContext(server: any): ToolContext {
-  const logger = pino({
-    name: 'containerization-assist',
-    level: 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'SYS:standard',
-      },
-    },
-  });
-
-  return {
-    logger,
-    sampling: {
-      createMessage: async (request) => {
-        // Implement actual MCP sampling request here
-        // This would use the server parameter to make real AI requests
-        throw new Error('Production sampling not implemented in example');
-      },
-    },
-    getPrompt: async (name: string, args?: Record<string, unknown>) => {
-      // Implement actual prompt registry access here
-      throw new Error('Production prompt registry not implemented in example');
-    },
-    signal: undefined,
-    progress: async (message: string, current?: number, total?: number) => {
-      const progressStr = current !== undefined && total !== undefined 
-        ? ` (${current}/${total})` 
-        : '';
-      logger.info(`Progress: ${message}${progressStr}`);
-    },
-  };
-}
-*/
 
 /**
  * Create a complete example ToolContext for demonstration purposes
@@ -151,59 +99,8 @@ function createExampleToolContext(): ToolContext {
   const logger = createSimpleLogger();
 
   return {
-    // Logger interface matching Pino Logger specification
     logger,
-
-    // AI sampling capabilities for MCP protocol
-    sampling: {
-      createMessage: async (request) => {
-        console.log('📤 AI Sampling Request:', {
-          messageCount: request.messages.length,
-          maxTokens: request.maxTokens || 2048,
-        });
-
-        // Mock response matching SamplingResponse interface
-        return {
-          role: 'assistant' as const,
-          content: [
-            {
-              type: 'text' as const,
-              text: 'Mock AI response for telemetry example',
-            },
-          ],
-          metadata: {
-            model: 'mock-model',
-            finishReason: 'stop' as const,
-          },
-        };
-      },
-    },
-
-    // Prompt registry access
-    getPrompt: async (name: string, args?: Record<string, unknown>) => {
-      console.log('📋 Prompt Request:', { name, args });
-
-      // Mock prompt response matching PromptWithMessages interface
-      return {
-        description: `Mock prompt: ${name}`,
-        messages: [
-          {
-            role: 'user' as const,
-            content: [
-              {
-                type: 'text' as const,
-                text: `Mock prompt content for ${name}`,
-              },
-            ],
-          },
-        ],
-      };
-    },
-
-    // Optional cancellation signal
     signal: undefined,
-
-    // Optional progress reporting
     progress: async (message: string, current?: number, total?: number) => {
       const progressStr = current !== undefined && total !== undefined
         ? ` (${current}/${total})`
@@ -317,11 +214,7 @@ async function main() {
   });
 
   // Create tool context with proper interface implementation
-  // Option 1: Simple console-based implementation for examples/testing
   const context: ToolContext = createExampleToolContext();
-
-  // Option 2: For production, use createProductionToolContext(server) instead
-  // const context = createProductionToolContext(server);
 
   // Register all Container Assist tools with telemetry wrapper
   console.log(`\n🚀 Registering ${ALL_TOOLS.length} Container Assist tools with telemetry...\n`);

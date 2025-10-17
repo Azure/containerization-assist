@@ -14,19 +14,6 @@ export const MOCK_CONFIG_PRESETS = {
       cacheDir: './test-cache',
       enableCompression: false,
     },
-    sampling: {
-      maxCandidates: 3,
-      defaultCandidates: 2,
-      scoringWeights: {
-        buildSpeed: 0.3,
-        imageSize: 0.2,
-        security: 0.3,
-        maintainability: 0.1,
-        performance: 0.1,
-      },
-      cacheTTL: 30000, // 30 seconds
-      enableDeterministicScoring: true,
-    },
     progress: {
       enableNotifications: true,
       batchSize: 5,
@@ -69,19 +56,6 @@ export const MOCK_CONFIG_PRESETS = {
       defaultTtl: 1800000, // 30 minutes
       cacheDir: './dev-cache',
       enableCompression: true,
-    },
-    sampling: {
-      maxCandidates: 5,
-      defaultCandidates: 3,
-      scoringWeights: {
-        buildSpeed: 0.25,
-        imageSize: 0.20,
-        security: 0.30,
-        maintainability: 0.15,
-        performance: 0.10,
-      },
-      cacheTTL: 600000, // 10 minutes
-      enableDeterministicScoring: true,
     },
     progress: {
       enableNotifications: true,
@@ -126,19 +100,6 @@ export const MOCK_CONFIG_PRESETS = {
       cacheDir: './minimal-cache',
       enableCompression: false,
     },
-    sampling: {
-      maxCandidates: 2,
-      defaultCandidates: 1,
-      scoringWeights: {
-        buildSpeed: 0.5,
-        imageSize: 0.3,
-        security: 0.2,
-        maintainability: 0.0,
-        performance: 0.0,
-      },
-      cacheTTL: 60000,
-      enableDeterministicScoring: false,
-    },
     progress: {
       enableNotifications: false,
       batchSize: 1,
@@ -181,19 +142,6 @@ export const MOCK_CONFIG_PRESETS = {
       defaultTtl: 3600000,
       cacheDir: './stress-cache',
       enableCompression: true,
-    },
-    sampling: {
-      maxCandidates: 10,
-      defaultCandidates: 5,
-      scoringWeights: {
-        buildSpeed: 0.2,
-        imageSize: 0.2,
-        security: 0.2,
-        maintainability: 0.2,
-        performance: 0.2,
-      },
-      cacheTTL: 1800000,
-      enableDeterministicScoring: true,
     },
     progress: {
       enableNotifications: true,
@@ -250,14 +198,6 @@ export const createMockConfig = (
     ...baseConfig,
     ...overrides,
     resources: { ...baseConfig.resources, ...overrides.resources },
-    sampling: {
-      ...baseConfig.sampling,
-      ...overrides.sampling,
-      scoringWeights: {
-        ...baseConfig.sampling.scoringWeights,
-        ...overrides.sampling?.scoringWeights,
-      },
-    },
     progress: { ...baseConfig.progress, ...overrides.progress },
     tools: { ...baseConfig.tools, ...overrides.tools },
     testing: {
@@ -278,11 +218,6 @@ export const createMockConfig = (
 export const getTestConfigForResources = (): MCPConfig => createMockConfig('development', {
   resources: { maxSize: 20 * 1024 * 1024 }, // Larger for testing
   progress: { enableNotifications: true, retainHistory: true },
-});
-
-export const getTestConfigForSampling = (): MCPConfig => createMockConfig('development', {
-  sampling: { maxCandidates: 7, defaultCandidates: 4 },
-  resources: { cacheTTL: 300000 },
 });
 
 export const getTestConfigForInspection = (): MCPConfig => createMockConfig('development', {
@@ -315,21 +250,9 @@ export const getTestConfigForIntegration = (): MCPConfig => createMockConfig('de
 export const validateMockConfig = (config: MCPConfig): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  // Validate scoring weights
-  const totalWeight = Object.values(config.sampling.scoringWeights).reduce((sum, w) => sum + w, 0);
-  if (Math.abs(totalWeight - 1.0) > 0.01) {
-    errors.push(`Scoring weights must sum to 1.0, got ${totalWeight}`);
-  }
-
   // Validate positive values
   if (config.resources.maxSize <= 0) errors.push('Resource maxSize must be positive');
-  if (config.sampling.maxCandidates <= 0) errors.push('Max candidates must be positive');
   if (config.tools.timeoutMs <= 0) errors.push('Tool timeout must be positive');
-
-  // Validate relationships
-  if (config.sampling.defaultCandidates > config.sampling.maxCandidates) {
-    errors.push('Default candidates cannot exceed max candidates');
-  }
 
   return {
     valid: errors.length === 0,

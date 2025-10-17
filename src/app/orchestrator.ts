@@ -220,11 +220,9 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
       const contextOptions = {
         ...(metadata?.signal && { signal: metadata.signal }),
         ...(metadata?.progress !== undefined && { progress: metadata.progress }),
-        ...(metadata?.maxTokens !== undefined && { maxTokens: metadata.maxTokens }),
-        ...(metadata?.stopSequences && { stopSequences: metadata.stopSequences }),
         ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
       };
-      return createToolContext(options.server, input.logger, contextOptions);
+      return createToolContext(input.logger, contextOptions);
     }
 
     return createHostlessToolContext(input.logger, {
@@ -457,18 +455,6 @@ export function createHostlessToolContext(
   const progress = coerceProgressReporter(options.metadata?.progress);
 
   return {
-    sampling: {
-      async createMessage(): Promise<never> {
-        throw new Error(
-          'Sampling is unavailable without an MCP transport. Start or bind to an MCP server to enable sampling.',
-        );
-      },
-    },
-    getPrompt: async (name: string): Promise<never> => {
-      throw new Error(
-        `Prompt '${name}' requested but no MCP transport is bound. Start or bind to an MCP server to access prompts.`,
-      );
-    },
     logger,
     signal: options.metadata?.signal,
     progress,

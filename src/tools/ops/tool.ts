@@ -29,7 +29,6 @@ interface PingResult {
   };
   capabilities: {
     tools: boolean;
-    sampling: boolean;
     progress: boolean;
   };
 }
@@ -59,7 +58,6 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
       },
       capabilities: {
         tools: true,
-        sampling: true,
         progress: true,
       },
     };

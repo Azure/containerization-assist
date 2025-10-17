@@ -32,7 +32,6 @@ export {
   getMockConfig,
   createMockConfig,
   getTestConfigForResources,
-  getTestConfigForSampling,
   getTestConfigForInspection,
   getTestConfigForTools,
   getTestConfigForIntegration,
@@ -150,10 +149,6 @@ export function createInfrastructure(
 export const MCPInfrastructure = {
   /** Standard configuration for general use */
   standard: () => createInfrastructure(),
-  /** Configuration optimized for sampling workflows */
-  sampling: () => createInfrastructure({
-    sampling: { maxCandidates: 7, defaultCandidates: 4, cacheTTL: 300000 }
-  }),
   /** Configuration optimized for testing workflows */
   testing: () => createInfrastructure({
     testing: { enableInspector: true, benchmarkSamples: 10 }

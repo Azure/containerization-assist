@@ -100,10 +100,8 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
           const contextOptions = {
             ...(metadata?.signal && { signal: metadata.signal }),
             ...(metadata?.progress !== undefined && { progress: metadata.progress }),
-            ...(metadata?.maxTokens !== undefined && { maxTokens: metadata.maxTokens }),
-            ...(metadata?.stopSequences && { stopSequences: metadata.stopSequences }),
           };
-          return createToolContext(server, toolLogger, contextOptions);
+          return createToolContext(toolLogger, contextOptions);
         }
 
         return createHostlessToolContext(toolLogger, {

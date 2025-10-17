@@ -34,7 +34,7 @@ export interface ErrorGuidance {
  * if (result.ok) {
  *   console.log(result.value);
  * } else {
- *   console.error(result.error); // string for backward compatibility
+ *   console.error(result.error);
  *   if (result.guidance) {
  *     console.error('Hint:', result.guidance.hint);
  *     console.error('Resolution:', result.guidance.resolution);
@@ -51,7 +51,7 @@ export const Success = <T>(value: T): Result<T> => ({ ok: true, value });
 
 /**
  * Create a failure result with optional guidance
- * @param error - Error message (required for backward compatibility)
+ * @param error - Error message
  * @param guidance - Optional structured guidance for operators
  */
 export const Failure = <T>(error: string, guidance?: ErrorGuidance): Result<T> => {
