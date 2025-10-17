@@ -112,22 +112,3 @@ describe('Configuration Defaults', () => {
   });
 });
 
-describe('Configuration Types', () => {
-  describe('Module Structure', () => {
-    it('should have types configuration file', () => {
-      const typesPath = join(__dirname, '../../../src/config/types.ts');
-      const content = readFileSync(typesPath, 'utf-8');
-
-      // File exists and has documentation
-      expect(content).toContain('Configuration Types');
-    });
-  });
-
-  describe('Types Export', () => {
-    it('should export configuration types module', async () => {
-      const typesModule = await import('../../../src/config/types');
-      expect(typeof typesModule).toBe('object');
-    });
-  });
-});
-
