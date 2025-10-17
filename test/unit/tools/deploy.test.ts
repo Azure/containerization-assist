@@ -145,7 +145,8 @@ describe('deployApplication', () => {
   let config: DeployApplicationParams;
 
   // Sample K8s manifests for testing
-  const sampleManifests = `apiVersion: apps/v1
+  const sampleManifests = `
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: test-app
