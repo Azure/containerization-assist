@@ -6,17 +6,10 @@
 import { describe, it, expect } from '@jest/globals';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import {
-  loadPolicy,
-  validatePolicy,
-  resolveEnvironment,
-  createDefaultPolicy,
-} from '@/config/policy-io';
+import { loadPolicy, validatePolicy, createDefaultPolicy } from '@/config/policy-io';
 import {
   evaluateMatcher,
   applyPolicy,
-  getRuleWeights,
-  selectStrategy,
 } from '@/config/policy-eval';
 import type {
   Policy,
@@ -130,106 +123,6 @@ describe('Policy System', () => {
         expect(result.value.cache?.enabled).toBe(true);
         expect(result.value.cache?.ttl).toBe(600);
       }
-    });
-  });
-
-  describe('Environment Resolution', () => {
-    it('should apply environment overrides', () => {
-      const policy: Policy = {
-        version: '2.0',
-        rules: [
-          {
-            id: 'security-rule',
-            priority: 100,
-            conditions: [],
-            actions: {
-              block: false,
-            },
-          },
-        ],
-        environments: {
-          production: {
-            overrides: [
-              {
-                rule_id: 'security-rule',
-                priority: 200,
-                actions: {
-                  block: true,
-                },
-              },
-            ],
-          },
-        },
-      };
-
-      const resolved = resolveEnvironment(policy, 'production');
-      expect(resolved.rules[0].priority).toBe(200);
-      expect(resolved.rules[0].actions.block).toBe(true);
-    });
-
-    it('should disable rules when enabled is false', () => {
-      const policy: Policy = {
-        version: '2.0',
-        rules: [
-          {
-            id: 'rule-1',
-            priority: 100,
-            conditions: [],
-            actions: {},
-          },
-          {
-            id: 'rule-2',
-            priority: 90,
-            conditions: [],
-            actions: {},
-          },
-        ],
-        environments: {
-          test: {
-            overrides: [
-              {
-                rule_id: 'rule-1',
-                enabled: false,
-              },
-            ],
-          },
-        },
-      };
-
-      const resolved = resolveEnvironment(policy, 'test');
-      expect(resolved.rules).toHaveLength(1);
-      expect(resolved.rules[0].id).toBe('rule-2');
-    });
-
-    it('should sort rules by priority after resolution', () => {
-      const policy: Policy = {
-        version: '2.0',
-        rules: [
-          {
-            id: 'low-priority',
-            priority: 50,
-            conditions: [],
-            actions: {},
-          },
-          {
-            id: 'high-priority',
-            priority: 100,
-            conditions: [],
-            actions: {},
-          },
-          {
-            id: 'medium-priority',
-            priority: 75,
-            conditions: [],
-            actions: {},
-          },
-        ],
-      };
-
-      const resolved = resolveEnvironment(policy, 'development');
-      expect(resolved.rules[0].id).toBe('high-priority');
-      expect(resolved.rules[1].id).toBe('medium-priority');
-      expect(resolved.rules[2].id).toBe('low-priority');
     });
   });
 
@@ -402,40 +295,6 @@ describe('Policy System', () => {
   });
 
   describe('Helper Functions', () => {
-    it('should get rule weights', () => {
-      const policy: Policy = {
-        version: '2.0',
-        rules: [
-          { id: 'rule-1', priority: 100, conditions: [], actions: {} },
-          { id: 'rule-2', priority: 50, conditions: [], actions: {} },
-          { id: 'rule-3', priority: 75, conditions: [], actions: {} },
-        ],
-      };
-
-      const weights = getRuleWeights(policy);
-      expect(weights.get('rule-1')).toBe(100);
-      expect(weights.get('rule-2')).toBe(50);
-      expect(weights.get('rule-3')).toBe(75);
-    });
-
-    it('should select best strategy based on weights', () => {
-      const policy: Policy = {
-        version: '2.0',
-        rules: [
-          { id: 'strategy-1', priority: 100, conditions: [], actions: {} },
-          { id: 'strategy-2', priority: 150, conditions: [], actions: {} },
-        ],
-      };
-
-      const candidates = [
-        { id: 'strategy-1', score: 80 },
-        { id: 'strategy-2', score: 70 },
-      ];
-
-      const selected = selectStrategy(policy, candidates);
-      expect(selected).toBe('strategy-2'); // Higher weight compensates for lower score
-    });
-
     it('should create default policy', () => {
       const policy = createDefaultPolicy();
       expect(policy.version).toBe('2.0');
@@ -459,19 +318,6 @@ describe('Policy System', () => {
       }
     });
 
-    it('should apply environment when loading', () => {
-      if (fs.existsSync(testPolicyPath)) {
-        const result = loadPolicy(testPolicyPath, 'production');
-        expect(result.ok).toBe(true);
-        if (result.ok) {
-          // Check that production overrides were applied
-          const securityRule = result.value.rules.find(r => r.id === 'security-scanning');
-          if (securityRule) {
-            expect(securityRule.priority).toBeGreaterThanOrEqual(100);
-          }
-        }
-      }
-    });
 
     it('should always return the TypeScript config', () => {
       // Now that we use TypeScript config, loadPolicy always succeeds

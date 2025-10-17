@@ -223,6 +223,7 @@ The following environment variables control server behavior:
 | `CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
 | `CONTAINERIZATION_ASSIST_IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
 | `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
+| `CONTAINERIZATION_ASSIST_POLICY_PATH` | Path to policy YAML file (overridden by --config flag) | Auto-discover all policies/ | No |
 
 **Progress Notifications:**
 Long-running operations (build, deploy, scan-image) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.

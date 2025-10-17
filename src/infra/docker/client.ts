@@ -1,14 +1,12 @@
 /**
- * Docker client for containerization operations with optional mutex support
+ * Docker client for containerization operations
  */
 
 import Docker, { DockerOptions } from 'dockerode';
 import tar from 'tar-fs';
-import { createHash } from 'crypto';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
-import { createKeyedMutex, type KeyedMutexInstance } from '@/lib/mutex';
 import { autoDetectDockerSocket } from './socket-validation';
 
 /**
@@ -23,17 +21,6 @@ export interface DockerClientConfig {
   port?: number;
   /** Connection timeout in milliseconds */
   timeout?: number;
-  /** Enable mutex protection for concurrent operations */
-  enableMutex?: boolean;
-  /** Mutex configuration options */
-  mutexConfig?: {
-    /** Default mutex timeout in milliseconds */
-    defaultTimeout?: number;
-    /** Docker build-specific timeout in milliseconds */
-    dockerBuildTimeout?: number;
-    /** Enable mutex monitoring */
-    monitoringEnabled?: boolean;
-  };
 }
 
 /**
@@ -181,20 +168,6 @@ export interface DockerClient {
     all?: boolean;
     filters?: Record<string, string[]>;
   }) => Promise<Result<DockerContainerInfo[]>>;
-}
-
-/**
- * Creates a hash key for Docker build operations to prevent concurrent builds
- * of the same context/dockerfile combination
- */
-function hashBuildContext(options: DockerBuildOptions): string {
-  const key = {
-    context: options.context || '.',
-    dockerfile: options.dockerfile || 'Dockerfile',
-    platform: options.platform,
-  };
-
-  return createHash('sha256').update(JSON.stringify(key)).digest('hex').substring(0, 16);
 }
 
 /**
@@ -588,136 +561,6 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 }
 
 /**
- * Wrap Docker client with mutex protection
- */
-function wrapWithMutex(
-  baseClient: DockerClient,
-  mutex: KeyedMutexInstance,
-  mutexConfig: DockerClientConfig['mutexConfig'],
-  logger: Logger,
-): DockerClient {
-  const buildTimeout = mutexConfig?.dockerBuildTimeout || 120000;
-  const defaultTimeout = mutexConfig?.defaultTimeout || 30000;
-
-  return {
-    async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
-      const lockKey = `docker:build:${hashBuildContext(options)}`;
-
-      logger.debug({ lockKey, timeout: buildTimeout }, 'Acquiring build mutex');
-
-      try {
-        return await mutex.withLock(
-          lockKey,
-          async () => {
-            logger.debug({ lockKey }, 'Build mutex acquired');
-            const result = await baseClient.buildImage(options);
-            logger.debug({ lockKey, success: result.ok }, 'Build completed');
-            return result;
-          },
-          buildTimeout,
-        );
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('Mutex timeout')) {
-          logger.error({ lockKey, timeout: buildTimeout }, 'Build mutex timeout');
-          return Failure(
-            `Build operation timed out after ${buildTimeout}ms - another build may be in progress`,
-          );
-        }
-        throw error;
-      }
-    },
-
-    async getImage(id: string): Promise<Result<DockerImageInfo>> {
-      // Image inspection is read-only, no mutex needed
-      return baseClient.getImage(id);
-    },
-
-    async inspectImage(imageId: string): Promise<Result<DockerImageInfo>> {
-      // Image inspection is read-only, no mutex needed
-      return baseClient.inspectImage(imageId);
-    },
-
-    async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {
-      const lockKey = `docker:tag:${imageId}`;
-
-      return mutex.withLock(
-        lockKey,
-        async () => {
-          logger.debug({ imageId, repository, tag }, 'Tagging image with mutex');
-          return baseClient.tagImage(imageId, repository, tag);
-        },
-        defaultTimeout,
-      );
-    },
-
-    async pushImage(
-      repository: string,
-      tag: string,
-      authConfig?: { username: string; password: string; serveraddress: string },
-    ): Promise<Result<DockerPushResult>> {
-      const lockKey = `docker:push:${repository}:${tag}`;
-
-      logger.debug({ lockKey, repository, tag }, 'Acquiring push mutex');
-
-      try {
-        return await mutex.withLock(
-          lockKey,
-          async () => {
-            logger.debug({ lockKey }, 'Push mutex acquired');
-            const result = await baseClient.pushImage(repository, tag, authConfig);
-            logger.debug({ lockKey, success: result.ok }, 'Push completed');
-            return result;
-          },
-          buildTimeout,
-        );
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('Mutex timeout')) {
-          logger.error({ lockKey, timeout: buildTimeout }, 'Push mutex timeout');
-          return Failure(
-            `Push operation timed out after ${buildTimeout}ms - another push may be in progress`,
-          );
-        }
-        throw error;
-      }
-    },
-
-    async removeImage(imageId: string, force = false): Promise<Result<void>> {
-      const lockKey = `docker:remove:image:${imageId}`;
-
-      return mutex.withLock(
-        lockKey,
-        async () => {
-          logger.debug({ imageId, force }, 'Removing image with mutex');
-          return baseClient.removeImage(imageId, force);
-        },
-        defaultTimeout,
-      );
-    },
-
-    async removeContainer(containerId: string, force = false): Promise<Result<void>> {
-      const lockKey = `docker:remove:container:${containerId}`;
-
-      return mutex.withLock(
-        lockKey,
-        async () => {
-          logger.debug({ containerId, force }, 'Removing container with mutex');
-          return baseClient.removeContainer(containerId, force);
-        },
-        defaultTimeout,
-      );
-    },
-
-    async listContainers(options?: {
-      all?: boolean;
-      filters?: Record<string, string[]>;
-    }): Promise<Result<DockerContainerInfo[]>> {
-      // Container listing is read-only, no mutex needed
-      return baseClient.listContainers(options);
-    },
-  };
-}
-
-/**
  * Create a Docker client with core operations
  * @param logger - Logger instance for debug output
  * @param config - Optional Docker client configuration
@@ -752,30 +595,8 @@ export const createDockerClient = (logger: Logger, config?: DockerClientConfig):
 
   const docker = new Docker(dockerOptions);
 
-  logger.debug({ dockerOptions, enableMutex: config?.enableMutex }, 'Created Docker client');
+  logger.debug({ dockerOptions }, 'Created Docker client');
 
-  // Create base client
-  const baseClient = createBaseDockerClient(docker, logger);
-
-  // Wrap with mutex if enabled
-  if (config?.enableMutex) {
-    const mutex = createKeyedMutex({
-      defaultTimeout: config.mutexConfig?.defaultTimeout || 30000,
-      monitoringEnabled: config.mutexConfig?.monitoringEnabled || false,
-    });
-
-    logger.debug('Docker client mutex protection enabled');
-    return wrapWithMutex(baseClient, mutex, config.mutexConfig, logger);
-  }
-
-  return baseClient;
+  // Create and return client
+  return createBaseDockerClient(docker, logger);
 };
-
-/**
- * Get mutex status for monitoring
- * @public
- */
-export function getDockerMutexStatus(): Map<string, unknown> {
-  const mutex = createKeyedMutex();
-  return mutex.getStatus();
-}

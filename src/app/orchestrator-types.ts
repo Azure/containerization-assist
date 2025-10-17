@@ -42,6 +42,5 @@ type ChainHintsMode = 'enabled' | 'disabled';
  */
 export interface OrchestratorConfig {
   policyPath?: string;
-  policyEnvironment?: string;
   chainHintsMode: ChainHintsMode;
 }
