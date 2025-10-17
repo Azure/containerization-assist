@@ -293,6 +293,8 @@ describe('scanImage', () => {
           highCount: 0,
           mediumCount: 0,
           lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
           totalVulnerabilities: 0,
           scanDate: new Date('2023-01-01T12:00:00Z'),
           imageId: 'sha256:mock-image-id',
