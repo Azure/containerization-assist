@@ -1,6 +1,9 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "module": "ES2022",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
       "containerization-assist-mcp": [
@@ -11,9 +14,6 @@
       ],
       "containerization-assist-mcp/server": [
         "../../src/mcp/server.ts"
-      ],
-      "containerization-assist-mcp/tools": [
-        "../../src/exports/tools.ts"
       ],
       "containerization-assist-mcp/types": [
         "../../src/types/index.ts"
@@ -27,10 +27,17 @@
       "containerization-assist-mcp/tools/*": [
         "../../src/tools/*/index.ts"
       ]
-    }
+    },
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": [
-    "**/*.ts",
-    "**/*.js"
+    "./*.ts",
+    "./*.js"
+  ],
+  "exclude": [
+    "../../src",
+    "../../node_modules"
   ]
 }
