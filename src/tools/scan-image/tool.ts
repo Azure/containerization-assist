@@ -17,7 +17,7 @@ import { scanImageSchema, type ScanImageParams } from './schema';
 interface DockerScanResult {
   vulnerabilities?: Array<{
     id?: string;
-    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NEGLIGIBLE' | 'UNKNOWN';
     package?: string;
     version?: string;
     description?: string;
@@ -28,7 +28,8 @@ interface DockerScanResult {
     high: number;
     medium: number;
     low: number;
-    unknown?: number;
+    negligible: number;
+    unknown: number;
     total: number;
   };
   scanTime?: string;
@@ -50,6 +51,7 @@ export interface ScanImageResult {
     high: number;
     medium: number;
     low: number;
+    negligible: number;
     unknown: number;
     total: number;
   };
@@ -116,6 +118,8 @@ async function handleScanImage(
         high: scanResult.highCount,
         medium: scanResult.mediumCount,
         low: scanResult.lowCount,
+        negligible: scanResult.negligibleCount,
+        unknown: scanResult.unknownCount,
         total: scanResult.totalVulnerabilities,
       },
       scanTime: scanResult.scanDate.toISOString(),
@@ -197,7 +201,8 @@ async function handleScanImage(
         high: scanResult.highCount,
         medium: scanResult.mediumCount,
         low: scanResult.lowCount,
-        unknown: 0, // BasicScanResult doesn't track unknown severity vulnerabilities
+        negligible: scanResult.negligibleCount,
+        unknown: scanResult.unknownCount,
         total: scanResult.totalVulnerabilities,
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
