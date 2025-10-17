@@ -20,8 +20,3 @@ export const PASSWORD_PATTERN = /\w*password\w*\s*=\s*["']?.+["']?/i;
 export const API_KEY_PATTERN = /\w*api[_-]?key\w*\s*=\s*["']?.+["']?/i;
 export const SECRET_PATTERN = /\w*secret\w*\s*=\s*["']?.+["']?/i;
 export const TOKEN_PATTERN = /\w*token\w*\s*=\s*["']?.+["']?/i;
-
-// Code fence patterns (for AI response processing)
-export const DOCKERFILE_FENCE = /```(?:docker|dockerfile|Dockerfile|DOCKERFILE)?\s*\n([\s\S]*?)```/;
-export const YAML_FENCE = /```(?:yaml|yml|YAML|YML)?\s*\n([\s\S]*?)```/;
-export const GENERIC_FENCE = /```[a-zA-Z0-9]*\s*\n?([\s\S]*?)```/;

@@ -23,14 +23,6 @@ export interface FunctionMatcher {
   args: unknown[];
 }
 
-/**
- * Cache configuration
- */
-export interface CacheConfig {
-  enabled: boolean;
-  ttl: number;
-}
-
 const PolicyRuleSchema = z.object({
   id: z.string(),
   category: z.enum(['quality', 'security', 'performance', 'compliance']).optional(),
@@ -121,18 +113,6 @@ export interface PolicyRule {
   actions: Record<string, unknown>;
   description?: string;
 }
-
-/**
- * Unified defaults that combines base and environment-specific fields
- * Derived from UnifiedDefaultsSchema
- */
-export type UnifiedDefaults = z.infer<typeof UnifiedDefaultsSchema>;
-
-/**
- * Typed environment defaults for data-driven constraint generation
- * Derived from UnifiedDefaults, excluding base-level fields
- */
-export type EnvironmentDefaults = Omit<UnifiedDefaults, 'cache_ttl' | 'enforcement'>;
 
 /**
  * Policy structure
