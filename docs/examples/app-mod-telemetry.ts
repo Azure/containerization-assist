@@ -13,7 +13,7 @@
  * - `metadata`: Tool capabilities and enhancement info
  */
 
-import { Server as McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { buildImageTool, deployTool, ALL_TOOLS } from 'containerization-assist-mcp';
 import type { MCPTool } from 'containerization-assist-mcp';

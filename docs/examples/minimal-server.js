@@ -5,39 +5,34 @@
  * This is the simplest possible working example
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Import Container Assist tools
-import { createContainerAssistServer } from 'containerization-assist-mcp';
+import { createApp } from 'containerization-assist-mcp';
 
 async function main() {
   console.error('Starting MCP server with Container Assist tools...');
 
   try {
     // Create the MCP server
-    const server = new Server(
-      {
-        name: 'containerization-assist-example',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
+    const server = new McpServer({
+      name: 'containerization-assist-example',
+      version: '1.0.0',
+    });
 
-    // Create Container Assist instance and bind tools
+    // Create Container Assist app and bind tools
     console.error('Setting up Container Assist tools...');
-    const caServer = createContainerAssistServer();
+    const app = createApp({
+      toolAliases: {
+        'analyze-repo': 'analyze_repo',
+        'generate-dockerfile': 'generate_dockerfile',
+        'build-image': 'build_image'
+      }
+    });
 
-    // Register specific tools (or use bindAll for all tools)
-    caServer.bindSampling({ server });
-    caServer.registerTools(
-      { server },
-      { tools: ['analyze_repo', 'generate_dockerfile', 'build_image'] }
-    );
+    // Bind tools to MCP server
+    app.bindToMCP(server);
 
     // Create stdio transport
     const transport = new StdioServerTransport();
@@ -46,7 +41,7 @@ async function main() {
     await server.connect(transport);
 
     console.error('✅ MCP server started successfully with Container Assist tools');
-    console.error('Available tools: analyze_repo, generate_dockerfile, build_image');
+    console.error(`Available tools: ${app.listTools().length} total`);
 
   } catch (error) {
     console.error('Failed to start MCP server:', error);

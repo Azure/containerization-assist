@@ -53,6 +53,10 @@ jobs:
         id: typecheck
         run: npm run typecheck
 
+      - name: Validate examples compile
+        id: examples
+        run: node scripts/validate-examples.js
+
       - name: Run lint and cache output
         id: lint
         run: npm run lint 2>&1 | tee eslint-output.txt || true

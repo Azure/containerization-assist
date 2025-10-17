@@ -5,6 +5,7 @@
 
 import {
   createApp,
+  type MCPTool as Tool,
 } from 'containerization-assist-mcp';
 
 /**
