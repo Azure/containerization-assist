@@ -16,8 +16,20 @@
       "@/*": [
         "src/*"
       ],
+      "@types": [
+        "src/types/index.ts"
+      ],
       "@/ai/*": [
         "src/ai/*"
+      ],
+      "@/config/*": [
+        "src/config/*"
+      ],
+      "@/infra/*": [
+        "src/infra/*"
+      ],
+      "@/lib/*": [
+        "src/lib/*"
       ],
       "@/mcp/*": [
         "src/mcp/*"
@@ -25,32 +37,11 @@
       "@/tools/*": [
         "src/tools/*"
       ],
-      "@/lib/*": [
-        "src/lib/*"
-      ],
-      "@/infra/*": [
-        "src/infra/*"
-      ],
-      "@/config/*": [
-        "src/config/*"
-      ],
-      "@/resources/*": [
-        "src/resources/*"
-      ],
-      "@/exports/*": [
-        "src/exports/*"
-      ],
       "@/knowledge/*": [
         "src/knowledge/*"
       ],
-      "@types": [
-        "src/types/index.ts"
-      ],
-      "@/container": [
-        "src/container"
-      ],
-      "@validation/*": [
-        "src/validation"
+      "@/validation/*": [
+        "src/validation/*"
       ]
     },
     "declaration": true,
