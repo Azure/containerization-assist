@@ -1,0 +1,628 @@
+{
+  "name": "DotNet Identity Pack",
+  "description": "Comprehensive containerization patterns for ASP.NET Core Identity, authentication, and authorization systems",
+  "version": "1.0.0",
+  "triggers": {
+    "frameworks": ["aspnet-core", "aspnet-identity"],
+    "packages": ["Microsoft.AspNetCore.Identity", "Microsoft.AspNetCore.Identity.EntityFrameworkCore", "IdentityServer4", "Duende.IdentityServer"],
+    "files": ["Identity/", "Areas/Identity/", "Models/ApplicationUser.cs"],
+    "patterns": ["IdentityUser", "IdentityDbContext", "UserManager", "SignInManager"]
+  },
+  "rules": [
+    {
+      "id": "identity-basic-setup",
+      "description": "Basic ASP.NET Core Identity containerization",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Identity.EntityFrameworkCore"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "base_image": "mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+          "build_stage": "mcr.microsoft.com/dotnet/sdk:8.0-alpine",
+          "layers": [
+            "# ASP.NET Core Identity Application",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "# Install required packages for Identity",
+            "RUN apk add --no-cache icu-libs",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Identity configuration",
+            "ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false",
+            "ENV ConnectionStrings__DefaultConnection=\"Server=db;Database=IdentityApp;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Security configuration",
+            "ENV Identity__Password__RequiredLength=\"8\"",
+            "ENV Identity__Password__RequireDigit=\"true\"",
+            "ENV Identity__Password__RequireUppercase=\"true\"",
+            "ENV Identity__Lockout__DefaultLockoutTimeSpan=\"00:05:00\"",
+            "ENV Identity__Lockout__MaxFailedAccessAttempts=\"5\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"IdentityApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-server",
+      "description": "IdentityServer4/Duende IdentityServer containerization",
+      "conditions": {
+        "packages": ["IdentityServer4", "Duende.IdentityServer"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# IdentityServer Application",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "# Install certificates and security tools",
+            "RUN apt-get update && apt-get install -y \\",
+            "    ca-certificates \\",
+            "    openssl \\",
+            "    && rm -rf /var/lib/apt/lists/*",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# IdentityServer configuration",
+            "ENV ASPNETCORE_ENVIRONMENT=Production",
+            "ENV IdentityServer__IssuerUri=\"https://identityserver.yourdomain.com\"",
+            "ENV IdentityServer__PublicOrigin=\"https://identityserver.yourdomain.com\"",
+            "",
+            "# Database configuration",
+            "ENV ConnectionStrings__DefaultConnection=\"Server=db;Database=IdentityServer;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "ENV ConnectionStrings__ConfigurationDbConnection=\"Server=db;Database=IdentityServerConfiguration;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "ENV ConnectionStrings__PersistedGrantDbConnection=\"Server=db;Database=IdentityServerGrants;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Security settings",
+            "ENV IdentityServer__KeyManagement__Enabled=\"true\"",
+            "ENV IdentityServer__Caching__ClientStoreExpiration=\"00:15:00\"",
+            "ENV IdentityServer__Caching__ResourceStoreExpiration=\"00:15:00\"",
+            "",
+            "# HTTPS configuration",
+            "ENV ASPNETCORE_URLS=\"https://+:8443;http://+:8080\"",
+            "ENV ASPNETCORE_HTTPS_PORT=\"8443\"",
+            "",
+            "EXPOSE 8080 8443",
+            "ENTRYPOINT [\"dotnet\", \"IdentityServer.dll\"]"
+          ]
+        },
+        "kubernetes": {
+          "deployment": {
+            "replicas": 2,
+            "resources": {
+              "requests": {
+                "cpu": "200m",
+                "memory": "256Mi"
+              },
+              "limits": {
+                "cpu": "1000m",
+                "memory": "1Gi"
+              }
+            }
+          },
+          "service": {
+            "type": "LoadBalancer",
+            "ports": [
+              {
+                "name": "http",
+                "port": 80,
+                "targetPort": 8080
+              },
+              {
+                "name": "https",
+                "port": 443,
+                "targetPort": 8443
+              }
+            ]
+          },
+          "ingress": {
+            "tls": true,
+            "annotations": {
+              "nginx.ingress.kubernetes.io/ssl-redirect": "true",
+              "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "identity-jwt-authentication",
+      "description": "JWT-based authentication service",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Authentication.JwtBearer"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# JWT Authentication Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# JWT Configuration",
+            "ENV Jwt__Issuer=\"https://yourdomain.com\"",
+            "ENV Jwt__Audience=\"https://yourdomain.com\"",
+            "ENV Jwt__SecretKey=\"YourSuperSecretKeyThatIsAtLeast32CharactersLong\"",
+            "ENV Jwt__ExpirationInMinutes=\"60\"",
+            "ENV Jwt__RefreshTokenExpirationInDays=\"7\"",
+            "",
+            "# Security headers",
+            "ENV SecurityHeaders__ContentSecurityPolicy=\"default-src 'self'\"",
+            "ENV SecurityHeaders__XFrameOptions=\"DENY\"",
+            "ENV SecurityHeaders__XContentTypeOptions=\"nosniff\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"JwtAuthService.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-oauth-provider",
+      "description": "OAuth 2.0 / OpenID Connect provider",
+      "conditions": {
+        "packages": ["AspNet.Security.OAuth"],
+        "patterns": ["OAuth", "OpenIdConnect"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# OAuth Provider Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# OAuth configuration",
+            "ENV OAuth__AuthorizationCodeExpiration=\"00:10:00\"",
+            "ENV OAuth__AccessTokenExpiration=\"01:00:00\"",
+            "ENV OAuth__RefreshTokenExpiration=\"30.00:00:00\"",
+            "",
+            "# OpenID Connect configuration",
+            "ENV OpenIdConnect__Issuer=\"https://oauth.yourdomain.com\"",
+            "ENV OpenIdConnect__SigningKey=\"YourRSASigningKey\"",
+            "",
+            "# Client store configuration",
+            "ENV ClientStore__Type=\"Database\"",
+            "ENV ConnectionStrings__ClientStore=\"Server=db;Database=OAuthClients;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Rate limiting",
+            "ENV RateLimit__AuthorizationRequests=\"100\"",
+            "ENV RateLimit__TokenRequests=\"200\"",
+            "ENV RateLimit__WindowInMinutes=\"15\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"OAuthProvider.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-external-providers",
+      "description": "Identity with external OAuth providers (Google, Facebook, etc.)",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Authentication.Google", "Microsoft.AspNetCore.Authentication.Facebook"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Identity with External Providers",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# External OAuth providers configuration",
+            "ENV Authentication__Google__ClientId=\"your-google-client-id\"",
+            "ENV Authentication__Google__ClientSecret=\"your-google-client-secret\"",
+            "ENV Authentication__Facebook__AppId=\"your-facebook-app-id\"",
+            "ENV Authentication__Facebook__AppSecret=\"your-facebook-app-secret\"",
+            "ENV Authentication__Microsoft__ClientId=\"your-microsoft-client-id\"",
+            "ENV Authentication__Microsoft__ClientSecret=\"your-microsoft-client-secret\"",
+            "",
+            "# Callback URLs",
+            "ENV Authentication__CallbackPath=\"/signin-google\"",
+            "ENV Authentication__ReturnUrlParameter=\"ReturnUrl\"",
+            "",
+            "# Cookie configuration",
+            "ENV Authentication__Cookies__SameSite=\"Lax\"",
+            "ENV Authentication__Cookies__SecurePolicy=\"Always\"",
+            "ENV Authentication__Cookies__HttpOnly=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"ExternalAuthApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-two-factor-auth",
+      "description": "Two-factor authentication with TOTP/SMS",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Identity"],
+        "patterns": ["TwoFactorAuthentication", "TOTP", "AuthenticatorKey"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Two-Factor Authentication Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Two-factor authentication configuration",
+            "ENV TwoFactor__Enabled=\"true\"",
+            "ENV TwoFactor__TOTPIssuer=\"YourCompany\"",
+            "ENV TwoFactor__TOTPDigits=\"6\"",
+            "ENV TwoFactor__TOTPPeriod=\"30\"",
+            "",
+            "# SMS provider configuration",
+            "ENV SMS__Provider=\"Twilio\"",
+            "ENV SMS__Twilio__AccountSid=\"your-twilio-account-sid\"",
+            "ENV SMS__Twilio__AuthToken=\"your-twilio-auth-token\"",
+            "ENV SMS__Twilio__FromNumber=\"+1234567890\"",
+            "",
+            "# Email provider configuration",
+            "ENV Email__Provider=\"SendGrid\"",
+            "ENV Email__SendGrid__ApiKey=\"your-sendgrid-api-key\"",
+            "ENV Email__SendGrid__FromEmail=\"noreply@yourdomain.com\"",
+            "",
+            "# Security settings",
+            "ENV TwoFactor__RequiredForSensitiveOperations=\"true\"",
+            "ENV TwoFactor__RememberBrowserDays=\"30\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"TwoFactorApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-role-based-authorization",
+      "description": "Advanced role-based and claims-based authorization",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Identity"],
+        "patterns": ["RoleManager", "ClaimsPrincipal", "AuthorizeAttribute"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Role-Based Authorization Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Authorization configuration",
+            "ENV Authorization__DefaultPolicy=\"DefaultPolicy\"",
+            "ENV Authorization__RequireAuthenticatedUser=\"true\"",
+            "",
+            "# Role configuration",
+            "ENV Roles__DefaultRoles=\"User,Manager,Admin\"",
+            "ENV Roles__AdminEmail=\"admin@yourdomain.com\"",
+            "",
+            "# Claims configuration",
+            "ENV Claims__EnableClaimsTransformation=\"true\"",
+            "ENV Claims__ClaimsIssuer=\"https://yourdomain.com\"",
+            "",
+            "# Permission configuration",
+            "ENV Permissions__CacheTimeout=\"300\"",
+            "ENV Permissions__EnableHierarchy=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"AuthorizationApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-session-management",
+      "description": "Advanced session management and security",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Session"],
+        "patterns": ["SessionManagement", "ISession"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Session Management Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Session configuration",
+            "ENV Session__Timeout=\"00:20:00\"",
+            "ENV Session__CookieName=\"YourAppSession\"",
+            "ENV Session__CookieSecure=\"true\"",
+            "ENV Session__CookieHttpOnly=\"true\"",
+            "ENV Session__CookieSameSite=\"Strict\"",
+            "",
+            "# Redis session store",
+            "ENV Session__Store=\"Redis\"",
+            "ENV ConnectionStrings__Redis=\"redis:6379\"",
+            "ENV Session__Redis__KeyPrefix=\"session:\"",
+            "",
+            "# Security settings",
+            "ENV Security__RegenerateSessionOnLogin=\"true\"",
+            "ENV Security__MaxConcurrentSessions=\"5\"",
+            "ENV Security__SessionFixationProtection=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"SessionApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-password-policy",
+      "description": "Advanced password policy and security enforcement",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Identity"],
+        "patterns": ["PasswordPolicy", "PasswordValidator"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Password Policy Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Password policy configuration",
+            "ENV PasswordPolicy__MinLength=\"12\"",
+            "ENV PasswordPolicy__MaxLength=\"128\"",
+            "ENV PasswordPolicy__RequireDigit=\"true\"",
+            "ENV PasswordPolicy__RequireUppercase=\"true\"",
+            "ENV PasswordPolicy__RequireLowercase=\"true\"",
+            "ENV PasswordPolicy__RequireSpecialCharacter=\"true\"",
+            "ENV PasswordPolicy__DisallowCommonPasswords=\"true\"",
+            "ENV PasswordPolicy__PreventPasswordReuse=\"5\"",
+            "",
+            "# Account lockout configuration",
+            "ENV Lockout__EnabledByDefault=\"true\"",
+            "ENV Lockout__DefaultLockoutTimeSpan=\"00:15:00\"",
+            "ENV Lockout__MaxFailedAccessAttempts=\"3\"",
+            "",
+            "# Password expiration",
+            "ENV PasswordExpiration__Enabled=\"true\"",
+            "ENV PasswordExpiration__ExpirationDays=\"90\"",
+            "ENV PasswordExpiration__WarningDays=\"14\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"PasswordPolicyApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-audit-logging",
+      "description": "Comprehensive identity audit logging and monitoring",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Identity"],
+        "patterns": ["AuditLog", "SecurityEvent"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Identity Audit Logging Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Audit logging configuration",
+            "ENV AuditLog__Enabled=\"true\"",
+            "ENV AuditLog__LogSuccessfulLogins=\"true\"",
+            "ENV AuditLog__LogFailedLogins=\"true\"",
+            "ENV AuditLog__LogPasswordChanges=\"true\"",
+            "ENV AuditLog__LogRoleChanges=\"true\"",
+            "ENV AuditLog__LogPermissionChanges=\"true\"",
+            "",
+            "# Security monitoring",
+            "ENV SecurityMonitoring__BruteForceThreshold=\"10\"",
+            "ENV SecurityMonitoring__BruteForceWindow=\"00:05:00\"",
+            "ENV SecurityMonitoring__SuspiciousActivityThreshold=\"5\"",
+            "",
+            "# Log storage configuration",
+            "ENV Logging__AuditLog__Provider=\"Elasticsearch\"",
+            "ENV Logging__AuditLog__Elasticsearch__Url=\"http://elasticsearch:9200\"",
+            "ENV Logging__AuditLog__Elasticsearch__Index=\"identity-audit\"",
+            "",
+            "# Alerting configuration",
+            "ENV Alerting__Enabled=\"true\"",
+            "ENV Alerting__EmailRecipients=\"security@yourdomain.com\"",
+            "ENV Alerting__SlackWebhook=\"https://hooks.slack.com/services/your/slack/webhook\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"AuditApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-multi-tenant",
+      "description": "Multi-tenant identity management with tenant isolation",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Identity"],
+        "patterns": ["TenantIdentity", "ITenantStore"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Multi-Tenant Identity Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Multi-tenancy configuration",
+            "ENV MultiTenancy__Strategy=\"Subdomain\"",
+            "ENV MultiTenancy__DefaultTenant=\"default\"",
+            "ENV MultiTenancy__RequireTenant=\"true\"",
+            "",
+            "# Database per tenant",
+            "ENV ConnectionStrings__Template=\"Server=db;Database=Identity_{tenant};User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Tenant isolation",
+            "ENV TenantIsolation__Users=\"true\"",
+            "ENV TenantIsolation__Roles=\"true\"",
+            "ENV TenantIsolation__Claims=\"true\"",
+            "",
+            "# Cross-tenant configuration",
+            "ENV CrossTenant__AllowSharedUsers=\"false\"",
+            "ENV CrossTenant__AllowSharedRoles=\"false\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"MultiTenantIdentity.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "identity-api-security",
+      "description": "Identity-secured API with comprehensive security features",
+      "conditions": {
+        "packages": ["Microsoft.AspNetCore.Authentication.JwtBearer", "Microsoft.AspNetCore.Authorization"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Secure Identity API",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# API security configuration",
+            "ENV ApiSecurity__RequireHttps=\"true\"",
+            "ENV ApiSecurity__RequireAuthentication=\"true\"",
+            "ENV ApiSecurity__EnableCors=\"true\"",
+            "",
+            "# Rate limiting",
+            "ENV RateLimit__Enabled=\"true\"",
+            "ENV RateLimit__PerUserLimit=\"100\"",
+            "ENV RateLimit__PerIpLimit=\"1000\"",
+            "ENV RateLimit__WindowInMinutes=\"15\"",
+            "",
+            "# CORS configuration",
+            "ENV Cors__AllowedOrigins=\"https://yourdomain.com,https://app.yourdomain.com\"",
+            "ENV Cors__AllowedMethods=\"GET,POST,PUT,DELETE\"",
+            "ENV Cors__AllowedHeaders=\"Authorization,Content-Type\"",
+            "",
+            "# Security headers",
+            "ENV SecurityHeaders__HSTS=\"true\"",
+            "ENV SecurityHeaders__ContentTypeOptions=\"nosniff\"",
+            "ENV SecurityHeaders__FrameOptions=\"DENY\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"SecureApi.dll\"]"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,332 @@
+[
+  {
+    "id": "k8s-resource-limits",
+    "category": "kubernetes",
+    "pattern": "resources:",
+    "recommendation": "Always set both resource requests and limits for predictable scheduling and performance",
+    "example": "resources:\n  requests:\n    memory: \"128Mi\"\n    cpu: \"100m\"\n  limits:\n    memory: \"256Mi\"\n    cpu: \"200m\"",
+    "severity": "high",
+    "tags": ["kubernetes", "resources", "scheduling"],
+    "description": "Resource requests and limits ensure predictable scheduling and prevent resource starvation"
+  },
+  {
+    "id": "k8s-liveness-probe",
+    "category": "kubernetes",
+    "pattern": "livenessProbe:",
+    "recommendation": "Configure appropriate liveness probes to restart unhealthy containers",
+    "example": "livenessProbe:\n  httpGet:\n    path: /health\n    port: 8080\n  initialDelaySeconds: 30\n  periodSeconds: 10",
+    "severity": "high",
+    "tags": ["kubernetes", "health", "probes"],
+    "description": "Liveness probes help Kubernetes detect and restart failed containers"
+  },
+  {
+    "id": "k8s-readiness-probe",
+    "category": "kubernetes",
+    "pattern": "readinessProbe:",
+    "recommendation": "Configure readiness probes to control traffic routing to healthy pods",
+    "example": "readinessProbe:\n  httpGet:\n    path: /ready\n    port: 8080\n  initialDelaySeconds: 5\n  periodSeconds: 5",
+    "severity": "high",
+    "tags": ["kubernetes", "health", "probes", "traffic"],
+    "description": "Readiness probes prevent traffic routing to pods that aren't ready to serve"
+  },
+  {
+    "id": "k8s-security-context",
+    "category": "kubernetes",
+    "pattern": "securityContext:",
+    "recommendation": "Configure security context to run containers as non-root with read-only filesystem",
+    "example": "securityContext:\n  runAsNonRoot: true\n  runAsUser: 1001\n  readOnlyRootFilesystem: true\n  allowPrivilegeEscalation: false",
+    "severity": "high",
+    "tags": ["kubernetes", "security", "non-root"],
+    "description": "Security contexts enforce security policies at the pod and container level"
+  },
+  {
+    "id": "k8s-image-pull-policy",
+    "category": "kubernetes",
+    "pattern": "imagePullPolicy:",
+    "recommendation": "Use 'Always' for latest tags, 'IfNotPresent' for specific versions",
+    "example": "image: myapp:v1.2.3\nimagePullPolicy: IfNotPresent",
+    "severity": "medium",
+    "tags": ["kubernetes", "images", "caching"],
+    "description": "Proper image pull policy reduces startup time and ensures consistency"
+  },
+  {
+    "id": "k8s-pod-disruption-budget",
+    "category": "kubernetes",
+    "pattern": "kind: PodDisruptionBudget",
+    "recommendation": "Use PodDisruptionBudget to maintain availability during voluntary disruptions",
+    "example": "apiVersion: policy/v1\nkind: PodDisruptionBudget\nmetadata:\n  name: myapp-pdb\nspec:\n  minAvailable: 2\n  selector:\n    matchLabels:\n      app: myapp",
+    "severity": "medium",
+    "tags": ["kubernetes", "availability", "disruption"],
+    "description": "PDB ensures minimum availability during cluster maintenance"
+  },
+  {
+    "id": "k8s-horizontal-pod-autoscaler",
+    "category": "kubernetes",
+    "pattern": "kind: HorizontalPodAutoscaler",
+    "recommendation": "Use HPA to automatically scale pods based on resource utilization",
+    "example": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: myapp-hpa\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: myapp\n  minReplicas: 2\n  maxReplicas: 10\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization: 70",
+    "severity": "medium",
+    "tags": ["kubernetes", "autoscaling", "performance"],
+    "description": "HPA automatically adjusts replica count based on resource metrics"
+  },
+  {
+    "id": "k8s-config-map-separation",
+    "category": "kubernetes",
+    "pattern": "kind: ConfigMap",
+    "recommendation": "Separate configuration from application code using ConfigMaps",
+    "example": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: myapp-config\ndata:\n  database_url: \"postgres://...\"\n  log_level: \"info\"",
+    "severity": "medium",
+    "tags": ["kubernetes", "configuration", "separation"],
+    "description": "ConfigMaps enable configuration changes without rebuilding images"
+  },
+  {
+    "id": "k8s-secret-management",
+    "category": "kubernetes",
+    "pattern": "kind: Secret",
+    "recommendation": "Use Secrets for sensitive data and avoid hardcoding credentials",
+    "example": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: myapp-secrets\ntype: Opaque\ndata:\n  password: <base64-encoded>",
+    "severity": "high",
+    "tags": ["kubernetes", "security", "secrets"],
+    "description": "Secrets provide secure storage for sensitive information"
+  },
+  {
+    "id": "k8s-service-type-selection",
+    "category": "kubernetes",
+    "pattern": "type: ClusterIP",
+    "recommendation": "Choose appropriate service type: ClusterIP for internal, LoadBalancer for external access",
+    "example": "apiVersion: v1\nkind: Service\nmetadata:\n  name: myapp-service\nspec:\n  type: ClusterIP\n  selector:\n    app: myapp\n  ports:\n  - port: 80\n    targetPort: 8080",
+    "severity": "medium",
+    "tags": ["kubernetes", "networking", "services"],
+    "description": "Service type determines how your application is exposed"
+  },
+  {
+    "id": "k8s-network-policy",
+    "category": "kubernetes",
+    "pattern": "kind: NetworkPolicy",
+    "recommendation": "Implement NetworkPolicies to control pod-to-pod communication",
+    "example": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: deny-all\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\n  - Egress",
+    "severity": "medium",
+    "tags": ["kubernetes", "security", "network"],
+    "description": "Network policies provide micro-segmentation for pod communication"
+  },
+  {
+    "id": "k8s-ingress-tls",
+    "category": "kubernetes",
+    "pattern": "kind: Ingress",
+    "recommendation": "Configure TLS termination in Ingress for secure external access",
+    "example": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: myapp-ingress\nspec:\n  tls:\n  - hosts:\n    - myapp.example.com\n    secretName: myapp-tls\n  rules:\n  - host: myapp.example.com",
+    "severity": "high",
+    "tags": ["kubernetes", "ingress", "tls", "security"],
+    "description": "TLS termination ensures encrypted communication with external clients"
+  },
+  {
+    "id": "k8s-deployment-strategy",
+    "category": "kubernetes",
+    "pattern": "strategy:",
+    "recommendation": "Use RollingUpdate strategy with appropriate maxUnavailable and maxSurge settings",
+    "example": "strategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxUnavailable: 1\n    maxSurge: 1",
+    "severity": "medium",
+    "tags": ["kubernetes", "deployment", "strategy"],
+    "description": "Deployment strategy controls how updates are rolled out"
+  },
+  {
+    "id": "k8s-pod-anti-affinity",
+    "category": "kubernetes",
+    "pattern": "podAntiAffinity:",
+    "recommendation": "Use pod anti-affinity to spread replicas across different nodes for high availability",
+    "example": "affinity:\n  podAntiAffinity:\n    preferredDuringSchedulingIgnoredDuringExecution:\n    - weight: 100\n      podAffinityTerm:\n        labelSelector:\n          matchExpressions:\n          - key: app\n            operator: In\n            values:\n            - myapp\n        topologyKey: kubernetes.io/hostname",
+    "severity": "medium",
+    "tags": ["kubernetes", "affinity", "availability"],
+    "description": "Pod anti-affinity improves availability by spreading pods across nodes"
+  },
+  {
+    "id": "k8s-startup-probe",
+    "category": "kubernetes",
+    "pattern": "startupProbe:",
+    "recommendation": "Use startup probes for slow-starting containers to avoid premature restarts",
+    "example": "startupProbe:\n  httpGet:\n    path: /health\n    port: 8080\n  failureThreshold: 30\n  periodSeconds: 10",
+    "severity": "medium",
+    "tags": ["kubernetes", "probes", "startup"],
+    "description": "Startup probes handle slow-starting applications gracefully"
+  },
+  {
+    "id": "k8s-quality-of-service",
+    "category": "kubernetes",
+    "pattern": "resources:",
+    "recommendation": "Design for Guaranteed QoS by setting equal requests and limits",
+    "example": "resources:\n  requests:\n    memory: \"256Mi\"\n    cpu: \"200m\"\n  limits:\n    memory: \"256Mi\"\n    cpu: \"200m\"",
+    "severity": "medium",
+    "tags": ["kubernetes", "qos", "scheduling"],
+    "description": "Guaranteed QoS provides highest priority for critical workloads"
+  },
+  {
+    "id": "k8s-persistent-volume",
+    "category": "kubernetes", 
+    "pattern": "kind: PersistentVolumeClaim",
+    "recommendation": "Use appropriate storage class and access modes for persistent volumes",
+    "example": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: myapp-pvc\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: fast-ssd\n  resources:\n    requests:\n      storage: 10Gi",
+    "severity": "medium",
+    "tags": ["kubernetes", "storage", "persistence"],
+    "description": "Proper PVC configuration ensures data persistence and performance"
+  },
+  {
+    "id": "k8s-service-account",
+    "category": "kubernetes",
+    "pattern": "serviceAccountName:",
+    "recommendation": "Use dedicated service accounts with minimal RBAC permissions",
+    "example": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: myapp-sa\n---\nspec:\n  template:\n    spec:\n      serviceAccountName: myapp-sa",
+    "severity": "medium",
+    "tags": ["kubernetes", "rbac", "security"],
+    "description": "Dedicated service accounts follow principle of least privilege"
+  },
+  {
+    "id": "k8s-namespace-organization",
+    "category": "kubernetes",
+    "pattern": "namespace:",
+    "recommendation": "Organize applications into logical namespaces for isolation and resource management",
+    "example": "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: production\n  labels:\n    environment: production",
+    "severity": "low",
+    "tags": ["kubernetes", "namespaces", "organization"],
+    "description": "Namespaces provide logical separation and resource scoping"
+  },
+  {
+    "id": "k8s-resource-quotas",
+    "category": "kubernetes",
+    "pattern": "kind: ResourceQuota",
+    "recommendation": "Use ResourceQuotas to limit resource consumption per namespace",
+    "example": "apiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: compute-quota\nspec:\n  hard:\n    requests.cpu: \"4\"\n    requests.memory: 8Gi\n    limits.cpu: \"8\"\n    limits.memory: 16Gi",
+    "severity": "medium",
+    "tags": ["kubernetes", "quotas", "resource-management"],
+    "description": "Resource quotas prevent resource exhaustion and ensure fair sharing"
+  },
+  {
+    "id": "k8s-istio-service-mesh",
+    "category": "kubernetes",
+    "pattern": "kind: VirtualService|kind: DestinationRule",
+    "recommendation": "Implement Istio service mesh for advanced traffic management and security",
+    "example": "apiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: ${APP_NAME}\nspec:\n  http:\n  - match:\n    - headers:\n        canary:\n          exact: \"true\"\n    route:\n    - destination:\n        host: ${APP_NAME}\n        subset: canary\n  - route:\n    - destination:\n        host: ${APP_NAME}\n        subset: stable\n---\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: ${APP_NAME}\nspec:\n  host: ${APP_NAME}\n  subsets:\n  - name: stable\n    labels:\n      version: stable\n  - name: canary\n    labels:\n      version: canary",
+    "severity": "medium",
+    "tags": ["kubernetes", "istio", "service-mesh", "traffic-management"],
+    "description": "Istio provides advanced traffic routing, security, and observability"
+  },
+  {
+    "id": "k8s-linkerd-service-mesh",
+    "category": "kubernetes",
+    "pattern": "linkerd.io",
+    "recommendation": "Configure Linkerd for lightweight service mesh with automatic mTLS",
+    "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: ${APP_NAME}\n  annotations:\n    linkerd.io/inject: enabled\nspec:\n  template:\n    metadata:\n      annotations:\n        linkerd.io/inject: enabled\n        config.linkerd.io/proxy-cpu-request: \"100m\"\n        config.linkerd.io/proxy-memory-request: \"20Mi\"\n    spec:\n      containers:\n      - name: app\n        image: ${IMAGE}\n        ports:\n        - containerPort: 8080\n          name: http",
+    "severity": "medium",
+    "tags": ["kubernetes", "linkerd", "service-mesh", "mtls"],
+    "description": "Linkerd provides automatic mTLS and observability with minimal configuration"
+  },
+  {
+    "id": "k8s-network-policies-comprehensive",
+    "category": "kubernetes",
+    "pattern": "kind: NetworkPolicy",
+    "recommendation": "Implement comprehensive network policies for zero-trust security",
+    "example": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: ${APP_NAME}-netpol\nspec:\n  podSelector:\n    matchLabels:\n      app: ${APP_NAME}\n  policyTypes:\n  - Ingress\n  - Egress\n  ingress:\n  - from:\n    - namespaceSelector:\n        matchLabels:\n          name: ${ALLOWED_NAMESPACE}\n    - podSelector:\n        matchLabels:\n          role: frontend\n    ports:\n    - protocol: TCP\n      port: 8080\n  egress:\n  - to:\n    - namespaceSelector:\n        matchLabels:\n          name: database\n    ports:\n    - protocol: TCP\n      port: 5432\n  - to: []  # Allow DNS\n    ports:\n    - protocol: UDP\n      port: 53",
+    "severity": "high",
+    "tags": ["kubernetes", "network-policy", "security", "zero-trust"],
+    "description": "Comprehensive network policies implement zero-trust networking"
+  },
+  {
+    "id": "k8s-pod-security-standards",
+    "category": "kubernetes",
+    "pattern": "securityContext:",
+    "recommendation": "Implement Pod Security Standards for enhanced container security",
+    "example": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: ${POD_NAME}\n  labels:\n    pod-security.kubernetes.io/enforce: restricted\n    pod-security.kubernetes.io/audit: restricted\n    pod-security.kubernetes.io/warn: restricted\nspec:\n  securityContext:\n    runAsNonRoot: true\n    runAsUser: 1000\n    runAsGroup: 3000\n    fsGroup: 2000\n    seccompProfile:\n      type: RuntimeDefault\n  containers:\n  - name: app\n    securityContext:\n      allowPrivilegeEscalation: false\n      readOnlyRootFilesystem: true\n      runAsNonRoot: true\n      capabilities:\n        drop:\n        - ALL\n      seccompProfile:\n        type: RuntimeDefault",
+    "severity": "high",
+    "tags": ["kubernetes", "pod-security", "security", "hardening"],
+    "description": "Pod Security Standards enforce security best practices at the cluster level"
+  },
+  {
+    "id": "k8s-hpa-advanced-metrics",
+    "category": "kubernetes",
+    "pattern": "kind: HorizontalPodAutoscaler",
+    "recommendation": "Configure HPA with custom metrics and advanced scaling behavior",
+    "example": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: ${APP_NAME}-hpa\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: ${APP_NAME}\n  minReplicas: 2\n  maxReplicas: 100\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization: 70\n  - type: Resource\n    resource:\n      name: memory\n      target:\n        type: Utilization\n        averageUtilization: 80\n  - type: Pods\n    pods:\n      metric:\n        name: requests_per_second\n      target:\n        type: AverageValue\n        averageValue: \"100\"\n  behavior:\n    scaleDown:\n      stabilizationWindowSeconds: 300\n      policies:\n      - type: Percent\n        value: 10\n        periodSeconds: 60\n    scaleUp:\n      stabilizationWindowSeconds: 0\n      policies:\n      - type: Percent\n        value: 100\n        periodSeconds: 15",
+    "severity": "medium",
+    "tags": ["kubernetes", "hpa", "autoscaling", "custom-metrics"],
+    "description": "Advanced HPA configuration provides intelligent scaling with custom metrics"
+  },
+  {
+    "id": "k8s-vpa-optimization",
+    "category": "kubernetes",
+    "pattern": "kind: VerticalPodAutoscaler",
+    "recommendation": "Use Vertical Pod Autoscaler to optimize resource requests and limits",
+    "example": "apiVersion: autoscaling.k8s.io/v1\nkind: VerticalPodAutoscaler\nmetadata:\n  name: ${APP_NAME}-vpa\nspec:\n  targetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: ${APP_NAME}\n  updatePolicy:\n    updateMode: \"Auto\"\n  resourcePolicy:\n    containerPolicies:\n    - containerName: app\n      minAllowed:\n        cpu: 100m\n        memory: 128Mi\n      maxAllowed:\n        cpu: 2\n        memory: 4Gi\n      controlledResources:\n      - cpu\n      - memory\n      controlledValues: RequestsAndLimits",
+    "severity": "medium",
+    "tags": ["kubernetes", "vpa", "optimization", "resources"],
+    "description": "VPA automatically optimizes resource requests based on actual usage"
+  },
+  {
+    "id": "k8s-statefulset-patterns",
+    "category": "kubernetes",
+    "pattern": "kind: StatefulSet",
+    "recommendation": "Use StatefulSet for stateful applications with persistent storage and ordered deployment",
+    "example": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: ${APP_NAME}\nspec:\n  serviceName: ${APP_NAME}-headless\n  replicas: 3\n  selector:\n    matchLabels:\n      app: ${APP_NAME}\n  template:\n    metadata:\n      labels:\n        app: ${APP_NAME}\n    spec:\n      containers:\n      - name: app\n        image: ${IMAGE}\n        volumeMounts:\n        - name: data\n          mountPath: /data\n  volumeClaimTemplates:\n  - metadata:\n      name: data\n    spec:\n      accessModes: [\"ReadWriteOnce\"]\n      storageClassName: ${STORAGE_CLASS}\n      resources:\n        requests:\n          storage: 10Gi\n  podManagementPolicy: Parallel\n  updateStrategy:\n    type: RollingUpdate\n    rollingUpdate:\n      partition: 0",
+    "severity": "medium",
+    "tags": ["kubernetes", "statefulset", "stateful", "persistence"],
+    "description": "StatefulSet provides ordered deployment and persistent storage for stateful applications"
+  },
+  {
+    "id": "k8s-daemonset-monitoring",
+    "category": "kubernetes",
+    "pattern": "kind: DaemonSet",
+    "recommendation": "Use DaemonSet for node-level monitoring and logging agents",
+    "example": "apiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: node-exporter\nspec:\n  selector:\n    matchLabels:\n      app: node-exporter\n  template:\n    metadata:\n      labels:\n        app: node-exporter\n    spec:\n      hostNetwork: true\n      hostPID: true\n      tolerations:\n      - key: node-role.kubernetes.io/master\n        effect: NoSchedule\n      containers:\n      - name: node-exporter\n        image: prom/node-exporter:latest\n        args:\n        - --path.procfs=/host/proc\n        - --path.sysfs=/host/sys\n        - --collector.filesystem.ignored-mount-points\n        - '^/(dev|proc|sys|var/lib/docker/.+)($|/)'\n        volumeMounts:\n        - name: proc\n          mountPath: /host/proc\n          readOnly: true\n        - name: sys\n          mountPath: /host/sys\n          readOnly: true\n      volumes:\n      - name: proc\n        hostPath:\n          path: /proc\n      - name: sys\n        hostPath:\n          path: /sys",
+    "severity": "medium",
+    "tags": ["kubernetes", "daemonset", "monitoring", "node-level"],
+    "description": "DaemonSet ensures monitoring agents run on every node in the cluster"
+  },
+  {
+    "id": "k8s-cronjob-patterns",
+    "category": "kubernetes",
+    "pattern": "kind: CronJob",
+    "recommendation": "Use CronJob for scheduled tasks with proper resource limits and failure handling",
+    "example": "apiVersion: batch/v1\nkind: CronJob\nmetadata:\n  name: ${JOB_NAME}\nspec:\n  schedule: \"${CRON_SCHEDULE}\"\n  timeZone: \"${TIMEZONE}\"\n  jobTemplate:\n    spec:\n      ttlSecondsAfterFinished: 3600\n      backoffLimit: 3\n      activeDeadlineSeconds: 1800\n      template:\n        spec:\n          restartPolicy: OnFailure\n          containers:\n          - name: job\n            image: ${IMAGE}\n            env:\n            - name: JOB_TYPE\n              value: \"${JOB_TYPE}\"\n            resources:\n              requests:\n                memory: \"256Mi\"\n                cpu: \"100m\"\n              limits:\n                memory: \"512Mi\"\n                cpu: \"500m\"\n  successfulJobsHistoryLimit: 3\n  failedJobsHistoryLimit: 1\n  concurrencyPolicy: Forbid",
+    "severity": "medium",
+    "tags": ["kubernetes", "cronjob", "scheduled", "batch"],
+    "description": "CronJob provides reliable scheduled task execution with proper resource management"
+  },
+  {
+    "id": "k8s-argocd-gitops",
+    "category": "kubernetes",
+    "pattern": "argocd.argoproj.io",
+    "recommendation": "Implement GitOps with ArgoCD for automated and auditable deployments",
+    "example": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: ${APP_NAME}\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: ${GIT_REPO_URL}\n    targetRevision: ${GIT_BRANCH}\n    path: k8s/\n    helm:\n      valueFiles:\n      - values-${ENVIRONMENT}.yaml\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: ${NAMESPACE}\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n    - CreateNamespace=true\n    - PrunePropagationPolicy=foreground\n    retry:\n      limit: 5\n      backoff:\n        duration: 5s\n        factor: 2\n        maxDuration: 3m",
+    "severity": "medium",
+    "tags": ["kubernetes", "argocd", "gitops", "automation"],
+    "description": "ArgoCD enables GitOps workflows with automated deployments and drift detection"
+  },
+  {
+    "id": "k8s-flux-gitops",
+    "category": "kubernetes",
+    "pattern": "fluxcd.io",
+    "recommendation": "Use Flux for GitOps with Helm and Kustomize support",
+    "example": "apiVersion: source.toolkit.fluxcd.io/v1beta2\nkind: GitRepository\nmetadata:\n  name: ${APP_NAME}\nspec:\n  interval: 5m\n  url: ${GIT_REPO_URL}\n  ref:\n    branch: ${GIT_BRANCH}\n---\napiVersion: helm.toolkit.fluxcd.io/v2beta1\nkind: HelmRelease\nmetadata:\n  name: ${APP_NAME}\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: ./charts/${APP_NAME}\n      sourceRef:\n        kind: GitRepository\n        name: ${APP_NAME}\n  values:\n    image:\n      tag: ${IMAGE_TAG}\n    resources:\n      requests:\n        cpu: ${CPU_REQUEST}\n        memory: ${MEMORY_REQUEST}\n  upgrade:\n    remediation:\n      retries: 3",
+    "severity": "medium",
+    "tags": ["kubernetes", "flux", "gitops", "helm"],
+    "description": "Flux provides GitOps automation with native Helm and Kustomize integration"
+  },
+  {
+    "id": "k8s-admission-controllers",
+    "category": "kubernetes",
+    "pattern": "ValidatingAdmissionWebhook|MutatingAdmissionWebhook",
+    "recommendation": "Implement admission controllers for policy enforcement and security",
+    "example": "apiVersion: admissionregistration.k8s.io/v1\nkind: ValidatingAdmissionWebhook\nmetadata:\n  name: ${WEBHOOK_NAME}\nwebhooks:\n- name: validate.example.com\n  clientConfig:\n    service:\n      name: ${WEBHOOK_SERVICE}\n      namespace: ${WEBHOOK_NAMESPACE}\n      path: /validate\n  rules:\n  - operations: [\"CREATE\", \"UPDATE\"]\n    apiGroups: [\"apps\"]\n    apiVersions: [\"v1\"]\n    resources: [\"deployments\"]\n  admissionReviewVersions: [\"v1\", \"v1beta1\"]\n  sideEffects: None\n  failurePolicy: Fail\n  namespaceSelector:\n    matchLabels:\n      policy-enforcement: enabled",
+    "severity": "high",
+    "tags": ["kubernetes", "admission-controllers", "security", "policy"],
+    "description": "Admission controllers enforce security policies and compliance at the API level"
+  },
+  {
+    "id": "k8s-priority-classes",
+    "category": "kubernetes",
+    "pattern": "priorityClassName:",
+    "recommendation": "Use priority classes for critical workload scheduling",
+    "example": "apiVersion: scheduling.k8s.io/v1\nkind: PriorityClass\nmetadata:\n  name: high-priority\nvalue: 1000000\nglobalDefault: false\ndescription: \"Priority class for critical applications\"\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: ${APP_NAME}\nspec:\n  template:\n    spec:\n      priorityClassName: high-priority\n      containers:\n      - name: app\n        image: ${IMAGE}\n        resources:\n          requests:\n            memory: \"256Mi\"\n            cpu: \"100m\"\n          limits:\n            memory: \"512Mi\"\n            cpu: \"200m\"",
+    "severity": "medium",
+    "tags": ["kubernetes", "priority", "scheduling", "critical"],
+    "description": "Priority classes ensure critical workloads are scheduled before lower-priority ones"
+  }
+]

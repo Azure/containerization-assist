@@ -1,0 +1,19 @@
+# Git attributes for the project
+
+# Reduce merge conflicts for quality gates file
+# This file is frequently updated but timestamps are not critical
+quality-gates.json merge=ours
+
+# Ensure consistent line endings
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+
+# Mark binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary

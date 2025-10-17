@@ -1,0 +1,419 @@
+name: Test Pipeline
+
+on:
+  push:
+    branches: [ main, develop, 'feat/**', 'fix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # Single test job with all essential validations
+  test:
+    name: Tests & Quality Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Restore build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            dist
+            dist-cjs
+            .tsbuildinfo
+            node_modules/.cache
+          key: build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig*.json', 'package-lock.json') }}
+          restore-keys: |
+            build-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Type check
+        id: typecheck
+        run: npm run typecheck
+
+      - name: Validate examples compile
+        id: examples
+        run: node scripts/validate-examples.js
+
+      - name: Run lint and cache output
+        id: lint
+        run: npm run lint 2>&1 | tee eslint-output.txt || true
+
+      - name: Run tests with coverage
+        id: test
+        run: npm run test:coverage -- --passWithNoTests
+        env:
+          DOCKER_AVAILABLE: true
+
+      - name: Verify coverage generation
+        run: |
+          echo "Checking for coverage output..."
+          if [ -d "coverage" ]; then
+            echo "✅ Coverage directory exists"
+            ls -la coverage/
+            if [ -f "coverage/coverage-summary.json" ]; then
+              echo "✅ coverage-summary.json exists"
+              echo "Coverage summary preview:"
+              jq '.total' coverage/coverage-summary.json || echo "Failed to parse coverage-summary.json"
+            else
+              echo "⚠️ coverage-summary.json NOT found"
+              echo "Available files in coverage directory:"
+              find coverage -type f | head -20
+            fi
+          else
+            echo "❌ Coverage directory does NOT exist"
+            echo "This indicates Jest did not generate coverage output"
+            echo "Check if test:coverage script is running with --coverage flag"
+          fi
+
+      - name: Extract coverage metrics
+        id: coverage
+        continue-on-error: true
+        run: |
+          # Initialize variables
+          OVERALL="N/A"
+          BRANCHES="N/A"
+          COVERAGE_AVAILABLE="false"
+
+          # Debug: Check if coverage directory and file exist
+          echo "Checking for coverage files..."
+          ls -la coverage/ 2>/dev/null || echo "Coverage directory not found"
+
+          if [ -f "coverage/coverage-summary.json" ]; then
+            echo "Found coverage-summary.json, extracting metrics..."
+            OVERALL=$(jq -r '.total.statements.pct // "N/A"' coverage/coverage-summary.json 2>/dev/null || echo "N/A")
+            BRANCHES=$(jq -r '.total.branches.pct // "N/A"' coverage/coverage-summary.json 2>/dev/null || echo "N/A")
+            COVERAGE_AVAILABLE="true"
+            echo "Coverage metrics: overall=$OVERALL%, branches=$BRANCHES%"
+          else
+            echo "Coverage file not found, coverage will be marked as N/A"
+          fi
+
+          # Debug: Show what we're setting
+          echo "Setting outputs: overall_coverage=$OVERALL, branch_coverage=$BRANCHES, coverage_available=$COVERAGE_AVAILABLE"
+
+          echo "overall_coverage=$OVERALL" >> $GITHUB_OUTPUT
+          echo "branch_coverage=$BRANCHES" >> $GITHUB_OUTPUT
+          echo "coverage_available=$COVERAGE_AVAILABLE" >> $GITHUB_OUTPUT
+
+          echo "Outputs written to GITHUB_OUTPUT"
+
+      - name: Verify build artifacts
+        run: |
+          echo "Verifying ESM build artifacts..."
+          test -f dist/src/index.js || { echo "❌ ESM index.js missing"; exit 1; }
+          test -f dist/src/index.d.ts || { echo "❌ ESM index.d.ts missing"; exit 1; }
+          test -x dist/src/cli/cli.js || { echo "❌ CLI not executable"; exit 1; }
+
+          echo "Verifying CJS build artifacts..."
+          test -f dist-cjs/src/index.js || { echo "❌ CJS index.js missing"; exit 1; }
+          test -f dist-cjs/src/index.d.ts || { echo "❌ CJS index.d.ts missing"; exit 1; }
+
+          echo "Verifying ESM imports have .js extensions..."
+          if grep -r "from ['\"]\.\.\/[^'\"]*['\"]" dist/src --include="*.js" | grep -v "\.js['\"]"; then
+            echo "❌ Found ESM imports without .js extensions"
+            exit 1
+          fi
+
+          echo "✅ Build artifact verification passed"
+
+      - name: Run quality gates
+        id: quality
+        run: |
+          # Initialize default values
+          CURRENT_WARNINGS=0
+          BASELINE_WARNINGS=0
+          REDUCTION=0
+          PERCENTAGE="0"
+          UNUSED_EXPORTS=0
+          DEADCODE_BASELINE=0
+          DEADCODE_REDUCTION=0
+          GATES_PASSED=0
+          GATES_FAILED=0
+          GATES_WARNINGS=0
+          STATUS="⚠️ NEEDS ATTENTION"
+
+          # Run quality gates with JSON output
+          UPDATE_BASELINES=true npm run quality:gates -- --json > quality-gates-raw.txt 2>&1 || true
+
+          # Skip npm's header lines (first 3 lines) to get clean JSON
+          tail -n +4 quality-gates-raw.txt > quality-gates.json 2>/dev/null || echo "{}" > quality-gates.json
+
+          # Debug: show JSON file size and first few lines
+          echo "JSON file size: $(wc -c < quality-gates.json) bytes"
+          echo "First 5 lines of JSON:"
+          head -5 quality-gates.json
+
+          # Check if JSON is valid
+          if jq empty quality-gates.json 2>/dev/null; then
+            echo "JSON is valid, parsing with jq"
+            # Parse JSON output with jq and ensure we get values
+            CURRENT_WARNINGS=$(jq -r '.currentWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            BASELINE_WARNINGS=$(jq -r '.baselineWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            REDUCTION=$(jq -r '.warningReduction // 0' quality-gates.json 2>/dev/null || echo "0")
+            PERCENTAGE=$(jq -r '.warningPercentage // "0"' quality-gates.json 2>/dev/null || echo "0")
+            UNUSED_EXPORTS=$(jq -r '.unusedExports // 0' quality-gates.json 2>/dev/null || echo "0")
+            DEADCODE_BASELINE=$(jq -r '.deadcodeBaseline // 0' quality-gates.json 2>/dev/null || echo "0")
+            DEADCODE_REDUCTION=$(jq -r '.deadcodeReduction // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_PASSED=$(jq -r '.gatesPassed // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_FAILED=$(jq -r '.gatesFailed // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_WARNINGS=$(jq -r '.gatesWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            STATUS=$(jq -r '.overallStatus // "⚠️ NEEDS ATTENTION"' quality-gates.json 2>/dev/null || echo "⚠️ NEEDS ATTENTION")
+
+            echo "Parsed values: warnings=$CURRENT_WARNINGS, baseline=$BASELINE_WARNINGS, exports=$UNUSED_EXPORTS"
+          else
+            echo "JSON is invalid, falling back to text parsing"
+
+            # Use raw output for text parsing (already ran above)
+            cp quality-gates-raw.txt quality-gates.txt 2>/dev/null || true
+
+            # If raw output is empty, run again without JSON flag
+            if [ ! -s quality-gates.txt ]; then
+              echo "Running quality gates again for text output"
+              UPDATE_BASELINES=true npm run quality:gates > quality-gates.txt 2>&1 || true
+            fi
+
+            # Fallback to text parsing
+            CURRENT_WARNINGS=$(grep "^ESLint Warnings:" quality-gates.txt 2>/dev/null | sed 's/ESLint Warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+            UNUSED_EXPORTS=$(grep "^Unused Exports:" quality-gates.txt 2>/dev/null | sed 's/Unused Exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+            BASELINE_WARNINGS=${CURRENT_WARNINGS}
+            DEADCODE_BASELINE=${UNUSED_EXPORTS}
+
+            echo "Text parsing values: warnings=$CURRENT_WARNINGS, exports=$UNUSED_EXPORTS"
+          fi
+
+          # Ensure all values are numeric (validation)
+          CURRENT_WARNINGS=${CURRENT_WARNINGS:-0}
+          BASELINE_WARNINGS=${BASELINE_WARNINGS:-0}
+          REDUCTION=${REDUCTION:-0}
+          UNUSED_EXPORTS=${UNUSED_EXPORTS:-0}
+          DEADCODE_BASELINE=${DEADCODE_BASELINE:-0}
+          DEADCODE_REDUCTION=${DEADCODE_REDUCTION:-0}
+          GATES_PASSED=${GATES_PASSED:-0}
+          GATES_FAILED=${GATES_FAILED:-0}
+          GATES_WARNINGS=${GATES_WARNINGS:-0}
+
+          # Set outputs
+          echo "current_warnings=${CURRENT_WARNINGS}" >> $GITHUB_OUTPUT
+          echo "baseline_warnings=${BASELINE_WARNINGS}" >> $GITHUB_OUTPUT
+          echo "warning_reduction=${REDUCTION}" >> $GITHUB_OUTPUT
+          echo "warning_percentage=${PERCENTAGE}" >> $GITHUB_OUTPUT
+          echo "unused_exports=${UNUSED_EXPORTS}" >> $GITHUB_OUTPUT
+          echo "deadcode_baseline=${DEADCODE_BASELINE}" >> $GITHUB_OUTPUT
+          echo "deadcode_reduction=${DEADCODE_REDUCTION}" >> $GITHUB_OUTPUT
+          echo "gates_passed=${GATES_PASSED}" >> $GITHUB_OUTPUT
+          echo "gates_failed=${GATES_FAILED}" >> $GITHUB_OUTPUT
+          echo "gates_warnings=${GATES_WARNINGS}" >> $GITHUB_OUTPUT
+          echo "overall_status=${STATUS}" >> $GITHUB_OUTPUT
+
+          echo "Set outputs completed"
+
+          # Ensure text output exists for artifacts
+          if [ ! -s quality-gates.txt ] && [ -f quality-gates-raw.txt ]; then
+            cp quality-gates-raw.txt quality-gates.txt
+          elif [ ! -s quality-gates.txt ]; then
+            echo "No quality gates output available" > quality-gates.txt
+          fi
+
+      - name: Extract top warning types
+        id: warnings
+        run: |
+          # Use cached ESLint output from earlier step
+          if [ ! -s eslint-output.txt ]; then
+            TOP_WARNINGS="No ESLint warnings found"
+          else
+            # Extract unique warning rule IDs and count them
+            TOP_WARNINGS=$(grep -o "\[.*\]" eslint-output.txt 2>/dev/null | sort | uniq -c | sort -rn | head -n 5 | sed 's/^[[:space:]]*//' || echo "No warning details available")
+            if [ -z "$TOP_WARNINGS" ]; then
+              TOP_WARNINGS="No ESLint warnings found"
+            fi
+          fi
+          echo "top_warnings<<EOF" >> $GITHUB_OUTPUT
+          echo "$TOP_WARNINGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Extract failed gates
+        id: failed_gates
+        run: |
+          # Extract failed and warning gates from JSON
+          FAILED_GATES=$(jq -r '.failedGates // [] | join("\n")' quality-gates.json)
+          WARNING_GATES=$(jq -r '.warningGates // [] | join("\n")' quality-gates.json)
+
+          echo "failed_gates<<EOF" >> $GITHUB_OUTPUT
+          echo "$FAILED_GATES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "warning_gates<<EOF" >> $GITHUB_OUTPUT
+          echo "$WARNING_GATES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload build artifacts for reuse
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-${{ github.run_id }}
+          path: |
+            dist/
+            dist-cjs/
+          retention-days: 1
+
+      - name: Upload quality artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: quality-report-${{ github.run_id }}
+          path: |
+            quality-gates.json
+            quality-gates.txt
+            quality-gates-raw.txt
+            eslint-output.txt
+            coverage/
+          retention-days: 7
+
+      # Generate and post PR comment for pull requests only
+      - name: Generate PR quality comment
+        if: github.event_name == 'pull_request'
+        run: |
+          # Calculate total gates dynamically
+          GATES_PASSED="${{ steps.quality.outputs.gates_passed }}"
+          GATES_FAILED="${{ steps.quality.outputs.gates_failed }}"
+          GATES_WARNINGS="${{ steps.quality.outputs.gates_warnings }}"
+          TOTAL_GATES=$(( ${GATES_PASSED:-0} + ${GATES_FAILED:-0} + ${GATES_WARNINGS:-0} ))
+
+          cat > pr_comment.md << EOF
+          ## 🛡️ Code Quality Report
+
+          **Status:** ${{ steps.quality.outputs.overall_status }}
+
+          ### 📊 Quality Metrics Summary
+
+          | Metric | Current | Baseline | Progress |
+          |--------|---------|----------|-----------|
+          | **ESLint Warnings** | ${{ steps.quality.outputs.current_warnings }} | ${{ steps.quality.outputs.baseline_warnings }} | $(if [ "${{ steps.quality.outputs.warning_reduction }}" -gt 0 ]; then echo "✅ -${{ steps.quality.outputs.warning_reduction }} (-${{ steps.quality.outputs.warning_percentage }}%)"; else echo "➖ No change"; fi) |
+          | **Dead Code** | ${{ steps.quality.outputs.unused_exports }} | ${{ steps.quality.outputs.deadcode_baseline }} | $(if [ "${{ steps.quality.outputs.deadcode_reduction }}" -gt 0 ]; then echo "✅ -${{ steps.quality.outputs.deadcode_reduction }}"; else echo "➖ No change"; fi) |
+          | **Quality Gates** | ${{ steps.quality.outputs.gates_passed }}/${TOTAL_GATES} passed | - | $(if [ "${{ steps.quality.outputs.gates_failed }}" -eq 0 ]; then echo "✅ All passing"; else echo "❌ ${{ steps.quality.outputs.gates_failed }} failed"; fi) |
+
+          ### 🎯 Coverage Highlights
+          $(if [ "${{ steps.coverage.outputs.coverage_available }}" = "true" ]; then
+            echo "- **Overall Coverage:** ${{ steps.coverage.outputs.overall_coverage }}%"
+            echo "- **Branch Coverage:** ${{ steps.coverage.outputs.branch_coverage }}%"
+          else
+            echo "- **Coverage:** Data not available (coverage may not have been collected)"
+            echo "- *Note: Ensure \`coverage-summary.json\` is generated by Jest*"
+          fi)
+
+          $(if [ "${{ steps.quality.outputs.gates_failed }}" -gt 0 ] || [ "${{ steps.quality.outputs.gates_warnings }}" -gt 0 ]; then
+            echo "### ⚠️ Quality Gate Issues"
+            echo ""
+            if [ -n "${{ steps.failed_gates.outputs.failed_gates }}" ]; then
+              echo "**Failed Gates:**"
+              echo "\`\`\`"
+              echo "${{ steps.failed_gates.outputs.failed_gates }}"
+              echo "\`\`\`"
+              echo ""
+            fi
+            if [ -n "${{ steps.failed_gates.outputs.warning_gates }}" ]; then
+              echo "**Warnings:**"
+              echo "\`\`\`"
+              echo "${{ steps.failed_gates.outputs.warning_gates }}"
+              echo "\`\`\`"
+              echo ""
+            fi
+          fi)
+
+          ### 💡 Top Warning Categories
+          \`\`\`
+          ${{ steps.warnings.outputs.top_warnings }}
+          \`\`\`
+
+          ### 🚀 Next Steps
+          $(if [ "${{ steps.quality.outputs.gates_failed }}" -gt 0 ]; then
+            echo "- **Action Required:** Fix the failing quality gate(s) listed above"
+          fi)
+          $(if [ "${{ steps.quality.outputs.current_warnings }}" -gt 400 ]; then
+            echo "- Consider reducing ESLint warnings toward <400 target"
+          fi)
+          $(if [ "${{ steps.quality.outputs.unused_exports }}" -gt 200 ]; then
+            echo "- Consider cleaning up unused exports toward <200 target"
+          fi)
+          $(if [ "${{ steps.quality.outputs.gates_failed }}" -eq 0 ] && [ "${{ steps.quality.outputs.current_warnings }}" -le 400 ]; then
+            echo "🎉 Excellent work! This PR meets all quality standards."
+          fi)
+
+          ---
+          *Generated by Quality Report Bot • Run: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) • Commit: \`${{ github.sha }}\`*
+          EOF
+
+      - name: Find existing PR comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
+        id: find-comment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '## 🛡️ Code Quality Report'
+
+      - name: Create or update PR comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: pr_comment.md
+          edit-mode: replace
+
+  # Optional security scan (reuses build from test job)
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Dependency audit
+        run: npm audit --audit-level moderate || true
+
+      - name: CodeQL Analysis
+        uses: github/codeql-action/init@f443b600d91635bebf5b0d9ebc620189c0d6fba5 # v3
+        with:
+          languages: typescript
+          queries: security-and-quality
+          config-file: ./.github/workflows/codeql/codeql-config.yml
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@f443b600d91635bebf5b0d9ebc620189c0d6fba5 # v3

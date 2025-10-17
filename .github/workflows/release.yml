@@ -1,0 +1,260 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.0)'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Restore build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            dist
+            dist-cjs
+            .tsbuildinfo
+            node_modules/.cache
+          key: build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig*.json', 'package-lock.json') }}
+          restore-keys: |
+            build-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION"
+
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ steps.version.outputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "Invalid version format: ${{ steps.version.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Run full validation
+        run: npm run validate
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build artifacts
+        run: |
+          echo "Verifying ESM build artifacts..."
+          test -f dist/src/index.js || { echo "❌ ESM index.js missing"; exit 1; }
+          test -f dist/src/index.d.ts || { echo "❌ ESM index.d.ts missing"; exit 1; }
+          test -x dist/src/cli/cli.js || { echo "❌ CLI not executable"; exit 1; }
+
+          echo "Verifying CJS build artifacts..."
+          test -f dist-cjs/src/index.js || { echo "❌ CJS index.js missing"; exit 1; }
+          test -f dist-cjs/src/index.d.ts || { echo "❌ CJS index.d.ts missing"; exit 1; }
+
+          echo "Verifying ESM imports have .js extensions..."
+          if grep -r "from ['\"]\.\.\/[^'\"]*['\"]" dist/src --include="*.js" | grep -v "\.js['\"]"; then
+            echo "❌ Found ESM imports without .js extensions"
+            exit 1
+          fi
+
+          echo "✅ Build artifact verification passed"
+
+      - name: Test CLI functionality
+        run: |
+          node dist/src/cli/cli.js --version
+          node dist/src/cli/cli.js --help
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            dist-cjs/
+            package.json
+            package-lock.json
+          retention-days: 1
+
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: validate-release
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
+        with:
+          name: build-artifacts
+          path: .
+
+      - name: Update package version
+        if: github.event_name == 'workflow_dispatch'
+        run: npm version ${{ needs.validate-release.outputs.version }} --no-git-tag-version
+
+      - name: Publish to NPM
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, publish-npm]
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
+        with:
+          name: build-artifacts
+          path: .
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | head -2 | tail -1)
+
+          if [ -z "$PREV_TAG" ]; then
+            CHANGELOG="Initial release of TypeScript MCP server for containerization workflows."
+          else
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG="Minor updates and improvements."
+            fi
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-release.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            NODE_VERSION=20
+          labels: |
+            org.opencontainers.image.version=${{ needs.validate-release.outputs.version }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.validate-release.outputs.version) || github.ref_name }}
+          name: Release ${{ needs.validate-release.outputs.version }}
+          body: |
+            ## Changes
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ## Installation
+            
+            ```bash
+            npm install -g containerization-assist-mcp@${{ needs.validate-release.outputs.version }}
+            ```
+            
+            ## Usage
+            
+            ```bash
+            containerization-assist-mcp --help
+            # or
+            ca-mcp --help
+            ```
+            
+            ## Docker Image
+            
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-release.outputs.version }}
+            ```
+          draft: false
+          prerelease: ${{ contains(needs.validate-release.outputs.version, '-') }}
+
+      - name: Create release tarball
+        run: |
+          tar -czf containerization-assist-mcp-${{ needs.validate-release.outputs.version }}.tar.gz \
+            dist/ \
+            package.json \
+            package-lock.json \
+            README.md \
+            LICENSE
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: ./containerization-assist-mcp-${{ needs.validate-release.outputs.version }}.tar.gz

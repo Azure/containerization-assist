@@ -1,0 +1,440 @@
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { z } from 'zod';
+import type { Tool } from '@/types/tool';
+import { registerToolsWithServer, objectToMarkdownRecursive, formatOutput, OUTPUTFORMAT } from '@/mcp/mcp-server';
+import { Success, Failure } from '@/types';
+import type { Logger } from 'pino';
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
+
+function createTool(name: string): Tool<ReturnType<typeof z.object>, unknown> {
+  return {
+    name,
+    description: `${name} tool`,
+    schema: z.object({ foo: z.string() }),
+    run: jest.fn(),
+  };
+}
+
+function createLoggerStub(): Logger {
+  return {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  } as unknown as Logger;
+}
+
+let executeMock: jest.Mock;
+let serverToolMock: jest.Mock;
+let logger: Logger;
+
+beforeEach(() => {
+  executeMock = jest.fn();
+  serverToolMock = jest.fn();
+  logger = createLoggerStub();
+});
+
+describe('registerToolsWithServer', () => {
+  it('sanitizes params and forwards execution to orchestrator', async () => {
+    const tool = createTool('exec-demo');
+    executeMock.mockResolvedValue(Success({ ok: true }));
+
+    const fakeServer = {
+      tool: serverToolMock,
+    } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+    registerToolsWithServer({
+      server: fakeServer,
+      tools: [tool],
+      logger,
+      transport: 'stdio',
+      execute: executeMock,
+      outputFormat: OUTPUTFORMAT.MARKDOWN,
+    });
+
+    expect(serverToolMock).toHaveBeenCalledTimes(1);
+    const handler = serverToolMock.mock.calls[0][3] as any;
+
+    const params = {
+      foo: 'value',
+      _meta: { progressToken: 'tok' },
+    } as Record<string, unknown>;
+
+    const extra = {
+      sendNotification: jest.fn(),
+      _meta: { progressToken: 'tok' },
+      signal: new AbortController().signal,
+      requestId: '123',
+    };
+
+    await handler(params, extra);
+
+    expect(executeMock).toHaveBeenCalledWith({
+      toolName: tool.name,
+      params: { foo: 'value' },
+      metadata: expect.objectContaining({
+        progress: expect.objectContaining({ _meta: expect.objectContaining({ progressToken: 'tok' }) }),
+        loggerContext: expect.objectContaining({ transport: 'stdio' }),
+      }),
+    });
+  });
+
+  it('wraps orchestrator failures in McpError', async () => {
+    const tool = createTool('error-demo');
+    (executeMock as any).mockResolvedValue(Failure('orchestrator boom'));
+
+    const fakeServer = {
+      tool: serverToolMock,
+    } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+    registerToolsWithServer({
+      server: fakeServer,
+      tools: [tool],
+      logger,
+      transport: 'stdio',
+      execute: executeMock,
+      outputFormat: OUTPUTFORMAT.MARKDOWN,
+    });
+
+    const handler = serverToolMock.mock.calls[0][3] as any;
+
+    const extra = {
+      sendNotification: jest.fn(),
+      signal: new AbortController().signal,
+      requestId: '456',
+    };
+
+    await expect(handler({ foo: 'value' }, extra)).rejects.toBeInstanceOf(McpError);
+    expect(executeMock).toHaveBeenCalled();
+  });
+
+  it('formats output according to specified outputFormat', async () => {
+    const tool = createTool('format-demo');
+    const mockResult = { name: 'test', version: '1.0' };
+    (executeMock as any).mockResolvedValue(Success(mockResult));
+
+    const fakeServer = {
+      tool: serverToolMock,
+    } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+    registerToolsWithServer({
+      server: fakeServer,
+      tools: [tool],
+      logger,
+      transport: 'stdio',
+      execute: executeMock,
+      outputFormat: OUTPUTFORMAT.JSON,
+    });
+
+    const handler = serverToolMock.mock.calls[0][3] as any;
+
+    const extra = {
+      sendNotification: jest.fn(),
+      signal: new AbortController().signal,
+      requestId: '789',
+    };
+
+    const result = await handler({ foo: 'value' }, extra);
+
+    expect(result.content[0].text).toBe('{\n  "name": "test",\n  "version": "1.0"\n}');
+  });
+});
+
+describe('objectToMarkdownRecursive', () => {
+  it('converts simple objects with only primitive values to Key: Value format', () => {
+    const input = {
+      name: 'test',
+      version: '1.0.0',
+      port: 8080,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `**name**: test
+**version**: 1.0.0
+**port**: 8080
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('handles simple objects with null and undefined values', () => {
+    const input = {
+      nullValue: null,
+      undefinedValue: undefined,
+      name: 'test',
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `**nullValue**: null
+**undefinedValue**: undefined
+**name**: test
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('converts simple arrays to markdown lists', () => {
+    const input = {
+      items: ['apple', 'banana', 'cherry'],
+      numbers: [1, 2, 3],
+      flags: [true, false, true],
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `# Items
+
+- apple
+- banana
+- cherry
+
+# Numbers
+
+- 1
+- 2
+- 3
+
+# Flags
+
+- true
+- false
+- true
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('uses headings for complex objects (non-simple values)', () => {
+    const input = {
+      name: 'test',
+      config: {
+        timeout: 30,
+      },
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `# Name
+
+test
+
+# Config
+
+**timeout**: 30
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('handles nested objects with increasing heading levels', () => {
+    const input = {
+      config: {
+        database: {
+          host: 'localhost',
+          port: 5432,
+        },
+        cache: {
+          enabled: true,
+        },
+      },
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `# Config
+
+## Database
+
+**host**: localhost
+**port**: 5432
+
+## Cache
+
+**enabled**: true
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('handles arrays with object elements (complex arrays)', () => {
+    const input = {
+      users: [
+        { name: 'Alice', age: 30 },
+        { name: 'Bob', age: 25 },
+      ],
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `# Users
+
+## 1
+
+**name**: Alice
+**age**: 30
+
+## 2
+
+**name**: Bob
+**age**: 25
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('handles arrays with mixed primitive and object elements', () => {
+    const input = {
+      mixedArray: ['string', 42, { nested: 'object' }],
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `# MixedArray
+
+1. string
+
+2. 42
+
+## 3
+
+**nested**: object
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('uses custom heading level', () => {
+    const input = {
+      title: 'Custom Level',
+    };
+
+    const result = objectToMarkdownRecursive(input, 4);
+
+    const expected = `**title**: Custom Level
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('handles empty objects', () => {
+    const input = {};
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe('\n');
+  });
+
+  it('handles complex mixed data structures', () => {
+    const input = {
+      metadata: {
+        version: '2.0',
+        tags: ['prod', 'api'],
+        config: {
+          timeout: 30,
+          retries: null,
+        },
+      },
+      enabled: false,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `# Metadata
+
+## Version
+
+2.0
+
+## Tags
+
+- prod
+- api
+
+## Config
+
+**timeout**: 30
+**retries**: null
+
+# Enabled
+
+false
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('formats simple object at root level correctly', () => {
+    const input = {
+      status: 'active',
+      count: 5,
+      readonly: true,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    const expected = `**status**: active
+**count**: 5
+**readonly**: true
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('formats empty arrays as empty sections', () => {
+    const input = {
+      emptyArray: [],
+      name: 'test',
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`# EmptyArray
+
+
+# Name
+
+test
+
+`);
+  });
+});
+
+describe('formatOutput', () => {
+  it('formats as JSON when format is JSON', () => {
+    const input = { name: 'test', version: 1 };
+
+    const result = formatOutput(input, OUTPUTFORMAT.JSON);
+
+    expect(result).toBe(JSON.stringify(input, null, 2));
+  });
+
+  it('formats simple objects as Key: Value when format is MARKDOWN', () => {
+    const input = { name: 'test', enabled: true };
+
+    const result = formatOutput(input, OUTPUTFORMAT.MARKDOWN);
+
+    const expected = `**name**: test
+**enabled**: true
+
+`;
+    expect(result).toBe(expected);
+  });
+
+  it('formats primitive values as string when format is MARKDOWN', () => {
+    expect(formatOutput('hello', OUTPUTFORMAT.MARKDOWN)).toBe('hello');
+    expect(formatOutput(42, OUTPUTFORMAT.MARKDOWN)).toBe('42');
+    expect(formatOutput(true, OUTPUTFORMAT.MARKDOWN)).toBe('true');
+    expect(formatOutput(null, OUTPUTFORMAT.MARKDOWN)).toBe('null');
+  });
+
+  it('handles invalid format by defaulting to string', () => {
+    const input = { test: 'value' };
+
+    const result = formatOutput(input, 'invalid' as any);
+
+    expect(result).toBe('[object Object]');
+  });
+});

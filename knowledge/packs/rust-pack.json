@@ -1,0 +1,162 @@
+[
+  {
+    "id": "rust-multi-stage-build",
+    "category": "dockerfile",
+    "pattern": "cargo build",
+    "recommendation": "Use multi-stage builds for Rust to create minimal runtime images",
+    "example": "FROM rust:1.75 AS builder\nWORKDIR /app\nCOPY . .\nRUN cargo build --release\n\nFROM debian:bookworm-slim\nCOPY --from=builder /app/target/release/myapp /usr/local/bin/myapp",
+    "severity": "high",
+    "tags": ["rust", "multistage", "optimization", "size"],
+    "description": "Multi-stage builds can reduce Rust image size from ~2GB to ~100MB"
+  },
+  {
+    "id": "rust-cargo-cache",
+    "category": "dockerfile",
+    "pattern": "COPY Cargo\\.toml",
+    "recommendation": "Cache Cargo dependencies by copying manifest files first",
+    "example": "COPY Cargo.toml Cargo.lock ./\nRUN mkdir src && echo 'fn main() {}' > src/main.rs\nRUN cargo build --release\nRUN rm -rf src\nCOPY src ./src\nRUN touch src/main.rs && cargo build --release",
+    "severity": "high",
+    "tags": ["rust", "cargo", "caching", "optimization"],
+    "description": "Dependency caching significantly improves Rust build times"
+  },
+  {
+    "id": "rust-musl-static",
+    "category": "dockerfile",
+    "pattern": "cargo build.*release",
+    "recommendation": "Build static binaries with musl for scratch/distroless images",
+    "example": "FROM rust:1.75-alpine AS builder\nRUN apk add --no-cache musl-dev\nRUN rustup target add x86_64-unknown-linux-musl\nRUN cargo build --release --target x86_64-unknown-linux-musl\n\nFROM scratch\nCOPY --from=builder /app/target/x86_64-unknown-linux-musl/release/myapp /myapp",
+    "severity": "medium",
+    "tags": ["rust", "musl", "static", "scratch"],
+    "description": "Static musl binaries enable ultra-minimal container images"
+  },
+  {
+    "id": "rust-cargo-chef",
+    "category": "dockerfile",
+    "pattern": "FROM.*rust",
+    "recommendation": "Use cargo-chef for optimal dependency caching in Docker",
+    "example": "FROM lukemathwalker/cargo-chef AS planner\nCOPY . .\nRUN cargo chef prepare\n\nFROM lukemathwalker/cargo-chef AS builder\nCOPY --from=planner /app/recipe.json .\nRUN cargo chef cook --release\nCOPY . .\nRUN cargo build --release",
+    "severity": "medium",
+    "tags": ["rust", "cargo-chef", "caching", "optimization"],
+    "description": "cargo-chef provides superior caching for Rust Docker builds"
+  },
+  {
+    "id": "rust-strip-symbols",
+    "category": "dockerfile",
+    "pattern": "cargo build --release",
+    "recommendation": "Strip debug symbols to reduce binary size",
+    "example": "RUN cargo build --release\nRUN strip target/release/myapp",
+    "severity": "low",
+    "tags": ["rust", "strip", "size", "optimization"],
+    "description": "Stripping symbols can reduce binary size by 30-50%"
+  },
+  {
+    "id": "rust-release-profile",
+    "category": "dockerfile",
+    "pattern": "\\[profile\\.release\\]",
+    "recommendation": "Optimize release profile in Cargo.toml for containers",
+    "example": "[profile.release]\nopt-level = 'z'  # Optimize for size\nlto = true       # Link-time optimization\ncodegen-units = 1  # Single codegen unit\nstrip = true     # Strip symbols",
+    "severity": "medium",
+    "tags": ["rust", "profile", "optimization", "size"],
+    "description": "Release profile optimization reduces binary size and improves performance"
+  },
+  {
+    "id": "rust-distroless-base",
+    "category": "dockerfile",
+    "pattern": "FROM debian:",
+    "recommendation": "Use distroless images for Rust runtime",
+    "example": "FROM gcr.io/distroless/cc-debian12\nCOPY --from=builder /app/target/release/myapp /usr/local/bin/myapp\nENTRYPOINT [\"myapp\"]",
+    "severity": "medium",
+    "tags": ["rust", "distroless", "security", "minimal"],
+    "description": "Distroless images provide minimal runtime without shell or package manager"
+  },
+  {
+    "id": "rust-workspace-cache",
+    "category": "dockerfile",
+    "pattern": "\\[workspace\\]",
+    "recommendation": "Handle Cargo workspaces efficiently for better caching",
+    "example": "COPY Cargo.toml Cargo.lock ./\nCOPY member1/Cargo.toml ./member1/\nCOPY member2/Cargo.toml ./member2/\nRUN cargo build --release\nCOPY . .\nRUN cargo build --release",
+    "severity": "medium",
+    "tags": ["rust", "workspace", "caching", "monorepo"],
+    "description": "Proper workspace handling improves build cache efficiency"
+  },
+  {
+    "id": "rust-cross-compilation",
+    "category": "dockerfile",
+    "pattern": "cargo build",
+    "recommendation": "Use cross-compilation for consistent Linux builds",
+    "example": "RUN rustup target add x86_64-unknown-linux-gnu\nRUN cargo build --release --target x86_64-unknown-linux-gnu",
+    "severity": "low",
+    "tags": ["rust", "cross-compile", "platform", "consistency"],
+    "description": "Cross-compilation ensures consistent builds across platforms"
+  },
+  {
+    "id": "rust-health-check",
+    "category": "dockerfile",
+    "pattern": "EXPOSE",
+    "recommendation": "Add health check endpoint for Rust web services",
+    "example": "HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:8080/health || exit 1",
+    "severity": "medium",
+    "tags": ["rust", "health", "monitoring", "web"],
+    "description": "Health checks enable better container orchestration"
+  },
+  {
+    "id": "rust-tokio-runtime",
+    "category": "dockerfile",
+    "pattern": "tokio",
+    "recommendation": "Configure Tokio runtime for container environments",
+    "example": "ENV TOKIO_WORKER_THREADS=4\nENV RUST_LOG=info",
+    "severity": "low",
+    "tags": ["rust", "tokio", "async", "runtime"],
+    "description": "Tokio runtime configuration optimizes async performance"
+  },
+  {
+    "id": "rust-security-user",
+    "category": "security",
+    "pattern": "FROM.*rust",
+    "recommendation": "Create non-root user for Rust applications",
+    "example": "RUN useradd -m -u 1001 -s /bin/bash rust\nUSER rust\nWORKDIR /home/rust",
+    "severity": "high",
+    "tags": ["rust", "security", "user", "non-root"],
+    "description": "Running as non-root reduces security attack surface"
+  },
+  {
+    "id": "rust-panic-abort",
+    "category": "dockerfile",
+    "pattern": "panic.*unwind",
+    "recommendation": "Use panic=abort for smaller binaries in production",
+    "example": "[profile.release]\npanic = 'abort'",
+    "severity": "low",
+    "tags": ["rust", "panic", "size", "production"],
+    "description": "panic=abort reduces binary size and removes unwinding code"
+  },
+  {
+    "id": "rust-actix-config",
+    "category": "dockerfile",
+    "pattern": "actix",
+    "recommendation": "Configure Actix Web for production containers",
+    "example": "ENV ACTIX_WORKERS=4\nENV RUST_LOG=actix_web=info",
+    "severity": "low",
+    "tags": ["rust", "actix", "web", "configuration"],
+    "description": "Proper Actix configuration optimizes web server performance"
+  },
+  {
+    "id": "rust-diesel-migrations",
+    "category": "dockerfile",
+    "pattern": "diesel",
+    "recommendation": "Handle Diesel migrations in containers properly",
+    "example": "RUN cargo install diesel_cli --no-default-features --features postgres\n# In entrypoint: diesel migration run",
+    "severity": "medium",
+    "tags": ["rust", "diesel", "database", "migrations"],
+    "description": "Proper migration handling prevents database inconsistencies"
+  },
+  {
+    "id": "rust-minimal-glibc",
+    "category": "dockerfile",
+    "pattern": "FROM ubuntu:",
+    "recommendation": "Use minimal glibc-based images for dynamic linking",
+    "example": "FROM ubuntu:22.04 AS runtime\nRUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*",
+    "severity": "medium",
+    "tags": ["rust", "glibc", "dynamic", "minimal"],
+    "description": "Minimal runtime images reduce attack surface"
+  }
+]

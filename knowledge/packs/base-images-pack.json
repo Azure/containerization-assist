@@ -1,0 +1,102 @@
+[
+  {
+    "id": "java-microsoft-azure-linux",
+    "category": "dockerfile",
+    "pattern": "java|openjdk|jdk|jre",
+    "recommendation": "Use Microsoft Azure Linux (Mariner) for enterprise Java applications",
+    "example": "# Build stage\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\n# Runtime stage\nFROM mcr.microsoft.com/openjdk/jdk:17-distroless AS runtime",
+    "severity": "high",
+    "tags": ["java", "microsoft", "azure", "enterprise", "security"],
+    "description": "Microsoft Azure Linux provides enterprise-grade security with reduced attack surface"
+  },
+  {
+    "id": "java-official-temurin",
+    "category": "dockerfile",
+    "pattern": "java|openjdk|jdk|jre",
+    "recommendation": "Eclipse Temurin as alternative for Java applications",
+    "example": "# Use specific major version tags, not patch versions\nFROM eclipse-temurin:17-jre-alpine\n# Or for build stage:\nFROM eclipse-temurin:21-jdk AS builder",
+    "severity": "medium",
+    "tags": ["java", "temurin", "official"],
+    "description": "Eclipse Temurin is the official OpenJDK distribution. Use major version tags (17, 21) not patch versions (17.0.8)"
+  },
+  {
+    "id": "dotnet-microsoft-azure-linux",
+    "category": "dockerfile",
+    "pattern": "dotnet|csharp|aspnet|netcore",
+    "recommendation": "Use Microsoft Azure Linux for .NET applications",
+    "example": "FROM mcr.microsoft.com/dotnet/sdk:8.0-azurelinux AS build\nFROM mcr.microsoft.com/dotnet/aspnet:8.0-azurelinux AS runtime",
+    "severity": "high",
+    "tags": ["dotnet", "microsoft", "azure", "enterprise"],
+    "description": "Azure Linux optimized for .NET workloads with Microsoft support"
+  },
+  {
+    "id": "node-microsoft-mariner",
+    "category": "dockerfile",
+    "pattern": "node|nodejs|javascript|typescript",
+    "recommendation": "Use Microsoft CBL-Mariner for Node.js in enterprise environments",
+    "example": "FROM mcr.microsoft.com/cbl-mariner/base/nodejs:18 AS builder\n# Install additional tools if needed\nRUN tdnf install -y tar",
+    "severity": "medium",
+    "tags": ["node", "microsoft", "mariner", "enterprise"],
+    "description": "CBL-Mariner provides a secure base for Node.js applications"
+  },
+  {
+    "id": "python-microsoft-azure",
+    "category": "dockerfile",
+    "pattern": "python|pip|django|flask",
+    "recommendation": "Use Microsoft Azure Linux for Python applications",
+    "example": "FROM mcr.microsoft.com/cbl-mariner/base/python:3.11",
+    "severity": "medium",
+    "tags": ["python", "microsoft", "azure"],
+    "description": "Azure Linux with Python runtime for enterprise deployments"
+  },
+  {
+    "id": "distroless-security",
+    "category": "dockerfile",
+    "pattern": "runtime|production|secure",
+    "recommendation": "Consider Google Distroless images for production runtime",
+    "example": "# Java\nFROM gcr.io/distroless/java17-debian12:nonroot\n# Node.js\nFROM gcr.io/distroless/nodejs18-debian12\n# Python\nFROM gcr.io/distroless/python3",
+    "severity": "high",
+    "tags": ["distroless", "security", "production", "minimal"],
+    "description": "Distroless images contain only runtime dependencies, no package managers or shells"
+  },
+  {
+    "id": "maven-wrapper-setup",
+    "category": "dockerfile",
+    "pattern": "maven|mvn|pom.xml",
+    "recommendation": "Use Maven wrapper for reproducible builds",
+    "example": "# Install tar if needed (Azure Linux/Mariner)\nRUN tdnf install -y tar || yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# Copy wrapper files first\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\n\n# Make wrapper executable and download dependencies\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# Then copy source\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B",
+    "severity": "high",
+    "tags": ["maven", "wrapper", "build", "reproducible"],
+    "description": "Maven wrapper ensures consistent Maven version and offline dependency resolution"
+  },
+  {
+    "id": "gradle-wrapper-setup",
+    "category": "dockerfile",
+    "pattern": "gradle|gradlew|build.gradle",
+    "recommendation": "Use Gradle wrapper for consistent builds",
+    "example": "# Install tar if needed\nRUN tdnf install -y tar || yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# Copy wrapper files\nCOPY gradlew build.gradle settings.gradle ./\nCOPY gradle gradle\n\n# Download dependencies\nRUN chmod +x gradlew && ./gradlew dependencies --no-daemon\n\n# Copy source and build\nCOPY src ./src\nRUN ./gradlew build --no-daemon",
+    "severity": "high",
+    "tags": ["gradle", "wrapper", "build", "reproducible"],
+    "description": "Gradle wrapper provides version consistency and offline builds"
+  },
+  {
+    "id": "package-manager-compatibility",
+    "category": "dockerfile",
+    "pattern": "RUN.*install",
+    "recommendation": "Use correct package manager for base image",
+    "example": "# Azure Linux/Mariner: tdnf\nRUN tdnf install -y tar curl\n\n# Alpine: apk\nRUN apk add --no-cache tar curl\n\n# Debian/Ubuntu: apt\nRUN apt-get update && apt-get install -y tar curl\n\n# RHEL/CentOS: yum/dnf\nRUN yum install -y tar curl",
+    "severity": "high",
+    "tags": ["package-manager", "compatibility"],
+    "description": "Different base images use different package managers - use the correct one"
+  },
+  {
+    "id": "base-image-preference-order",
+    "category": "dockerfile",
+    "pattern": "FROM",
+    "recommendation": "Follow enterprise preference order for base images",
+    "example": "# Preference order:\n# 1. Microsoft Azure Linux/Mariner (enterprise)\n# 2. Distroless (security-focused)\n# 3. Official language images (general purpose)\n# 4. Alpine (size-optimized)\n# 5. Ubuntu/Debian (compatibility)",
+    "severity": "medium",
+    "tags": ["base-image", "selection", "enterprise"],
+    "description": "Choose base images based on organizational requirements and security posture"
+  }
+]

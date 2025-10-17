@@ -1,0 +1,282 @@
+[
+  {
+    "id": "blazor-server-signalr-configuration",
+    "category": "dockerfile",
+    "pattern": "Blazor.*Server|AddServerSideBlazor",
+    "recommendation": "Configure SignalR properly for Blazor Server applications in containers",
+    "example": "FROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY . .\nEXPOSE 80\n# Configure SignalR for load balancing\nENV ASPNETCORE_URLS=http://+:80",
+    "severity": "high",
+    "tags": ["blazor", "server", "signalr", "websockets"],
+    "description": "Blazor Server requires proper SignalR configuration for container deployments"
+  },
+  {
+    "id": "blazor-wasm-static-files",
+    "category": "dockerfile",
+    "pattern": "Blazor.*WebAssembly|BlazorWebAssembly",
+    "recommendation": "Optimize static file serving for Blazor WebAssembly applications",
+    "example": "FROM nginx:alpine\nCOPY wwwroot /usr/share/nginx/html\nCOPY nginx.conf /etc/nginx/nginx.conf\nEXPOSE 80\n# Configure MIME types for .wasm, .dll files",
+    "severity": "high",
+    "tags": ["blazor", "webassembly", "static-files", "nginx"],
+    "description": "Blazor WASM requires proper static file serving with correct MIME types"
+  },
+  {
+    "id": "blazor-wasm-compression",
+    "category": "dockerfile",
+    "pattern": "blazor.*wasm|_framework",
+    "recommendation": "Enable compression for Blazor WebAssembly assets to reduce download size",
+    "example": "# nginx.conf for Blazor WASM\nhttp {\n  gzip on;\n  gzip_types\n    application/wasm\n    application/octet-stream\n    text/css\n    application/javascript;\n  \n  location ~ \\.(wasm|dll)$ {\n    add_header Cache-Control \"public, max-age=31536000, immutable\";\n  }\n}",
+    "severity": "medium",
+    "tags": ["blazor", "webassembly", "compression", "performance"],
+    "description": "Blazor WASM benefits significantly from compression and caching of framework files"
+  },
+  {
+    "id": "blazor-server-circuit-management",
+    "category": "dockerfile",
+    "pattern": "AddServerSideBlazor|Circuit",
+    "recommendation": "Configure circuit options for Blazor Server scalability in containers",
+    "example": "// In Startup.cs or Program.cs\nservices.AddServerSideBlazor(options =>\n{\n    options.DetailedErrors = false; // Production\n    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);\n    options.DisconnectedCircuitMaxRetained = 100;\n    options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);\n});",
+    "severity": "medium",
+    "tags": ["blazor", "server", "circuits", "scalability"],
+    "description": "Circuit management should be optimized for container resource constraints"
+  },
+  {
+    "id": "blazor-pwa-manifest",
+    "category": "dockerfile",
+    "pattern": "manifest\\.json|service-worker",
+    "recommendation": "Include PWA manifest and service worker for Blazor Progressive Web Apps",
+    "example": "FROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY . .\n# Ensure PWA files are included\nCOPY wwwroot/manifest.json wwwroot/\nCOPY wwwroot/service-worker.js wwwroot/\nEXPOSE 80 443",
+    "severity": "low",
+    "tags": ["blazor", "pwa", "manifest", "service-worker"],
+    "description": "PWA features require proper inclusion of manifest and service worker files"
+  },
+  {
+    "id": "blazor-server-sticky-sessions",
+    "category": "dockerfile",
+    "pattern": "Blazor.*Server|SignalR",
+    "recommendation": "Configure sticky sessions or Redis backplane for Blazor Server load balancing",
+    "example": "// For Redis SignalR backplane\nservices.AddSignalR().AddRedis(connectionString);\n// Or use sticky sessions in load balancer\n# Docker Compose example:\n# deploy:\n#   labels:\n#     - \"traefik.http.services.blazor.loadbalancer.sticky.cookie=true\"",
+    "severity": "high",
+    "tags": ["blazor", "server", "load-balancing", "sticky-sessions", "redis"],
+    "description": "Blazor Server requires sticky sessions or shared state for multi-container deployments"
+  },
+  {
+    "id": "blazor-hybrid-file-access",
+    "category": "dockerfile",
+    "pattern": "Blazor.*Hybrid|MauiBlazor",
+    "recommendation": "Configure file access permissions for Blazor Hybrid applications",
+    "example": "FROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY . .\n# Configure file access for hybrid scenarios\nRUN chmod +x app\nENV ASPNETCORE_ENVIRONMENT=Production",
+    "severity": "medium",
+    "tags": ["blazor", "hybrid", "maui", "file-access"],
+    "description": "Blazor Hybrid apps may need special file access configurations in containers"
+  },
+  {
+    "id": "blazor-component-libraries",
+    "category": "dockerfile",
+    "pattern": "RazorClassLib|ComponentLib",
+    "recommendation": "Include all Razor component libraries and their static assets",
+    "example": "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY *.csproj ./\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o /app/publish --no-restore\n# Ensure component library assets are included",
+    "severity": "medium",
+    "tags": ["blazor", "components", "libraries", "static-assets"],
+    "description": "Component libraries require proper inclusion of all static assets and dependencies"
+  },
+  {
+    "id": "blazor-wasm-security-headers",
+    "category": "security",
+    "pattern": "blazor.*wasm|WebAssembly",
+    "recommendation": "Configure security headers for Blazor WebAssembly applications",
+    "example": "# nginx.conf security headers\nadd_header Cross-Origin-Embedder-Policy require-corp;\nadd_header Cross-Origin-Opener-Policy same-origin;\nadd_header X-Content-Type-Options nosniff;\nadd_header X-Frame-Options DENY;\nadd_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'wasm-unsafe-eval';\"",
+    "severity": "high",
+    "tags": ["blazor", "webassembly", "security", "headers", "csp"],
+    "description": "Blazor WASM requires specific security headers including WASM evaluation permissions"
+  },
+  {
+    "id": "blazor-server-websocket-configuration",
+    "category": "dockerfile",
+    "pattern": "WebSocket|SignalR.*Hub",
+    "recommendation": "Configure WebSocket settings for Blazor Server SignalR connections",
+    "example": "// Configure WebSocket options\napp.UseWebSockets(new WebSocketOptions\n{\n    KeepAliveInterval = TimeSpan.FromMinutes(2),\n    ReceiveBufferSize = 4 * 1024\n});\n\n// Configure SignalR hub options\nservices.Configure<HubOptions>(options =>\n{\n    options.MaximumReceiveMessageSize = 64 * 1024;\n});",
+    "severity": "medium",
+    "tags": ["blazor", "server", "websockets", "signalr", "hubs"],
+    "description": "WebSocket configuration affects Blazor Server performance and reliability"
+  },
+  {
+    "id": "blazor-wasm-lazy-loading",
+    "category": "dockerfile",
+    "pattern": "LazyAssemblyLoader|lazy.*load",
+    "recommendation": "Configure lazy loading assemblies for optimized Blazor WASM startup",
+    "example": "<!-- In index.html -->\n<script src=\"_framework/blazor.webassembly.js\" autostart=\"false\"></script>\n<script>\n  Blazor.start({\n    loadBootResource: function (type, name, defaultUri, integrity) {\n      if (type === 'dotnetjs') return defaultUri;\n      return defaultUri + '?v=' + Date.now();\n    }\n  });\n</script>",
+    "severity": "low",
+    "tags": ["blazor", "webassembly", "lazy-loading", "performance"],
+    "description": "Lazy loading can significantly improve Blazor WASM initial load times"
+  },
+  {
+    "id": "blazor-server-prerendering",
+    "category": "dockerfile",
+    "pattern": "Prerender|RenderMode\\.ServerPrerendered",
+    "recommendation": "Configure prerendering for better Blazor Server SEO and initial load performance",
+    "example": "// In _Host.cshtml or App.razor\n<component type=\"typeof(App)\" render-mode=\"ServerPrerendered\" />\n\n// Handle prerendering state\n@code {\n    protected override async Task OnAfterRenderAsync(bool firstRender)\n    {\n        if (firstRender)\n        {\n            // Initialize client-side only components\n        }\n    }\n}",
+    "severity": "medium",
+    "tags": ["blazor", "server", "prerendering", "seo", "performance"],
+    "description": "Prerendering improves SEO and perceived performance for Blazor Server applications"
+  },
+  {
+    "id": "blazor-wasm-culture-globalization",
+    "category": "dockerfile",
+    "pattern": "Localization|Culture|Globalization",
+    "recommendation": "Configure globalization and localization for Blazor WebAssembly",
+    "example": "// In Program.cs\nbuilder.Services.Configure<RequestLocalizationOptions>(options =>\n{\n    var supportedCultures = new[] { \"en-US\", \"es-ES\", \"fr-FR\" };\n    options.SetDefaultCulture(supportedCultures[0])\n           .AddSupportedCultures(supportedCultures)\n           .AddSupportedUICultures(supportedCultures);\n});\n\n// Include localization assemblies in publish",
+    "severity": "low",
+    "tags": ["blazor", "webassembly", "localization", "globalization"],
+    "description": "Globalization requires proper configuration and inclusion of localization assemblies"
+  },
+  {
+    "id": "blazor-server-authentication-state",
+    "category": "security",
+    "pattern": "AuthenticationState|CascadingAuthenticationState",
+    "recommendation": "Configure authentication state properly for containerized Blazor Server apps",
+    "example": "// In Program.cs\nbuilder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)\n    .AddCookie(options =>\n    {\n        options.Cookie.SameSite = SameSiteMode.Strict;\n        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;\n        options.LoginPath = \"/Account/Login\";\n    });\n\nbuilder.Services.AddAuthorizationCore();",
+    "severity": "high",
+    "tags": ["blazor", "server", "authentication", "security", "cookies"],
+    "description": "Authentication state must be properly configured for container security requirements"
+  },
+  {
+    "id": "blazor-wasm-api-base-address",
+    "category": "dockerfile",
+    "pattern": "HttpClient.*BaseAddress|ApiClient",
+    "recommendation": "Configure API base addresses using environment variables for different container environments",
+    "example": "// In Program.cs\nbuilder.Services.AddScoped(sp => new HttpClient\n{\n    BaseAddress = new Uri(builder.Configuration[\"ApiBaseUrl\"] ?? builder.HostEnvironment.BaseAddress)\n});\n\n// In appsettings.json\n{\n  \"ApiBaseUrl\": \"https://api.myapp.com/\"\n}",
+    "severity": "medium",
+    "tags": ["blazor", "webassembly", "httpclient", "configuration"],
+    "description": "API endpoints should be configurable for different container deployment environments"
+  },
+  {
+    "id": "blazor-shared-components-optimization",
+    "category": "dockerfile",
+    "pattern": "Shared.*Components|ComponentBase",
+    "recommendation": "Optimize shared components for better performance and smaller bundle size",
+    "example": "// Use [Parameter] efficiently\n[Parameter] public string? Value { get; set; }\n[Parameter] public EventCallback<string> ValueChanged { get; set; }\n\n// Implement IDisposable for cleanup\npublic void Dispose()\n{\n    // Clean up subscriptions\n}",
+    "severity": "low",
+    "tags": ["blazor", "components", "performance", "optimization"],
+    "description": "Shared components should be optimized for performance and memory usage"
+  },
+  {
+    "id": "blazor-wasm-service-worker-caching",
+    "category": "dockerfile",
+    "pattern": "service-worker|PWA",
+    "recommendation": "Configure service worker caching strategies for Blazor WASM offline support",
+    "example": "// service-worker.js\nconst CACHE_NAME = 'blazor-cache-v1';\nconst urlsToCache = [\n  '/',\n  '/css/app.css',\n  '/_framework/blazor.webassembly.js',\n  // Add other static assets\n];\n\nself.addEventListener('install', event => {\n  event.waitUntil(\n    caches.open(CACHE_NAME)\n      .then(cache => cache.addAll(urlsToCache))\n  );\n});",
+    "severity": "low",
+    "tags": ["blazor", "webassembly", "service-worker", "caching", "offline"],
+    "description": "Service worker caching enables offline support and improved performance"
+  },
+  {
+    "id": "blazor-server-connection-monitoring",
+    "category": "dockerfile",
+    "pattern": "blazor.*connection|ConnectionState",
+    "recommendation": "Implement connection monitoring for Blazor Server resilience",
+    "example": "// JavaScript in _Host.cshtml\nBlazor.defaultReconnectionHandler._reconnectCallback = function(d) {\n  document.getElementById('reconnect-modal').style.display = d ? 'none' : 'block';\n};\n\n// Monitor connection state\nBlazor.start().then(() => {\n  const connection = Blazor.hub.connection;\n  connection.onclose(() => {\n    // Handle disconnection\n  });\n});",
+    "severity": "medium",
+    "tags": ["blazor", "server", "connection", "monitoring", "resilience"],
+    "description": "Connection monitoring improves user experience during network issues"
+  },
+  {
+    "id": "blazor-wasm-trimming-configuration",
+    "category": "dockerfile",
+    "pattern": "PublishTrimmed|ILLink",
+    "recommendation": "Configure assembly trimming carefully for Blazor WASM to avoid runtime issues",
+    "example": "<!-- In .csproj -->\n<PropertyGroup>\n  <PublishTrimmed>true</PublishTrimmed>\n  <TrimMode>link</TrimMode>\n  <RunAOTCompilation>false</RunAOTCompilation>\n</PropertyGroup>\n\n<!-- Preserve assemblies if needed -->\n<ItemGroup>\n  <TrimmerRootAssembly Include=\"MyLibrary\" />\n</ItemGroup>",
+    "severity": "medium",
+    "tags": ["blazor", "webassembly", "trimming", "optimization", "aot"],
+    "description": "Assembly trimming reduces bundle size but may require configuration to avoid runtime issues"
+  },
+  {
+    "id": "blazor-server-scalability-redis",
+    "category": "dockerfile",
+    "pattern": "AddServerSideBlazor|Scale",
+    "recommendation": "Use Redis for Blazor Server scalability across multiple container instances",
+    "example": "// In Program.cs\nbuilder.Services.AddStackExchangeRedisCache(options =>\n{\n    options.Configuration = builder.Configuration.GetConnectionString(\"Redis\");\n});\n\nbuilder.Services.AddSignalR()\n    .AddRedis(builder.Configuration.GetConnectionString(\"Redis\"));\n\n// Configure data protection\nbuilder.Services.AddDataProtection()\n    .PersistKeysToStackExchangeRedis(redis, \"DataProtection-Keys\");",
+    "severity": "high",
+    "tags": ["blazor", "server", "redis", "scalability", "data-protection"],
+    "description": "Redis enables Blazor Server to scale across multiple container instances"
+  },
+  {
+    "id": "blazor-component-isolation-css",
+    "category": "dockerfile",
+    "pattern": "\\.razor\\.css|scoped.*css",
+    "recommendation": "Ensure CSS isolation files are properly included in container builds",
+    "example": "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY . .\nRUN dotnet publish -c Release -o /app/publish\n# CSS isolation files are automatically included\n# Verify with: RUN ls -la /app/publish/wwwroot/css/",
+    "severity": "low",
+    "tags": ["blazor", "css", "isolation", "scoped-styles"],
+    "description": "CSS isolation files must be properly included in the container build output"
+  },
+  {
+    "id": "blazor-javascript-interop-performance",
+    "category": "dockerfile",
+    "pattern": "JSRuntime|IJSRuntime",
+    "recommendation": "Optimize JavaScript interop calls for better Blazor performance",
+    "example": "// Batch JS calls when possible\nawait JS.InvokeVoidAsync(\"batchOperations\", new object[] { data1, data2, data3 });\n\n// Use IJSUnmarshalledRuntime for performance-critical scenarios\nvar unmarshalledRuntime = (IJSUnmarshalledRuntime)JS;\nvar result = unmarshalledRuntime.InvokeUnmarshalled<string, int>(\"fastOperation\", input);",
+    "severity": "low",
+    "tags": ["blazor", "javascript", "interop", "performance"],
+    "description": "JavaScript interop should be optimized to minimize serialization overhead"
+  },
+  {
+    "id": "blazor-server-memory-management",
+    "category": "dockerfile",
+    "pattern": "IDisposable|ComponentBase",
+    "recommendation": "Implement proper memory management in Blazor Server components",
+    "example": "@implements IDisposable\n\n@code {\n    private Timer? timer;\n    \n    protected override void OnInitialized()\n    {\n        timer = new Timer(OnTimerElapsed, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));\n    }\n    \n    public void Dispose()\n    {\n        timer?.Dispose();\n    }\n}",
+    "severity": "medium",
+    "tags": ["blazor", "server", "memory", "disposal", "components"],
+    "description": "Proper disposal prevents memory leaks in long-running Blazor Server applications"
+  },
+  {
+    "id": "blazor-wasm-loading-optimization",
+    "category": "dockerfile",
+    "pattern": "blazor.*loading|startup",
+    "recommendation": "Optimize Blazor WASM loading experience with custom loading indicators",
+    "example": "<!-- In index.html -->\n<div id=\"blazor-loading\" class=\"loading-container\">\n  <div class=\"loading-spinner\"></div>\n  <div class=\"loading-text\">Loading application...</div>\n</div>\n\n<script>\n  document.addEventListener('DOMContentLoaded', () => {\n    Blazor.start().then(() => {\n      document.getElementById('blazor-loading').style.display = 'none';\n    });\n  });\n</script>",
+    "severity": "low",
+    "tags": ["blazor", "webassembly", "loading", "ux", "startup"],
+    "description": "Custom loading indicators improve user experience during WASM application startup"
+  },
+  {
+    "id": "blazor-server-health-checks",
+    "category": "dockerfile",
+    "pattern": "HealthCheck|Health.*Blazor",
+    "recommendation": "Implement health checks for Blazor Server applications in container environments",
+    "example": "// In Program.cs\nbuilder.Services.AddHealthChecks()\n    .AddSignalRHub(\"/blazorhub\")\n    .AddDbContext<AppDbContext>();\n\napp.MapHealthChecks(\"/health\");\n\n// Docker health check\nHEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:80/health || exit 1",
+    "severity": "medium",
+    "tags": ["blazor", "server", "health-checks", "monitoring"],
+    "description": "Health checks enable container orchestrators to monitor Blazor Server application status"
+  },
+  {
+    "id": "blazor-wasm-debug-production-config",
+    "category": "dockerfile",
+    "pattern": "BlazorDebugger|Debug.*true",
+    "recommendation": "Ensure debug features are disabled in production Blazor WASM builds",
+    "example": "<!-- In index.html - Remove or comment out for production -->\n<!-- <script src=\"_framework/blazor.webassembly.js\" autostart=\"false\"></script> -->\n<!-- <script>Blazor.start({ enableDebugAssertions: false });</script> -->\n\n// In .csproj\n<PropertyGroup Condition=\"'$(Configuration)' == 'Release'\">\n  <DebugType>none</DebugType>\n  <DebugSymbols>false</DebugSymbols>\n</PropertyGroup>",
+    "severity": "high",
+    "tags": ["blazor", "webassembly", "debug", "production", "security"],
+    "description": "Debug features should be completely disabled in production WASM builds"
+  },
+  {
+    "id": "blazor-server-error-boundary",
+    "category": "dockerfile",
+    "pattern": "ErrorBoundary|Exception.*Handler",
+    "recommendation": "Implement error boundaries for robust Blazor Server error handling",
+    "example": "<ErrorBoundary>\n  <ChildContent>\n    @Body\n  </ChildContent>\n  <ErrorContent Context=\"exception\">\n    <div class=\"error-container\">\n      <h3>Something went wrong</h3>\n      <p>We're sorry, but an error occurred. Please try refreshing the page.</p>\n    </div>\n  </ErrorContent>\n</ErrorBoundary>",
+    "severity": "medium",
+    "tags": ["blazor", "server", "error-boundary", "error-handling"],
+    "description": "Error boundaries provide graceful error handling and better user experience"
+  },
+  {
+    "id": "blazor-wasm-asset-optimization",
+    "category": "dockerfile",
+    "pattern": "wwwroot|static.*assets",
+    "recommendation": "Optimize static assets for Blazor WASM with proper caching and compression",
+    "example": "# In nginx.conf\nlocation ~* \\.(css|js|wasm|dll|pdb|map)$ {\n  expires 1y;\n  add_header Cache-Control \"public, immutable\";\n  add_header Vary Accept-Encoding;\n  \n  # Enable compression\n  gzip on;\n  gzip_types application/wasm application/octet-stream;\n}\n\nlocation /_framework/ {\n  expires 1y;\n  add_header Cache-Control \"public, immutable\";\n}",
+    "severity": "medium",
+    "tags": ["blazor", "webassembly", "assets", "caching", "compression"],
+    "description": "Proper asset optimization significantly improves Blazor WASM loading performance"
+  }
+]
