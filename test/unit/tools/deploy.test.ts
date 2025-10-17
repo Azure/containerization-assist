@@ -33,28 +33,6 @@ function createMockLogger() {
   } as any;
 }
 
-// Mock lib modules following analyze-repo pattern
-const mockSessionManager = {
-  create: jest.fn().mockResolvedValue({
-    workflow_state: {},
-    metadata: {},
-    completed_steps: [],
-    errors: {},
-
-    createdAt: '2025-09-08T11:12:40.362Z',
-    updatedAt: '2025-09-08T11:12:40.362Z',
-  }),
-  get: jest.fn(),
-  update: jest.fn(),
-};
-
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
-
 const mockKubernetesClient = {
   applyManifest: jest.fn(),
   getDeploymentStatus: jest.fn(),
@@ -120,7 +98,7 @@ jest.mock('js-yaml', () => ({
   }),
 }));
 
-
+// Mock lib modules following analyze-repo pattern
 jest.mock('@/lib/tool-helpers', () => ({
   getToolLogger: jest.fn(() => createMockLogger()),
   createToolTimer: jest.fn(() => mockTimer),
@@ -159,16 +137,12 @@ function createMockToolContext(): ToolContext {
   return {
     logger: createMockLogger(),
     progressReporter: jest.fn(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   };
 }
 
 describe('deployApplication', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
   let config: DeployApplicationParams;
-  let mockEnsureSession: jest.Mock;
-  let mockUseSessionSlice: jest.Mock;
 
   // Sample K8s manifests for testing
   const sampleManifests = `
@@ -215,19 +189,12 @@ spec:
     };
 
     jest.clearAllMocks();
-    mockSessionManager.update.mockResolvedValue(true);
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
     mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
       ready: true,
       readyReplicas: 2,
       totalReplicas: 2,
     }));
-
-    mockSessionManager.get.mockResolvedValue({
-      completed_steps: [],
-      createdAt: '2025-09-08T11:12:40.362Z',
-      updatedAt: '2025-09-08T11:12:40.362Z',
-    });
   });
 
   describe('Successful Deployments', () => {
@@ -468,7 +435,6 @@ spec:
 
         // Reset mocks between tests
         jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
         mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
         mockKubernetesClient.waitForDeploymentReady.mockResolvedValue(createSuccessResult({
           ready: true,

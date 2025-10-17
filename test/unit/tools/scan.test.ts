@@ -48,26 +48,11 @@ import type { ScanImageParams } from '../../../src/tools/scan-image/schema';
 import { createLogger } from '../../../src/lib/logger';
 
 // Get the mocked instances after imports
-const mockSessionManager = {
-  create: jest.fn(),
-  get: jest.fn(),
-  update: jest.fn(),
-};
 const mockLogger = (createLogger as jest.Mock)();
-
-// Create session facade mock
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
 
 function createMockToolContext() {
   return {
     logger: mockLogger,
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -87,7 +72,6 @@ describe('scanImage', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
-    mockSessionManager.update.mockResolvedValue(true);
   });
 
   describe('Basic Functionality', () => {
@@ -227,17 +211,6 @@ describe('scanImage', () => {
 
   describe('Vulnerability Counting', () => {
     it('should correctly count vulnerabilities by severity', async () => {
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
-          return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
-          };
-        }
-        return undefined;
-      });
-
       mockSecurityScannerInstance.scanImage.mockResolvedValue(
         createSuccessResult({
           vulnerabilities: [

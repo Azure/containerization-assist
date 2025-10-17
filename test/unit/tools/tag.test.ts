@@ -33,16 +33,6 @@ function createMockLogger() {
 }
 
 // Mock lib modules following analyze-repo pattern
-const mockSessionManager = {
-  create: jest.fn().mockResolvedValue({
-    completed_steps: [],
-    createdAt: '2025-09-08T11:12:40.362Z',
-    updatedAt: '2025-09-08T11:12:40.362Z',
-  }),
-  get: jest.fn(),
-  update: jest.fn(),
-};
-
 const mockDockerClient = {
   tagImage: jest.fn(),
 };
@@ -72,14 +62,6 @@ jest.mock('../../../src/lib/tool-helpers', () => ({
   })),
 }));
 
-// Mock session facade
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
-
 // Import these after mocks are set up
 import tagImageTool from '../../../src/tools/tag-image/tool';
 import type { TagImageParams } from '../../../src/tools/tag-image/schema';
@@ -88,8 +70,6 @@ import type { TagImageParams } from '../../../src/tools/tag-image/schema';
 function createMockToolContext() {
   return {
     logger: createMockLogger(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -111,15 +91,6 @@ describe('tagImage', () => {
     // Re-establish timer mock after clearing
     const { createToolTimer } = jest.requireMock('../../../src/lib/tool-helpers');
     createToolTimer.mockReturnValue(mockTimer);
-
-    mockSessionManager.update.mockResolvedValue({
-      ok: true,
-      value: {
-        completed_steps: ['tag-image'],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
 
     // Setup default successful Docker tag result
     mockDockerClient.tagImage.mockResolvedValue(
@@ -147,8 +118,6 @@ describe('tagImage', () => {
         'myapp',
         'v1.0',
       );
-
-      // Note: Session storage is handled by the orchestrator, not the tool directly
 
       // Verify timer was used correctly
       expect(mockTimer.end).toHaveBeenCalledWith({
@@ -212,7 +181,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
 
@@ -252,7 +220,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
 
@@ -283,7 +250,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
   });
@@ -433,7 +399,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
   });

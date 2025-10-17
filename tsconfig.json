@@ -31,9 +31,6 @@
       "@/infra/*": [
         "src/infra/*"
       ],
-      "@/session/*": [
-        "src/session/*"
-      ],
       "@/config/*": [
         "src/config/*"
       ],

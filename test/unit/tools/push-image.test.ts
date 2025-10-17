@@ -109,7 +109,6 @@ describe('push-image tool', () => {
         debug: jest.fn(),
         trace: jest.fn(),
       } as any,
-      sessionManager: {} as any,
       sampling: {} as any,
       docker: fakeDocker,
     } as ToolContext);
