@@ -98,7 +98,7 @@ jest.mock('js-yaml', () => ({
   }),
 }));
 
-// Mock lib modules following analyze-repo pattern
+// Mock lib modules
 jest.mock('@/lib/tool-helpers', () => ({
   getToolLogger: jest.fn(() => createMockLogger()),
   createToolTimer: jest.fn(() => mockTimer),
