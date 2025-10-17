@@ -15,6 +15,7 @@ This directory contains code examples demonstrating how to use the Containerizat
 - **[custom-server.ts](./custom-server.ts)** - Custom MCP server with Container Assist tools
 - **[clean-api-example.ts](./clean-api-example.ts)** - Clean API patterns using Result types
 - **[app-mod-telemetry.ts](./app-mod-telemetry.ts)** - External telemetry integration pattern for wrapping tools with custom tracking
+- **[minimal-tool-context.ts](./minimal-tool-context.ts)** - Minimal ToolContext implementation for quick setup
 
 ## Running the Examples
 
@@ -86,7 +87,30 @@ All AI-powered tools use deterministic sampling (`count: 1`) to ensure reproduci
 **Progress Notifications:**
 Long-running operations (build, deploy, scan-image) emit MCP notifications that clients can subscribe to for real-time progress updates.
 
-### 2. Tool Orchestration
+### 2. Tool Context Requirements
+
+All Container Assist tools require a ToolContext with these properties:
+
+```typescript
+interface ToolContext {
+  logger: Logger;                    // Pino-compatible logger (required)
+  sampling: SamplingCapabilities;    // AI capabilities for MCP protocol
+  getPrompt: PromptFunction;         // Access to prompt registry  
+  signal?: AbortSignal;              // Optional cancellation signal
+  progress?: ProgressReporter;       // Optional progress reporting
+}
+```
+
+**Quick Setup Options:**
+
+1. **Minimal Implementation** - See [minimal-tool-context.ts](./minimal-tool-context.ts)
+2. **Full Example** - See [app-mod-telemetry.ts](./app-mod-telemetry.ts) `createExampleToolContext()`
+3. **Production** - Use actual Pino logger and MCP server capabilities
+
+**Logger Requirements:**
+The logger must implement Pino's interface with methods: debug, info, warn, error, fatal, trace, silent, child, and a level property.
+
+### 3. Tool Orchestration
 
 Tools are stateless functions that can be called independently or chained together:
 
@@ -112,7 +136,7 @@ await generateDockerfile.handler({
 - Results from previous tools can inform subsequent calls
 - Each tool execution is independent and can be tested in isolation
 
-### 3. Error Handling
+### 4. Error Handling
 
 All tools return Result types for safe error handling:
 

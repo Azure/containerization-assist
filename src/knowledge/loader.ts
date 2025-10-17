@@ -15,7 +15,7 @@ interface KnowledgeState {
   compilationStats: CompilationStats;
 }
 
-let knowledgeState: KnowledgeState = {
+const knowledgeState: KnowledgeState = {
   entries: new Map(),
   byCategory: new Map(),
   byTag: new Map(),
@@ -238,9 +238,6 @@ export const loadKnowledgeBase = async (): Promise<void> => {
   }
 };
 
-
-
-
 /**
  * Get all entries
  */
@@ -248,14 +245,12 @@ export const getAllEntries = (): LoadedEntry[] => {
   return Array.from(knowledgeState.entries.values());
 };
 
-
 /**
  * Check if knowledge base is loaded
  */
 export const isKnowledgeLoaded = (): boolean => {
   return knowledgeState.loaded;
 };
-
 
 /**
  * Load knowledge data and return entries.
