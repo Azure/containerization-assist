@@ -6,19 +6,9 @@
 import type { Result } from '@/types/core';
 
 /**
- * Narrow logger interface for tools - only exposes safe logging methods
- */
-export type ToolLogger = {
-  debug: (message: string, context?: Record<string, unknown>) => void;
-  info: (message: string, context?: Record<string, unknown>) => void;
-  warn: (message: string, context?: Record<string, unknown>) => void;
-  error: (message: string, context?: Record<string, unknown>) => void;
-};
-
-/**
  * Standard error formatting for CLI commands
  */
-export function formatError(message: string, error?: unknown): string {
+function formatError(message: string, error?: unknown): string {
   const prefix = '❌';
   const baseMessage = `${prefix} ${message}`;
 

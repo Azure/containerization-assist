@@ -10,8 +10,9 @@ import { Result, Success, Failure } from './core';
 
 /**
  * Comprehensive enum for enhancement capabilities
+ * @internal - Only used internally for validation
  */
-export const EnhancementCapabilitySchema = z.enum([
+const EnhancementCapabilitySchema = z.enum([
   'analysis',
   'azure-optimization',
   'best-practices',
@@ -63,8 +64,9 @@ export type EnhancementCapability = z.infer<typeof EnhancementCapabilitySchema>;
  *
  * All tools must provide complete metadata for proper AI enhancement
  * and capability discovery.
+ * @internal - Only used internally for validation
  */
-export const ToolMetadataSchema = z.object({
+const ToolMetadataSchema = z.object({
   /** Whether this tool uses knowledge enhancement (required) */
   knowledgeEnhanced: z.boolean(),
 
@@ -85,8 +87,9 @@ export type ToolMetadata = z.infer<typeof ToolMetadataSchema>;
  *
  * @param metadata - Unknown metadata object to validate
  * @returns Result containing validated metadata or validation errors
+ * @internal - Only used by validateAllToolMetadata
  */
-export function validateToolMetadata(metadata: unknown): Result<ToolMetadata> {
+function validateToolMetadata(metadata: unknown): Result<ToolMetadata> {
   try {
     const validatedMetadata = ToolMetadataSchema.parse(metadata);
     return Success(validatedMetadata);
@@ -102,34 +105,6 @@ export function validateToolMetadata(metadata: unknown): Result<ToolMetadata> {
 }
 
 /**
- * Creates default metadata for non-AI tools
- */
-export function createDefaultMetadata(): ToolMetadata {
-  return {
-    knowledgeEnhanced: false,
-  };
-}
-
-/**
- * Creates metadata for AI-driven tools with sensible defaults
- */
-export function createAIMetadata(overrides: Partial<ToolMetadata> = {}): ToolMetadata {
-  return {
-    knowledgeEnhanced: overrides.knowledgeEnhanced ?? true,
-    enhancementCapabilities: overrides.enhancementCapabilities ?? ['generation', 'analysis'],
-    confidenceThreshold: overrides.confidenceThreshold,
-    maxRetries: overrides.maxRetries ?? 3,
-  };
-}
-
-/**
- * Type guard to check if metadata is valid
- */
-export function isValidToolMetadata(metadata: unknown): metadata is ToolMetadata {
-  return ToolMetadataSchema.safeParse(metadata).success;
-}
-
-/**
  * Helper function to check if knowledge-enhanced tool is missing capabilities
  */
 function isKnowledgeEnhancedWithoutCapabilities(metadata: ToolMetadata): boolean {
@@ -141,8 +116,9 @@ function isKnowledgeEnhancedWithoutCapabilities(metadata: ToolMetadata): boolean
 
 /**
  * Validates metadata consistency with tool properties
+ * @internal - Only used by validateAllToolMetadata
  */
-export function validateMetadataConsistency(
+function validateMetadataConsistency(
   toolName: string,
   metadata: ToolMetadata,
 ): Result<void> {
@@ -171,8 +147,9 @@ export interface ValidatableTool {
 /**
  * Performs post-validation checks for a single tool
  * Consolidates all validation logic from CLI into centralized location
+ * @internal - Only used by validateAllToolMetadata
  */
-export function postValidate(tool: ValidatableTool): string[] {
+function postValidate(tool: ValidatableTool): string[] {
   const issues: string[] = [];
 
   // Knowledge-enhanced tool missing capabilities

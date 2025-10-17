@@ -3,9 +3,7 @@
  * Minimal types for tool orchestration without unnecessary complexity
  */
 
-import type { z } from 'zod';
 import type { Result } from '@/types/index';
-import type { Logger } from 'pino';
 
 /**
  * Request to execute a tool
@@ -27,17 +25,6 @@ export interface ExecuteMetadata {
   stopSequences?: string[];
   loggerContext?: Record<string, unknown>;
   sendNotification?: (notification: unknown) => Promise<void>;
-}
-
-/**
- * Minimal tool registration
- */
-export interface RegisteredTool {
-  name: string;
-  description: string;
-  schema: z.ZodSchema;
-  handler: (params: unknown, logger: Logger) => Promise<Result<unknown>>;
-  requires?: string[]; // Dependencies if needed
 }
 
 /**

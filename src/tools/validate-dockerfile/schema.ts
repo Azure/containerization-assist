@@ -12,8 +12,6 @@ export const validateImageSchema = z.object({
     .describe('If true, requires at least one allowlist match when allowlist is configured'),
 });
 
-export type ValidateImageParams = z.infer<typeof validateImageSchema>;
-
 export interface ValidateImageResult {
   success: boolean;
   passed: boolean;

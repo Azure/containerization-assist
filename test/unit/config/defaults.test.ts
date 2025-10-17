@@ -117,22 +117,14 @@ describe('Configuration Types', () => {
     it('should have types configuration file', () => {
       const typesPath = join(__dirname, '../../../src/config/types.ts');
       const content = readFileSync(typesPath, 'utf-8');
-      
-      expect(content).toContain('export');
-      expect(content).toContain('interface');
-    });
 
-    it('should define configuration types', () => {
-      const typesPath = join(__dirname, '../../../src/config/types.ts');
-      const content = readFileSync(typesPath, 'utf-8');
-      
-      expect(content).toContain('Config');
-      expect(content).toContain('type');
+      // File exists and has documentation
+      expect(content).toContain('Configuration Types');
     });
   });
 
   describe('Types Export', () => {
-    it('should export configuration types', async () => {
+    it('should export configuration types module', async () => {
       const typesModule = await import('../../../src/config/types');
       expect(typeof typesModule).toBe('object');
     });

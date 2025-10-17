@@ -35,19 +35,3 @@ export const ERROR_MESSAGES = {
   OPERATION_FAILED: (operation: string, error: string) => `${operation} failed: ${error}`,
   RESOURCE_NOT_FOUND: (type: string, id: string) => `${type} not found: ${id}`,
 } as const;
-
-/**
- * Type-safe error message creator
- */
-export type ErrorMessageKey = keyof typeof ERROR_MESSAGES;
-
-/**
- * Helper function to create error messages with type safety
- */
-export function createErrorMessage<K extends ErrorMessageKey>(
-  key: K,
-  ...args: Parameters<(typeof ERROR_MESSAGES)[K]>
-): string {
-  const template = ERROR_MESSAGES[key];
-  return (template as any)(...args);
-}

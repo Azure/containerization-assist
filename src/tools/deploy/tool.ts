@@ -490,7 +490,6 @@ async function handleDeploy(
  */
 export const deployApplication = handleDeploy;
 
-// New Tool interface export
 import { tool } from '@/types/tool';
 
 export default tool({

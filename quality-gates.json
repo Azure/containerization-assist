@@ -24,7 +24,7 @@
         "warningSignatures": []
       },
       "deadcode": {
-        "count": 258
+        "count": 1
       },
       "typescript": {
         "errors": 0
