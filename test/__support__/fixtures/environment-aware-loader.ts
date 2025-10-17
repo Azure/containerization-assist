@@ -332,7 +332,7 @@ export class EnvironmentAwareFixtureLoader {
       'push-image': ['docker'],
       'tag-image': ['docker'],
       deploy: ['kubernetes'],
-      'verify-deployment': ['kubernetes'],
+      'verify-deploy': ['kubernetes'],
       'prepare-cluster': ['kubernetes'],
       'scan-image': ['trivy'],
       'generate-k8s-manifests': [], // Can run without cluster

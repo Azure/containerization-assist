@@ -107,7 +107,7 @@ function createExampleToolContext(): ToolContext {
         : '';
       console.log(`⏳ Progress: ${message}${progressStr}`);
     },
-  };
+  } as ToolContext;
 }
 
 /**

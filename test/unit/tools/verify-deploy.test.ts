@@ -61,11 +61,11 @@ function createMockToolContext() {
 
 // Import these after mocks are set up
 import { default as verifyDeploymentTool } from '../../../src/tools/verify-deploy/tool';
-import type { VerifyDeployParams } from '../../../src/tools/verify-deploy/schema';
+import type { VerifyDeploymentParams } from '../../../src/tools/verify-deploy/schema';
 
 describe('verify-deploy', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
-  let config: VerifyDeployParams;
+  let config: VerifyDeploymentParams;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
@@ -137,7 +137,7 @@ describe('verify-deploy', () => {
     });
 
     it('should handle minimal configuration', async () => {
-      const minimalConfig: VerifyDeployParams = {
+      const minimalConfig: VerifyDeploymentParams = {
         deploymentName: 'minimal-app',
       };
 
@@ -435,9 +435,7 @@ describe('verify-deploy', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        const availableCondition = result.value.status.conditions.find(
-          (c) => c.type === 'Available',
-        );
+        const availableCondition = result.value.status.conditions.find((c) => c.type === 'Available');
         expect(availableCondition?.status).toBe('False');
       }
     });

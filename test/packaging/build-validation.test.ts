@@ -85,7 +85,7 @@ describe('Build Validation', () => {
         'scan-image',
         'tag-image',
         'validate-dockerfile',
-        'verify-deployment',
+        'verify-deploy',
       ];
 
       for (const tool of tools) {

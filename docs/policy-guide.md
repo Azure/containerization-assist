@@ -6,7 +6,7 @@ The policy system enables enforcement of security, quality, and compliance rules
 
 **Key Features:**
 - **Auto-loading:** Policies are automatically discovered from the `policies/` directory
-- **All tools:** Applied to all 17 MCP tools via the orchestrator
+- **All tools:** Applied to all 13 MCP tools via the orchestrator
 - **Shipped with package:** Policies are included in the npm package and ready to use
 - **Override support:** Optional environment variable to select specific policies
 - **Type-safe:** Validated using Zod schemas at load time
