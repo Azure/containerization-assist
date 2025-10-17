@@ -1,13 +1,12 @@
 /**
  * Configuration Constants
  *
- * Consolidated constants for sampling, scoring, and token limits.
- * Merges sampling.ts, scoring.ts, and tokens.ts into a single source of truth.
+ * Consolidated constants for AI generation limits, scoring, and token limits.
  */
 
 /**
- * AI Sampling Configuration
- * Limits and operation parameters for deterministic single-candidate sampling.
+ * AI Generation Configuration
+ * Limits and operation parameters for AI-powered tool outputs.
  */
 export const SAMPLING_CONFIG = {
   LIMITS: {

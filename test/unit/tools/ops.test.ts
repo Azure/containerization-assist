@@ -59,7 +59,6 @@ describe('opsTool', () => {
         });
         expect(data.capabilities).toEqual({
           tools: true,
-          sampling: true,
           progress: true,
         });
       }

@@ -6,7 +6,7 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 
 - 🐳 **Docker Integration**: Build, scan, and deploy container images
 - ☸️ **Kubernetes Support**: Generate manifests and deploy applications
-- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization with deterministic sampling
+- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization
 - 🧠 **Knowledge Enhanced**: AI-driven content improvement with security and performance best practices
 - 🔄 **Intelligent Tool Routing**: Automatic dependency resolution and execution
 - 📊 **Progress Tracking**: Real-time progress updates via MCP notifications
@@ -122,7 +122,7 @@ This server is optimized for **one engineer containerizing one application at a 
 
 - **Sequential execution**: Each tool builds on the results of previous steps
 - **Fast-fail validation**: Clear, actionable error messages if Docker/Kubernetes are unavailable
-- **Deterministic AI generation**: All AI-powered tools use single-candidate sampling with scoring for quality validation
+- **Deterministic AI generation**: Tools provide reproducible outputs through built-in prompt engineering
 - **Real-time progress**: MCP notifications surface progress updates to clients during long-running operations
 
 ### Multi-Module/Monorepo Support
@@ -218,7 +218,6 @@ The following environment variables control server behavior:
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` | No |
 | `LOG_LEVEL` | Logging level | `info` | No |
 | `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
-| `TEMP_DIR` | Temporary directory for build artifacts | System temp dir | No |
 | `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
 | `CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
@@ -227,9 +226,6 @@ The following environment variables control server behavior:
 
 **Progress Notifications:**
 Long-running operations (build, deploy, scan-image) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
-
-**Deterministic AI Sampling:**
-All AI-powered tools use deterministic sampling with `count: 1` to ensure reproducible outputs. Each generation includes scoring metadata for quality validation and diagnostics.
 
 ### Tool Execution Logging
 
@@ -275,22 +271,32 @@ By default, **all policies** in the `policies/` directory are automatically disc
 
 This provides comprehensive coverage out-of-the-box.
 
-**Use a Specific Policy Only:**
+**Use a Specific Policy File:**
 ```bash
-# Use only the security baseline (disables auto-merging)
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
+# Use only the security baseline policy file (disables auto-merging)
+containerization-assist-mcp start --config ./policies/security-baseline.yaml
 
 # Or specify in VS Code MCP configuration
-"env": {
-  "CONTAINERIZATION_ASSIST_POLICY_PATH": "./policies/security-baseline.yaml"
+{
+  "servers": {
+    "containerization-assist": {
+      "command": "containerization-assist-mcp",
+      "args": ["start", "--config", "./policies/security-baseline.yaml"]
+    }
+  }
 }
 ```
 
 **Environment-Specific Configuration:**
 ```bash
-# Set policy environment (development, staging, production)
-export CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT=production
+# Use development mode (less strict policy enforcement)
+containerization-assist-mcp start --dev
+
+# Production mode is the default
+containerization-assist-mcp start
 ```
+
+> **Note:** Environment variable support for `CONTAINERIZATION_ASSIST_POLICY_PATH` and `CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT` is planned for a future release. Currently, use the CLI flags `--config` and `--dev` as shown above.
 
 See **[Policy Guide](./docs/policy-guide.md)** for complete documentation, rule syntax, and examples.
 

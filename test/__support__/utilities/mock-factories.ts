@@ -445,7 +445,7 @@ export function createMockCoreServices(): {
 }
 
 /**
- * Individual mock service factories for backward compatibility
+ * Individual mock service factories
  */
 export function createMockDockerClient() {
   return {

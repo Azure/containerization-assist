@@ -29,8 +29,6 @@ export const generateDockerfileSchema = z.object({
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;
 
-// Legacy export for compatibility
-
 export interface DockerfileRequirement {
   id: string;
   category: string;

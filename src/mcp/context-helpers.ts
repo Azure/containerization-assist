@@ -6,7 +6,6 @@
  * previously embedded in the main context.ts file.
  */
 
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
 
 /**
@@ -92,7 +91,6 @@ export function extractProgressToken(request: unknown): string | undefined {
  * Creates a progress reporter that forwards notifications through the MCP protocol
  */
 export function createProgressReporter(
-  server: Server,
   progressToken?: string | number,
   logger?: Logger,
   sendNotification?: (notification: unknown) => Promise<void>,
@@ -116,7 +114,7 @@ export function createProgressReporter(
         ...(metadata && { metadata }),
       };
 
-      await sendProgressNotification(server, notification, logger, sendNotification);
+      await sendProgressNotification(notification, logger, sendNotification);
     } catch (error) {
       logger?.warn(
         {
@@ -135,7 +133,6 @@ export function createProgressReporter(
  * Uses sendNotification callback if available (from request handler), otherwise falls back to logging.
  */
 async function sendProgressNotification(
-  _server: Server,
   notification: ProgressNotification,
   logger?: Logger,
   sendNotification?: (notification: unknown) => Promise<void>,
@@ -194,7 +191,6 @@ async function sendProgressNotification(
  */
 export function extractProgressReporter(
   progress: unknown,
-  server: Server,
   logger: Logger,
   sendNotification?: (notification: unknown) => Promise<void>,
 ): EnhancedProgressReporter | undefined {
@@ -208,7 +204,7 @@ export function extractProgressReporter(
   // Extract token and create reporter
   const progressToken = extractProgressToken(progress);
   if (progressToken) {
-    return createProgressReporter(server, progressToken, logger, sendNotification);
+    return createProgressReporter(progressToken, logger, sendNotification);
   }
 
   return undefined;

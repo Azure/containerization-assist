@@ -59,22 +59,6 @@
 - Message building for AI interactions
 - Template management
 
-### 📁 `/mcp/ai` - MCP AI Integration
-**Purpose**: MCP-specific AI enhancements and sampling.
-
-**Key Files**:
-- `knowledge-enhancement.ts`: Knowledge pack integration
-- `sampling-runner.ts`: Deterministic sampling system
-- `quality.ts`: Quality scoring for AI outputs
-- `response-parser.ts`: AI response parsing
-- `schemas.ts`: AI-related schemas
-
-**Responsibilities**:
-- Deterministic single-candidate sampling with quality scoring
-- Knowledge enhancement of AI prompts
-- AI response parsing and validation
-- Quality scoring and metadata
-
 ### 📁 `/app` - Application Core
 **Purpose**: Core application logic and orchestration.
 
@@ -167,24 +151,14 @@
 ### 📁 `/mcp` - MCP Server Implementation
 **Purpose**: Model Context Protocol server and adapters.
 
-**Subdirectories**:
-
-#### `/ai`
-- `knowledge-enhancement.ts`: Knowledge pack integration for MCP tools
-- `sampling-runner.ts`: Deterministic sampling system
-- `quality.ts`: Quality scoring and validation
-- `response-parser.ts`: AI response parsing
-
 **Key Files**:
 - `mcp-server.ts`: MCP protocol server implementation
-- `context.ts`: Tool execution context management
+- `context.ts`: Tool execution context management 
 
 **Responsibilities**:
 - MCP protocol implementation
 - Tool registration and routing
-- MCP-specific AI integration with knowledge enhancement
 - Context propagation for tool execution
-- Deterministic sampling coordination
 
 ### 📁 `/tools` - Tool Implementations
 **Purpose**: Individual MCP tool implementations using co-located pattern.

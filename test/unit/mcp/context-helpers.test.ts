@@ -85,13 +85,13 @@ describe('MCP Context Helpers', () => {
 
   describe('createProgressReporter', () => {
     it('should return undefined when no token provided', () => {
-      const reporter = createProgressReporter(mockServer, undefined, mockLogger);
+      const reporter = createProgressReporter(undefined, mockLogger);
       expect(reporter).toBeUndefined();
     });
 
     it('should create a reporter with string token', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const reporter = createProgressReporter(mockServer, 'test-token', mockLogger, mockSendNotification);
+      const reporter = createProgressReporter('test-token', mockLogger, mockSendNotification);
 
       expect(reporter).toBeDefined();
       await reporter!('Processing step 1', 1, 5);
@@ -110,7 +110,7 @@ describe('MCP Context Helpers', () => {
 
     it('should create a reporter with numeric token', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const reporter = createProgressReporter(mockServer, 12345, mockLogger, mockSendNotification);
+      const reporter = createProgressReporter(12345, mockLogger, mockSendNotification);
 
       expect(reporter).toBeDefined();
       await reporter!('Processing', 50, 100);
@@ -129,7 +129,7 @@ describe('MCP Context Helpers', () => {
 
     it('should handle notification without total', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const reporter = createProgressReporter(mockServer, 'token', mockLogger, mockSendNotification);
+      const reporter = createProgressReporter('token', mockLogger, mockSendNotification);
 
       await reporter!('Processing', 25);
 
@@ -145,7 +145,7 @@ describe('MCP Context Helpers', () => {
 
     it('should include metadata when provided', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const reporter = createProgressReporter(mockServer, 'token', mockLogger, mockSendNotification);
+      const reporter = createProgressReporter('token', mockLogger, mockSendNotification);
 
       await reporter!('Processing', 10, 20, { stepName: 'validation', details: 'checking files' });
 
@@ -164,7 +164,7 @@ describe('MCP Context Helpers', () => {
 
     it('should log warning on sendNotification failure', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockRejectedValue(new Error('Network error'));
-      const reporter = createProgressReporter(mockServer, 'token', mockLogger, mockSendNotification);
+      const reporter = createProgressReporter('token', mockLogger, mockSendNotification);
 
       await reporter!('Processing', 1, 5);
 
@@ -178,7 +178,7 @@ describe('MCP Context Helpers', () => {
     });
 
     it('should fallback to logging when no sendNotification provided', async () => {
-      const reporter = createProgressReporter(mockServer, 'token', mockLogger);
+      const reporter = createProgressReporter('token', mockLogger);
 
       await reporter!('Processing', 1, 5);
 
@@ -196,13 +196,13 @@ describe('MCP Context Helpers', () => {
 
   describe('extractProgressReporter', () => {
     it('should return undefined when no progress provided', () => {
-      const reporter = extractProgressReporter(undefined, mockServer, mockLogger);
+      const reporter = extractProgressReporter(undefined, mockLogger);
       expect(reporter).toBeUndefined();
     });
 
     it('should return existing function', () => {
       const existingReporter = jest.fn();
-      const reporter = extractProgressReporter(existingReporter, mockServer, mockLogger);
+      const reporter = extractProgressReporter(existingReporter, mockLogger);
       expect(reporter).toBe(existingReporter);
     });
 
@@ -210,7 +210,7 @@ describe('MCP Context Helpers', () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
       const request = { progressToken: 'extracted-token' };
 
-      const reporter = extractProgressReporter(request, mockServer, mockLogger, mockSendNotification);
+      const reporter = extractProgressReporter(request, mockLogger, mockSendNotification);
 
       expect(reporter).toBeDefined();
       await reporter!('Test message', 1, 1);
@@ -235,7 +235,7 @@ describe('MCP Context Helpers', () => {
         },
       };
 
-      const reporter = extractProgressReporter(request, mockServer, mockLogger, mockSendNotification);
+      const reporter = extractProgressReporter(request, mockLogger, mockSendNotification);
 
       expect(reporter).toBeDefined();
       await reporter!('Nested test', 5, 10);
@@ -264,7 +264,7 @@ describe('MCP Context Helpers', () => {
         },
       };
 
-      const reporter = extractProgressReporter(request, mockServer, mockLogger, mockSendNotification);
+      const reporter = extractProgressReporter(request, mockLogger, mockSendNotification);
       expect(reporter).toBeDefined();
 
       // Simulate multi-step progress reporting

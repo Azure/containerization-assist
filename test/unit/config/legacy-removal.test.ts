@@ -50,7 +50,6 @@ describe('Legacy Configuration Removal', () => {
         logger: undefined,
       };
 
-      // These properties should not exist on the type (removed in Workstream A)
       expect((testConfig as any).samplingHooks).toBeUndefined();
       expect((testConfig as any).configure).toBeUndefined();
       expect((testConfig as any).getConfig).toBeUndefined();

@@ -16,7 +16,7 @@ export interface ExecuteRequest {
 
 /**
  * Optional execution metadata supplied by transports or callers.
- * Used to pass progress tokens, abort signals, or sampling preferences.
+ * Used to pass progress tokens and abort signals.
  */
 export interface ExecuteMetadata {
   progress?: unknown;

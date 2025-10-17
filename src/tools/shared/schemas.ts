@@ -13,8 +13,6 @@ export const repositoryPath = z
     'Absolute path to the repository. Paths are automatically normalized to forward slashes on all platforms (e.g., /path/to/repo or C:/path/to/repo)',
   );
 
-// Legacy export for backwards compatibility
-
 export const namespaceOptional = z.string().optional().describe('Kubernetes namespace');
 
 // Unified environment schema - single source of truth
@@ -37,9 +35,6 @@ export const port = z.number().optional().describe('Application port');
 // Health checks
 
 // Autoscaling
-
-// Sampling options (used by AI-powered generation tools)
-// Note: Now uses deterministic single-candidate sampling
 
 // Analysis options
 export const analysisOptions = {
