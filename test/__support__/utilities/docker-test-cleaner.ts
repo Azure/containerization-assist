@@ -154,9 +154,14 @@ export class DockerTestCleaner {
    */
   async cleanup(): Promise<void> {
     const cleanupPromise = this.performCleanup();
-    const timeoutPromise = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('Cleanup timeout')), this.config.cleanupTimeoutMs)
-    );
+
+    // Create timeout that doesn't prevent process exit
+    let timeoutId: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Cleanup timeout')), this.config.cleanupTimeoutMs);
+      // Unref the timeout so it doesn't keep the event loop alive
+      timeoutId.unref();
+    });
 
     try {
       await Promise.race([cleanupPromise, timeoutPromise]);
@@ -167,6 +172,10 @@ export class DockerTestCleaner {
       this.logger.error(`Cleanup failed: ${error}`);
       throw error;
     } finally {
+      // Clear the timeout if cleanup completed before timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       this.trackedImages.clear();
       this.trackedContainers.clear();
     }

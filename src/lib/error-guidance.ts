@@ -3,7 +3,7 @@
  */
 
 import type { ErrorGuidance } from '@/types';
-import { extractErrorMessage } from './error-utils';
+import { extractErrorMessage } from './errors';
 
 /**
  * Pattern definition for matching errors and generating guidance

@@ -31,7 +31,7 @@ export function renderTools(tools: Tool[], options: RenderOptions): void {
 /**
  * Output tools in table format
  */
-function outputTable(tools: Tool[], detailed: boolean = false): void {
+function outputTable(tools: Tool[], _detailed: boolean = false): void {
   if (tools.length === 0) {
     console.info('No tools found matching criteria');
     return;
@@ -53,18 +53,6 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
     const ke = tool.metadata.knowledgeEnhanced ? ' ✅ ' : ' ❌ ';
 
     console.info(`│ ${name} │ ${category} │${ke}│`);
-
-    if (
-      detailed &&
-      tool.metadata.enhancementCapabilities &&
-      tool.metadata.enhancementCapabilities.length > 0
-    ) {
-      const caps = tool.metadata.enhancementCapabilities.join(', ');
-      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 6);
-      for (const line of wrappedCaps) {
-        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 6)} │`);
-      }
-    }
   }
 
   console.info(`└─${'─'.repeat(nameWidth)}─┴─${'─'.repeat(categoryWidth)}─┴────┘`);
@@ -72,46 +60,11 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
 }
 
 /**
- * Escape and quote a CSV field value
- */
-function escapeCSVField(value: string): string {
-  // Escape double quotes by doubling them, then wrap in quotes
-  const escaped = value.replace(/"/g, '""');
-  return `"${escaped}"`;
-}
-
-/**
  * Output tools in CSV format
  */
 function outputCSV(tools: Tool[]): void {
-  console.info('Name,Category,Knowledge-Enhanced,Enhancement Capabilities');
+  console.info('Name,Category,Knowledge-Enhanced');
   for (const tool of tools) {
-    const caps = tool.metadata.enhancementCapabilities?.join(';') ?? '';
-    const capsEscaped = escapeCSVField(caps);
-    console.info(
-      `${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},${capsEscaped}`,
-    );
+    console.info(`${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced}`);
   }
-}
-
-/**
- * Wrap text to fit within specified width
- */
-function wrapText(text: string, width: number): string[] {
-  if (text.length <= width) return [text];
-
-  const lines: string[] = [];
-  let current = '';
-
-  for (const word of text.split(' ')) {
-    if (current.length + word.length + 1 <= width) {
-      current += (current ? ' ' : '') + word;
-    } else {
-      if (current) lines.push(current);
-      current = word;
-    }
-  }
-
-  if (current) lines.push(current);
-  return lines;
 }

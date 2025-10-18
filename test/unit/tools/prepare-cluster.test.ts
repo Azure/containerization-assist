@@ -65,12 +65,13 @@ jest.mock('@/lib/tool-helpers', () => ({
   })),
 }));
 
-jest.mock('@/lib/error-utils', () => ({
+jest.mock('@/lib/errors', () => ({
   extractErrorMessage: jest.fn((error) => error.message || String(error)),
+  ERROR_MESSAGES: {},
 }));
 
-jest.mock('@/lib/platform-utils', () => ({
-  getSystemInfo: jest.fn(() => ({ platform: 'linux', arch: 'x64' })),
+jest.mock('@/lib/platform', () => ({
+  getSystemInfo: jest.fn(() => ({ isWindows: false, isMac: false, isLinux: true })),
   getDownloadOS: jest.fn(() => 'linux'),
   getDownloadArch: jest.fn(() => 'amd64'),
 }));

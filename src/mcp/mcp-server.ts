@@ -13,7 +13,7 @@ import {
   type ServerNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { MCPTool } from '@/types/tool';
 import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
@@ -374,9 +374,6 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
 
 /**
  * Format tool output based on requested format
- * @param output - The output value to format
- * @param format - Desired output format (json, markdown, or text)
- * @returns Formatted string representation of the output
  */
 export function formatOutput(output: unknown, format: OutputFormat): string {
   switch (format) {

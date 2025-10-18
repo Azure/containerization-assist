@@ -1,106 +1,146 @@
 /**
  * Validate Dockerfile Tool
  *
- * Validates Dockerfile base images against configurable allowlist/denylist regex patterns.
- * Configuration is managed at the server level via environment variables.
+ * Validates Dockerfile content against organizational policies defined in policies/*.yaml
+ * Applies policy rules and returns violations, warnings, and suggestions.
  */
 
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { getToolLogger } from '@/lib/tool-helpers';
-import { validateImageSchema, type ValidateImageResult } from './schema';
-import { promises as fs } from 'node:fs';
+import {
+  validateImageSchema,
+  type ValidateImageResult,
+  type PolicyViolation,
+} from './schema';
+import { existsSync, readdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import nodePath from 'node:path';
-import { DockerfileParser } from 'dockerfile-ast';
 import type { z } from 'zod';
-import { config } from '@/config';
+import { loadPolicy } from '@/config/policy-io';
+import { applyPolicy } from '@/config/policy-eval';
+import type { Policy } from '@/config/policy-schemas';
+import { createLogger } from '@/lib/logger';
 
 const name = 'validate-dockerfile';
-const description = 'Validate Dockerfile base images against allowlist/denylist patterns';
-const version = '1.0.0';
+const description = 'Validate Dockerfile against organizational policies';
+const version = '2.0.0';
 
-interface BaseImageInfo {
-  image: string;
-  line: number;
-}
-
-function extractBaseImages(content: string): BaseImageInfo[] {
-  const baseImages: BaseImageInfo[] = [];
-
+/**
+ * Get default policy paths from policies/ directory
+ */
+function getDefaultPolicyPaths(): string[] {
+  const logger = createLogger({ name: 'policy-discovery' });
   try {
-    const dockerfile = DockerfileParser.parse(content);
-    const instructions = dockerfile.getInstructions();
+    const policiesDir = nodePath.join(process.cwd(), 'policies');
 
-    for (const instr of instructions) {
-      if (instr.getInstruction() === 'FROM') {
-        const args = instr.getArguments();
-        if (args && args.length > 0) {
-          const imageArg = args[0];
-          if (imageArg) {
-            const image = imageArg.getValue();
-            const line = (instr.getRange()?.start.line ?? 0) + 1;
-            baseImages.push({ image, line });
-          }
-        }
-      }
+    if (!existsSync(policiesDir)) {
+      logger.debug({ policiesDir }, 'Policies directory not found');
+      return [];
     }
-  } catch (parseError) {
-    throw new Error(
-      `Failed to parse Dockerfile: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-    );
-  }
 
-  return baseImages;
+    const files = readdirSync(policiesDir);
+    return files
+      .filter((f: string) => f.endsWith('.yaml') || f.endsWith('.yml'))
+      .sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((f: string) => nodePath.join(policiesDir, f));
+  } catch (error) {
+    logger.warn(
+      { error, cwd: process.cwd() },
+      'Failed to read policies directory - using no policies',
+    );
+    return [];
+  }
 }
 
-function validateImageAgainstRules(
-  image: string,
-  allowlist: string[],
-  denylist: string[],
-  strictMode: boolean,
-): {
-  allowed: boolean;
-  denied: boolean;
-  matchedAllowRule?: string | undefined;
-  matchedDenyRule?: string | undefined;
-} {
-  // strictMode controls whether allowlist is enforced
-  // If allowlist exists AND strictMode is true: must match to be allowed (start with false)
-  // Otherwise: permissive by default (start with true)
-  let allowed = !(allowlist.length > 0 && strictMode);
-  let denied = false;
-  let matchedAllowRule: string | undefined;
-  let matchedDenyRule: string | undefined;
+/**
+ * Merge multiple policies into a single unified policy
+ */
+function mergePolicies(policies: Policy[]): Policy {
+  if (policies.length === 0) {
+    throw new Error('Cannot merge empty policy list');
+  }
 
-  for (const pattern of denylist) {
-    try {
-      const regex = new RegExp(pattern);
-      if (regex.test(image)) {
-        denied = true;
-        matchedDenyRule = pattern;
-        break;
-      }
-    } catch {
-      throw new Error(`Invalid denylist regex pattern: ${pattern}`);
+  if (policies.length === 1) {
+    const singlePolicy = policies[0];
+    if (!singlePolicy) {
+      throw new Error('Unexpected: policy array is empty');
+    }
+    return singlePolicy;
+  }
+
+  // Merge all policies - later policies override earlier ones for rules with same ID
+  const ruleMap = new Map<string, Policy['rules'][0]>();
+  let mergedDefaults = {};
+
+  for (const policy of policies) {
+    // Merge defaults (later overrides earlier)
+    mergedDefaults = { ...mergedDefaults, ...policy.defaults };
+
+    // Merge rules by ID (later overrides earlier)
+    for (const rule of policy.rules) {
+      ruleMap.set(rule.id, rule);
     }
   }
 
-  if (allowlist.length > 0) {
-    for (const pattern of allowlist) {
-      try {
-        const regex = new RegExp(pattern);
-        if (regex.test(image)) {
-          allowed = true;
-          matchedAllowRule = pattern;
-          break;
-        }
-      } catch {
-        throw new Error(`Invalid allowlist regex pattern: ${pattern}`);
-      }
-    }
+  const merged: Policy = {
+    version: '2.0',
+    metadata: {
+      name: 'Merged Policies',
+      description: `Merged from ${policies.length} policy files`,
+    },
+    defaults: mergedDefaults,
+    rules: Array.from(ruleMap.values()).sort((a, b) => b.priority - a.priority),
+  };
+
+  return merged;
+}
+
+/**
+ * Classify matched rules by severity based on actions
+ */
+function classifyViolation(
+  ruleId: string,
+  category: string | undefined,
+  priority: number,
+  actions: Record<string, unknown>,
+  description?: string,
+): PolicyViolation | null {
+  // Check for blocking actions
+  if (actions.block === true || actions.block_deployment === true || actions.block_build === true) {
+    return {
+      ruleId,
+      category,
+      priority,
+      severity: 'block',
+      message: (actions.message as string) || description || `Rule ${ruleId} violated`,
+    };
   }
 
-  return { allowed, denied, matchedAllowRule, matchedDenyRule };
+  // Check for warning actions
+  if (actions.warn === true || actions.require_approval === true) {
+    return {
+      ruleId,
+      category,
+      priority,
+      severity: 'warn',
+      message: (actions.message as string) || description || `Rule ${ruleId} triggered warning`,
+    };
+  }
+
+  // Check for suggestion actions
+  if (actions.suggest === true || actions.suggest_pinned_version === true) {
+    return {
+      ruleId,
+      category,
+      priority,
+      severity: 'suggest',
+      message: (actions.message as string) || description || `Rule ${ruleId} suggests improvement`,
+    };
+  }
+
+  // Rule matched but no actionable severity
+  return null;
 }
 
 async function handleValidateDockerfile(
@@ -108,14 +148,15 @@ async function handleValidateDockerfile(
   ctx: ToolContext,
 ): Promise<Result<ValidateImageResult>> {
   const logger = getToolLogger(ctx, 'validate-dockerfile');
-  const { path, dockerfile: inputDockerfile, strictMode = false } = input;
+  const { path, dockerfile: inputDockerfile, policyPath } = input;
 
   let content = inputDockerfile || '';
 
+  // Read Dockerfile from path if provided
   if (path) {
     const dockerfilePath = nodePath.isAbsolute(path) ? path : nodePath.resolve(process.cwd(), path);
     try {
-      content = await fs.readFile(dockerfilePath, 'utf-8');
+      content = await readFile(dockerfilePath, 'utf-8');
     } catch (error) {
       return Failure(`Failed to read Dockerfile at ${dockerfilePath}: ${error}`);
     }
@@ -125,89 +166,120 @@ async function handleValidateDockerfile(
     return Failure('Either path or dockerfile content is required');
   }
 
-  const allowlist = config.validation.imageAllowlist;
-  const denylist = config.validation.imageDenylist;
+  // Load policies
+  const policyPaths = policyPath ? [policyPath] : getDefaultPolicyPaths();
+
+  if (policyPaths.length === 0) {
+    logger.warn('No policy files found - validation will pass without checks');
+    return Success({
+      success: true,
+      passed: true,
+      violations: [],
+      warnings: [],
+      suggestions: [],
+      summary: {
+        totalRules: 0,
+        matchedRules: 0,
+        blockingViolations: 0,
+        warnings: 0,
+        suggestions: 0,
+      },
+    });
+  }
+
+  const policies: Policy[] = [];
+  for (const policyFile of policyPaths) {
+    const policyResult = loadPolicy(policyFile);
+    if (policyResult.ok) {
+      policies.push(policyResult.value);
+      logger.debug({ policyFile, rulesCount: policyResult.value.rules.length }, 'Loaded policy');
+    } else {
+      logger.warn({ policyFile, error: policyResult.error }, 'Failed to load policy file');
+    }
+  }
+
+  if (policies.length === 0) {
+    return Failure('No valid policies could be loaded');
+  }
+
+  // Merge all policies
+  const mergedPolicy = mergePolicies(policies);
 
   logger.info(
     {
-      allowlistCount: allowlist.length,
-      denylistCount: denylist.length,
-      strictMode,
+      policiesLoaded: policies.length,
+      totalRules: mergedPolicy.rules.length,
     },
-    'Validating Dockerfile base images',
+    'Validating Dockerfile against policies',
   );
 
-  let baseImages: BaseImageInfo[];
-  try {
-    baseImages = extractBaseImages(content);
-  } catch (error) {
-    return Failure(
-      `Failed to extract base images: ${error instanceof Error ? error.message : String(error)}`,
+  // Apply policy to Dockerfile content
+  const policyResults = applyPolicy(mergedPolicy, content);
+
+  // Classify matched rules
+  const violations: PolicyViolation[] = [];
+  const warnings: PolicyViolation[] = [];
+  const suggestions: PolicyViolation[] = [];
+
+  let matchedRulesCount = 0;
+
+  for (const result of policyResults) {
+    if (!result.matched) continue;
+
+    matchedRulesCount++;
+    const violation = classifyViolation(
+      result.rule.id,
+      result.rule.category,
+      result.rule.priority,
+      result.rule.actions,
+      result.rule.description,
     );
-  }
 
-  if (baseImages.length === 0) {
-    return Failure('No FROM instructions found in Dockerfile');
-  }
+    if (!violation) continue;
 
-  const validatedImages = baseImages.map((baseImage) => {
-    const validation = validateImageAgainstRules(baseImage.image, allowlist, denylist, strictMode);
-
-    return {
-      image: baseImage.image,
-      line: baseImage.line,
-      allowed: validation.allowed && !validation.denied,
-      denied: validation.denied,
-      matchedAllowRule: validation.matchedAllowRule,
-      matchedDenyRule: validation.matchedDenyRule,
-    };
-  });
-
-  const allowedImages = validatedImages.filter((img) => img.allowed && !img.denied);
-  const deniedImages = validatedImages.filter((img) => img.denied);
-  const unknownImages = validatedImages.filter((img) => !img.allowed && !img.denied);
-
-  const violations: string[] = [];
-
-  for (const img of deniedImages) {
-    violations.push(
-      `Line ${img.line}: Image '${img.image}' matches denylist pattern '${img.matchedDenyRule}'`,
-    );
-  }
-
-  if (strictMode && allowlist.length > 0) {
-    for (const img of unknownImages) {
-      violations.push(
-        `Line ${img.line}: Image '${img.image}' does not match any allowlist pattern (strict mode)`,
-      );
+    switch (violation.severity) {
+      case 'block':
+        violations.push(violation);
+        break;
+      case 'warn':
+        warnings.push(violation);
+        break;
+      case 'suggest':
+        suggestions.push(violation);
+        break;
     }
   }
 
   const passed = violations.length === 0;
 
-  const result: ValidateImageResult = {
+  const resultData: ValidateImageResult = {
     success: true,
     passed,
-    baseImages: validatedImages,
-    summary: {
-      totalImages: baseImages.length,
-      allowedImages: allowedImages.length,
-      deniedImages: deniedImages.length,
-      unknownImages: unknownImages.length,
-    },
     violations,
+    warnings,
+    suggestions,
+    summary: {
+      totalRules: mergedPolicy.rules.length,
+      matchedRules: matchedRulesCount,
+      blockingViolations: violations.length,
+      warnings: warnings.length,
+      suggestions: suggestions.length,
+    },
   };
 
   logger.info(
     {
-      totalImages: baseImages.length,
+      totalRules: mergedPolicy.rules.length,
+      matchedRules: matchedRulesCount,
       passed,
       violations: violations.length,
+      warnings: warnings.length,
+      suggestions: suggestions.length,
     },
-    'Image validation completed',
+    'Dockerfile validation completed',
   );
 
-  return Success(result);
+  return Success(resultData);
 }
 
 import { tool } from '@/types/tool';
@@ -223,9 +295,9 @@ export default tool({
   },
   chainHints: {
     success:
-      'Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the generate-k8s-manifests tool to proceed with containerization.',
+      'Dockerfile validated against policies. If violations exist, fix them before building. Continue by building the Dockerfile with build-image, then proceed with generate-k8s-manifests.',
     failure:
-      'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
+      'Dockerfile validation failed. Review the policy violations and update the Dockerfile to comply with organizational policies.',
   },
   handler: handleValidateDockerfile,
 });

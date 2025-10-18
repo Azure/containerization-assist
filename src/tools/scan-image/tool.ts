@@ -97,7 +97,10 @@ async function handleScanImage(
     const scanResultWrapper = await securityScanner.scanImage(imageId);
 
     if (!scanResultWrapper.ok) {
-      return Failure(`Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`);
+      return Failure(
+        `Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`,
+        scanResultWrapper.guidance,
+      );
     }
 
     const scanResult = scanResultWrapper.value;

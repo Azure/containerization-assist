@@ -7,43 +7,56 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Policy, PolicyRule, Matcher, FunctionMatcher } from './policy-schemas';
 
-type FunctionEvaluator = (args: unknown[], input: string | Record<string, unknown>) => boolean;
+/**
+ * Convert input to searchable text for pattern matching
+ */
+function toSearchableText(input: string | Record<string, unknown>): string {
+  return typeof input === 'string' ? input : JSON.stringify(input);
+}
 
-const functionEvaluators: Record<FunctionMatcher['name'], FunctionEvaluator> = {
-  hasPattern: (args, input) => {
-    const [pattern, flags] = args as [string, string?];
-    const regex = new RegExp(pattern, flags);
-    const text = typeof input === 'string' ? input : JSON.stringify(input);
-    return regex.test(text);
-  },
+/**
+ * Evaluate a function matcher against input data
+ */
+function evaluateFunctionMatcher(
+  matcher: FunctionMatcher,
+  input: string | Record<string, unknown>,
+): boolean {
+  const text = toSearchableText(input);
 
-  fileExists: (args, input) => {
-    const [filePath] = args as [string];
-    const basePath = typeof input === 'object' && input.path ? String(input.path) : '.';
-    return fs.existsSync(path.join(basePath, filePath));
-  },
-
-  largerThan: (args, input) => {
-    const [size] = args as [number];
-    if (typeof input === 'string') {
-      return input.length > size;
+  switch (matcher.name) {
+    case 'hasPattern': {
+      const [pattern, flags] = matcher.args as [string, string?];
+      return new RegExp(pattern, flags).test(text);
     }
-    if (typeof input === 'object' && input.size !== undefined) {
-      return Number(input.size) > size;
-    }
-    return false;
-  },
 
-  hasVulnerabilities: (args, input) => {
-    const [severities] = args as [string[]];
-    if (typeof input === 'object' && Array.isArray(input.vulnerabilities)) {
-      return input.vulnerabilities.some((v) =>
-        severities.includes(String(v.severity).toUpperCase()),
-      );
+    case 'fileExists': {
+      const [filePath] = matcher.args as [string];
+      const basePath = typeof input === 'object' && 'path' in input ? String(input.path) : '.';
+      return fs.existsSync(path.join(basePath, filePath));
     }
-    return false;
-  },
-};
+
+    case 'largerThan': {
+      const [size] = matcher.args as [number];
+      if (typeof input === 'string') return input.length > size;
+      if (typeof input === 'object' && 'size' in input) {
+        return Number(input.size) > size;
+      }
+      return false;
+    }
+
+    case 'hasVulnerabilities': {
+      const [severities] = matcher.args as [string[]];
+      if (typeof input === 'object' && 'vulnerabilities' in input) {
+        const vulns = input.vulnerabilities as Array<{ severity: string }>;
+        return vulns.some((v) => severities.includes(v.severity.toUpperCase()));
+      }
+      return false;
+    }
+
+    default:
+      return false;
+  }
+}
 
 /**
  * Evaluate a matcher against input data
@@ -54,7 +67,7 @@ export function evaluateMatcher(
 ): boolean {
   switch (matcher.kind) {
     case 'regex': {
-      const text = typeof input === 'string' ? input : JSON.stringify(input);
+      const text = toSearchableText(input);
 
       if (matcher.count_threshold !== undefined) {
         // Only use 'g' flag when counting matches
@@ -70,8 +83,7 @@ export function evaluateMatcher(
     }
 
     case 'function': {
-      const evaluator = functionEvaluators[matcher.name];
-      return evaluator ? evaluator(matcher.args, input) : false;
+      return evaluateFunctionMatcher(matcher, input);
     }
 
     default:

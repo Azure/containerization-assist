@@ -7,7 +7,7 @@
 import * as yaml from 'js-yaml';
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import type { Logger } from '@/lib/logger';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
@@ -240,6 +240,136 @@ async function deployManifest(
 }
 
 /**
+ * Deploy multiple manifests in order and collect results
+ */
+async function deployManifests(
+  manifests: KubernetesManifest[],
+  namespace: string,
+  k8sClient: ReturnType<typeof createKubernetesClient>,
+  logger: Logger,
+  dryRun: boolean,
+): Promise<{
+  deployedResources: Array<{ kind: string; name: string; namespace: string }>;
+  failedResources: Array<{ kind: string; name: string; error: string; guidance?: import('@/types').ErrorGuidance }>;
+}> {
+  const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
+  const failedResources: Array<{ kind: string; name: string; error: string; guidance?: import('@/types').ErrorGuidance }> = [];
+
+  if (dryRun) {
+    // For dry run, simulate deployment
+    logger.info('Dry run mode - simulating deployment');
+    for (const manifest of manifests) {
+      deployedResources.push({
+        kind: manifest.kind ?? 'unknown',
+        name: manifest.metadata?.name ?? 'unknown',
+        namespace: manifest.metadata?.namespace ?? namespace,
+      });
+    }
+    return { deployedResources, failedResources };
+  }
+
+  // Report progress
+  logger.info({ totalManifests: manifests.length }, 'Starting manifest deployment');
+
+  for (let i = 0; i < manifests.length; i++) {
+    const manifest = manifests[i];
+    if (!manifest) continue; // Skip undefined entries
+
+    const progress = `[${i + 1}/${manifests.length}]`;
+
+    logger.debug(
+      {
+        progress,
+        kind: manifest.kind,
+        name: manifest.metadata?.name,
+      },
+      'Deploying manifest',
+    );
+
+    const result = await deployManifest(manifest, namespace, k8sClient, logger);
+
+    if (result.ok) {
+      deployedResources.push(result.value);
+    } else {
+      failedResources.push({
+        kind: manifest.kind ?? 'unknown',
+        name: manifest.metadata?.name ?? 'unknown',
+        error: result.error,
+        ...(result.guidance && { guidance: result.guidance }),
+      });
+    }
+  }
+
+  // Log deployment summary
+  logger.info(
+    {
+      deployed: deployedResources.length,
+      failed: failedResources.length,
+      total: manifests.length,
+    },
+    'Manifest deployment completed',
+  );
+
+  return { deployedResources, failedResources };
+}
+
+/**
+ * Build service endpoints from manifests
+ */
+function buildEndpoints(
+  service: ServiceManifest | undefined,
+  ingress: IngressManifest | undefined,
+  serviceName: string,
+  namespace: string,
+): Array<{ type: 'internal' | 'external'; url: string; port: number }> {
+  const endpoints: Array<{ type: 'internal' | 'external'; url: string; port: number }> = [];
+
+  if (service) {
+    const port = service.spec?.ports?.[0]?.port ?? DEPLOYMENT_CONFIG.DEFAULT_PORT;
+
+    // Internal endpoint
+    endpoints.push({
+      type: 'internal',
+      url: `http://${serviceName}.${namespace}.svc.cluster.local`,
+      port,
+    });
+
+    // External endpoint if LoadBalancer
+    if (service.spec?.type === 'LoadBalancer') {
+      endpoints.push({
+        type: 'external',
+        url: DEPLOYMENT_CONFIG.PENDING_LB_URL,
+        port,
+      });
+    }
+
+    // NodePort endpoint
+    if (service.spec?.type === 'NodePort') {
+      const nodePort = service.spec?.ports?.[0]?.nodePort;
+      if (nodePort) {
+        endpoints.push({
+          type: 'external',
+          url: `http://<node-ip>`,
+          port: nodePort,
+        });
+      }
+    }
+  }
+
+  // Check for ingress
+  if (ingress) {
+    const host = ingress.spec?.rules?.[0]?.host ?? DEPLOYMENT_CONFIG.DEFAULT_INGRESS_HOST;
+    endpoints.push({
+      type: 'external',
+      url: `http://${host}`,
+      port: DEPLOYMENT_CONFIG.DEFAULT_PORT,
+    });
+  }
+
+  return endpoints;
+}
+
+/**
  * Core deployment implementation
  */
 async function handleDeploy(
@@ -286,84 +416,32 @@ async function handleDeploy(
       { manifestCount: orderedManifests.length, dryRun, namespace },
       'Deploying manifests to Kubernetes',
     );
-    // Deploy manifests with proper error handling
-    const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
-    const failedResources: Array<{
-      kind: string;
-      name: string;
-      error: string;
-      guidance?: import('@/types').ErrorGuidance;
-    }> = [];
 
-    if (!dryRun) {
-      // Report progress
-      logger.info({ totalManifests: orderedManifests.length }, 'Starting manifest deployment');
+    // Deploy manifests and collect results
+    const { deployedResources, failedResources } = await deployManifests(
+      orderedManifests,
+      namespace,
+      k8sClient,
+      logger,
+      dryRun,
+    );
 
-      for (let i = 0; i < orderedManifests.length; i++) {
-        const manifest = orderedManifests[i];
-        if (!manifest) continue; // Skip undefined entries
+    // Handle deployment failures
+    if (failedResources.length > 0) {
+      logger.warn({ failedResources }, 'Some resources failed to deploy');
 
-        const progress = `[${i + 1}/${orderedManifests.length}]`;
-
-        logger.debug(
-          {
-            progress,
-            kind: manifest.kind,
-            name: manifest.metadata?.name,
-          },
-          'Deploying manifest',
-        );
-
-        const result = await deployManifest(manifest, namespace, k8sClient, logger);
-
-        if (result.ok) {
-          deployedResources.push(result.value);
-        } else {
-          failedResources.push({
-            kind: manifest.kind ?? 'unknown',
-            name: manifest.metadata?.name ?? 'unknown',
-            error: result.error,
-            ...(result.guidance && { guidance: result.guidance }),
-          });
-        }
-      }
-
-      // Log deployment summary
-      logger.info(
-        {
-          deployed: deployedResources.length,
-          failed: failedResources.length,
-          total: orderedManifests.length,
-        },
-        'Manifest deployment completed',
-      );
-
-      if (failedResources.length > 0) {
-        logger.warn({ failedResources }, 'Some resources failed to deploy');
-
-        // If ALL manifests failed, return failure with guidance from the first failure
-        if (deployedResources.length === 0) {
-          const firstFailure = failedResources[0];
-          if (firstFailure?.guidance) {
-            return Failure(
-              `All manifest deployments failed. First error: ${firstFailure.error}`,
-              firstFailure.guidance,
-            );
-          }
+      // If ALL manifests failed, return failure with guidance from the first failure
+      if (deployedResources.length === 0) {
+        const firstFailure = failedResources[0];
+        if (firstFailure?.guidance) {
           return Failure(
-            `All manifest deployments failed. Errors: ${failedResources.map((f) => `${f.kind}/${f.name}: ${f.error}`).join(', ')}`,
+            `All manifest deployments failed. First error: ${firstFailure.error}`,
+            firstFailure.guidance,
           );
         }
-      }
-    } else {
-      // For dry run, simulate deployment
-      logger.info('Dry run mode - simulating deployment');
-      for (const manifest of orderedManifests) {
-        deployedResources.push({
-          kind: manifest.kind ?? 'unknown',
-          name: manifest.metadata?.name ?? 'unknown',
-          namespace: manifest.metadata?.namespace ?? namespace,
-        });
+        return Failure(
+          `All manifest deployments failed. Errors: ${failedResources.map((f) => `${f.kind}/${f.name}: ${f.error}`).join(', ')}`,
+        );
       }
     }
     // Find deployment and service with type safety
@@ -408,50 +486,8 @@ async function handleDeploy(
       ready = true;
       readyReplicas = totalReplicas;
     }
-    // Build endpoints with proper configuration
-    const endpoints: Array<{ type: 'internal' | 'external'; url: string; port: number }> = [];
-
-    if (service) {
-      const port = service.spec?.ports?.[0]?.port ?? DEPLOYMENT_CONFIG.DEFAULT_PORT;
-
-      // Internal endpoint
-      endpoints.push({
-        type: 'internal',
-        url: `http://${serviceName}.${namespace}.svc.cluster.local`,
-        port,
-      });
-
-      // External endpoint if LoadBalancer
-      if (service.spec?.type === 'LoadBalancer') {
-        endpoints.push({
-          type: 'external',
-          url: DEPLOYMENT_CONFIG.PENDING_LB_URL,
-          port,
-        });
-      }
-
-      // NodePort endpoint
-      if (service.spec?.type === 'NodePort') {
-        const nodePort = service.spec?.ports?.[0]?.nodePort;
-        if (nodePort) {
-          endpoints.push({
-            type: 'external',
-            url: `http://<node-ip>`,
-            port: nodePort,
-          });
-        }
-      }
-    }
-
-    // Check for ingress
-    if (ingress) {
-      const host = ingress.spec?.rules?.[0]?.host ?? DEPLOYMENT_CONFIG.DEFAULT_INGRESS_HOST;
-      endpoints.push({
-        type: 'external',
-        url: `http://${host}`,
-        port: DEPLOYMENT_CONFIG.DEFAULT_PORT,
-      });
-    }
+    // Build endpoints using helper function
+    const endpoints = buildEndpoints(service, ingress, serviceName, namespace);
 
     // Prepare the result
     const result: DeployApplicationResult = {
@@ -501,8 +537,7 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success:
-      'Application deployed successfully. Use verify-deploy to check deployment health and status.',
+    success: 'Application deployed successfully. Use verify-deploy to check deployment health and status.',
     failure:
       'Deployment failed. Check cluster connectivity, manifests validity, and pod status with kubectl.',
   },

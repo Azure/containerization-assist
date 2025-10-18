@@ -402,8 +402,7 @@ export default tool({
     knowledgeEnhanced: true,
   },
   chainHints: {
-    success:
-      'Dockerfile fixes applied successfully. Next: Call build-image to test the fixed Dockerfile.',
+    success: 'Dockerfile fixes applied successfully. Next: Call build-image to test the fixed Dockerfile.',
     failure: 'Dockerfile fix failed. Review validation errors and try manual fixes.',
   },
   handler: handleFixDockerfile,

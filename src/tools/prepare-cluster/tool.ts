@@ -21,7 +21,7 @@
  */
 
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/mcp/context';
 import {
@@ -29,7 +29,7 @@ import {
   type K8sManifest,
   type KubernetesClient,
 } from '@/infra/kubernetes/client';
-import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-utils';
+import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform';
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
 import type * as pino from 'pino';
@@ -294,6 +294,133 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
 }
 
 /**
+ * Setup Kind cluster if needed
+ */
+async function setupKindCluster(
+  cluster: string,
+  logger: pino.Logger,
+  checks: {
+    kindInstalled: boolean | undefined;
+    kindClusterCreated: boolean | undefined;
+  },
+): Promise<void> {
+  checks.kindInstalled = await checkKindInstalled(logger);
+  if (!checks.kindInstalled) {
+    await installKind(logger);
+    checks.kindInstalled = true;
+    logger.info('Kind installation completed');
+  }
+
+  const kindClusterExists = await checkKindClusterExists(cluster, logger);
+  if (!kindClusterExists) {
+    await createKindCluster(cluster, logger);
+    checks.kindClusterCreated = true;
+    logger.info({ clusterName: cluster }, 'Kind cluster creation completed');
+
+    // Wait for cluster to stabilize
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  } else {
+    checks.kindClusterCreated = true;
+    logger.info({ clusterName: cluster }, 'Kind cluster already exists');
+  }
+
+  // Export kubeconfig
+  try {
+    await execAsync(`kind export kubeconfig --name ${cluster}`);
+  } catch (error) {
+    logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
+  }
+}
+
+/**
+ * Setup local Docker registry if needed
+ */
+async function setupLocalRegistry(
+  logger: pino.Logger,
+  checks: {
+    localRegistryCreated: boolean | undefined;
+  },
+): Promise<string> {
+  const registryExists = await checkLocalRegistryExists(logger);
+  if (!registryExists) {
+    const registryUrl = await createLocalRegistry(logger);
+    checks.localRegistryCreated = true;
+    logger.info({ registryUrl }, 'Local registry creation completed');
+    return registryUrl;
+  } else {
+    const registryUrl = 'localhost:5001';
+    checks.localRegistryCreated = true;
+    logger.info({ registryUrl }, 'Local registry already exists');
+    return registryUrl;
+  }
+}
+
+/**
+ * Verify cluster readiness by checking connectivity, permissions, and namespace
+ */
+async function verifyClusterReadiness(
+  k8sClient: KubernetesClient,
+  namespace: string,
+  shouldCreateNamespace: boolean,
+  shouldSetupRbac: boolean,
+  checkRequirements: boolean,
+  installIngress: boolean,
+  logger: pino.Logger,
+  checks: {
+    connectivity: boolean;
+    permissions: boolean;
+    namespaceExists: boolean;
+    ingressController: boolean | undefined;
+    rbacConfigured: boolean | undefined;
+  },
+  warnings: string[],
+): Promise<Result<boolean>> {
+  // Check connectivity
+  checks.connectivity = await checkConnectivity(k8sClient, logger);
+  if (!checks.connectivity) {
+    return Failure('Cannot connect to Kubernetes cluster');
+  }
+
+  // Check permissions
+  checks.permissions = await k8sClient.checkPermissions(namespace);
+  if (!checks.permissions) {
+    warnings.push('Limited permissions - some operations may fail');
+  }
+
+  // Check/create namespace
+  checks.namespaceExists = await checkNamespace(k8sClient, namespace, logger);
+  if (!checks.namespaceExists && shouldCreateNamespace) {
+    const ensureResult = await k8sClient.ensureNamespace(namespace);
+    if (ensureResult.ok) {
+      checks.namespaceExists = true;
+      logger.info({ namespace }, 'Namespace created successfully');
+    } else {
+      logger.error({ namespace, error: ensureResult.error }, 'Failed to create namespace');
+      return Failure(ensureResult.error || 'Failed to create namespace', ensureResult.guidance);
+    }
+  } else if (!checks.namespaceExists) {
+    warnings.push(`Namespace ${namespace} does not exist - deployment may fail`);
+  }
+
+  // Setup RBAC if needed
+  if (shouldSetupRbac) {
+    await setupRbac(k8sClient, namespace, logger);
+    checks.rbacConfigured = true;
+  }
+
+  // Check ingress controller if needed
+  if (checkRequirements || installIngress) {
+    checks.ingressController = await checkIngressController(k8sClient, logger);
+    if (!checks.ingressController) {
+      warnings.push('No ingress controller found - external access may not work');
+    }
+  }
+
+  const clusterReady = checks.connectivity && checks.permissions && checks.namespaceExists;
+  return Success(clusterReady);
+}
+
+/**
  * Core cluster preparation implementation
  */
 async function handlePrepareCluster(
@@ -336,84 +463,34 @@ async function handlePrepareCluster(
     };
     let localRegistryUrl: string | undefined;
 
+    // Setup Kind cluster if in development environment
     if (shouldSetupKind) {
-      checks.kindInstalled = await checkKindInstalled(logger);
-      if (!checks.kindInstalled) {
-        await installKind(logger);
-        checks.kindInstalled = true;
-        logger.info('Kind installation completed');
-      }
-
-      const kindClusterName = cluster;
-      const kindClusterExists = await checkKindClusterExists(kindClusterName, logger);
-      if (!kindClusterExists) {
-        await createKindCluster(kindClusterName, logger);
-        checks.kindClusterCreated = true;
-        logger.info({ clusterName: kindClusterName }, 'Kind cluster creation completed');
-
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      } else {
-        checks.kindClusterCreated = true;
-        logger.info({ clusterName: kindClusterName }, 'Kind cluster already exists');
-      }
-
-      try {
-        await execAsync(`kind export kubeconfig --name ${kindClusterName}`);
-      } catch (error) {
-        logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
-      }
+      await setupKindCluster(cluster, logger, checks);
     }
 
+    // Setup local Docker registry if in development environment
     if (shouldCreateLocalRegistry) {
-      const registryExists = await checkLocalRegistryExists(logger);
-      if (!registryExists) {
-        localRegistryUrl = await createLocalRegistry(logger);
-        checks.localRegistryCreated = true;
-        logger.info({ registryUrl: localRegistryUrl }, 'Local registry creation completed');
-      } else {
-        localRegistryUrl = 'localhost:5001';
-        checks.localRegistryCreated = true;
-        logger.info({ registryUrl: localRegistryUrl }, 'Local registry already exists');
-      }
+      localRegistryUrl = await setupLocalRegistry(logger, checks);
     }
 
-    checks.connectivity = await checkConnectivity(k8sClient, logger);
-    if (!checks.connectivity) {
-      return Failure('Cannot connect to Kubernetes cluster');
+    // Verify cluster readiness (connectivity, permissions, namespace, RBAC, ingress)
+    const readinessResult = await verifyClusterReadiness(
+      k8sClient,
+      namespace,
+      shouldCreateNamespace,
+      shouldSetupRbac,
+      checkRequirements,
+      installIngress,
+      logger,
+      checks,
+      warnings,
+    );
+
+    if (!readinessResult.ok) {
+      return readinessResult;
     }
 
-    checks.permissions = await k8sClient.checkPermissions(namespace);
-    if (!checks.permissions) {
-      warnings.push('Limited permissions - some operations may fail');
-    }
-
-    checks.namespaceExists = await checkNamespace(k8sClient, namespace, logger);
-    if (!checks.namespaceExists && shouldCreateNamespace) {
-      const ensureResult = await k8sClient.ensureNamespace(namespace);
-      if (ensureResult.ok) {
-        checks.namespaceExists = true;
-        logger.info({ namespace }, 'Namespace created successfully');
-      } else {
-        logger.error({ namespace, error: ensureResult.error }, 'Failed to create namespace');
-        return Failure(ensureResult.error || 'Failed to create namespace', ensureResult.guidance);
-      }
-    } else if (!checks.namespaceExists) {
-      warnings.push(`Namespace ${namespace} does not exist - deployment may fail`);
-    }
-
-    if (shouldSetupRbac) {
-      await setupRbac(k8sClient, namespace, logger);
-      checks.rbacConfigured = true;
-    }
-
-    if (checkRequirements || installIngress) {
-      checks.ingressController = await checkIngressController(k8sClient, logger);
-      if (!checks.ingressController) {
-        warnings.push('No ingress controller found - external access may not work');
-      }
-    }
-
-    const clusterReady = checks.connectivity && checks.permissions && checks.namespaceExists;
+    const clusterReady = readinessResult.value;
 
     const result: PrepareClusterResult = {
       success: true,

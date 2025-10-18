@@ -15,7 +15,7 @@ import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
 import { pushImageSchema } from './schema';
 import type { z } from 'zod';
-import { createErrorGuidance } from '@/lib/error-utils';
+import { createErrorGuidance } from '@/lib/errors';
 
 export interface PushImageResult {
   success: true;

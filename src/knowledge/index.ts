@@ -6,7 +6,6 @@ export type {
   KnowledgeQuery,
   KnowledgeMatch,
   LoadedEntry,
-  CompilationStats,
 } from './types';
 
 import { findKnowledgeMatches } from './matcher';

@@ -1,83 +1,21 @@
 /**
  * Tool Metadata Contract & Validation
  *
- * Provides comprehensive Zod-based validation with mandatory metadata
- * for all AI-enhanced tools.
+ * Provides Zod-based validation for tool metadata.
  */
 
 import { z } from 'zod';
 import { Result, Success, Failure } from './core';
 
 /**
- * Comprehensive enum for enhancement capabilities
- * @internal - Only used internally for validation
- */
-const EnhancementCapabilitySchema = z.enum([
-  'analysis',
-  'azure-optimization',
-  'best-practices',
-  'build-analysis',
-  'chart-optimization',
-  'cluster-optimization',
-  'content-generation',
-  'deployment-analysis',
-  'enhancement',
-  'generation',
-  'health-analysis',
-  'helm-templating',
-  'image-recommendation',
-  'kubernetes-optimization',
-  'manifest-conversion',
-  'manifest-generation',
-  'optimization',
-  'optimization-recommendations',
-  'optimization-suggestions',
-  'performance-insights',
-  'performance-recommendations',
-  'performance-tuning',
-  'platform-translation',
-  'push-optimization',
-  'recommendations',
-  'registry-insights',
-  'repair',
-  'resource-recommendations',
-  'risk-assessment',
-  'security',
-  'security-analysis',
-  'security-enhancements',
-  'security-recommendations',
-  'security-suggestions',
-  'self-repair',
-  'tagging-strategy',
-  'technology-detection',
-  'troubleshooting',
-  'troubleshooting-guidance',
-  'validation',
-  'validation-insights',
-  'vulnerability-analysis',
-]);
-
-export type EnhancementCapability = z.infer<typeof EnhancementCapabilitySchema>;
-
-/**
- * Mandatory Tool Metadata Schema
+ * Tool Metadata Schema
  *
- * All tools must provide complete metadata for proper AI enhancement
- * and capability discovery.
+ * All tools must specify whether they use knowledge enhancement.
  * @internal - Only used internally for validation
  */
 const ToolMetadataSchema = z.object({
   /** Whether this tool uses knowledge enhancement (required) */
   knowledgeEnhanced: z.boolean(),
-
-  /** List of enhancement capabilities this tool provides (optional) */
-  enhancementCapabilities: z.array(EnhancementCapabilitySchema).optional(),
-
-  /** Confidence threshold for accepting AI responses (optional) */
-  confidenceThreshold: z.number().min(0).max(1).optional(),
-
-  /** Maximum number of retry attempts for AI operations (optional) */
-  maxRetries: z.number().int().positive().max(10).optional(),
 });
 
 export type ToolMetadata = z.infer<typeof ToolMetadataSchema>;
@@ -105,31 +43,15 @@ function validateToolMetadata(metadata: unknown): Result<ToolMetadata> {
 }
 
 /**
- * Helper function to check if knowledge-enhanced tool is missing capabilities
- */
-function isKnowledgeEnhancedWithoutCapabilities(metadata: ToolMetadata): boolean {
-  return (
-    metadata.knowledgeEnhanced &&
-    (!metadata.enhancementCapabilities || metadata.enhancementCapabilities.length === 0)
-  );
-}
-
-/**
  * Validates metadata consistency with tool properties
  * @internal - Only used by validateAllToolMetadata
  */
-function validateMetadataConsistency(toolName: string, metadata: ToolMetadata): Result<void> {
-  const issues: string[] = [];
-
-  // Knowledge-enhanced tools should have enhancement capabilities
-  if (isKnowledgeEnhancedWithoutCapabilities(metadata)) {
-    issues.push('Knowledge-enhanced tools should specify enhancement capabilities');
-  }
-
-  if (issues.length > 0) {
-    return Failure(`Tool "${toolName}" metadata inconsistency: ${issues.join('; ')}`);
-  }
-
+function validateMetadataConsistency(
+  _toolName: string,
+  _metadata: ToolMetadata,
+): Result<void> {
+  // Currently no additional consistency checks needed beyond schema validation
+  // This function is kept for future extensibility
   return Success(undefined);
 }
 
@@ -146,15 +68,10 @@ export interface ValidatableTool {
  * Consolidates all validation logic from CLI into centralized location
  * @internal - Only used by validateAllToolMetadata
  */
-function postValidate(tool: ValidatableTool): string[] {
-  const issues: string[] = [];
-
-  // Knowledge-enhanced tool missing capabilities
-  if (isKnowledgeEnhancedWithoutCapabilities(tool.metadata)) {
-    issues.push('Knowledge-enhanced tool missing capabilities');
-  }
-
-  return issues;
+function postValidate(_tool: ValidatableTool): string[] {
+  // Currently no additional post-validation checks needed beyond schema validation
+  // This function is kept for future extensibility
+  return [];
 }
 
 /**
@@ -187,7 +104,6 @@ export interface ValidationReport {
  * Suggestion mapping for common validation issues
  */
 const VALIDATION_SUGGESTIONS: Record<string, string> = {
-  'Knowledge-enhanced tool missing capabilities': 'Add appropriate enhancementCapabilities array',
   'Invalid metadata schema': 'Fix metadata schema validation errors',
   'Metadata consistency issues': 'Review and fix metadata consistency',
 };

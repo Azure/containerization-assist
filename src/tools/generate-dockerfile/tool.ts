@@ -47,6 +47,101 @@ interface ExtendedDockerfileParams extends GenerateDockerfileParams {
 }
 
 /**
+ * List of valid Dockerfile instruction keywords
+ */
+const DOCKERFILE_KEYWORDS = [
+  'FROM',
+  'RUN',
+  'CMD',
+  'LABEL',
+  'EXPOSE',
+  'ENV',
+  'ADD',
+  'COPY',
+  'ENTRYPOINT',
+  'VOLUME',
+  'USER',
+  'WORKDIR',
+  'ARG',
+  'ONBUILD',
+  'STOPSIGNAL',
+  'HEALTHCHECK',
+  'SHELL',
+] as const;
+
+/**
+ * Parse Dockerfile content and extract base images
+ */
+function extractBaseImages(lines: string[]): string[] {
+  return lines
+    .filter((line) => line.toUpperCase().startsWith('FROM '))
+    .map((line) => line.substring(5).trim().split(' ')[0])
+    .filter((image): image is string => Boolean(image));
+}
+
+/**
+ * Check if Dockerfile has a HEALTHCHECK instruction
+ */
+function hasHealthCheckInstruction(lines: string[]): boolean {
+  return lines.some((line) => line.toUpperCase().startsWith('HEALTHCHECK '));
+}
+
+/**
+ * Check if Dockerfile has a non-root USER instruction
+ */
+function hasNonRootUserInstruction(lines: string[]): boolean {
+  return lines.some((line) => {
+    const upper = line.toUpperCase();
+    return (
+      upper.startsWith('USER ') && !upper.startsWith('USER ROOT') && !upper.startsWith('USER 0')
+    );
+  });
+}
+
+/**
+ * Count Dockerfile instructions
+ */
+function countInstructions(lines: string[]): number {
+  return lines.filter((line) => {
+    const firstWord = line.split(/\s+/)[0];
+    return firstWord && DOCKERFILE_KEYWORDS.includes(firstWord.toUpperCase() as typeof DOCKERFILE_KEYWORDS[number]);
+  }).length;
+}
+
+/**
+ * Determine Dockerfile complexity based on instruction count and structure
+ */
+function determineComplexity(
+  instructionCount: number,
+  isMultistage: boolean,
+): 'simple' | 'moderate' | 'complex' {
+  if (instructionCount > 20 || isMultistage) {
+    return 'complex';
+  } else if (instructionCount > 10) {
+    return 'moderate';
+  }
+  return 'simple';
+}
+
+/**
+ * Assess security posture based on Dockerfile features
+ */
+function assessSecurityPosture(
+  hasNonRootUser: boolean,
+  hasHealthCheck: boolean,
+): 'good' | 'needs-improvement' | 'poor' {
+  const hasRunAsRoot = !hasNonRootUser;
+  const hasNoHealthCheck = !hasHealthCheck;
+
+  if (!hasRunAsRoot && hasHealthCheck) {
+    return 'good';
+  } else if (hasRunAsRoot && hasNoHealthCheck) {
+    return 'poor';
+  }
+  return 'needs-improvement';
+}
+
+/**
  * Analyzes an existing Dockerfile to extract structure and patterns
  */
 function analyzeDockerfile(content: string): DockerfileAnalysis {
@@ -55,69 +150,13 @@ function analyzeDockerfile(content: string): DockerfileAnalysis {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // Extract base images (FROM instructions)
-  const baseImages = lines
-    .filter((line) => line.toUpperCase().startsWith('FROM '))
-    .map((line) => line.substring(5).trim().split(' ')[0])
-    .filter((image): image is string => Boolean(image));
-
-  // Check for multi-stage build (multiple FROM statements)
+  const baseImages = extractBaseImages(lines);
   const isMultistage = baseImages.length > 1;
-
-  // Check for HEALTHCHECK
-  const hasHealthCheck = lines.some((line) => line.toUpperCase().startsWith('HEALTHCHECK '));
-
-  // Check for non-root USER
-  const hasNonRootUser = lines.some((line) => {
-    const upper = line.toUpperCase();
-    return (
-      upper.startsWith('USER ') && !upper.startsWith('USER ROOT') && !upper.startsWith('USER 0')
-    );
-  });
-
-  // Count total instructions (lines that start with Dockerfile keywords)
-  const dockerfileKeywords = [
-    'FROM',
-    'RUN',
-    'CMD',
-    'LABEL',
-    'EXPOSE',
-    'ENV',
-    'ADD',
-    'COPY',
-    'ENTRYPOINT',
-    'VOLUME',
-    'USER',
-    'WORKDIR',
-    'ARG',
-    'ONBUILD',
-    'STOPSIGNAL',
-    'HEALTHCHECK',
-    'SHELL',
-  ];
-  const instructionCount = lines.filter((line) => {
-    const firstWord = line.split(/\s+/)[0];
-    return firstWord && dockerfileKeywords.includes(firstWord.toUpperCase());
-  }).length;
-
-  // Determine complexity
-  let complexity: 'simple' | 'moderate' | 'complex' = 'simple';
-  if (instructionCount > 20 || isMultistage) {
-    complexity = 'complex';
-  } else if (instructionCount > 10) {
-    complexity = 'moderate';
-  }
-
-  // Assess security posture
-  let securityPosture: 'good' | 'needs-improvement' | 'poor' = 'needs-improvement';
-  const hasRunAsRoot = !hasNonRootUser;
-  const hasNoHealthCheck = !hasHealthCheck;
-
-  if (!hasRunAsRoot && hasHealthCheck) {
-    securityPosture = 'good';
-  } else if (hasRunAsRoot && hasNoHealthCheck) {
-    securityPosture = 'poor';
-  }
+  const hasHealthCheck = hasHealthCheckInstruction(lines);
+  const hasNonRootUser = hasNonRootUserInstruction(lines);
+  const instructionCount = countInstructions(lines);
+  const complexity = determineComplexity(instructionCount, isMultistage);
+  const securityPosture = assessSecurityPosture(hasNonRootUser, hasHealthCheck);
 
   return {
     baseImages,
@@ -131,21 +170,11 @@ function analyzeDockerfile(content: string): DockerfileAnalysis {
 }
 
 /**
- * Generates enhancement guidance based on Dockerfile analysis and knowledge recommendations
+ * Identify good patterns to preserve from existing Dockerfile
  */
-function generateEnhancementGuidance(
-  analysis: DockerfileAnalysis,
-  recommendations: {
-    securityConsiderations: DockerfileRequirement[];
-    optimizations: DockerfileRequirement[];
-    bestPractices: DockerfileRequirement[];
-  },
-): EnhancementGuidance {
+function identifyPreservationNeeds(analysis: DockerfileAnalysis): string[] {
   const preserve: string[] = [];
-  const improve: string[] = [];
-  const addMissing: string[] = [];
 
-  // Preserve good existing patterns
   if (analysis.isMultistage) {
     preserve.push('Multi-stage build structure');
   }
@@ -159,7 +188,24 @@ function generateEnhancementGuidance(
     preserve.push(`Existing base image selection (${analysis.baseImages.join(', ')})`);
   }
 
-  // Identify improvements needed
+  return preserve;
+}
+
+/**
+ * Identify improvements needed in existing Dockerfile
+ */
+function identifyImprovementOpportunities(
+  analysis: DockerfileAnalysis,
+  recommendations: {
+    securityConsiderations: DockerfileRequirement[];
+    optimizations: DockerfileRequirement[];
+    bestPractices: DockerfileRequirement[];
+  },
+): { improve: string[]; addMissing: string[] } {
+  const improve: string[] = [];
+  const addMissing: string[] = [];
+
+  // Identify missing security features
   if (!analysis.hasNonRootUser) {
     improve.push('Add non-root USER for security');
     addMissing.push('Non-root user configuration');
@@ -168,6 +214,8 @@ function generateEnhancementGuidance(
     improve.push('Add HEALTHCHECK instruction');
     addMissing.push('Container health monitoring');
   }
+
+  // Suggest multi-stage for complex builds
   if (analysis.complexity === 'complex' && !analysis.isMultistage) {
     improve.push('Consider multi-stage build for optimization');
   }
@@ -182,20 +230,48 @@ function generateEnhancementGuidance(
     improve.push('Apply layer caching and size optimization techniques');
   }
 
-  // Determine strategy
-  let strategy: 'minor-tweaks' | 'moderate-refactor' | 'major-overhaul' = 'minor-tweaks';
+  return { improve, addMissing };
+}
+
+/**
+ * Determine enhancement strategy based on analysis and improvement needs
+ */
+function determineEnhancementStrategy(
+  analysis: DockerfileAnalysis,
+  preserve: string[],
+  improve: string[],
+  addMissing: string[],
+): 'minor-tweaks' | 'moderate-refactor' | 'major-overhaul' {
   const issueCount = improve.length + addMissing.length;
 
   if (analysis.securityPosture === 'poor' || issueCount > 5) {
-    strategy = 'major-overhaul';
+    return 'major-overhaul';
   } else if (analysis.securityPosture === 'needs-improvement' || issueCount > 2) {
-    strategy = 'moderate-refactor';
+    return 'moderate-refactor';
   }
 
-  // If nothing to improve, note that
+  // If nothing to improve, note that it's well-structured
   if (preserve.length > 0 && improve.length === 0 && addMissing.length === 0) {
     preserve.push('Well-structured Dockerfile - minimal changes needed');
   }
+
+  return 'minor-tweaks';
+}
+
+/**
+ * Generates enhancement guidance based on Dockerfile analysis and knowledge recommendations
+ */
+function generateEnhancementGuidance(
+  analysis: DockerfileAnalysis,
+  recommendations: {
+    securityConsiderations: DockerfileRequirement[];
+    optimizations: DockerfileRequirement[];
+    bestPractices: DockerfileRequirement[];
+  },
+): EnhancementGuidance {
+  const preserve = identifyPreservationNeeds(analysis);
+  const { improve, addMissing } = identifyImprovementOpportunities(analysis, recommendations);
+  const strategy = determineEnhancementStrategy(analysis, preserve, improve, addMissing);
 
   return {
     preserve,

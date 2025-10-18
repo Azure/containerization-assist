@@ -13,7 +13,7 @@
  */
 
 import path from 'path';
-import { normalizePath } from '@/lib/path-utils';
+import { normalizePath } from '@/lib/platform';
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import { promises as fs } from 'node:fs';
 import type { ToolContext } from '@/mcp/context';
@@ -21,7 +21,7 @@ import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/clie
 import { validatePathOrFail } from '@/lib/validation-helpers';
 
 import { type Result, Success, Failure } from '@/types';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { fileExists } from '@/lib/file-utils';
 import { type BuildImageParams, buildImageSchema } from './schema';
 
@@ -245,8 +245,7 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success:
-      'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
+    success: 'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
     failure: 'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image.',
   },
   handler: handleBuildImage,

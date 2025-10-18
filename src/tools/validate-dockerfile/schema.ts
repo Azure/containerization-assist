@@ -6,28 +6,31 @@ export const validateImageSchema = z.object({
     .string()
     .optional()
     .describe('Dockerfile content to validate (alternative to path)'),
-  strictMode: z
-    .boolean()
-    .default(false)
-    .describe('If true, requires at least one allowlist match when allowlist is configured'),
+  policyPath: z
+    .string()
+    .optional()
+    .describe('Optional path to specific policy file to use (defaults to all policies in policies/)'),
 });
+
+export interface PolicyViolation {
+  ruleId: string;
+  category: string | undefined;
+  priority: number;
+  severity: 'block' | 'warn' | 'suggest';
+  message: string;
+}
 
 export interface ValidateImageResult {
   success: boolean;
   passed: boolean;
-  baseImages: Array<{
-    image: string;
-    line: number;
-    allowed: boolean;
-    denied: boolean;
-    matchedAllowRule?: string | undefined;
-    matchedDenyRule?: string | undefined;
-  }>;
+  violations: PolicyViolation[];
+  warnings: PolicyViolation[];
+  suggestions: PolicyViolation[];
   summary: {
-    totalImages: number;
-    allowedImages: number;
-    deniedImages: number;
-    unknownImages: number;
+    totalRules: number;
+    matchedRules: number;
+    blockingViolations: number;
+    warnings: number;
+    suggestions: number;
   };
-  violations: string[];
 }
