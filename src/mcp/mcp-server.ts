@@ -353,19 +353,12 @@ export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingL
           }
         });
       }
-    } else if (
-      typeof value === 'object' &&
-      value !== null &&
-      !(value instanceof Date) &&
-      !(value instanceof RegExp)
-    ) {
-      const valueObj = value as Record<string, unknown>;
+    } else if (isPlainObject(value)) {
+      const valueObj = value;
       if (isSimpleObject(valueObj)) {
-        // Format simple objects as key-value pairs
         markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
         markdown += printSimpleObject(valueObj);
       } else {
-        // Format complex objects with recursive headings
         markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
         markdown += objectToMarkdownRecursive(valueObj, headingLevel + 1);
       }
@@ -396,4 +389,20 @@ function isSimpleObject(obj: Record<string, unknown>): boolean {
       value === null ||
       value === undefined,
   );
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  // Exclude null and non-objects early
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+
+  // Exclude Date and RegExp instances
+  if (value instanceof Date || value instanceof RegExp) {
+    return false;
+  }
+
+  // Consider plain objects those with Object.prototype or null prototype
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
