@@ -161,6 +161,7 @@ export const createKubernetesClient = (
     }
   };
 
+
   return {
     /**
      * Apply Kubernetes manifest (supports all resource types)
@@ -179,16 +180,15 @@ export const createKubernetesClient = (
       );
 
       // Create a working copy to avoid mutating the input manifest
-      const workingManifest =
-        !isClusterScoped && !manifest.metadata.namespace
-          ? {
-              ...manifest,
-              metadata: {
-                ...manifest.metadata,
-                namespace,
-              },
-            }
-          : manifest;
+      const workingManifest = !isClusterScoped && !manifest.metadata.namespace
+        ? {
+            ...manifest,
+            metadata: {
+              ...manifest.metadata,
+              namespace,
+            },
+          }
+        : manifest;
 
       // Use the consolidated resource operations module
       const result = await applyK8sResource(kc, workingManifest, logger);

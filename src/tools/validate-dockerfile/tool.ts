@@ -1,8 +1,7 @@
 /**
  * Validate Dockerfile Tool
  *
- * Validates Dockerfile content against organizational policies defined in YAML files located in the
- * 'policies' directory, which is resolved relative to the current working directory (process.cwd()).
+ * Validates Dockerfile content against organizational policies defined in policies/*.yaml
  * Applies policy rules and returns violations, warnings, and suggestions.
  */
 
@@ -21,7 +20,7 @@ import type { z } from 'zod';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
-import type { Logger } from 'pino';
+import { createLogger } from '@/lib/logger';
 
 const name = 'validate-dockerfile';
 const description = 'Validate Dockerfile against organizational policies';
@@ -30,7 +29,8 @@ const version = '2.0.0';
 /**
  * Get default policy paths from policies/ directory
  */
-function getDefaultPolicyPaths(logger: Logger): string[] {
+function getDefaultPolicyPaths(): string[] {
+  const logger = createLogger({ name: 'policy-discovery' });
   try {
     const policiesDir = nodePath.join(process.cwd(), 'policies');
 
@@ -167,7 +167,7 @@ async function handleValidateDockerfile(
   }
 
   // Load policies
-  const policyPaths = policyPath ? [policyPath] : getDefaultPolicyPaths(logger);
+  const policyPaths = policyPath ? [policyPath] : getDefaultPolicyPaths();
 
   if (policyPaths.length === 0) {
     logger.warn('No policy files found - validation will pass without checks');
@@ -295,9 +295,9 @@ export default tool({
   },
   chainHints: {
     success:
-      'Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the generate-k8s-manifests tool to proceed with containerization.',
+      'Dockerfile validated against policies. If violations exist, fix them before building. Continue by building the Dockerfile with build-image, then proceed with generate-k8s-manifests.',
     failure:
-      'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
+      'Dockerfile validation failed. Review the policy violations and update the Dockerfile to comply with organizational policies.',
   },
   handler: handleValidateDockerfile,
 });

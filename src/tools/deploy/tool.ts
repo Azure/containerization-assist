@@ -537,8 +537,7 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success:
-      'Application deployed successfully. Use verify-deploy to check deployment health and status.',
+    success: 'Application deployed successfully. Use verify-deploy to check deployment health and status.',
     failure:
       'Deployment failed. Check cluster connectivity, manifests validity, and pod status with kubectl.',
   },

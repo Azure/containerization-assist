@@ -245,8 +245,7 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success:
-      'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
+    success: 'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
     failure: 'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image.',
   },
   handler: handleBuildImage,

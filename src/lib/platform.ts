@@ -63,9 +63,7 @@ export function getDownloadArch(): string {
  * @param inputPath The path to normalize
  * @returns The normalized path with forward slashes, or the original value if null/undefined
  */
-export function normalizePath(inputPath: string): string;
-export function normalizePath(inputPath: string | null | undefined): string | null | undefined;
-export function normalizePath(inputPath: string | null | undefined): string | null | undefined {
+export function normalizePath(inputPath: string): string {
   if (inputPath == null) return inputPath; // handles both null and undefined
   if (inputPath === '') return inputPath;
   // Convert all backslashes to forward slashes, then normalize

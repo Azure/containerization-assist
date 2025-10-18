@@ -344,14 +344,7 @@ async function setupKindCluster(
     kindInstalled: boolean | undefined;
     kindClusterCreated: boolean | undefined;
   },
-): Promise<Result<void>> {
-  // Validate cluster name upfront
-  const escapedNameResult = validateAndEscapeClusterName(cluster);
-  if (!escapedNameResult.ok) {
-    return escapedNameResult;
-  }
-  const escapedName = escapedNameResult.value;
-
+): Promise<void> {
   checks.kindInstalled = await checkKindInstalled(logger);
   if (!checks.kindInstalled) {
     await installKind(logger);
@@ -359,17 +352,9 @@ async function setupKindCluster(
     logger.info('Kind installation completed');
   }
 
-  const clusterExistsResult = await checkKindClusterExists(cluster, logger);
-  if (!clusterExistsResult.ok) {
-    return clusterExistsResult;
-  }
-  const kindClusterExists = clusterExistsResult.value;
-
+  const kindClusterExists = await checkKindClusterExists(cluster, logger);
   if (!kindClusterExists) {
-    const createResult = await createKindCluster(cluster, logger);
-    if (!createResult.ok) {
-      return createResult;
-    }
+    await createKindCluster(cluster, logger);
     checks.kindClusterCreated = true;
     logger.info({ clusterName: cluster }, 'Kind cluster creation completed');
 
@@ -382,13 +367,10 @@ async function setupKindCluster(
 
   // Export kubeconfig
   try {
-    // escapedName is already wrapped in single quotes for shell safety
-    await execAsync(`kind export kubeconfig --name ${escapedName}`);
+    await execAsync(`kind export kubeconfig --name ${cluster}`);
   } catch (error) {
     logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
   }
-
-  return Success(undefined);
 }
 
 /**
@@ -524,10 +506,7 @@ async function handlePrepareCluster(
 
     // Setup Kind cluster if in development environment
     if (shouldSetupKind) {
-      const setupResult = await setupKindCluster(cluster, logger, checks);
-      if (!setupResult.ok) {
-        return setupResult;
-      }
+      await setupKindCluster(cluster, logger, checks);
     }
 
     // Setup local Docker registry if in development environment

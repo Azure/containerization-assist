@@ -374,9 +374,6 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
 
 /**
  * Format tool output based on requested format
- * @param output - The output value to format
- * @param format - Desired output format (json, markdown, or text)
- * @returns Formatted string representation of the output
  */
 export function formatOutput(output: unknown, format: OutputFormat): string {
   switch (format) {

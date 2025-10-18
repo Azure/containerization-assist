@@ -120,7 +120,7 @@ function calculatePolicyStrictness(policy: Policy): number {
 
   // Use max priority as the strictness metric
   // This ensures policies with the highest-priority rules take precedence
-  return policy.rules.reduce((max, r) => Math.max(max, r.priority), 0);
+  return policy.rules.reduce((max, r) => Math.max(max, r.priority), -Infinity);
 }
 
 /**

@@ -156,7 +156,7 @@ export class DockerTestCleaner {
     const cleanupPromise = this.performCleanup();
 
     // Create timeout that doesn't prevent process exit
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error('Cleanup timeout')), this.config.cleanupTimeoutMs);
       // Unref the timeout so it doesn't keep the event loop alive
@@ -173,7 +173,9 @@ export class DockerTestCleaner {
       throw error;
     } finally {
       // Clear the timeout if cleanup completed before timeout
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       this.trackedImages.clear();
       this.trackedContainers.clear();
     }
