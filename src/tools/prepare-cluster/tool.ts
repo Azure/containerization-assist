@@ -65,9 +65,9 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
     return Failure(`Cluster name too long: "${clusterName}". Must be 63 characters or less.`);
   }
 
-  // Input is strictly validated, so escaping is not needed.
-  // Single quotes prevent all expansion and are safe for direct interpolation.
-  return Success(`'${clusterName}'`);
+  // Even though we validated, still escape for shell safety
+  // Single quotes prevent all expansion
+  return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
 }
 
 export interface PrepareClusterResult {
@@ -344,7 +344,14 @@ async function setupKindCluster(
     kindInstalled: boolean | undefined;
     kindClusterCreated: boolean | undefined;
   },
-): Promise<void> {
+): Promise<Result<void>> {
+  // Validate cluster name upfront
+  const escapedNameResult = validateAndEscapeClusterName(cluster);
+  if (!escapedNameResult.ok) {
+    return escapedNameResult;
+  }
+  const escapedName = escapedNameResult.value;
+
   checks.kindInstalled = await checkKindInstalled(logger);
   if (!checks.kindInstalled) {
     await installKind(logger);
@@ -352,9 +359,17 @@ async function setupKindCluster(
     logger.info('Kind installation completed');
   }
 
-  const kindClusterExists = await checkKindClusterExists(cluster, logger);
+  const clusterExistsResult = await checkKindClusterExists(cluster, logger);
+  if (!clusterExistsResult.ok) {
+    return clusterExistsResult;
+  }
+  const kindClusterExists = clusterExistsResult.value;
+
   if (!kindClusterExists) {
-    await createKindCluster(cluster, logger);
+    const createResult = await createKindCluster(cluster, logger);
+    if (!createResult.ok) {
+      return createResult;
+    }
     checks.kindClusterCreated = true;
     logger.info({ clusterName: cluster }, 'Kind cluster creation completed');
 
@@ -367,10 +382,12 @@ async function setupKindCluster(
 
   // Export kubeconfig
   try {
-    await execAsync(`kind export kubeconfig --name ${cluster}`);
+    await execAsync(`kind export kubeconfig --name ${escapedName}`);
   } catch (error) {
     logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
   }
+
+  return Success(undefined);
 }
 
 /**
@@ -506,7 +523,10 @@ async function handlePrepareCluster(
 
     // Setup Kind cluster if in development environment
     if (shouldSetupKind) {
-      await setupKindCluster(cluster, logger, checks);
+      const setupResult = await setupKindCluster(cluster, logger, checks);
+      if (!setupResult.ok) {
+        return setupResult;
+      }
     }
 
     // Setup local Docker registry if in development environment
