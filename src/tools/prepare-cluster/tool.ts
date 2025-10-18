@@ -228,7 +228,10 @@ async function installKind(logger: pino.Logger): Promise<void> {
   }
 }
 
-async function checkKindClusterExists(clusterName: string, logger: pino.Logger): Promise<Result<boolean>> {
+async function checkKindClusterExists(
+  clusterName: string,
+  logger: pino.Logger,
+): Promise<Result<boolean>> {
   const escapedNameResult = validateAndEscapeClusterName(clusterName);
   if (!escapedNameResult.ok) {
     return escapedNameResult;

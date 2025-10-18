@@ -80,10 +80,7 @@ async function callPatchMethod(
         }) => Promise<{ body?: K8sResource }>
       )({ name, namespace, body: resource })
     : await (
-        patchMethod as (args: {
-          name: string;
-          body: unknown;
-        }) => Promise<{ body?: K8sResource }>
+        patchMethod as (args: { name: string; body: unknown }) => Promise<{ body?: K8sResource }>
       )({ name, body: resource });
 }
 
