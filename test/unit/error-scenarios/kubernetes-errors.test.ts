@@ -30,13 +30,14 @@ function createMockToolContext() {
 }
 
 const mockK8sClient = {
-  createNamespace: jest.fn(),
   applyManifest: jest.fn(),
   getDeploymentStatus: jest.fn(),
-  deleteResource: jest.fn(),
-  getResource: jest.fn(),
-  listResources: jest.fn(),
+  waitForDeploymentReady: jest.fn(),
+  ensureNamespace: jest.fn(),
   ping: jest.fn(),
+  namespaceExists: jest.fn(),
+  checkPermissions: jest.fn(),
+  checkIngressController: jest.fn(),
 };
 
 jest.mock('../../../src/infra/kubernetes/client', () => ({
@@ -159,10 +160,15 @@ describe('Kubernetes Error Scenarios', () => {
     });
 
     it('should handle permission errors', async () => {
-      mockK8sClient.createNamespace.mockResolvedValue(createFailureResult('Forbidden'));
+      // Mock successful connectivity and permission checks
+      mockK8sClient.ping.mockResolvedValue(true);
+      mockK8sClient.checkPermissions.mockResolvedValue(true);
+      mockK8sClient.namespaceExists.mockResolvedValue(false);
+      // Mock failure when trying to ensure namespace exists
+      mockK8sClient.ensureNamespace.mockResolvedValue(createFailureResult('Forbidden'));
 
       const result = await prepareCluster(
-        { namespace: 'test-ns', clusterType: 'kind' },
+        { namespace: 'test-ns', environment: 'production' },
         createMockToolContext(),
       );
 

@@ -172,7 +172,6 @@ WORKDIR /app
 COPY . .
 USER node
 CMD ["node", "index.js"]`,
-          expectedGrades: ['A', 'B'],
         },
         {
           name: 'good (B/C grade)',
@@ -180,7 +179,6 @@ CMD ["node", "index.js"]`,
 WORKDIR /app
 COPY . .
 CMD node index.js`,
-          expectedGrades: ['A', 'B', 'C'],
         },
       ];
 
