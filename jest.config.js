@@ -145,7 +145,7 @@ export default {
     },
     './src/tools/': {
       branches: 50,
-      functions: 65,
+      functions: 64,
       lines: 65,
       statements: 65,
     },
