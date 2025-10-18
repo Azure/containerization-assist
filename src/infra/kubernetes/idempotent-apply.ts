@@ -37,7 +37,10 @@ export interface K8sResource {
  * idempotent apply using server-side apply. Kubernetes server-side apply handles
  * concurrent updates safely at the API level.
  */
-export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
+export function createIdempotentApply(
+  logger: Logger,
+  kubeconfig?: string,
+): (resource: K8sResource, options?: ApplyOptions) => Promise<Result<K8sResource>> {
   const kc = new k8s.KubeConfig();
 
   if (kubeconfig) {

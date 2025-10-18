@@ -182,7 +182,7 @@ export class DockerTestCleaner {
   }
 
   /**
-   * Perform the actual cleanup operations - SIMPLIFIED
+   * Perform the actual cleanup operations
    */
   private async performCleanup(): Promise<void> {
     // Clean tracked containers first (they might reference images)
@@ -256,7 +256,7 @@ export class DockerTestCleaner {
   }
 
   /**
-   * Verify cleanup success (if enabled) - SIMPLIFIED
+   * Verify cleanup success (if enabled)
    */
   private async verifyCleanupSuccess(): Promise<void> {
     try {

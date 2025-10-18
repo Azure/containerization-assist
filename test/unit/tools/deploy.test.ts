@@ -127,16 +127,15 @@ jest.mock('../../../src/lib/logger', () => ({
 }));
 
 // Mock config constants
-jest.mock('../../../src/config/constants', () => {
-  const actual = jest.requireActual('../../../src/config/constants') as any;
-  return {
-    ...actual,
-    DEFAULT_TIMEOUTS: {
-      ...actual.DEFAULT_TIMEOUTS,
-      deploymentPoll: 1000, // Short timeout for tests
-    },
-  };
-});
+jest.mock('../../../src/config/constants', () => ({
+  environmentSchema: z.enum(['development', 'staging', 'production', 'testing']),
+  DEFAULT_TIMEOUTS: {
+    deploymentPoll: 1000, // Short timeout for tests
+  },
+  DEFAULT_PORTS: {},
+  DEFAULT_NETWORK: {},
+  getDefaultPort: jest.fn(),
+}));
 
 // Create mock ToolContext
 function createMockToolContext(): ToolContext {

@@ -75,7 +75,10 @@ export function loadPolicy(file: string): Result<Policy> {
 
     // Cache the loaded policy
     policyCache.set(path.resolve(file), base.value);
-    log.debug({ file, rulesCount: base.value.rules.length }, 'Policy loaded and cached successfully');
+    log.debug(
+      { file, rulesCount: base.value.rules.length },
+      'Policy loaded and cached successfully',
+    );
     return base;
   } catch (err) {
     return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(extractErrorMessage(err)));
@@ -124,7 +127,7 @@ function calculatePolicyStrictness(policy: Policy): number {
 }
 
 /**
- * Merge multiple policies into a single unified policy
+ * Merge multiple policies into a single policy
  * Policies are merged in order of strictness (least strict first)
  * so that stricter policies override less strict ones for rules with the same ID
  */
@@ -192,7 +195,7 @@ function mergePolicies(policies: Policy[]): Result<Policy> {
 }
 
 /**
- * Load and merge multiple policy files into a single unified policy
+ * Load and merge multiple policy files into a single policy
  * Returns Failure if no policies can be loaded successfully
  */
 export function loadAndMergePolicies(policyPaths: string[]): Result<Policy> {

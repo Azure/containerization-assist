@@ -32,7 +32,7 @@ const PolicyRuleSchema = z.object({
   description: z.string().optional(),
 });
 
-// Unified defaults schema that includes both base and environment-specific fields
+// Defaults schema that includes both base and environment-specific fields
 const UnifiedDefaultsSchema = z.object({
   cache_ttl: z.number().optional(),
   enforcement: z.enum(['strict', 'lenient', 'advisory']).optional(),

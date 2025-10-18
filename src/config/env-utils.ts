@@ -34,8 +34,7 @@ export function parseIntEnv(key: string, defaultValue: number): number {
  * parseStringEnv('LOG_LEVEL', 'info') // Returns 'info' if LOG_LEVEL not set
  */
 export function parseStringEnv(key: string, defaultValue: string): string {
-  const value = process.env[key];
-  return value === undefined ? defaultValue : value;
+  return process.env[key] || defaultValue;
 }
 
 /**

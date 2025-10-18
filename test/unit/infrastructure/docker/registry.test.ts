@@ -1,8 +1,10 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import {
   getImageMetadata,
-  DockerRegistry,
-  createDockerRegistry,
+  authenticateRegistry,
+  checkRegistryHealth,
+  checkImageExists,
+  listRepositoryTags,
   type ImageMetadata,
   type RegistryConfig,
 } from '../../../../src/infra/docker/registry';
@@ -302,9 +304,8 @@ describe('Docker Registry Client', () => {
     });
   });
 
-  describe('DockerRegistry', () => {
+  describe('Registry Functions', () => {
     let mockDocker: any;
-    let registryClient: DockerRegistry;
 
     beforeEach(() => {
       jest.clearAllMocks();
@@ -313,11 +314,9 @@ describe('Docker Registry Client', () => {
         checkAuth: jest.fn(),
         getImage: jest.fn(),
       };
-
-      registryClient = createDockerRegistry(mockDocker as unknown as Docker, mockLogger);
     });
 
-    describe('authenticate', () => {
+    describe('authenticateRegistry', () => {
       it('should authenticate with username and password', async () => {
         const config: RegistryConfig = {
           url: 'https://registry.example.com',
@@ -327,9 +326,16 @@ describe('Docker Registry Client', () => {
 
         mockDocker.checkAuth.mockResolvedValue(undefined);
 
-        const result = await registryClient.authenticate(config);
+        const result = await authenticateRegistry(mockDocker as unknown as Docker, config, mockLogger);
 
         expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toEqual({
+            username: 'testuser',
+            password: 'testpass',
+            serveraddress: 'registry.example.com',
+          });
+        }
         expect(mockDocker.checkAuth).toHaveBeenCalledWith({
           username: 'testuser',
           password: 'testpass',
@@ -349,9 +355,16 @@ describe('Docker Registry Client', () => {
 
         mockDocker.checkAuth.mockResolvedValue(undefined);
 
-        const result = await registryClient.authenticate(config);
+        const result = await authenticateRegistry(mockDocker as unknown as Docker, config, mockLogger);
 
         expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toEqual({
+            username: '',
+            password: 'test-token-123',
+            serveraddress: 'https://index.docker.io/v1/',
+          });
+        }
         expect(mockDocker.checkAuth).toHaveBeenCalledWith({
           username: '',
           password: 'test-token-123',
@@ -364,7 +377,7 @@ describe('Docker Registry Client', () => {
           url: 'registry.example.com',
         };
 
-        const result = await registryClient.authenticate(config);
+        const result = await authenticateRegistry(mockDocker as unknown as Docker, config, mockLogger);
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
@@ -382,7 +395,7 @@ describe('Docker Registry Client', () => {
 
         mockDocker.checkAuth.mockRejectedValue(new Error('Invalid credentials'));
 
-        const result = await registryClient.authenticate(config);
+        const result = await authenticateRegistry(mockDocker as unknown as Docker, config, mockLogger);
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
@@ -393,12 +406,12 @@ describe('Docker Registry Client', () => {
       });
     });
 
-    describe('healthCheck', () => {
+    describe('checkRegistryHealth', () => {
       it('should return true for accessible registry (200)', async () => {
         const mockResponse = { ok: true, status: 200 };
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.healthCheck('https://registry.example.com');
+        const result = await checkRegistryHealth('https://registry.example.com', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -410,7 +423,7 @@ describe('Docker Registry Client', () => {
         const mockResponse = { ok: false, status: 401 };
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.healthCheck('https://registry.example.com');
+        const result = await checkRegistryHealth('https://registry.example.com', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -422,7 +435,7 @@ describe('Docker Registry Client', () => {
         const mockResponse = { ok: false, status: 500 };
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.healthCheck('https://registry.example.com');
+        const result = await checkRegistryHealth('https://registry.example.com', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -433,7 +446,7 @@ describe('Docker Registry Client', () => {
       it('should return false on network error', async () => {
         (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-        const result = await registryClient.healthCheck('https://registry.example.com');
+        const result = await checkRegistryHealth('https://registry.example.com', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -445,7 +458,7 @@ describe('Docker Registry Client', () => {
         const mockResponse = { ok: true, status: 200 };
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.healthCheck('docker.io');
+        const result = await checkRegistryHealth('docker.io', mockLogger);
 
         expect(result.ok).toBe(true);
         expect(global.fetch).toHaveBeenCalledWith(
@@ -455,7 +468,7 @@ describe('Docker Registry Client', () => {
       });
     });
 
-    describe('imageExists', () => {
+    describe('checkImageExists', () => {
       it('should return true when image exists', async () => {
         const mockImage = {
           inspect: jest.fn().mockResolvedValue({ Id: 'sha256:abc123' }),
@@ -463,7 +476,7 @@ describe('Docker Registry Client', () => {
 
         mockDocker.getImage.mockReturnValue(mockImage);
 
-        const result = await registryClient.imageExists('node:18-alpine');
+        const result = await checkImageExists(mockDocker as unknown as Docker, 'node:18-alpine', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -479,7 +492,7 @@ describe('Docker Registry Client', () => {
 
         mockDocker.getImage.mockReturnValue(mockImage);
 
-        const result = await registryClient.imageExists('nonexistent:latest');
+        const result = await checkImageExists(mockDocker as unknown as Docker, 'nonexistent:latest', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -494,7 +507,7 @@ describe('Docker Registry Client', () => {
 
         mockDocker.getImage.mockReturnValue(mockImage);
 
-        const result = await registryClient.imageExists('node@sha256:abc123');
+        const result = await checkImageExists(mockDocker as unknown as Docker, 'node@sha256:abc123', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -503,7 +516,7 @@ describe('Docker Registry Client', () => {
       });
     });
 
-    describe('listTags', () => {
+    describe('listRepositoryTags', () => {
       it('should list tags for Docker Hub official repository', async () => {
         const mockResponse = {
           ok: true,
@@ -514,7 +527,7 @@ describe('Docker Registry Client', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.listTags('node');
+        const result = await listRepositoryTags('node', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -538,7 +551,7 @@ describe('Docker Registry Client', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.listTags('bitnami/redis');
+        const result = await listRepositoryTags('bitnami/redis', mockLogger);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -550,18 +563,15 @@ describe('Docker Registry Client', () => {
         );
       });
 
-      it('should list tags for private registry', async () => {
-        // First authenticate
-        const config: RegistryConfig = {
-          url: 'registry.example.com',
+      it('should list tags for private registry with authentication', async () => {
+        // Create auth config
+        const authConfig = {
           username: 'testuser',
           password: 'testpass',
+          serveraddress: 'registry.example.com',
         };
 
-        mockDocker.checkAuth.mockResolvedValue(undefined);
-        await registryClient.authenticate(config);
-
-        // Then list tags
+        // Mock successful tag listing
         const mockResponse = {
           ok: true,
           json: jest.fn().mockResolvedValue({
@@ -571,7 +581,7 @@ describe('Docker Registry Client', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.listTags('registry.example.com/myapp');
+        const result = await listRepositoryTags('registry.example.com/myapp', mockLogger, authConfig);
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -593,7 +603,7 @@ describe('Docker Registry Client', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.listTags('registry.example.com/private/repo');
+        const result = await listRepositoryTags('registry.example.com/private/repo', mockLogger);
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
@@ -607,20 +617,12 @@ describe('Docker Registry Client', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-        const result = await registryClient.listTags('node');
+        const result = await listRepositoryTags('node', mockLogger);
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
           expect(result.error).toContain('404');
         }
-      });
-    });
-
-    describe('createDockerRegistry', () => {
-      it('should create a registry client instance', () => {
-        const client = createDockerRegistry(mockDocker as unknown as Docker, mockLogger);
-
-        expect(client).toBeInstanceOf(DockerRegistry);
       });
     });
   });

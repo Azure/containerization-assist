@@ -18,12 +18,13 @@ export function createLogger(options: pino.LoggerOptions = {}): pino.Logger {
   // Skip transport in test environment to avoid worker thread leaks
   const isMCPMode = process.env.MCP_MODE === 'true' || process.argv.includes('--mcp');
   const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
-  const transport = isMCPMode && !isTestEnv
-    ? pino.transport({
-        target: 'pino/file',
-        options: { destination: 2 }, // 2 is stderr
-      })
-    : undefined;
+  const transport =
+    isMCPMode && !isTestEnv
+      ? pino.transport({
+          target: 'pino/file',
+          options: { destination: 2 }, // 2 is stderr
+        })
+      : undefined;
 
   return pino(
     {

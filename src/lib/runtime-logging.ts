@@ -2,7 +2,7 @@
  * Shared Runtime Logging - Harmonized Startup/Shutdown/Tool Logging
  *
  * Provides consistent logging behavior across CLI, server entry points,
- * and tool executions to ensure unified messages for Copilot transcripts.
+ * and tool executions.
  */
 
 import type { Logger } from 'pino';
@@ -168,7 +168,7 @@ export function logForcedShutdown(logger: Logger, quiet = false): void {
 }
 
 /**
- * Create a unified shutdown handler with proper logging
+ * Create a shutdown handler with proper logging
  * @public
  */
 export function createShutdownHandler(

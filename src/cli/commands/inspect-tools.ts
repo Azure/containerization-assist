@@ -105,7 +105,6 @@ async function validateToolMetadata(): Promise<
   });
 }
 
-
 /**
  * Generate comprehensive tool capabilities report
  */

@@ -104,7 +104,10 @@ function hasNonRootUserInstruction(lines: string[]): boolean {
 function countInstructions(lines: string[]): number {
   return lines.filter((line) => {
     const firstWord = line.split(/\s+/)[0];
-    return firstWord && DOCKERFILE_KEYWORDS.includes(firstWord.toUpperCase() as typeof DOCKERFILE_KEYWORDS[number]);
+    return (
+      firstWord &&
+      DOCKERFILE_KEYWORDS.includes(firstWord.toUpperCase() as (typeof DOCKERFILE_KEYWORDS)[number])
+    );
   }).length;
 }
 

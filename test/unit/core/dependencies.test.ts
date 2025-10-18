@@ -15,7 +15,7 @@ describe('Service Dependencies', () => {
   });
 
   test('should validate dependency structure for architecture', () => {
-    // Test the expected structure of dependencies after refactor
+    // Test the expected structure of dependencies
     const expectedDependencies = {
       logger: expect.any(Object),
       progressEmitter: expect.any(Object),
@@ -62,10 +62,10 @@ describe('Service Dependencies', () => {
   });
 
   test('should support infrastructure standardization', () => {
-    // Test unified logger and single Docker abstraction
+    // Test logger and Docker abstraction
     const infrastructureDeps = {
-      logger: mockLogger, // Unified logger interface
-      dockerService: {    // Single Docker abstraction
+      logger: mockLogger, // Logger interface
+      dockerService: {    // Docker abstraction
         build: jest.fn(),
         scan: jest.fn(),
         push: jest.fn(),

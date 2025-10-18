@@ -46,10 +46,7 @@ function validateToolMetadata(metadata: unknown): Result<ToolMetadata> {
  * Validates metadata consistency with tool properties
  * @internal - Only used by validateAllToolMetadata
  */
-function validateMetadataConsistency(
-  _toolName: string,
-  _metadata: ToolMetadata,
-): Result<void> {
+function validateMetadataConsistency(_toolName: string, _metadata: ToolMetadata): Result<void> {
   // Currently no additional consistency checks needed beyond schema validation
   // This function is kept for future extensibility
   return Success(undefined);
@@ -137,6 +134,12 @@ export async function validateAllToolMetadata(
           VALIDATION_SUGGESTIONS['Invalid metadata schema'] ??
             'Fix metadata schema validation errors',
         );
+        // Push to invalidTools and continue - no further validation needed for invalid schema
+        invalidTools.push({
+          name: tool.name,
+          issues,
+          suggestions,
+        });
         continue;
       }
 

@@ -64,9 +64,9 @@ describe('env-utils', () => {
       expect(parseStringEnv('TEST_STRING', 'default')).toBe('default');
     });
 
-    it('should return empty string when value is empty string', () => {
+    it('should return default when value is empty string', () => {
       process.env.TEST_STRING = '';
-      expect(parseStringEnv('TEST_STRING', 'default')).toBe('');
+      expect(parseStringEnv('TEST_STRING', 'default')).toBe('default');
     });
 
     it('should preserve whitespace in non-empty values', () => {

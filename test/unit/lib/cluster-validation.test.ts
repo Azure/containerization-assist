@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import type { Logger } from 'pino';
 
-// Create simplified types for testing
+// Create types for testing
 interface ClusterValidationResult {
   accessible: boolean;
   version?: string;

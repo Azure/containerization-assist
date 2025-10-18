@@ -1,0 +1,242 @@
+/**
+ * Unit Tests: Kubernetes Error Scenarios
+ * Tests Kubernetes error handling patterns without being prescriptive about exact error messages
+ */
+
+import { jest } from '@jest/globals';
+
+function createSuccessResult<T>(value: T) {
+  return { ok: true as const, value };
+}
+
+function createFailureResult(error: string, guidance?: { resolution?: string; hints?: string[] }) {
+  return { ok: false as const, error, guidance };
+}
+
+function createMockLogger() {
+  return {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    trace: jest.fn(),
+    fatal: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  } as any;
+}
+
+function createMockToolContext() {
+  return { logger: createMockLogger() } as any;
+}
+
+const mockK8sClient = {
+  createNamespace: jest.fn(),
+  applyManifest: jest.fn(),
+  getDeploymentStatus: jest.fn(),
+  deleteResource: jest.fn(),
+  getResource: jest.fn(),
+  listResources: jest.fn(),
+  ping: jest.fn(),
+};
+
+jest.mock('../../../src/infra/kubernetes/client', () => ({
+  createKubernetesClient: jest.fn(() => mockK8sClient),
+}));
+
+jest.mock('../../../src/lib/logger', () => ({
+  createTimer: jest.fn(() => ({ end: jest.fn(), error: jest.fn() })),
+  createLogger: jest.fn(() => createMockLogger()),
+}));
+
+jest.mock('../../../src/lib/validation', () => ({
+  validatePath: jest.fn().mockImplementation(async (pathStr: string) => ({ ok: true, value: pathStr })),
+  validateNamespace: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+  validateK8sName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+}));
+
+import { deployApplication as deploy } from '../../../src/tools/deploy/tool';
+import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
+
+describe('Kubernetes Error Scenarios', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('Error Handling Pattern', () => {
+    it('should return Result<T> on K8s client errors', async () => {
+      mockK8sClient.applyManifest.mockRejectedValue(new Error('K8s error'));
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result).toHaveProperty('ok');
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(typeof result.error).toBe('string');
+        expect(result.error.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should never throw exceptions', async () => {
+      mockK8sClient.applyManifest.mockRejectedValue(new Error('Unexpected error'));
+
+      await expect(
+        deploy(
+          { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+          createMockToolContext(),
+        ),
+      ).resolves.not.toThrow();
+    });
+
+    it('should propagate errors through Result without throwing', async () => {
+      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Deploy failed'));
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBeDefined();
+      }
+    });
+  });
+
+  describe('Connection Errors', () => {
+    it('should handle cluster unreachable errors', async () => {
+      const err = new Error('ECONNREFUSED');
+      (err as any).code = 'ECONNREFUSED';
+      mockK8sClient.applyManifest.mockRejectedValue(err);
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('should handle authentication errors', async () => {
+      const err = new Error('Unauthorized');
+      (err as any).statusCode = 401;
+      mockK8sClient.applyManifest.mockRejectedValue(err);
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('should handle timeout errors', async () => {
+      const err = new Error('Timeout');
+      (err as any).code = 'ETIMEDOUT';
+      mockK8sClient.applyManifest.mockRejectedValue(err);
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe('Resource Operation Errors', () => {
+    it('should handle namespace not found errors', async () => {
+      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Namespace not found'));
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'missing-ns' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('should handle permission errors', async () => {
+      mockK8sClient.createNamespace.mockResolvedValue(createFailureResult('Forbidden'));
+
+      const result = await prepareCluster(
+        { namespace: 'test-ns', clusterType: 'kind' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('should handle validation errors', async () => {
+      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Validation failed'));
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe('Deployment Status Errors', () => {
+    it('should handle deployment failures through deploy tool', async () => {
+      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Deployment failed'));
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe('Guidance Structure', () => {
+    it('should optionally provide guidance on errors', async () => {
+      mockK8sClient.applyManifest.mockResolvedValue(
+        createFailureResult('Error', {
+          resolution: 'Fix the issue',
+          hints: ['Hint 1', 'Hint 2'],
+        }),
+      );
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok && result.guidance) {
+        if (result.guidance.resolution) {
+          expect(typeof result.guidance.resolution).toBe('string');
+        }
+        if (result.guidance.hints) {
+          expect(Array.isArray(result.guidance.hints)).toBe(true);
+        }
+      }
+    });
+  });
+
+  describe('Success Cases', () => {
+    it('should handle K8s operations', async () => {
+      mockK8sClient.applyManifest.mockResolvedValue(
+        createSuccessResult({
+          success: true,
+          resources: [{ kind: 'Pod', name: 'test', status: 'Created' }],
+        }),
+      );
+
+      const result = await deploy(
+        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        createMockToolContext(),
+      );
+
+      // Result should be defined and follow Result pattern
+      expect(result).toHaveProperty('ok');
+      expect(typeof result.ok).toBe('boolean');
+    });
+  });
+});

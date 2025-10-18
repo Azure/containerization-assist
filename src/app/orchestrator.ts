@@ -14,11 +14,7 @@ import type { Policy } from '@/config/policy-schemas';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
-import type {
-  ToolOrchestrator,
-  OrchestratorConfig,
-  ExecuteRequest,
-} from './orchestrator-types';
+import type { ToolOrchestrator, OrchestratorConfig, ExecuteRequest } from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { MCPTool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
@@ -65,10 +61,7 @@ function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger 
  * Create a ToolContext for the given request
  * Delegates to the canonical createToolContext from @mcp/context
  */
-function createContextForTool(
-  request: ExecuteRequest,
-  logger: Logger,
-): ToolContext {
+function createContextForTool(request: ExecuteRequest, logger: Logger): ToolContext {
   const metadata = request.metadata;
 
   return createToolContext(logger, {

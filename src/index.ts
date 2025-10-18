@@ -39,7 +39,6 @@ export {
   getToolDefaults,
 } from './lib/param-defaults.js';
 
-
 /** @public */
 export { tool } from './types/tool.js';
 

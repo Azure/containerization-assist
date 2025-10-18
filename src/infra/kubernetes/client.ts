@@ -161,7 +161,6 @@ export const createKubernetesClient = (
     }
   };
 
-
   return {
     /**
      * Apply Kubernetes manifest (supports all resource types)

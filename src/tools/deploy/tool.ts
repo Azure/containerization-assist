@@ -250,10 +250,20 @@ async function deployManifests(
   dryRun: boolean,
 ): Promise<{
   deployedResources: Array<{ kind: string; name: string; namespace: string }>;
-  failedResources: Array<{ kind: string; name: string; error: string; guidance?: import('@/types').ErrorGuidance }>;
+  failedResources: Array<{
+    kind: string;
+    name: string;
+    error: string;
+    guidance?: import('@/types').ErrorGuidance;
+  }>;
 }> {
   const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
-  const failedResources: Array<{ kind: string; name: string; error: string; guidance?: import('@/types').ErrorGuidance }> = [];
+  const failedResources: Array<{
+    kind: string;
+    name: string;
+    error: string;
+    guidance?: import('@/types').ErrorGuidance;
+  }> = [];
 
   if (dryRun) {
     // For dry run, simulate deployment
@@ -537,7 +547,8 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success: 'Application deployed successfully. Use verify-deploy to check deployment health and status.',
+    success:
+      'Application deployed successfully. Use verify-deploy to check deployment health and status.',
     failure:
       'Deployment failed. Check cluster connectivity, manifests validity, and pod status with kubectl.',
   },

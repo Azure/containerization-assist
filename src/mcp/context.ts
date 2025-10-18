@@ -25,7 +25,7 @@ export type ProgressReporter = (
 ) => Promise<void>;
 
 /**
- * Main context object passed to tools - Unified interface for all tool implementations
+ * Main context object passed to tools
  */
 export interface ToolContext {
   /**

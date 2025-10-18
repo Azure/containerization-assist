@@ -1,9 +1,7 @@
 /**
  * MCP Context Helper Functions
  *
- * Extracted helper functions for progress handling and context utilities.
- * This module contains the internal implementation details that were
- * previously embedded in the main context.ts file.
+ * Helper functions for progress handling and context utilities.
  */
 
 import type { Logger } from 'pino';

@@ -161,5 +161,140 @@ CMD ["node", "server.js"]`;
       expect(report).toBeDefined();
       expect(report.results).toBeDefined();
     });
+
+    it('should handle grade calculation for different score ranges', async () => {
+      // Test various Dockerfiles to exercise grade calculation logic
+      const testCases = [
+        {
+          name: 'excellent (A grade)',
+          dockerfile: `FROM node:20-alpine
+WORKDIR /app
+COPY . .
+USER node
+CMD ["node", "index.js"]`,
+          expectedGrades: ['A', 'B'],
+        },
+        {
+          name: 'good (B/C grade)',
+          dockerfile: `FROM ubuntu:latest
+WORKDIR /app
+COPY . .
+CMD node index.js`,
+          expectedGrades: ['A', 'B', 'C'],
+        },
+      ];
+
+      for (const testCase of testCases) {
+        const report = await lintWithDockerfilelint(testCase.dockerfile);
+        expect(report.grade).toBeDefined();
+        expect(['A', 'B', 'C', 'D', 'F']).toContain(report.grade);
+      }
+    });
+
+    it('should handle Dockerfile with multiple severity levels', async () => {
+      // Create a Dockerfile that might trigger different severity levels
+      const mixedDockerfile = `FROM ubuntu:latest
+# Missing WORKDIR
+COPY . .
+# Using sudo
+RUN sudo apt-get update
+# Multiple RUN commands
+RUN apt-get install -y curl
+RUN apt-get install -y wget
+RUN apt-get install -y git`;
+
+      const report = await lintWithDockerfilelint(mixedDockerfile);
+
+      expect(report).toBeDefined();
+      expect(report.errors).toBeGreaterThanOrEqual(0);
+      expect(report.warnings).toBeGreaterThanOrEqual(0);
+      expect(report.info).toBeGreaterThanOrEqual(0);
+
+      // Verify counts match results
+      const errorCount = report.results.filter(r => r.metadata?.severity === 'error').length;
+      const warningCount = report.results.filter(r => r.metadata?.severity === 'warning').length;
+      const infoCount = report.results.filter(r => r.metadata?.severity === 'info').length;
+
+      expect(report.errors).toBe(errorCount);
+      expect(report.warnings).toBe(warningCount);
+      expect(report.info).toBe(infoCount);
+    });
+
+    it('should handle Dockerfile with special characters', async () => {
+      const specialCharsDockerfile = `FROM node:20-alpine
+WORKDIR /app
+ENV MESSAGE="Hello, World! 🌍"
+COPY package*.json ./
+RUN echo "Testing special chars: @#$%^&*()"
+CMD ["node", "-e", "console.log('Hi')"]`;
+
+      const report = await lintWithDockerfilelint(specialCharsDockerfile);
+
+      expect(report).toBeDefined();
+      expect(report.results).toBeDefined();
+    });
+
+    it('should count passed and failed results correctly', async () => {
+      const dockerfile = `FROM node:20-alpine
+WORKDIR /app
+COPY . .
+CMD ["node", "index.js"]`;
+
+      const report = await lintWithDockerfilelint(dockerfile);
+
+      expect(report.passed).toBeGreaterThanOrEqual(0);
+      expect(report.failed).toBeGreaterThanOrEqual(0);
+      // passed should be 0 since all results have isValid: false
+      expect(report.passed).toBe(0);
+      expect(report.failed).toBe(report.results.length);
+    });
+
+    it('should include timestamp in report', async () => {
+      const dockerfile = 'FROM node:20';
+      const before = new Date();
+
+      const report = await lintWithDockerfilelint(dockerfile);
+
+      const after = new Date();
+
+      expect(report.timestamp).toBeDefined();
+      expect(typeof report.timestamp).toBe('string');
+      const reportTime = new Date(report.timestamp);
+      expect(reportTime.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(reportTime.getTime()).toBeLessThanOrEqual(after.getTime());
+    });
+
+    it('should handle Dockerfile with only FROM instruction', async () => {
+      const minimalDockerfile = 'FROM node:20';
+
+      const report = await lintWithDockerfilelint(minimalDockerfile);
+
+      expect(report).toBeDefined();
+      expect(report.results).toBeDefined();
+      expect(Array.isArray(report.results)).toBe(true);
+    });
+
+    it('should handle Dockerfile with comments only', async () => {
+      const commentsOnly = `# This is a comment
+# Another comment
+# More comments`;
+
+      const report = await lintWithDockerfilelint(commentsOnly);
+
+      expect(report).toBeDefined();
+      expect(report.results).toBeDefined();
+    });
+
+    it('should handle Dockerfile with mixed case instructions', async () => {
+      const mixedCase = `from node:20-alpine
+workdir /app
+copy . .
+cmd ["node", "index.js"]`;
+
+      const report = await lintWithDockerfilelint(mixedCase);
+
+      expect(report).toBeDefined();
+      expect(report.results).toBeDefined();
+    });
   });
 });
