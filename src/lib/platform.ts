@@ -64,8 +64,6 @@ export function getDownloadArch(): string {
  * @returns The normalized path with forward slashes, or the original value if null/undefined
  */
 export function normalizePath(inputPath: string): string;
-export function normalizePath(inputPath: null): null;
-export function normalizePath(inputPath: undefined): undefined;
 export function normalizePath(inputPath: string | null | undefined): string | null | undefined;
 export function normalizePath(inputPath: string | null | undefined): string | null | undefined {
   if (inputPath == null) return inputPath; // handles both null and undefined

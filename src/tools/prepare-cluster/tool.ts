@@ -66,7 +66,7 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
   }
 
   // Even though we validated, still escape for shell safety
-  // Single quotes prevent all expansion
+  // Single quotes prevent all expansion and are safe for direct interpolation
   return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
 }
 
@@ -382,6 +382,7 @@ async function setupKindCluster(
 
   // Export kubeconfig
   try {
+    // escapedName is already wrapped in single quotes for shell safety
     await execAsync(`kind export kubeconfig --name ${escapedName}`);
   } catch (error) {
     logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
