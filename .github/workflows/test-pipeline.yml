@@ -9,6 +9,12 @@ on:
 env:
   NODE_VERSION: '20'
 
+permissions:
+  contents: read
+  actions: read
+  issues: write
+  pull-requests: none
+
 jobs:
   # Single test job with all essential validations
   test:

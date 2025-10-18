@@ -5,6 +5,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  packages: none
 
 jobs:
   Build:
@@ -57,12 +59,12 @@ jobs:
     name: publish
     runs-on: ubuntu-latest
     needs: Build
-    permissions: 
-        actions: read
-        contents: write
-        deployments: read
-        packages: none
-        id-token: write
+    permissions:
+      actions: read
+      contents: write
+      deployments: read
+      packages: none
+      id-token: none
     env: 
       current-version: ${{ needs.Build.outputs.current-version }}
     steps:
