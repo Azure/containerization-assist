@@ -20,7 +20,7 @@ import type { z } from 'zod';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
-import { createLogger } from '@/lib/logger';
+import type { Logger } from 'pino';
 
 const name = 'validate-dockerfile';
 const description = 'Validate Dockerfile against organizational policies';
@@ -29,8 +29,7 @@ const version = '2.0.0';
 /**
  * Get default policy paths from policies/ directory
  */
-function getDefaultPolicyPaths(): string[] {
-  const logger = createLogger({ name: 'policy-discovery' });
+function getDefaultPolicyPaths(logger: Logger): string[] {
   try {
     const policiesDir = nodePath.join(process.cwd(), 'policies');
 
@@ -167,7 +166,7 @@ async function handleValidateDockerfile(
   }
 
   // Load policies
-  const policyPaths = policyPath ? [policyPath] : getDefaultPolicyPaths();
+  const policyPaths = policyPath ? [policyPath] : getDefaultPolicyPaths(logger);
 
   if (policyPaths.length === 0) {
     logger.warn('No policy files found - validation will pass without checks');

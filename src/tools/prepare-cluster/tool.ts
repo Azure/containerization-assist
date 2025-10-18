@@ -42,6 +42,29 @@ const execAsync = promisify(exec);
 
 const KIND_VERSION = 'v0.20.0';
 
+/**
+ * Validate and escape cluster name to prevent command injection
+ * Cluster names must follow Kubernetes naming conventions
+ */
+function validateAndEscapeClusterName(clusterName: string): Result<string> {
+  // Kubernetes resource names must be lowercase alphanumeric with dashes
+  const nameRegex = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+
+  if (!nameRegex.test(clusterName)) {
+    return Failure(
+      `Invalid cluster name: "${clusterName}". Must contain only lowercase letters, numbers, and hyphens.`,
+    );
+  }
+
+  if (clusterName.length > 63) {
+    return Failure(`Cluster name too long: "${clusterName}". Must be 63 characters or less.`);
+  }
+
+  // Even though we validated, still escape for shell safety
+  // Single quotes prevent all expansion
+  return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
+}
+
 export interface PrepareClusterResult {
   success: boolean;
   clusterReady: boolean;
@@ -200,7 +223,12 @@ async function installKind(logger: pino.Logger): Promise<void> {
   }
 }
 
-async function checkKindClusterExists(clusterName: string, logger: pino.Logger): Promise<boolean> {
+async function checkKindClusterExists(clusterName: string, logger: pino.Logger): Promise<Result<boolean>> {
+  const escapedNameResult = validateAndEscapeClusterName(clusterName);
+  if (!escapedNameResult.ok) {
+    return escapedNameResult;
+  }
+
   try {
     const { stdout } = await execAsync('kind get clusters');
     const clusters = stdout
@@ -209,14 +237,20 @@ async function checkKindClusterExists(clusterName: string, logger: pino.Logger):
       .filter((line: string) => line.trim());
     const exists = clusters.includes(clusterName);
     logger.debug({ clusterName, exists, clusters }, 'Checking kind cluster existence');
-    return exists;
+    return Success(exists);
   } catch (error) {
     logger.debug({ error }, 'Error checking kind clusters');
-    return false;
+    return Success(false);
   }
 }
 
-async function createKindCluster(clusterName: string, logger: pino.Logger): Promise<void> {
+async function createKindCluster(clusterName: string, logger: pino.Logger): Promise<Result<void>> {
+  const escapedNameResult = validateAndEscapeClusterName(clusterName);
+  if (!escapedNameResult.ok) {
+    return escapedNameResult;
+  }
+  const escapedName = escapedNameResult.value;
+
   try {
     logger.info({ clusterName }, 'Creating kind cluster...');
 
@@ -247,14 +281,15 @@ nodes:
     const configPath = await createTempFile(kindConfig, '.yaml');
 
     try {
-      await execAsync(`kind create cluster --name ${clusterName} --config "${configPath}"`);
+      await execAsync(`kind create cluster --name ${escapedName} --config "${configPath}"`);
       logger.info({ clusterName }, 'Kind cluster created successfully');
+      return Success(undefined);
     } finally {
       await deleteTempFile(configPath);
     }
   } catch (error) {
     logger.error({ clusterName, error }, 'Failed to create kind cluster');
-    throw new Error(`Kind cluster creation failed: ${extractErrorMessage(error)}`);
+    return Failure(`Kind cluster creation failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -303,7 +338,14 @@ async function setupKindCluster(
     kindInstalled: boolean | undefined;
     kindClusterCreated: boolean | undefined;
   },
-): Promise<void> {
+): Promise<Result<void>> {
+  // Validate cluster name upfront
+  const escapedNameResult = validateAndEscapeClusterName(cluster);
+  if (!escapedNameResult.ok) {
+    return escapedNameResult;
+  }
+  const escapedName = escapedNameResult.value;
+
   checks.kindInstalled = await checkKindInstalled(logger);
   if (!checks.kindInstalled) {
     await installKind(logger);
@@ -311,9 +353,17 @@ async function setupKindCluster(
     logger.info('Kind installation completed');
   }
 
-  const kindClusterExists = await checkKindClusterExists(cluster, logger);
+  const clusterExistsResult = await checkKindClusterExists(cluster, logger);
+  if (!clusterExistsResult.ok) {
+    return clusterExistsResult;
+  }
+  const kindClusterExists = clusterExistsResult.value;
+
   if (!kindClusterExists) {
-    await createKindCluster(cluster, logger);
+    const createResult = await createKindCluster(cluster, logger);
+    if (!createResult.ok) {
+      return createResult;
+    }
     checks.kindClusterCreated = true;
     logger.info({ clusterName: cluster }, 'Kind cluster creation completed');
 
@@ -326,10 +376,12 @@ async function setupKindCluster(
 
   // Export kubeconfig
   try {
-    await execAsync(`kind export kubeconfig --name ${cluster}`);
+    await execAsync(`kind export kubeconfig --name ${escapedName}`);
   } catch (error) {
     logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
   }
+
+  return Success(undefined);
 }
 
 /**
@@ -465,7 +517,10 @@ async function handlePrepareCluster(
 
     // Setup Kind cluster if in development environment
     if (shouldSetupKind) {
-      await setupKindCluster(cluster, logger, checks);
+      const setupResult = await setupKindCluster(cluster, logger, checks);
+      if (!setupResult.ok) {
+        return setupResult;
+      }
     }
 
     // Setup local Docker registry if in development environment
