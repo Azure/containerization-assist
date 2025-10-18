@@ -45,6 +45,11 @@ const KIND_VERSION = 'v0.20.0';
 /**
  * Validate and escape cluster name to prevent command injection
  * Cluster names must follow Kubernetes naming conventions
+ *
+ * Returns the cluster name wrapped in single quotes for shell safety.
+ * The returned value can be directly interpolated into shell commands via template literals.
+ * Example: if clusterName is "my-cluster", returns "'my-cluster'" (with quotes)
+ * Usage: `kind create cluster --name ${escapedName}` becomes `kind create cluster --name 'my-cluster'`
  */
 function validateAndEscapeClusterName(clusterName: string): Result<string> {
   // Kubernetes resource names must be lowercase alphanumeric with dashes
@@ -61,7 +66,7 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
   }
 
   // Even though we validated, still escape for shell safety
-  // Single quotes prevent all expansion
+  // Single quotes prevent all expansion and are safe for direct interpolation
   return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
 }
 
@@ -281,6 +286,7 @@ nodes:
     const configPath = await createTempFile(kindConfig, '.yaml');
 
     try {
+      // escapedName is already wrapped in single quotes for shell safety
       await execAsync(`kind create cluster --name ${escapedName} --config "${configPath}"`);
       logger.info({ clusterName }, 'Kind cluster created successfully');
       return Success(undefined);
@@ -376,6 +382,7 @@ async function setupKindCluster(
 
   // Export kubeconfig
   try {
+    // escapedName is already wrapped in single quotes for shell safety
     await execAsync(`kind export kubeconfig --name ${escapedName}`);
   } catch (error) {
     logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');

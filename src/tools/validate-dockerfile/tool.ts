@@ -1,7 +1,8 @@
 /**
  * Validate Dockerfile Tool
  *
- * Validates Dockerfile content against organizational policies defined in policies/*.yaml
+ * Validates Dockerfile content against organizational policies defined in YAML files located in the
+ * 'policies' directory, which is resolved relative to the current working directory (process.cwd()).
  * Applies policy rules and returns violations, warnings, and suggestions.
  */
 

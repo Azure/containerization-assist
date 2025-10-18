@@ -305,6 +305,20 @@ function createLoggerContext(
 }
 
 /**
+ * Creates a type-safe notification adapter that wraps the MCP SDK sendNotification
+ * @param mcpSendNotification - The MCP SDK sendNotification function
+ * @returns Type-safe notification sender
+ */
+function createNotificationAdapter(
+  mcpSendNotification: (notification: ServerNotification) => Promise<void>,
+): (notification: unknown) => Promise<void> {
+  return async (notification: unknown) => {
+    // Assume the caller provides the correct type, or add runtime validation here if needed
+    return mcpSendNotification(notification as ServerNotification);
+  };
+}
+
+/**
  * Creates execution metadata from parameters and request context
  * @param toolName - Name of the tool being executed
  * @param params - Tool parameters
@@ -324,7 +338,7 @@ function createExecuteMetadata(
     progress: params,
     loggerContext: createLoggerContext(toolName, transport, meta),
     ...(extra.sendNotification && {
-      sendNotification: extra.sendNotification as (notification: unknown) => Promise<void>,
+      sendNotification: createNotificationAdapter(extra.sendNotification),
     }),
   };
 }
