@@ -8,14 +8,13 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { createLogger } from '@/lib/logger';
 import { type Tool, type ToolName, ALL_TOOLS } from '@/tools';
-import { createToolContext } from '@/mcp/context';
 import {
   createMCPServer,
   OUTPUTFORMAT,
   registerToolsWithServer,
   type MCPServer,
 } from '@/mcp/mcp-server';
-import { createOrchestrator, createHostlessToolContext } from './orchestrator';
+import { createOrchestrator } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
 import type { Result } from '@/types';
 import type {
@@ -105,21 +104,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       registry: toolsMap,
       logger,
       config: orchestratorConfig,
-      contextFactory: ({ request, logger: toolLogger }) => {
-        const metadata = request.metadata;
-        const server = activeServer;
-        if (server) {
-          const contextOptions = {
-            ...(metadata?.signal && { signal: metadata.signal }),
-            ...(metadata?.progress !== undefined && { progress: metadata.progress }),
-          };
-          return createToolContext(toolLogger, contextOptions);
-        }
-
-        return createHostlessToolContext(toolLogger, {
-          ...(metadata && { metadata }),
-        });
-      },
+      ...(activeServer && { server: activeServer }),
     });
   }
 

@@ -1,4 +1,4 @@
-import { normalizePath } from '../../../src/lib/path-utils';
+import { normalizePath } from '../../../src/lib/platform';
 
 describe('normalizePath', () => {
   it('should convert Windows backslashes to forward slashes', () => {

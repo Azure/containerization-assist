@@ -15,7 +15,7 @@ import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
 import { pushImageSchema } from './schema';
 import type { z } from 'zod';
-import { createErrorGuidance } from '@/lib/error-utils';
+import { createErrorGuidance } from '@/lib/errors';
 
 export interface PushImageResult {
   success: true;
@@ -177,6 +177,11 @@ export default tool({
   schema: pushImageSchema,
   metadata: {
     knowledgeEnhanced: false,
+  },
+  chainHints: {
+    success: 'Image pushed successfully. Review AI optimization insights for push improvements.',
+    failure:
+      'Image push failed. Check registry credentials, network connectivity, and image tag format.',
   },
   handler: handlePushImage,
 });

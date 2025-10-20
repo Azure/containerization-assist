@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import { Result, Success, Failure } from '@/types';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { scanImageWithTrivy, checkTrivyAvailability } from './trivy-scanner';
 
 interface SecurityScanner {

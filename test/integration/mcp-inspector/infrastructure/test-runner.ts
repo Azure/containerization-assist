@@ -6,7 +6,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { TestResult, PerformanceMetrics } from '../../../../src/types/result-types.js';
-import { extractErrorMessage, formatErrorMessage } from '../../../../src/lib/error-utils.js';
+import { extractErrorMessage, formatErrorMessage } from '../../../../src/lib/errors.js';
 
 export interface TestCase {
   name: string;

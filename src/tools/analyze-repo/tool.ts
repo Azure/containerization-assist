@@ -262,5 +262,10 @@ export default tool({
   metadata: {
     knowledgeEnhanced: false,
   },
+  chainHints: {
+    success:
+      'Repository analysis completed successfully. Continue by calling the generate-dockerfile or fix-dockerfile tools to create or fix your Dockerfile.',
+    failure: 'Repository analysis failed. Please check the logs for details.',
+  },
   handler: handleAnalyzeRepo,
 });

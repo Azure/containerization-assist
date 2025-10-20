@@ -24,7 +24,7 @@
  */
 
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
 

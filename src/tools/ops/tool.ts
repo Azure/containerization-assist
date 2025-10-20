@@ -6,7 +6,7 @@
  */
 
 import * as os from 'os';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';

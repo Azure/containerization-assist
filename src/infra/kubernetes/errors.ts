@@ -3,185 +3,6 @@
  */
 
 import type { ErrorGuidance } from '@/types';
-import { createErrorGuidanceBuilder, customPattern, type ErrorPattern } from '@/lib/error-guidance';
-
-/**
- * Helper to extract message from error (handles both Error instances and plain objects)
- */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  const errorObj = error as { message?: string };
-  if (errorObj && typeof errorObj.message === 'string') {
-    return errorObj.message;
-  }
-  return String(error);
-}
-
-/**
- * Kubernetes error patterns in order of specificity
- */
-const k8sErrorPatterns: ErrorPattern[] = [
-  // Kubeconfig issues
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('kubeconfig') || msg.includes('config file');
-    },
-    {
-      message: 'Kubernetes configuration not found',
-      hint: 'Unable to locate or read kubeconfig file',
-      resolution:
-        'Set KUBECONFIG environment variable or ensure ~/.kube/config exists. Run `kubectl config view` to verify.',
-    },
-  ),
-
-  // Connection issues - ECONNREFUSED
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return (
-        msg.includes('econnrefused') ||
-        msg.includes('connection refused') ||
-        msg.includes('connect econnrefused')
-      );
-    },
-    {
-      message: 'Cannot connect to Kubernetes cluster',
-      hint: 'Connection to Kubernetes API server was refused',
-      resolution:
-        'Verify cluster is running: `kubectl cluster-info`. Check API server address in kubeconfig and ensure network connectivity.',
-    },
-  ),
-
-  // Timeout issues
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('etimedout') || msg.includes('timeout');
-    },
-    {
-      message: 'Kubernetes operation timed out',
-      hint: 'The API server did not respond in time',
-      resolution:
-        'Check cluster connectivity and load. Verify firewall rules allow access to the API server. Try `kubectl get nodes` to test connectivity.',
-    },
-  ),
-
-  // Authentication issues
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('unauthorized') || msg.includes('401') || msg.includes('authentication');
-    },
-    {
-      message: 'Kubernetes authentication failed',
-      hint: 'Invalid or expired credentials',
-      resolution:
-        'Refresh cluster credentials. For cloud providers: re-authenticate (e.g., `aws eks update-kubeconfig`, `gcloud container clusters get-credentials`).',
-    },
-  ),
-
-  // Authorization issues
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('forbidden') || msg.includes('403') || msg.includes('authorization');
-    },
-    {
-      message: 'Kubernetes authorization failed',
-      hint: 'Your user/service account lacks required permissions',
-      resolution:
-        'Verify RBAC permissions with `kubectl auth can-i <verb> <resource>`. Contact cluster administrator to grant necessary roles.',
-    },
-  ),
-
-  // Resource not found
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('not found') || msg.includes('404');
-    },
-    {
-      message: 'Kubernetes resource not found',
-      hint: 'The requested resource does not exist in the cluster',
-      resolution:
-        'Verify resource name and namespace. Use `kubectl get <resource> -n <namespace>` to list available resources.',
-    },
-  ),
-
-  // Namespace issues
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('namespace') && msg.includes('does not exist');
-    },
-    {
-      message: 'Kubernetes namespace does not exist',
-      hint: 'The target namespace has not been created',
-      resolution:
-        'Create the namespace: `kubectl create namespace <name>` or ensure it exists before deploying resources.',
-    },
-  ),
-
-  // Resource conflicts
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('already exists') || msg.includes('conflict');
-    },
-    {
-      message: 'Kubernetes resource already exists',
-      hint: 'A resource with this name already exists',
-      resolution:
-        'Use a different name, delete the existing resource, or use `kubectl apply` instead of `create` to update it.',
-    },
-  ),
-
-  // Validation errors
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('invalid') || msg.includes('validation');
-    },
-    {
-      message: 'Kubernetes resource validation failed',
-      hint: 'The resource specification is invalid',
-      resolution:
-        'Check the manifest against Kubernetes API documentation. Use `kubectl apply --dry-run=client` to validate syntax.',
-    },
-  ),
-
-  // API version mismatch
-  customPattern(
-    (error: unknown) => {
-      const msg = getErrorMessage(error).toLowerCase();
-      return msg.includes('no matches for kind') || msg.includes('api version');
-    },
-    {
-      message: 'Kubernetes API version not supported',
-      hint: 'The resource type or API version is not available in this cluster',
-      resolution:
-        'Check cluster version with `kubectl version` and update API versions in manifests. Some resources may require cluster upgrades.',
-    },
-  ),
-];
-
-/**
- * Default guidance when no pattern matches
- */
-function defaultK8sGuidance(error: unknown): ErrorGuidance {
-  const message = getErrorMessage(error);
-
-  return {
-    message: message || 'Kubernetes operation failed',
-    hint: 'An error occurred during the Kubernetes operation',
-    resolution:
-      'Run `kubectl get events --sort-by=.lastTimestamp` to see recent cluster events. Check resource logs with `kubectl logs`.',
-    details: { originalError: message },
-  };
-}
 
 /**
  * Extract error with actionable guidance for Kubernetes operations
@@ -190,16 +11,150 @@ function defaultK8sGuidance(error: unknown): ErrorGuidance {
  * @param operation - Optional operation context to include in the message
  */
 export function extractK8sErrorGuidance(error: unknown, operation?: string): ErrorGuidance {
-  const baseExtractor = createErrorGuidanceBuilder(k8sErrorPatterns, defaultK8sGuidance);
-  const guidance = baseExtractor(error);
+  // Handle both Error instances and plain objects with a message property (from K8s client)
+  const errorObj = error as { message?: string };
+  if (error instanceof Error || (errorObj && typeof errorObj.message === 'string')) {
+    const errorMessage = (error instanceof Error ? error.message : errorObj.message || '').toLowerCase();
 
-  // If operation context is provided and error is "not found", include it in the message
-  if (operation && guidance.message.includes('resource not found')) {
+    // Kubeconfig issues
+    if (errorMessage.includes('kubeconfig') || errorMessage.includes('config file')) {
+      return {
+        message: 'Kubernetes configuration not found',
+        hint: 'Unable to locate or read kubeconfig file',
+        resolution:
+          'Set KUBECONFIG environment variable or ensure ~/.kube/config exists. Run `kubectl config view` to verify.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // Connection issues
+    if (
+      errorMessage.includes('econnrefused') ||
+      errorMessage.includes('connection refused') ||
+      errorMessage.includes('connect econnrefused')
+    ) {
+      return {
+        message: 'Cannot connect to Kubernetes cluster',
+        hint: 'Connection to Kubernetes API server was refused',
+        resolution:
+          'Verify cluster is running: `kubectl cluster-info`. Check API server address in kubeconfig and ensure network connectivity.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    if (errorMessage.includes('etimedout') || errorMessage.includes('timeout')) {
+      return {
+        message: 'Kubernetes operation timed out',
+        hint: 'The API server did not respond in time',
+        resolution:
+          'Check cluster connectivity and load. Verify firewall rules allow access to the API server. Try `kubectl get nodes` to test connectivity.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // Authentication issues
+    if (
+      errorMessage.includes('unauthorized') ||
+      errorMessage.includes('401') ||
+      errorMessage.includes('authentication')
+    ) {
+      return {
+        message: 'Kubernetes authentication failed',
+        hint: 'Invalid or expired credentials',
+        resolution:
+          'Refresh cluster credentials. For cloud providers: re-authenticate (e.g., `aws eks update-kubeconfig`, `gcloud container clusters get-credentials`).',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // Authorization issues
+    if (
+      errorMessage.includes('forbidden') ||
+      errorMessage.includes('403') ||
+      errorMessage.includes('authorization')
+    ) {
+      return {
+        message: 'Kubernetes authorization failed',
+        hint: 'Your user/service account lacks required permissions',
+        resolution:
+          'Verify RBAC permissions with `kubectl auth can-i <verb> <resource>`. Contact cluster administrator to grant necessary roles.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // Resource not found
+    if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+      const resource = operation ? ` (${operation})` : '';
+      return {
+        message: `Kubernetes resource not found${resource}`,
+        hint: 'The requested resource does not exist in the cluster',
+        resolution:
+          'Verify resource name and namespace. Use `kubectl get <resource> -n <namespace>` to list available resources.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // Namespace issues
+    if (errorMessage.includes('namespace') && errorMessage.includes('does not exist')) {
+      return {
+        message: 'Kubernetes namespace does not exist',
+        hint: 'The target namespace has not been created',
+        resolution:
+          'Create the namespace: `kubectl create namespace <name>` or ensure it exists before deploying resources.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // Resource conflicts
+    if (errorMessage.includes('already exists') || errorMessage.includes('conflict')) {
+      return {
+        message: 'Kubernetes resource already exists',
+        hint: 'A resource with this name already exists',
+        resolution:
+          'Use a different name, delete the existing resource, or use `kubectl apply` instead of `create` to update it.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // Validation errors
+    if (errorMessage.includes('invalid') || errorMessage.includes('validation')) {
+      return {
+        message: 'Kubernetes resource validation failed',
+        hint: 'The resource specification is invalid',
+        resolution:
+          'Check the manifest against Kubernetes API documentation. Use `kubectl apply --dry-run=client` to validate syntax.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // API version mismatch
+    if (errorMessage.includes('no matches for kind') || errorMessage.includes('api version')) {
+      return {
+        message: 'Kubernetes API version not supported',
+        hint: 'The resource type or API version is not available in this cluster',
+        resolution:
+          'Check cluster version with `kubectl version` and update API versions in manifests. Some resources may require cluster upgrades.',
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
+      };
+    }
+
+    // General error
+    const originalMessage = error instanceof Error ? error.message : errorObj.message;
     return {
-      ...guidance,
-      message: `Kubernetes resource not found (${operation})`,
+      message: originalMessage || 'Kubernetes operation failed',
+      hint: 'An error occurred during the Kubernetes operation',
+      resolution:
+        'Run `kubectl get events --sort-by=.lastTimestamp` to see recent cluster events. Check resource logs with `kubectl logs`.',
+      details: { originalError: originalMessage },
     };
   }
 
-  return guidance;
+  // Fallback for non-Error, non-object errors
+  return {
+    message: 'Kubernetes operation failed',
+    hint: 'An unknown error occurred',
+    resolution:
+      'Run `kubectl get events --sort-by=.lastTimestamp` to see recent cluster events. Check resource logs with `kubectl logs`.',
+    details: { originalError: String(error) },
+  };
 }
