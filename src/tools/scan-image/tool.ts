@@ -251,11 +251,5 @@ export default tool({
   metadata: {
     knowledgeEnhanced: true,
   },
-  chainHints: {
-    success:
-      'Security scan passed! Proceed with push-image to push to a registry, or continue with deployment preparation.',
-    failure:
-      'Security scan found vulnerabilities. Use fix-dockerfile to address security issues in your base images and dependencies.',
-  },
   handler: handleScanImage,
 });

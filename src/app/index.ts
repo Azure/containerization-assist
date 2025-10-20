@@ -27,6 +27,7 @@ import type {
 } from '@/types/runtime';
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
 import { checkDockerHealth, checkKubernetesHealth } from '@/lib/health-checks';
+import { DEFAULT_CHAIN_HINTS } from './chain-hints';
 
 /**
  * Apply tool aliases to create renamed versions of tools
@@ -72,7 +73,10 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
 
   const chainHintsMode = config.chainHintsMode || 'enabled';
   const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
-  const orchestratorConfig: OrchestratorConfig = { chainHintsMode };
+  const orchestratorConfig: OrchestratorConfig = {
+    chainHintsMode,
+    chainHints: DEFAULT_CHAIN_HINTS,
+  };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
 
   const toolList = Array.from(toolsMap.values());

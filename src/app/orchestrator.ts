@@ -321,17 +321,22 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     if (result.ok) {
       let valueWithMessages = result.value;
 
-      if (env.config.chainHintsMode === 'enabled' && tool.chainHints) {
+      // Look up chain hints from application-level registry
+      const chainHints = env.config.chainHints?.[tool.name];
+      if (env.config.chainHintsMode === 'enabled' && chainHints) {
         valueWithMessages = {
           ...valueWithMessages,
-          nextSteps: tool.chainHints.success,
+          nextSteps: chainHints.success,
         };
       }
 
       result.value = valueWithMessages;
-    } else if (result.guidance && tool.chainHints) {
-      // Add failure hint to error guidance
-      result.guidance.hint = tool.chainHints.failure;
+    } else if (result.guidance) {
+      // Add failure hint to error guidance from application-level registry
+      const chainHints = env.config.chainHints?.[tool.name];
+      if (chainHints) {
+        result.guidance.hint = chainHints.failure;
+      }
     }
     tracker.complete({});
     return result;
