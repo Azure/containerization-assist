@@ -223,20 +223,32 @@ export const createKubernetesClient = (
         // Use a shorter timeout for ping operations
         const pingTimeout = timeout || 5000;
 
-        // Create timeout promise
+        // Create timeout promise with proper cleanup
         let timeoutHandle: NodeJS.Timeout | undefined;
+        let isTimedOut = false;
+
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutHandle = setTimeout(() => {
+            isTimedOut = true;
             reject(new Error('Connection timeout'));
           }, pingTimeout);
         });
 
         try {
-          await Promise.race([coreApi.listNamespace(), timeoutPromise]);
+          await Promise.race([
+            coreApi.listNamespace().then((result) => {
+              // Clear timeout on success to prevent unhandled rejection
+              if (timeoutHandle) {
+                clearTimeout(timeoutHandle);
+              }
+              return result;
+            }),
+            timeoutPromise,
+          ]);
           return true;
         } finally {
-          // Always clear the timeout to prevent hanging timers
-          if (timeoutHandle) {
+          // Clear timeout if it hasn't fired yet
+          if (timeoutHandle && !isTimedOut) {
             clearTimeout(timeoutHandle);
           }
         }
