@@ -72,7 +72,6 @@ async function handlePushImage(
       const expectedPrefix = `${registryHost}/`;
 
       // Check if repository already starts with the registry override (avoid double-prefixing)
-      // Note: String.startsWith() performs literal string comparison, safe for any characters
       if (!repository.startsWith(expectedPrefix)) {
         // Repository doesn't start with the override, so replace/add the registry
         repository = `${registryHost}/${parsedImage.value.repository}`;

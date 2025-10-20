@@ -74,7 +74,14 @@ jest.mock('node:fs', () => ({
 
 // Mock lib modules
 const mockDockerClient = {
-  buildImage: jest.fn(),
+  buildImage: jest.fn() as jest.MockedFunction<
+    (options: any) => Promise<{
+      ok: boolean;
+      value?: any;
+      error?: string;
+      guidance?: { hint?: string; resolution?: string };
+    }>
+  >,
 };
 
 
@@ -391,7 +398,7 @@ CMD ["node", "index.js"]`;
   describe('Error Scenarios - Infrastructure', () => {
     it('should fail gracefully when Docker daemon is not running', async () => {
       mockFs.readFile.mockResolvedValue(mockDockerfile);
-      (mockDockerClient.buildImage.mockResolvedValue as any)({
+      mockDockerClient.buildImage.mockResolvedValue({
         ok: false,
         error: 'Cannot connect to the Docker daemon',
         guidance: {
@@ -413,7 +420,7 @@ CMD ["node", "index.js"]`;
 
     it('should fail when Docker socket is not accessible', async () => {
       mockFs.readFile.mockResolvedValue(mockDockerfile);
-      (mockDockerClient.buildImage.mockResolvedValue as any)({
+      mockDockerClient.buildImage.mockResolvedValue({
         ok: false,
         error: 'EACCES: permission denied, connect /var/run/docker.sock',
         guidance: {
@@ -435,7 +442,7 @@ CMD ["node", "index.js"]`;
 
     it('should fail when network is unreachable during base image pull', async () => {
       mockFs.readFile.mockResolvedValue(mockDockerfile);
-      (mockDockerClient.buildImage.mockResolvedValue as any)({
+      mockDockerClient.buildImage.mockResolvedValue({
         ok: false,
         error: 'Error pulling image: network unreachable',
         guidance: {
@@ -536,7 +543,7 @@ CMD ["node", "index.js"]`;
   describe('Error Scenarios - Docker Build Failures', () => {
     it('should fail when Dockerfile has syntax errors', async () => {
       mockFs.readFile.mockResolvedValue('INVALID DOCKERFILE SYNTAX');
-      (mockDockerClient.buildImage.mockResolvedValue as any)({
+      mockDockerClient.buildImage.mockResolvedValue({
         ok: false,
         error: 'Dockerfile parse error: unknown instruction: INVALID',
         guidance: {
@@ -555,7 +562,7 @@ CMD ["node", "index.js"]`;
 
     it('should fail when base image is not found', async () => {
       mockFs.readFile.mockResolvedValue('FROM nonexistent:image\nCMD ["echo", "hello"]');
-      (mockDockerClient.buildImage.mockResolvedValue as any)({
+      mockDockerClient.buildImage.mockResolvedValue({
         ok: false,
         error: 'manifest for nonexistent:image not found',
         guidance: {
@@ -575,7 +582,7 @@ CMD ["node", "index.js"]`;
 
     it('should fail when build step fails', async () => {
       mockFs.readFile.mockResolvedValue(mockDockerfile);
-      (mockDockerClient.buildImage.mockResolvedValue as any)({
+      mockDockerClient.buildImage.mockResolvedValue({
         ok: false,
         error: 'RUN command failed: npm ci exited with code 1',
         guidance: {
@@ -595,7 +602,7 @@ CMD ["node", "index.js"]`;
 
     it('should fail when disk space is insufficient', async () => {
       mockFs.readFile.mockResolvedValue(mockDockerfile);
-      (mockDockerClient.buildImage.mockResolvedValue as any)({
+      mockDockerClient.buildImage.mockResolvedValue({
         ok: false,
         error: 'no space left on device',
         guidance: {
@@ -621,7 +628,7 @@ CMD ["node", "index.js"]`;
       mockFs.readFile.mockResolvedValue(mockDockerfile);
 
       // Setup docker build mock
-      (mockDockerClient.buildImage.mockResolvedValue as any)(
+      mockDockerClient.buildImage.mockResolvedValue(
         createSuccessResult({
           imageId: 'sha256:mock-image-id',
           digest: 'sha256:abcdef1234567890',
