@@ -9,6 +9,7 @@ import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractK8sErrorGuidance } from './errors';
+import { getResourceConfig, getApiMethod } from './types';
 
 export interface K8sResource {
   apiVersion: string;
@@ -21,143 +22,6 @@ export interface K8sResource {
   };
   spec?: Record<string, unknown>;
   data?: Record<string, unknown>;
-}
-
-// Resource mapping for type-safe resource creation
-type ResourceCreateConfig = {
-  api: unknown;
-  createMethod: string;
-  patchMethod: string;
-  namespaced: boolean;
-};
-
-/**
- * Get resource configuration for a given resource kind
- * Maps Kubernetes resource types to their corresponding API clients and methods
- */
-function getResourceConfig(
-  kc: k8s.KubeConfig,
-  kind: string,
-): ResourceCreateConfig | undefined {
-  const coreApi = kc.makeApiClient(k8s.CoreV1Api);
-  const appsApi = kc.makeApiClient(k8s.AppsV1Api);
-  const networkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
-  const batchApi = kc.makeApiClient(k8s.BatchV1Api);
-  const rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
-  const autoscalingApi = kc.makeApiClient(k8s.AutoscalingV2Api);
-
-  const resourceMap: Record<string, ResourceCreateConfig> = {
-    Namespace: {
-      api: coreApi,
-      createMethod: 'createNamespace',
-      patchMethod: 'patchNamespace',
-      namespaced: false,
-    },
-    Deployment: {
-      api: appsApi,
-      createMethod: 'createNamespacedDeployment',
-      patchMethod: 'patchNamespacedDeployment',
-      namespaced: true,
-    },
-    Service: {
-      api: coreApi,
-      createMethod: 'createNamespacedService',
-      patchMethod: 'patchNamespacedService',
-      namespaced: true,
-    },
-    ConfigMap: {
-      api: coreApi,
-      createMethod: 'createNamespacedConfigMap',
-      patchMethod: 'patchNamespacedConfigMap',
-      namespaced: true,
-    },
-    Secret: {
-      api: coreApi,
-      createMethod: 'createNamespacedSecret',
-      patchMethod: 'patchNamespacedSecret',
-      namespaced: true,
-    },
-    ServiceAccount: {
-      api: coreApi,
-      createMethod: 'createNamespacedServiceAccount',
-      patchMethod: 'patchNamespacedServiceAccount',
-      namespaced: true,
-    },
-    Ingress: {
-      api: networkingApi,
-      createMethod: 'createNamespacedIngress',
-      patchMethod: 'patchNamespacedIngress',
-      namespaced: true,
-    },
-    StatefulSet: {
-      api: appsApi,
-      createMethod: 'createNamespacedStatefulSet',
-      patchMethod: 'patchNamespacedStatefulSet',
-      namespaced: true,
-    },
-    DaemonSet: {
-      api: appsApi,
-      createMethod: 'createNamespacedDaemonSet',
-      patchMethod: 'patchNamespacedDaemonSet',
-      namespaced: true,
-    },
-    Job: {
-      api: batchApi,
-      createMethod: 'createNamespacedJob',
-      patchMethod: 'patchNamespacedJob',
-      namespaced: true,
-    },
-    CronJob: {
-      api: batchApi,
-      createMethod: 'createNamespacedCronJob',
-      patchMethod: 'patchNamespacedCronJob',
-      namespaced: true,
-    },
-    Role: {
-      api: rbacApi,
-      createMethod: 'createNamespacedRole',
-      patchMethod: 'patchNamespacedRole',
-      namespaced: true,
-    },
-    RoleBinding: {
-      api: rbacApi,
-      createMethod: 'createNamespacedRoleBinding',
-      patchMethod: 'patchNamespacedRoleBinding',
-      namespaced: true,
-    },
-    ClusterRole: {
-      api: rbacApi,
-      createMethod: 'createClusterRole',
-      patchMethod: 'patchClusterRole',
-      namespaced: false,
-    },
-    ClusterRoleBinding: {
-      api: rbacApi,
-      createMethod: 'createClusterRoleBinding',
-      patchMethod: 'patchClusterRoleBinding',
-      namespaced: false,
-    },
-    PersistentVolumeClaim: {
-      api: coreApi,
-      createMethod: 'createNamespacedPersistentVolumeClaim',
-      patchMethod: 'patchNamespacedPersistentVolumeClaim',
-      namespaced: true,
-    },
-    PersistentVolume: {
-      api: coreApi,
-      createMethod: 'createPersistentVolume',
-      patchMethod: 'patchPersistentVolume',
-      namespaced: false,
-    },
-    HorizontalPodAutoscaler: {
-      api: autoscalingApi,
-      createMethod: 'createNamespacedHorizontalPodAutoscaler',
-      patchMethod: 'patchNamespacedHorizontalPodAutoscaler',
-      namespaced: true,
-    },
-  };
-
-  return resourceMap[kind];
 }
 
 /**
@@ -174,6 +38,53 @@ function handleK8sError(error: unknown, operation: string, logger: Logger): Resu
   const guidance = extractK8sErrorGuidance(error, operation);
   logger.error({ error: guidance.message, operation }, 'K8s operation failed');
   return Failure(guidance.message, guidance);
+}
+
+/**
+ * Helper function to call create method with appropriate arguments based on whether resource is namespaced
+ */
+async function callCreateMethod(
+  createMethod: unknown,
+  isNamespaced: boolean,
+  namespace: string,
+  resource: K8sResource,
+): Promise<{ body?: K8sResource }> {
+  return isNamespaced
+    ? await (
+        createMethod as (args: {
+          namespace: string;
+          body: unknown;
+        }) => Promise<{ body?: K8sResource }>
+      )({ namespace, body: resource })
+    : await (createMethod as (args: { body: unknown }) => Promise<{ body?: K8sResource }>)({
+        body: resource,
+      });
+}
+
+/**
+ * Helper function to call patch method with appropriate arguments based on whether resource is namespaced
+ */
+async function callPatchMethod(
+  patchMethod: unknown,
+  isNamespaced: boolean,
+  name: string,
+  namespace: string,
+  resource: K8sResource,
+): Promise<{ body?: K8sResource }> {
+  return isNamespaced
+    ? await (
+        patchMethod as (args: {
+          name: string;
+          namespace: string;
+          body: unknown;
+        }) => Promise<{ body?: K8sResource }>
+      )({ name, namespace, body: resource })
+    : await (
+        patchMethod as (args: {
+          name: string;
+          body: unknown;
+        }) => Promise<{ body?: K8sResource }>
+      )({ name, body: resource });
 }
 
 /**
@@ -232,17 +143,14 @@ export async function applyResource(
 
     // Try to create the resource first (optimistic approach)
     if (config) {
-      const api = config.api as Record<string, (args: unknown) => Promise<{ body?: K8sResource }>>;
-      const createMethod = api[config.createMethod];
+      const createMethod = getApiMethod(config.api, config.createMethod);
 
-      if (!createMethod) {
+      if (typeof createMethod !== 'function') {
         return Failure(`Method ${config.createMethod} not found on API client`);
       }
 
       try {
-        const result = config.namespaced
-          ? await createMethod({ namespace, body: resource })
-          : await createMethod({ body: resource });
+        const result = await callCreateMethod(createMethod, config.namespaced, namespace, resource);
 
         const resourceBody = result.body || (result as unknown as K8sResource);
         logger.info({ kind, name, namespace }, 'Resource created successfully');
@@ -252,14 +160,18 @@ export async function applyResource(
         if (isConflictError(createError)) {
           logger.debug({ kind, name, namespace }, 'Resource exists, updating with patch');
 
-          const patchMethod = api[config.patchMethod];
-          if (!patchMethod) {
+          const patchMethod = getApiMethod(config.api, config.patchMethod);
+          if (typeof patchMethod !== 'function') {
             return Failure(`Method ${config.patchMethod} not found on API client`);
           }
 
-          const patchResult = config.namespaced
-            ? await patchMethod({ name, namespace, body: resource })
-            : await patchMethod({ name, body: resource });
+          const patchResult = await callPatchMethod(
+            patchMethod,
+            config.namespaced,
+            name,
+            namespace,
+            resource,
+          );
 
           const patchBody = patchResult.body || (patchResult as unknown as K8sResource);
           logger.info({ kind, name, namespace }, 'Resource updated successfully');
@@ -299,4 +211,3 @@ export async function applyResource(
     return handleK8sError(error, 'apply resource', logger);
   }
 }
-

@@ -88,7 +88,10 @@ export function loadPolicy(file: string): Result<Policy> {
 
     const ttl = base.value.cache?.ttl ?? 300;
     putCached(file, base.value, ttl);
-    log.debug({ file, rulesCount: base.value.rules.length }, 'Policy loaded and cached successfully');
+    log.debug(
+      { file, rulesCount: base.value.rules.length },
+      'Policy loaded and cached successfully',
+    );
     return base;
   } catch (err) {
     return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(extractErrorMessage(err)));

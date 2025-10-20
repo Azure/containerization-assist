@@ -5,7 +5,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
 import { getToolLogger } from '@/lib/tool-helpers';
-import { validatePath } from '@/lib/validation';
+import { validatePathOrFail } from '@/lib/validation-helpers';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
 import {
   parsePackageJson,
@@ -192,14 +192,11 @@ async function handleAnalyzeRepo(
   const logger = getToolLogger(ctx, 'analyze-repo');
 
   // Validate and resolve repository path
-  const pathResult = await validatePath(input.repositoryPath, {
+  const pathResult = await validatePathOrFail(input.repositoryPath, {
     mustExist: true,
     mustBeDirectory: true,
   });
-
-  if (!pathResult.ok) {
-    return pathResult;
-  }
+  if (!pathResult.ok) return pathResult;
 
   const repoPath = pathResult.value;
 

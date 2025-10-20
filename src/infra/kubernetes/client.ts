@@ -161,7 +161,6 @@ export const createKubernetesClient = (
     }
   };
 
-
   return {
     /**
      * Apply Kubernetes manifest (supports all resource types)
@@ -180,15 +179,16 @@ export const createKubernetesClient = (
       );
 
       // Create a working copy to avoid mutating the input manifest
-      const workingManifest = !isClusterScoped && !manifest.metadata.namespace
-        ? {
-            ...manifest,
-            metadata: {
-              ...manifest.metadata,
-              namespace,
-            },
-          }
-        : manifest;
+      const workingManifest =
+        !isClusterScoped && !manifest.metadata.namespace
+          ? {
+              ...manifest,
+              metadata: {
+                ...manifest.metadata,
+                namespace,
+              },
+            }
+          : manifest;
 
       // Use the consolidated resource operations module
       const result = await applyK8sResource(kc, workingManifest, logger);
@@ -222,6 +222,14 @@ export const createKubernetesClient = (
       let timeoutId: NodeJS.Timeout | undefined;
       let timeoutCleared = false;
 
+      // Helper function to cleanup timeout
+      const cleanupTimeout = (): void => {
+        timeoutCleared = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+
       try {
         // Use a shorter timeout for ping operations
         const pingTimeout = timeout || 5000;
@@ -246,10 +254,7 @@ export const createKubernetesClient = (
           return true;
         } finally {
           // Always clear the timeout to prevent hanging timers
-          timeoutCleared = true;
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
+          cleanupTimeout();
         }
       } catch (error) {
         const guidance = extractK8sErrorGuidance(error, 'ping cluster');

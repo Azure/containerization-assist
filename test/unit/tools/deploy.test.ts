@@ -5,6 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
+import { z } from 'zod';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -125,12 +126,17 @@ jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
-// Mock DEFAULT_TIMEOUTS
-jest.mock('../../../src/config/defaults', () => ({
-  DEFAULT_TIMEOUTS: {
-    deploymentPoll: 1000, // Short timeout for tests
-  },
-}));
+// Mock config constants
+jest.mock('../../../src/config/constants', () => {
+  const actual = jest.requireActual('../../../src/config/constants') as any;
+  return {
+    ...actual,
+    DEFAULT_TIMEOUTS: {
+      ...actual.DEFAULT_TIMEOUTS,
+      deploymentPoll: 1000, // Short timeout for tests
+    },
+  };
+});
 
 // Create mock ToolContext
 function createMockToolContext(): ToolContext {

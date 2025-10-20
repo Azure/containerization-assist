@@ -118,10 +118,7 @@ function isKnowledgeEnhancedWithoutCapabilities(metadata: ToolMetadata): boolean
  * Validates metadata consistency with tool properties
  * @internal - Only used by validateAllToolMetadata
  */
-function validateMetadataConsistency(
-  toolName: string,
-  metadata: ToolMetadata,
-): Result<void> {
+function validateMetadataConsistency(toolName: string, metadata: ToolMetadata): Result<void> {
   const issues: string[] = [];
 
   // Knowledge-enhanced tools should have enhancement capabilities
