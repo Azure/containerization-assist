@@ -35,7 +35,7 @@ export function parseIntEnv(key: string, defaultValue: number): number {
  */
 export function parseStringEnv(key: string, defaultValue: string): string {
   const value = process.env[key];
-  return value !== undefined ? value : defaultValue;
+  return value === undefined ? defaultValue : value;
 }
 
 /**

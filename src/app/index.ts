@@ -31,17 +31,30 @@ import { DEFAULT_CHAIN_HINTS } from './chain-hints';
 
 /**
  * Apply tool aliases to create renamed versions of tools
+ * Returns both the aliased tools and a reverse mapping (alias -> original)
  */
-function applyToolAliases(tools: readonly Tool[], aliases?: Record<string, string>): Tool[] {
-  if (!aliases) return [...tools];
+function applyToolAliases(
+  tools: readonly Tool[],
+  aliases?: Record<string, string>,
+): { aliasedTools: Tool[]; aliasToOriginalMap: Record<string, string> } {
+  if (!aliases) {
+    return { aliasedTools: [...tools], aliasToOriginalMap: {} };
+  }
 
-  return tools.map((tool) => {
+  const aliasToOriginalMap: Record<string, string> = {};
+
+  const aliasedTools = tools.map((tool) => {
     const alias = aliases[tool.name];
     if (!alias) return tool;
+
+    // Store reverse mapping (alias -> original)
+    aliasToOriginalMap[alias] = tool.name;
 
     // Create a new tool object with the alias name
     return { ...tool, name: alias };
   });
+
+  return { aliasedTools, aliasToOriginalMap };
 }
 
 /**
@@ -61,7 +74,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   createToolLoggerFile(logger);
 
   const tools = config.tools || ALL_TOOLS;
-  const aliasedTools = applyToolAliases(tools, config.toolAliases);
+  const { aliasedTools, aliasToOriginalMap } = applyToolAliases(tools, config.toolAliases);
 
   // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema
   const registryTools: Tool[] = aliasedTools.map((tool) => tool as unknown as Tool);
@@ -76,6 +89,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const orchestratorConfig: OrchestratorConfig = {
     chainHintsMode,
     chainHints: DEFAULT_CHAIN_HINTS,
+    aliasToOriginalMap,
   };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
 
