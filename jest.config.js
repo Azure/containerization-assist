@@ -83,6 +83,7 @@ export default {
         '/dist/',
         // ES module issues resolved - all integration tests enabled
       ],
+      workerIdleMemoryLimit: '512MB', // Force worker restart after integration tests
     },
     {
       displayName: 'e2e',
@@ -109,6 +110,7 @@ export default {
 
   // Performance optimizations
   maxWorkers: '50%', // Use half of available CPU cores
+  workerIdleMemoryLimit: '512MB', // Force worker restart to prevent memory leaks
   cache: true,
   cacheDirectory: '<rootDir>/node_modules/.cache/jest',
 

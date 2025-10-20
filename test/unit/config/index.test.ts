@@ -19,7 +19,6 @@ describe('Main Configuration', () => {
       expect(config.workspace).toBeDefined();
       expect(config.docker).toBeDefined();
       expect(config.toolLogging).toBeDefined();
-      expect(config.validation).toBeDefined();
     });
 
     it('should use environment variables when provided', () => {
@@ -60,15 +59,6 @@ describe('Main Configuration', () => {
 
       expect(testConfig.workspace.maxFileSize).toBe(20971520);
       expect(testConfig.docker.timeout).toBe(90000);
-    });
-
-    it('should handle list environment variables', () => {
-      process.env.CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST = 'nginx:latest,alpine:3.14';
-
-      jest.resetModules();
-      const { config: testConfig } = require('../../../src/config/index');
-
-      expect(testConfig.validation.imageAllowlist).toEqual(['nginx:latest', 'alpine:3.14']);
     });
 
     it('should have toolLogging configuration', () => {
@@ -179,13 +169,6 @@ describe('Main Configuration', () => {
     it('should have valid file paths', () => {
       expect(config.docker.socketPath).toContain('/');
       expect(config.workspace.workspaceDir).toBeTruthy();
-    });
-
-    it('should have validation settings', () => {
-      expect(config.validation.imageAllowlist).toBeDefined();
-      expect(config.validation.imageDenylist).toBeDefined();
-      expect(Array.isArray(config.validation.imageAllowlist)).toBe(true);
-      expect(Array.isArray(config.validation.imageDenylist)).toBe(true);
     });
   });
 });

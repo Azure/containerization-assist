@@ -184,24 +184,25 @@ export interface DockerClient {
  * Generate a digest from an image ID
  * @param imageId - The Docker image ID
  * @param logger - Logger instance
- * @returns Result<string> containing the SHA-256 digest, or Failure if invalid
+ * @returns A SHA-256 digest string
+ * @throws Error if imageId is not a valid SHA-256 hash
  */
-function generateDigestFromImageId(imageId: string, logger: Logger): Result<string> {
+function generateDigestFromImageId(imageId: string, logger: Logger): string {
   // If already prefixed, validate the hash portion
   if (imageId.startsWith('sha256:')) {
     const hash = imageId.substring(7);
     if (/^[a-f0-9]{64}$/.test(hash)) {
-      return Success(imageId);
+      return imageId;
     }
   } else {
     // If not prefixed, validate and add prefix
     if (/^[a-f0-9]{64}$/.test(imageId)) {
-      return Success(`sha256:${imageId}`);
+      return `sha256:${imageId}`;
     }
   }
 
   logger.warn({ imageId }, 'Image ID is not a valid SHA-256 hash, cannot generate digest');
-  return Failure('Image ID is not a valid SHA-256 hash, cannot generate digest');
+  throw new Error(`Image ID is not a valid SHA-256 hash: ${imageId}`);
 }
 
 /**
@@ -340,28 +341,14 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             if (inspect.RepoDigests?.[0]) {
               digest = inspect.RepoDigests[0];
             } else {
-              const digestResult = generateDigestFromImageId(inspect.Id, logger);
-              if (digestResult.ok) {
-                digest = digestResult.value;
-              } else {
-                logger.warn({ imageId: inspect.Id }, 'Could not generate image digest from image ID');
-                buildWarnings.push('Could not generate image digest from image ID');
-                digest = '';
-              }
+              digest = generateDigestFromImageId(inspect.Id, logger);
             }
             layers = inspect.RootFS?.Layers?.length;
           } catch (inspectError) {
             logger.warn({ error: inspectError, imageId }, 'Could not inspect image after build');
             buildWarnings.push('Could not retrieve complete image metadata');
             // Use fallback digest from image ID
-            const digestResult = generateDigestFromImageId(imageId, logger);
-            if (digestResult.ok) {
-              digest = digestResult.value;
-            } else {
-              logger.warn({ imageId }, 'Could not generate image digest from image ID');
-              buildWarnings.push('Could not generate image digest from image ID');
-              digest = '';
-            }
+            digest = generateDigestFromImageId(imageId, logger);
           }
         }
 

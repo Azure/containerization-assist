@@ -8,7 +8,7 @@
  */
 
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { createDockerClient } from '@/infra/docker/client';
 import { parseImageName } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';

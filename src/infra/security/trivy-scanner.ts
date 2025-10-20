@@ -11,7 +11,7 @@ import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Logger } from 'pino';
 
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { Result, Success, Failure } from '@/types';
 import type { BasicScanResult } from './scanner';
 
