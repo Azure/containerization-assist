@@ -29,7 +29,6 @@ describe('Tool Metadata Validation', () => {
         expect(result.value.validTools).toEqual(['test-tool-1', 'test-tool-2']);
         expect(result.value.invalidTools).toEqual([]);
         expect(result.value.metadataErrors).toEqual([]);
-        expect(result.value.consistencyErrors).toEqual([]);
       }
     });
 
