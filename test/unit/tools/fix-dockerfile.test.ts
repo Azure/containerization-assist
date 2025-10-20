@@ -375,6 +375,198 @@ describe('fix-dockerfile', () => {
         await fixDockerfileTool.handler(config, mockContext);
       }).rejects.toThrow('Validation service unavailable');
     });
+
+    it('should handle permission errors when reading Dockerfile', async () => {
+      delete config.dockerfile;
+      config.path = '/restricted/Dockerfile';
+
+      mockFs.access.mockRejectedValue(new Error('EACCES: permission denied'));
+      mockFs.stat.mockRejectedValue(new Error('EACCES: permission denied'));
+      mockFs.readFile.mockRejectedValue(new Error('EACCES: permission denied'));
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBeTruthy();
+      }
+    });
+
+    it('should handle Dockerfile with only whitespace', async () => {
+      config.dockerfile = '   \n\n\t\t   \n   ';
+
+      // Reset the mock to return validation results for empty/whitespace content
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: false,
+        score: 0,
+        grade: 'F',
+        results: [
+          {
+            passed: false,
+            rule: 'empty-dockerfile',
+            message: 'Dockerfile appears to be empty',
+            line: 1,
+            metadata: {
+              category: ValidationCategory.SECURITY,
+              severity: ValidationSeverity.ERROR,
+            },
+          },
+        ],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      // Tool may process whitespace-only content as valid input
+      // The validation will catch it as having issues
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.currentIssues).toBeDefined();
+      }
+    });
+
+    it('should handle binary content in Dockerfile', async () => {
+      config.dockerfile = '\x00\x01\x02\x03\x04\x05';
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: false,
+        score: 0,
+        grade: 'F',
+        results: [
+          {
+            passed: false,
+            rule: 'syntax-error',
+            message: 'Invalid Dockerfile syntax',
+            line: 1,
+            metadata: {
+              category: ValidationCategory.SECURITY,
+              severity: ValidationSeverity.ERROR,
+            },
+          },
+        ],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      // Tool should handle binary content
+      expect(result).toBeDefined();
+    });
+
+    it('should handle very large Dockerfile files', async () => {
+      // Create a very large Dockerfile (10000 lines)
+      const largeDockerfile = Array(10000)
+        .fill('RUN echo "line"')
+        .join('\n');
+      config.dockerfile = largeDockerfile;
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: false,
+        score: 50,
+        grade: 'F',
+        results: [
+          {
+            passed: false,
+            rule: 'too-many-layers',
+            message: 'Too many layers',
+            line: 1,
+            metadata: {
+              category: ValidationCategory.PERFORMANCE,
+              severity: ValidationSeverity.WARNING,
+            },
+          },
+        ],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.currentIssues).toBeDefined();
+      }
+    });
+
+    it('should handle invalid file path characters', async () => {
+      delete config.dockerfile;
+      config.path = '/invalid\x00path/Dockerfile';
+
+      mockFs.readFile.mockRejectedValue(new Error('Invalid path'));
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('should handle Dockerfile with unicode characters', async () => {
+      config.dockerfile = `FROM node:18-alpine
+# 这是一个注释
+WORKDIR /app
+COPY . .
+RUN npm install
+# Comment with émojis: 🐳 🚀
+CMD ["node", "index.js"]`;
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: true,
+        score: 85,
+        grade: 'B',
+        results: [],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.validationScore).toBeGreaterThan(0);
+      }
+    });
+
+    it('should handle network timeout during validation', async () => {
+      mockValidateDockerfileContent.mockImplementation(() => {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => reject(new Error('Network timeout')), 100);
+        });
+      });
+
+      const mockContext = createMockToolContext();
+
+      await expect(async () => {
+        await fixDockerfileTool.handler(config, mockContext);
+      }).rejects.toThrow('Network timeout');
+    });
+
+    it('should handle malformed validation results', async () => {
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: true,
+        score: null as any,
+        grade: undefined as any,
+        results: null as any,
+      });
+
+      const mockContext = createMockToolContext();
+
+      // Tool should handle malformed validation data
+      await expect(async () => {
+        await fixDockerfileTool.handler(config, mockContext);
+      }).rejects.toThrow();
+    });
+
+    it('should handle Dockerfile path that is actually a directory', async () => {
+      delete config.dockerfile;
+      config.path = '/test/directory';
+
+      mockFs.stat.mockResolvedValue({ isFile: () => false, isDirectory: () => true } as any);
+      mockFs.readFile.mockRejectedValue(new Error('EISDIR: illegal operation on a directory'));
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(false);
+    });
   });
 
   describe('Edge Cases', () => {

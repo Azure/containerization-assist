@@ -98,7 +98,11 @@ async function handleBuildImage(
   context: ToolContext,
 ): Promise<Result<BuildImageResult>> {
   if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+    return Failure('Invalid parameters provided', {
+      message: 'Invalid parameters provided',
+      hint: 'The build-image tool received invalid or missing parameters',
+      resolution: 'Ensure you are providing a valid parameters object with required fields like path and dockerfile',
+    });
   }
 
   // Optional progress reporting for complex operations (Docker build process)
@@ -153,7 +157,11 @@ async function handleBuildImage(
       const err = error as { code?: string };
       if (err.code === 'EISDIR') {
         logger.error({ path: finalDockerfilePath }, 'Attempted to read directory as file');
-        return Failure(`Dockerfile path points to a directory: ${finalDockerfilePath}`);
+        return Failure(`Dockerfile path points to a directory: ${finalDockerfilePath}`, {
+          message: `Dockerfile path points to a directory: ${finalDockerfilePath}`,
+          hint: 'The provided Dockerfile path is a directory, not a file',
+          resolution: 'Provide the full path to the Dockerfile file, not just the directory (e.g., ./path/to/Dockerfile instead of ./path/to)',
+        });
       }
       throw error;
     }
@@ -224,7 +232,11 @@ async function handleBuildImage(
   } catch (error) {
     timer.error(error);
 
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred during the Docker build process',
+      resolution: 'Check the error message above for details. Common issues include Docker daemon not running, insufficient permissions, or invalid build context',
+    });
   }
 }
 

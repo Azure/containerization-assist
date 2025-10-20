@@ -35,7 +35,11 @@ async function handleTagImage(
   const { tag } = input;
 
   if (!tag) {
-    return Failure('Tag parameter is required');
+    return Failure('Tag parameter is required', {
+      message: 'Tag parameter is required',
+      hint: 'The tag parameter is missing',
+      resolution: 'Provide a valid tag in the format "repository:tag" or "registry/repository:tag"',
+    });
   }
 
   // Parse and validate image name
@@ -50,7 +54,11 @@ async function handleTagImage(
     const source = input.imageId;
 
     if (!source) {
-      return Failure('No image specified. Provide imageId parameter.');
+      return Failure('No image specified. Provide imageId parameter.', {
+        message: 'No image specified. Provide imageId parameter.',
+        hint: 'The imageId parameter is required to tag an image',
+        resolution: 'Provide the imageId or existing image tag to apply a new tag to',
+      });
     }
 
     // Extract repository and tag from parsed image
@@ -81,7 +89,11 @@ async function handleTagImage(
     return Success(result);
   } catch (error) {
     timer.error(error);
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred while tagging the image',
+      resolution: 'Verify that Docker is running, the source image exists, and the tag format is valid',
+    });
   }
 }
 

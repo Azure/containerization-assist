@@ -56,17 +56,36 @@ function toValidationResults(issues: DflIssue[]): ValidationResult[] {
 }
 
 /**
+ * Cached module instance - load once at module initialization
+ * This avoids repeatedly trying to load the module on every linting call
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let cachedModule: any | null | undefined = undefined;
+
+/**
+ * Track whether CLI is available - cache the result to avoid repeated npx attempts
+ */
+let cliAvailable: boolean | undefined = undefined;
+
+/**
  * Try to load dockerfilelint module programmatically
+ * Uses caching to avoid repeated load attempts
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function tryLoadModule(): Promise<any> {
+  // Return cached result if already attempted
+  if (cachedModule !== undefined) {
+    return cachedModule;
+  }
+
   try {
     // Try to dynamically import dockerfilelint - using require syntax for optional dependency
-    const mod = eval('require("dockerfilelint")');
+    cachedModule = eval('require("dockerfilelint")');
     logger.debug('Loaded dockerfilelint module programmatically');
-    return mod;
+    return cachedModule;
   } catch {
     logger.debug('Could not load dockerfilelint module, will use CLI fallback');
+    cachedModule = null;
     return null;
   }
 }
@@ -115,6 +134,17 @@ export async function lintWithDockerfilelint(dockerfileContent: string): Promise
     }
   }
 
+  // If we've already determined CLI is not available, skip the expensive npx call
+  if (cliAvailable === false) {
+    return createEmptyReport();
+  }
+
+  // Skip CLI fallback in test environment to avoid slow npx calls
+  if (process.env.NODE_ENV === 'test' || process.env.SKIP_DOCKERFILELINT_CLI === 'true') {
+    cliAvailable = false;
+    return createEmptyReport();
+  }
+
   // CLI fallback using npx (no external binary needed)
   try {
     // Secure temp file creation using Node.js built-ins
@@ -143,6 +173,7 @@ export async function lintWithDockerfilelint(dockerfileContent: string): Promise
 
       if (cli.error) {
         logger.warn({ error: cli.error }, 'dockerfilelint CLI error');
+        cliAvailable = false;
         return createEmptyReport();
       }
 
@@ -151,6 +182,7 @@ export async function lintWithDockerfilelint(dockerfileContent: string): Promise
         try {
           const output: DflOutput = JSON.parse(cli.stdout);
           if (output.issues) {
+            cliAvailable = true;
             return toReport(output.issues);
           }
         } catch {
@@ -163,6 +195,8 @@ export async function lintWithDockerfilelint(dockerfileContent: string): Promise
         logger.debug({ stderr: cli.stderr }, 'dockerfilelint stderr output');
       }
 
+      // CLI ran but returned no valid output - mark as available but return empty
+      cliAvailable = true;
       return createEmptyReport();
     } finally {
       // Ensure temp file is cleaned up
@@ -176,6 +210,7 @@ export async function lintWithDockerfilelint(dockerfileContent: string): Promise
     }
   } catch (error) {
     logger.error({ error }, 'Failed to run dockerfilelint');
+    cliAvailable = false;
     return createEmptyReport();
   }
 }

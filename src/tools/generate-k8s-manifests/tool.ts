@@ -342,7 +342,11 @@ async function handleGenerateK8sManifests(
     try {
       parseAcaManifest(input.acaManifest);
     } catch (error) {
-      return Failure(`Invalid ACA manifest: ${extractErrorMessage(error)}`);
+      return Failure(`Invalid ACA manifest: ${extractErrorMessage(error)}`, {
+        message: `Invalid ACA manifest: ${extractErrorMessage(error)}`,
+        hint: 'The provided Azure Container Apps manifest could not be parsed',
+        resolution: 'Ensure the acaManifest parameter contains valid YAML or JSON content representing an ACA manifest',
+      });
     }
   }
 

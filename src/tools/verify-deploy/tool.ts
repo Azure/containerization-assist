@@ -155,7 +155,11 @@ async function handleVerifyDeployment(
   context: ToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
   if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+    return Failure('Invalid parameters provided', {
+      message: 'Invalid parameters provided',
+      hint: 'The verify-deploy tool received invalid or missing parameters',
+      resolution: 'Ensure you are providing a valid parameters object with the deploymentName field',
+    });
   }
   const { logger, timer } = setupToolContext(context, 'verify-deploy');
 
@@ -173,7 +177,11 @@ async function handleVerifyDeployment(
     const k8sClient = createKubernetesClient(logger);
 
     if (!configDeploymentName) {
-      return Failure('Deployment name is required. Provide deploymentName parameter.');
+      return Failure('Deployment name is required. Provide deploymentName parameter.', {
+        message: 'Deployment name is required. Provide deploymentName parameter.',
+        hint: 'The deploymentName parameter is missing',
+        resolution: 'Provide the name of the Kubernetes deployment to verify (e.g., "my-app" or "web-deployment")',
+      });
     }
 
     const namespace = configNamespace ?? 'default';
@@ -265,7 +273,11 @@ async function handleVerifyDeployment(
   } catch (error) {
     timer.error(error);
 
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred during deployment verification',
+      resolution: 'Check the error message for details. Verify the deployment exists, cluster is accessible, and you have proper permissions',
+    });
   }
 }
 
