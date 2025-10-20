@@ -10,6 +10,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { validateImageSchema, type ValidateImageResult, type PolicyViolation } from './schema';
+import { validatePathOrFail } from '@/lib/validation-helpers';
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import nodePath from 'node:path';
@@ -150,7 +151,15 @@ async function handleValidateDockerfile(
 
   // Read Dockerfile from path if provided
   if (path) {
-    const dockerfilePath = nodePath.isAbsolute(path) ? path : nodePath.resolve(process.cwd(), path);
+    // Validate path upfront
+    const pathValidation = await validatePathOrFail(path, {
+      mustExist: true,
+      mustBeFile: true,
+      readable: true,
+    });
+    if (!pathValidation.ok) return pathValidation;
+
+    const dockerfilePath = pathValidation.value;
     try {
       content = await readFile(dockerfilePath, 'utf-8');
     } catch (error) {

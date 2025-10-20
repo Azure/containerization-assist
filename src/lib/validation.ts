@@ -18,6 +18,10 @@ export interface PathValidationOptions {
   mustBeDirectory?: boolean;
   /** Path must be a file */
   mustBeFile?: boolean;
+  /** Path must be readable */
+  readable?: boolean;
+  /** Path must be writable (or parent directory writable if path doesn't exist) */
+  writable?: boolean;
 }
 
 /**
@@ -42,6 +46,15 @@ export async function validatePath(
   pathStr: string,
   options: PathValidationOptions = {},
 ): Promise<Result<string>> {
+  // Validate path is not empty
+  if (!pathStr?.trim()) {
+    return Failure('Path cannot be empty', {
+      message: 'Path cannot be empty',
+      hint: 'A valid file or directory path must be provided',
+      resolution: 'Provide a non-empty path string',
+    });
+  }
+
   // Resolve to absolute path
   const absolutePath = path.isAbsolute(pathStr) ? pathStr : path.resolve(process.cwd(), pathStr);
 
@@ -71,6 +84,62 @@ export async function validatePath(
         message: `Path does not exist: ${absolutePath}`,
         hint: 'The specified path could not be found on the filesystem',
         resolution: 'Verify the path is correct and the file/directory exists',
+        details: { originalError: errorMsg },
+      });
+    }
+  }
+
+  // Check readability if required
+  if (options.readable) {
+    try {
+      await fs.access(absolutePath, fs.constants.R_OK);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return Failure(`Path not readable: ${absolutePath}`, {
+        message: `Path not readable: ${absolutePath}`,
+        hint: 'The specified path exists but cannot be read',
+        resolution: 'Check file permissions and ensure you have read access',
+        details: { originalError: errorMsg },
+      });
+    }
+  }
+
+  // Check writability if required
+  if (options.writable) {
+    try {
+      // Check if path exists
+      let pathExists = false;
+      try {
+        await fs.stat(absolutePath);
+        pathExists = true;
+      } catch {
+        pathExists = false;
+      }
+
+      if (pathExists) {
+        // Path exists - check if it's writable
+        await fs.access(absolutePath, fs.constants.W_OK);
+      } else {
+        // Path doesn't exist - check if parent directory is writable
+        const parentDir = path.dirname(absolutePath);
+        try {
+          await fs.access(parentDir, fs.constants.W_OK);
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          return Failure(`Parent directory not writable: ${parentDir}`, {
+            message: `Cannot write to parent directory: ${parentDir}`,
+            hint: 'The parent directory exists but is not writable',
+            resolution: 'Check parent directory permissions and ensure you have write access',
+            details: { originalError: errorMsg },
+          });
+        }
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return Failure(`Path not writable: ${absolutePath}`, {
+        message: `Path not writable: ${absolutePath}`,
+        hint: 'The specified path exists but cannot be written to',
+        resolution: 'Check file permissions and ensure you have write access',
         details: { originalError: errorMsg },
       });
     }

@@ -573,6 +573,9 @@ export async function checkImageExists(
   logger: Logger,
 ): Promise<Result<boolean>> {
   try {
+    // Normalize imageName to avoid subtle failures due to whitespace
+    imageName = imageName.trim();
+
     // Parse image name into components
     const { repository, reference } = parseImageName(imageName);
 

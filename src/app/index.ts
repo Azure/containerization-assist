@@ -25,7 +25,7 @@ import type {
   ExecutionMetadata,
 } from '@/types/runtime';
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
-import { checkDockerHealth, checkKubernetesHealth } from '@/lib/health-checks';
+import { checkDockerHealth, checkKubernetesHealth } from '@/infra/health/checks';
 import { DEFAULT_CHAIN_HINTS } from './chain-hints';
 
 /**

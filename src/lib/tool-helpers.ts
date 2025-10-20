@@ -23,16 +23,36 @@ export function getToolLogger(context: ToolContext, toolName: string): Logger {
 }
 
 /**
- * Creates a timer for measuring tool execution time.
+ * Creates a timer for measuring tool execution time with safeguards.
  * Consolidates timer creation pattern for consistent usage across tools.
+ * Wraps the timer to prevent double end/error calls which can skew metrics.
  *
  * @param logger - Logger instance for timer output
  * @param toolName - Name of the tool for timer identification
- * @returns Timer instance
+ * @returns Timer instance with double-call protection
  */
 export function createToolTimer(logger: Logger, toolName: string): Timer {
-  // Just create and return the timer - process will exit naturally
-  return createTimer(logger, toolName);
+  const timer = createTimer(logger, toolName);
+  let completed = false;
+
+  return {
+    end(additionalContext?: Record<string, unknown>): void {
+      if (completed) return;
+      completed = true;
+      timer.end(additionalContext);
+    },
+
+    error(error: unknown, additionalContext?: Record<string, unknown>): void {
+      if (completed) return;
+      completed = true;
+      timer.error(error, additionalContext);
+    },
+
+    checkpoint(label: string, additionalContext?: Record<string, unknown>): number {
+      // Checkpoints are allowed even after completion for debugging
+      return timer.checkpoint(label, additionalContext);
+    },
+  };
 }
 
 /**

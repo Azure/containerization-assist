@@ -5,6 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
+import { createMockValidatePath } from '../../__support__/utilities/mocks';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -35,13 +36,18 @@ function createMockLogger() {
 
 // Mock the validation library to bypass path validation in tests
 jest.mock('../../../src/lib/validation', () => ({
-  validatePath: jest.fn().mockImplementation(async (pathStr: string, options: any) => {
-    // Always return success with the path for tests
-    return { ok: true, value: pathStr };
-  }),
+  validatePath: createMockValidatePath(),
   validateImageName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
   validateK8sName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
   validateNamespace: jest.fn().mockImplementation((ns: string) => ({ ok: true, value: ns })),
+}));
+
+// Mock validation-helpers to use the mocked validation
+jest.mock('../../../src/lib/validation-helpers', () => ({
+  validatePathOrFail: jest.fn().mockImplementation(async (...args: any[]) => {
+    const { validatePath } = require('../../../src/lib/validation');
+    return validatePath(...args);
+  }),
 }));
 
 // Mock filesystem functions with proper structure
@@ -213,14 +219,15 @@ CMD ["node", "index.js"]`;
 
   describe('Dockerfile Resolution', () => {
     it('should fail when Dockerfile does not exist', async () => {
-      // Mock stat to return that the file doesn't exist
+      // Mock access to simulate file doesn't exist (for validation)
+      mockFs.access.mockRejectedValue(new Error('ENOENT: no such file or directory'));
       mockFs.stat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Dockerfile not found');
+        expect(result.error).toContain('does not exist');
       }
     });
 

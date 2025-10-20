@@ -4,12 +4,14 @@
  */
 
 import { jest } from '@jest/globals';
+import type { ErrorGuidance } from '../../../src/types/core';
+import type { KubernetesClient } from '../../../src/infra/kubernetes/client';
 
 function createSuccessResult<T>(value: T) {
   return { ok: true as const, value };
 }
 
-function createFailureResult(error: string, guidance?: { resolution?: string; hints?: string[] }) {
+function createFailureResult(error: string, guidance?: ErrorGuidance) {
   return { ok: false as const, error, guidance };
 }
 
@@ -38,7 +40,7 @@ const mockK8sClient = {
   namespaceExists: jest.fn(),
   checkPermissions: jest.fn(),
   checkIngressController: jest.fn(),
-};
+} as jest.Mocked<KubernetesClient>;
 
 jest.mock('../../../src/infra/kubernetes/client', () => ({
   createKubernetesClient: jest.fn(() => mockK8sClient),
@@ -204,8 +206,9 @@ describe('Kubernetes Error Scenarios', () => {
     it('should optionally provide guidance on errors', async () => {
       mockK8sClient.applyManifest.mockResolvedValue(
         createFailureResult('Error', {
+          message: 'Deploy failed',
+          hint: 'Check your cluster connection',
           resolution: 'Fix the issue',
-          hints: ['Hint 1', 'Hint 2'],
         }),
       );
 
@@ -216,11 +219,14 @@ describe('Kubernetes Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok && result.guidance) {
+        if (result.guidance.message) {
+          expect(typeof result.guidance.message).toBe('string');
+        }
+        if (result.guidance.hint) {
+          expect(typeof result.guidance.hint).toBe('string');
+        }
         if (result.guidance.resolution) {
           expect(typeof result.guidance.resolution).toBe('string');
-        }
-        if (result.guidance.hints) {
-          expect(Array.isArray(result.guidance.hints)).toBe(true);
         }
       }
     });
