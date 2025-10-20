@@ -51,7 +51,7 @@ The implementation follows these principles:
 
 **MCP Server Structure (src/mcp/mcp-server.ts:116-146)**:
 ```typescript
-export function createMCPServer<TTool extends MCPTool>(
+export function createMCPServer<TTool extends Tool>(
   tools: Array<TTool>,
   options: ServerOptions = {},
   execute: ToolExecutor,

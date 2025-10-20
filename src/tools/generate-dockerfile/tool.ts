@@ -560,9 +560,9 @@ async function handleGenerateDockerfile(
 
   if (!path) {
     return Failure('Path is required. Provide a path parameter.', {
-      message: 'Path is required. Provide a path parameter.',
-      hint: 'The repositoryPath parameter is missing or empty',
-      resolution: 'Provide a valid repositoryPath parameter pointing to the directory containing your application code',
+      message: 'Missing required parameter: path',
+      hint: 'Repository path must be specified to generate Dockerfile',
+      resolution: 'Add path parameter with the repository directory path',
     });
   }
 

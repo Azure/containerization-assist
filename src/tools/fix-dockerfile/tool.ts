@@ -8,7 +8,7 @@
  * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
  */
 
-import { Failure, type Result, Success, TOPICS } from '@/types';
+import { type Result, Success, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { LIMITS } from '@/config/constants';
@@ -24,9 +24,9 @@ import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import { ValidationCategory, ValidationSeverity } from '@/validation/core-types';
-import { validatePathOrFail } from '@/lib/validation-helpers';
 import type { z } from 'zod';
-import { promises as fs, existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import { readDockerfile } from '@/lib/file-utils';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
@@ -536,39 +536,18 @@ async function handleFixDockerfile(
   ctx: ToolContext,
 ): Promise<Result<DockerfileFixPlan>> {
   const logger = getToolLogger(ctx, 'fix-dockerfile');
-  let content = input.dockerfile || '';
 
-  if (input.path) {
-    // Validate path upfront
-    const pathValidation = await validatePathOrFail(input.path, {
-      mustExist: true,
-      mustBeFile: true,
-      readable: true,
-    });
-    if (!pathValidation.ok) return pathValidation;
+  // Use shared utility to read Dockerfile
+  const contentResult = await readDockerfile({
+    ...(input.path !== undefined && { path: input.path }),
+    ...(input.dockerfile !== undefined && { content: input.dockerfile }),
+  });
 
-    const dockerfilePath = pathValidation.value;
-    try {
-      content = await fs.readFile(dockerfilePath, 'utf-8');
-    } catch (error) {
-      return Failure(
-        `Failed to read Dockerfile at ${dockerfilePath}: ${error instanceof Error ? error.message : String(error)}`,
-        {
-          message: `Failed to read Dockerfile at ${dockerfilePath}: ${error instanceof Error ? error.message : String(error)}`,
-          hint: 'Unable to read the Dockerfile from the specified path',
-          resolution: 'Verify the file exists and you have read permissions, or provide the Dockerfile content directly using the dockerfile parameter instead of path',
-        },
-      );
-    }
+  if (!contentResult.ok) {
+    return contentResult;
   }
 
-  if (!content) {
-    return Failure('Dockerfile content is empty. Provide valid Dockerfile content or path.', {
-      message: 'Dockerfile content is empty. Provide valid Dockerfile content or path.',
-      hint: 'No Dockerfile content was provided for validation',
-      resolution: 'Provide either a valid path parameter pointing to a Dockerfile or supply the Dockerfile content directly via the dockerfile parameter',
-    });
-  }
+  const content = contentResult.value;
 
   logger.info({ preview: content.substring(0, 100) }, 'Validating Dockerfile for issues');
 

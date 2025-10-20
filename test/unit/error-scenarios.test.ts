@@ -10,12 +10,14 @@
  * - Validation failures
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest, beforeAll, afterAll } from '@jest/globals';
 import { createLogger } from '@/lib/logger';
 import type { ToolContext } from '@/mcp/context';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
+import { Failure } from '@/types';
+import * as scannerModule from '@/infra/security/scanner';
 
 // Import tools
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
@@ -38,6 +40,50 @@ const toolContext: ToolContext = {
 };
 
 describe('Error Scenario Coverage', () => {
+  // Mock the security scanner to avoid slow Trivy timeouts in error tests
+  let scannerSpy: jest.SpiedFunction<typeof scannerModule.createSecurityScanner>;
+
+  beforeAll(() => {
+    scannerSpy = jest.spyOn(scannerModule, 'createSecurityScanner').mockImplementation(() => ({
+      scanImage: async (imageId: string) => {
+        // Fail fast for nonexistent images to avoid Trivy pulling from Docker Hub
+        if (imageId.includes('nonexistent') || imageId.includes('invalid')) {
+          return Failure('Image not found', {
+            message: 'Failed to scan image',
+            hint: 'The specified image does not exist',
+            resolution: 'Verify the image exists: docker images',
+          });
+        }
+        // Return empty scan for alpine (used in tests)
+        return {
+          ok: true,
+          value: {
+            imageId,
+            vulnerabilities: [],
+            totalVulnerabilities: 0,
+            criticalCount: 0,
+            highCount: 0,
+            mediumCount: 0,
+            lowCount: 0,
+            negligibleCount: 0,
+            unknownCount: 0,
+            scanDate: new Date(),
+          },
+        };
+      },
+      ping: async () => ({ ok: true, value: true }),
+    }));
+  });
+
+  afterAll(() => {
+    // Restore the spy and clear all mocks to prevent handle leaks
+    if (scannerSpy) {
+      scannerSpy.mockRestore();
+    }
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
   describe('Invalid Parameters', () => {
     it('should reject analyze-repo with invalid path', async () => {
       const result = await analyzeRepoTool.handler(

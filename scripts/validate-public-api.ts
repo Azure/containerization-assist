@@ -27,7 +27,7 @@ const PUBLIC_EXPORTS: PublicExport[] = [
   { file: 'src/index.ts', exportName: 'Result', exportType: 'type', critical: true },
   { file: 'src/index.ts', exportName: 'Success', exportType: 'type', critical: true },
   { file: 'src/index.ts', exportName: 'Failure', exportType: 'type', critical: true },
-  { file: 'src/index.ts', exportName: 'MCPTool', exportType: 'type', critical: true },
+  { file: 'src/index.ts', exportName: 'Tool', exportType: 'type', critical: true },
 
   // Runtime types - Public API
   { file: 'src/index.ts', exportName: 'AppRuntime', exportType: 'type', critical: true },

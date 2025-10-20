@@ -156,9 +156,9 @@ async function handleVerifyDeployment(
 ): Promise<Result<VerifyDeploymentResult>> {
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided', {
-      message: 'Invalid parameters provided',
-      hint: 'The verify-deploy tool received invalid or missing parameters',
-      resolution: 'Ensure you are providing a valid parameters object with the deploymentName field',
+      message: 'Parameters must be a valid object',
+      hint: 'Tool received invalid or missing parameters',
+      resolution: 'Ensure parameters are provided as a JSON object',
     });
   }
   const { logger, timer } = setupToolContext(context, 'verify-deploy');
@@ -178,9 +178,9 @@ async function handleVerifyDeployment(
 
     if (!configDeploymentName) {
       return Failure('Deployment name is required. Provide deploymentName parameter.', {
-        message: 'Deployment name is required. Provide deploymentName parameter.',
-        hint: 'The deploymentName parameter is missing',
-        resolution: 'Provide the name of the Kubernetes deployment to verify (e.g., "my-app" or "web-deployment")',
+        message: 'Missing required parameter: deploymentName',
+        hint: 'Deployment name must be specified to verify the deployment',
+        resolution: 'Add deploymentName parameter with the name of the deployment to verify',
       });
     }
 

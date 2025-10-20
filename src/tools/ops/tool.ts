@@ -1,8 +1,21 @@
 /**
- * Ops Tool - Modernized Implementation
+ * Ops Tool - MCP Server Diagnostics
  *
- * Provides operational utilities like ping and server status
- * Follows the new Tool interface pattern
+ * Provides health monitoring and connectivity testing for the MCP server itself.
+ * This tool operates on the server infrastructure, not on user applications.
+ *
+ * **Use Cases:**
+ * - Health checks for monitoring systems
+ * - Connectivity testing during troubleshooting
+ * - Resource usage monitoring (memory, CPU)
+ * - Server diagnostics and metadata
+ *
+ * **NOT for:**
+ * - Application containerization (use build-image, etc.)
+ * - Docker operations (use Docker tools)
+ * - Kubernetes operations (use K8s tools)
+ *
+ * @packageDocumentation
  */
 
 import * as os from 'os';
@@ -224,7 +237,7 @@ import { tool } from '@/types/tool';
 
 export default tool({
   name: 'ops',
-  description: 'Operational utilities for ping and server status',
+  description: 'MCP server diagnostics: ping for connectivity testing, status for health metrics (memory, CPU, uptime). Use this for server monitoring, not application containerization.',
   category: 'utility',
   version: '2.0.0',
   schema: opsToolSchema,

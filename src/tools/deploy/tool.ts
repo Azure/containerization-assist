@@ -422,9 +422,9 @@ async function handleDeploy(
 
     if (manifests.length === 0) {
       return Failure('No valid manifests found in session', {
-        message: 'No valid manifests found in session',
-        hint: 'No Kubernetes manifests were found or all manifests failed validation',
-        resolution: 'Ensure you are providing valid Kubernetes manifests with proper kind and metadata fields',
+        message: 'No Kubernetes manifests to deploy',
+        hint: 'No manifests were provided or generated in this session',
+        resolution: 'Generate Kubernetes manifests using generate-k8s-manifests tool first',
       });
     }
     // Order manifests for deployment

@@ -63,7 +63,7 @@
     "dev": "tsx watch src/cli/cli.ts",
     "start": "node dist/src/cli/cli.js",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
-    "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit",
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --runInBand",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
