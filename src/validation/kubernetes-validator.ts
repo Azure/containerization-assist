@@ -6,7 +6,7 @@
  */
 
 import { parse as parseYaml } from 'yaml';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import {
   KubernetesValidationRule,
   KubernetesManifest,
@@ -559,9 +559,7 @@ const getKubernetesRules = (): KubernetesValidationRule[] => {
 /**
  * Get Kubernetes rules by category
  */
-const getKubernetesRulesByCategory = (
-  category: ValidationCategory,
-): KubernetesValidationRule[] => {
+const getKubernetesRulesByCategory = (category: ValidationCategory): KubernetesValidationRule[] => {
   return KUBERNETES_RULES.filter((rule) => rule.category === category);
 };
 

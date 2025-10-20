@@ -6,12 +6,15 @@ import type { ErrorGuidance } from '@/types';
 
 /**
  * Extract error with actionable guidance for Kubernetes operations
+ *
+ * @param error - The error to extract guidance from
+ * @param operation - Optional operation context to include in the message
  */
 export function extractK8sErrorGuidance(error: unknown, operation?: string): ErrorGuidance {
-  const details: Record<string, unknown> = {};
-
-  if (error instanceof Error) {
-    const errorMessage = error.message.toLowerCase();
+  // Handle both Error instances and plain objects with a message property (from K8s client)
+  const errorObj = error as { message?: string };
+  if (error instanceof Error || (errorObj && typeof errorObj.message === 'string')) {
+    const errorMessage = (error instanceof Error ? error.message : errorObj.message || '').toLowerCase();
 
     // Kubeconfig issues
     if (errorMessage.includes('kubeconfig') || errorMessage.includes('config file')) {
@@ -20,7 +23,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'Unable to locate or read kubeconfig file',
         resolution:
           'Set KUBECONFIG environment variable or ensure ~/.kube/config exists. Run `kubectl config view` to verify.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -35,7 +38,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'Connection to Kubernetes API server was refused',
         resolution:
           'Verify cluster is running: `kubectl cluster-info`. Check API server address in kubeconfig and ensure network connectivity.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -45,7 +48,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'The API server did not respond in time',
         resolution:
           'Check cluster connectivity and load. Verify firewall rules allow access to the API server. Try `kubectl get nodes` to test connectivity.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -60,7 +63,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'Invalid or expired credentials',
         resolution:
           'Refresh cluster credentials. For cloud providers: re-authenticate (e.g., `aws eks update-kubeconfig`, `gcloud container clusters get-credentials`).',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -75,7 +78,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'Your user/service account lacks required permissions',
         resolution:
           'Verify RBAC permissions with `kubectl auth can-i <verb> <resource>`. Contact cluster administrator to grant necessary roles.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -87,7 +90,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'The requested resource does not exist in the cluster',
         resolution:
           'Verify resource name and namespace. Use `kubectl get <resource> -n <namespace>` to list available resources.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -98,7 +101,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'The target namespace has not been created',
         resolution:
           'Create the namespace: `kubectl create namespace <name>` or ensure it exists before deploying resources.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -109,7 +112,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'A resource with this name already exists',
         resolution:
           'Use a different name, delete the existing resource, or use `kubectl apply` instead of `create` to update it.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -120,7 +123,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'The resource specification is invalid',
         resolution:
           'Check the manifest against Kubernetes API documentation. Use `kubectl apply --dry-run=client` to validate syntax.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
@@ -131,27 +134,27 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
         hint: 'The resource type or API version is not available in this cluster',
         resolution:
           'Check cluster version with `kubectl version` and update API versions in manifests. Some resources may require cluster upgrades.',
-        details: { originalError: error.message },
+        details: { originalError: error instanceof Error ? error.message : errorObj.message },
       };
     }
 
     // General error
+    const originalMessage = error instanceof Error ? error.message : errorObj.message;
     return {
-      message: error.message || 'Kubernetes operation failed',
+      message: originalMessage || 'Kubernetes operation failed',
       hint: 'An error occurred during the Kubernetes operation',
       resolution:
         'Run `kubectl get events --sort-by=.lastTimestamp` to see recent cluster events. Check resource logs with `kubectl logs`.',
-      details,
+      details: { originalError: originalMessage },
     };
   }
 
-  // Non-Error object
+  // Fallback for non-Error, non-object errors
   return {
-    message: String(error) || 'Unknown Kubernetes error',
-    hint: 'An unexpected error occurred',
+    message: 'Kubernetes operation failed',
+    hint: 'An unknown error occurred',
     resolution:
-      'Check cluster status with `kubectl cluster-info` and verify your kubeconfig is valid.',
-    details,
+      'Run `kubectl get events --sort-by=.lastTimestamp` to see recent cluster events. Check resource logs with `kubectl logs`.',
+    details: { originalError: String(error) },
   };
 }
-

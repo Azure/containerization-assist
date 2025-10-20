@@ -1,5 +1,5 @@
 import { createLogger } from '@/lib/logger';
-import type { KnowledgeEntry, LoadedEntry, CompilationStats } from './types';
+import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
@@ -12,7 +12,6 @@ interface KnowledgeState {
   byCategory: Map<string, LoadedEntry[]>;
   byTag: Map<string, LoadedEntry[]>;
   loaded: boolean;
-  compilationStats: CompilationStats;
 }
 
 const knowledgeState: KnowledgeState = {
@@ -20,12 +19,6 @@ const knowledgeState: KnowledgeState = {
   byCategory: new Map(),
   byTag: new Map(),
   loaded: false,
-  compilationStats: {
-    totalEntries: 0,
-    compiledSuccessfully: 0,
-    compilationErrors: 0,
-    avgCompilationTime: 0,
-  },
 };
 
 const findExistingPath = (paths: readonly string[]): string | null => {
@@ -58,53 +51,9 @@ const validateEntry = (entry: unknown): entry is KnowledgeEntry => {
   }
 };
 
-const updateCompilationStats = (time: number): void => {
-  const { totalEntries, avgCompilationTime } = knowledgeState.compilationStats;
-  knowledgeState.compilationStats.totalEntries++;
-  knowledgeState.compilationStats.avgCompilationTime =
-    (avgCompilationTime * totalEntries + time) / (totalEntries + 1);
-};
-
-const compilePattern = (entry: KnowledgeEntry): LoadedEntry => {
-  const startTime = performance.now();
-  const loaded: LoadedEntry = { ...entry };
-
-  if (entry.pattern) {
-    try {
-      // Compile with case-insensitive and multiline flags
-      const regex = new RegExp(entry.pattern, 'gmi');
-      loaded.compiledCache = {
-        pattern: regex,
-        lastCompiled: Date.now(),
-      };
-      knowledgeState.compilationStats.compiledSuccessfully++;
-    } catch (error) {
-      logger.warn(
-        {
-          entryId: entry.id,
-          pattern: entry.pattern,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        'Failed to compile pattern',
-      );
-      loaded.compiledCache = {
-        pattern: null,
-        lastCompiled: Date.now(),
-        compilationError: error instanceof Error ? error.message : 'Unknown error',
-      };
-      knowledgeState.compilationStats.compilationErrors++;
-    }
-  }
-
-  const compilationTime = performance.now() - startTime;
-  updateCompilationStats(compilationTime);
-
-  return loaded;
-};
-
 const addEntry = (entry: KnowledgeEntry): void => {
-  const loadedEntry = compilePattern(entry);
-  knowledgeState.entries.set(entry.id, loadedEntry);
+  // No pattern compilation - patterns are compiled on-demand during matching
+  knowledgeState.entries.set(entry.id, entry);
 };
 
 const buildIndices = (): void => {

@@ -132,10 +132,13 @@ CMD ["node", "index.js"]`;
     mockDockerClient.buildImage.mockResolvedValue(
       createSuccessResult({
         imageId: 'sha256:mock-image-id',
+        digest: 'sha256:abcdef1234567890',
         tags: ['myapp:latest', 'myapp:v1.0'],
         size: 123456789,
         layers: 8,
+        buildTime: 5000,
         logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+        warnings: [],
       }),
     );
   });
@@ -388,8 +391,12 @@ CMD ["node", "index.js"]`;
       mockDockerClient.buildImage.mockResolvedValue(
         createSuccessResult({
           imageId: 'sha256:mock-image-id',
-          logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+          digest: 'sha256:abcdef1234567890',
+          size: 123456789,
           layers: 8,
+          buildTime: 5000,
+          logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+          warnings: [],
         }),
       );
     });

@@ -23,12 +23,12 @@
  * ```
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { setupToolContext } from '@/lib/tool-context-helpers';
+import { extractErrorMessage } from '@/lib/errors';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
 
-import { DEFAULT_TIMEOUTS } from '@/config/defaults';
+import { DEFAULT_TIMEOUTS } from '@/config/constants';
 import { Success, Failure, type Result } from '@/types';
 import { verifyDeploySchema, type VerifyDeployParams } from './schema';
 
@@ -157,8 +157,7 @@ async function handleVerifyDeployment(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = getToolLogger(context, 'verify-deploy');
-  const timer = createToolTimer(logger, 'verify-deploy');
+  const { logger, timer } = setupToolContext(context, 'verify-deploy');
 
   const {
     deploymentName: configDeploymentName,
