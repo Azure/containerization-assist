@@ -22,7 +22,6 @@ import { validatePathOrFail } from '@/lib/validation-helpers';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
-import { fileExists } from '@/lib/file-utils';
 import { type BuildImageParams, buildImageSchema } from './schema';
 
 export interface BuildImageResult {
@@ -138,11 +137,13 @@ async function handleBuildImage(
       ? path.resolve(repoPath, dockerfilePath)
       : path.resolve(repoPath, dockerfile);
 
-    if (!(await fileExists(finalDockerfilePath))) {
-      return Failure(
-        `Dockerfile not found at ${finalDockerfilePath}. Provide dockerfilePath parameter.`,
-      );
-    }
+    // Validate Dockerfile path upfront
+    const dockerfileValidation = await validatePathOrFail(finalDockerfilePath, {
+      mustExist: true,
+      mustBeFile: true,
+      readable: true,
+    });
+    if (!dockerfileValidation.ok) return dockerfileValidation;
 
     // Read Dockerfile for security analysis
     let dockerfileContent: string;

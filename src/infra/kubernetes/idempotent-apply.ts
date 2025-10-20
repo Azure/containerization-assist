@@ -1,8 +1,8 @@
 /**
- * Idempotent Kubernetes resource application using server-side apply
+ * Idempotent Kubernetes resource application using create/patch strategy
  *
  * Note: This function should be called sequentially per resource.
- * Kubernetes server-side apply handles concurrent updates safely at the API level.
+ * Resources are created if they don't exist, or patched if they already exist.
  */
 
 import * as k8s from '@kubernetes/client-node';
@@ -34,8 +34,8 @@ export interface K8sResource {
  * Creates an idempotent K8s apply function using the consolidated resource-operations module
  *
  * Note: This function uses the consolidated resource-operations module which handles
- * idempotent apply using server-side apply. Kubernetes server-side apply handles
- * concurrent updates safely at the API level.
+ * idempotent apply using create/patch strategy. Resources are created if they don't exist,
+ * or patched if they already exist.
  */
 export function createIdempotentApply(
   logger: Logger,

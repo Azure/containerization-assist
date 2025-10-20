@@ -2,7 +2,7 @@
  * Kubernetes Resource Operations - Consolidated K8s resource management
  *
  * Provides operations for creating, updating, deleting, and reading K8s resources.
- * Uses server-side apply for idempotent operations.
+ * Uses create/patch strategy for idempotent operations.
  */
 
 import * as k8s from '@kubernetes/client-node';
@@ -85,11 +85,11 @@ async function callPatchMethod(
 }
 
 /**
- * Apply a Kubernetes resource using server-side apply.
+ * Apply a Kubernetes resource using create/patch strategy.
  * Idempotent - safe to call multiple times.
  *
  * Note: This function should be called sequentially per resource.
- * K8s server-side apply handles concurrent updates safely.
+ * Creates the resource if it doesn't exist, or patches it if it already exists.
  *
  * @param kc - Kubernetes config
  * @param resource - Resource to apply

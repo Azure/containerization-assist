@@ -9,6 +9,7 @@ import { environmentSchema } from '@/config/constants';
 // Paths
 export const repositoryPath = z
   .string()
+  .min(1, 'Repository path cannot be empty')
   .describe(
     'Absolute path to the repository. Paths are automatically normalized to forward slashes on all platforms (e.g., /path/to/repo or C:/path/to/repo)',
   );

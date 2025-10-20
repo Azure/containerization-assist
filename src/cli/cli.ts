@@ -12,7 +12,7 @@ import { exit, argv, env, cwd } from 'node:process';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkDockerHealth, checkKubernetesHealth } from '@/lib/health-checks';
+import { checkDockerHealth, checkKubernetesHealth } from '@/infra/health/checks';
 import { validateDockerSocket } from '@/infra/docker/socket-validation';
 import { createInspectToolsCommand } from './commands/inspect-tools';
 import { provideContextualGuidance } from './guidance';

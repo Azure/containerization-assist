@@ -1,8 +1,8 @@
 import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
-import { KnowledgeEntrySchema } from './schemas';
+import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import path from 'path';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
@@ -28,6 +28,47 @@ const findExistingPath = (paths: readonly string[]): string | null => {
     }
   }
   return null;
+};
+
+/**
+ * Validate and normalize pack structure
+ * Handles both array and object-wrapped pack formats
+ */
+const validateAndNormalizePack = (
+  packFile: string,
+  data: unknown,
+): { valid: boolean; entries?: KnowledgeEntry[] } => {
+  try {
+    const validated = KnowledgePackSchema.parse(data);
+
+    // Extract entries based on format
+    // Cast to KnowledgeEntry[] since Zod validation ensures compatibility
+    let entries: KnowledgeEntry[];
+    if (Array.isArray(validated)) {
+      // Format 1: Flat array of entries
+      entries = validated as KnowledgeEntry[];
+    } else {
+      // Format 2: Object with metadata and rules array
+      entries = validated.rules as KnowledgeEntry[];
+    }
+
+    return { valid: true, entries };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      logger.warn(
+        {
+          pack: packFile,
+          errors: error.issues.slice(0, 5).map((e: z.ZodIssue) => ({
+            path: e.path.join('.'),
+            message: e.message,
+          })),
+          totalErrors: error.issues.length,
+        },
+        'Pack validation failed',
+      );
+    }
+    return { valid: false };
+  }
 };
 
 const validateEntry = (entry: unknown): entry is KnowledgeEntry => {
@@ -105,82 +146,103 @@ export const loadKnowledgeBase = async (): Promise<void> => {
     return;
   }
 
+  const stats = {
+    packsAttempted: 0,
+    packsLoaded: 0,
+    packsFailed: 0,
+    entriesValid: 0,
+    entriesInvalid: 0,
+    failures: [] as Array<{ file: string; error: string }>,
+  };
+
   try {
-    const knowledgePacks = [
-      'starter-pack.json',
-      'base-images-pack.json',
-      'nodejs-pack.json',
-      'python-pack.json',
-      'java-pack.json',
-      'go-pack.json',
-      'dotnet-pack.json',
-      'dotnet-framework-pack.json',
-      'ruby-pack.json',
-      'rust-pack.json',
-      'php-pack.json',
-      'database-pack.json',
-      'kubernetes-pack.json',
-      'security-pack.json',
-      'azure-container-apps-pack.json',
-    ] as const;
+    // Find packs directory
+    const possiblePacksDirs = [
+      path.resolve(process.cwd(), 'knowledge/packs'),
+      path.resolve(process.cwd(), 'dist/knowledge/packs'),
+      path.resolve(process.cwd(), 'node_modules/containerization-assist-mcp/knowledge/packs'),
+    ];
 
-    for (const packFile of knowledgePacks) {
+    const packsDir = findExistingPath(possiblePacksDirs);
+    if (!packsDir) {
+      throw new Error('Could not find knowledge packs directory');
+    }
+
+    // Discover all .json files in packs directory
+    const packFiles = readdirSync(packsDir).filter((file) => file.endsWith('.json')).sort();
+    stats.packsAttempted = packFiles.length;
+
+    logger.info({ packsDir, totalPacks: packFiles.length }, 'Discovered knowledge packs');
+
+    // Load each pack
+    for (const packFile of packFiles) {
       try {
-        const possiblePaths = [
-          path.resolve(process.cwd(), 'knowledge/packs', packFile),
-          path.resolve(process.cwd(), 'dist/knowledge/packs', packFile),
-          path.resolve(
-            process.cwd(),
-            'node_modules/containerization-assist-mcp/knowledge/packs',
-            packFile,
-          ),
-        ] as const;
+        const packPath = path.join(packsDir, packFile);
+        const content = readFileSync(packPath, 'utf-8');
 
-        const dataPath = findExistingPath(possiblePaths);
-        if (!dataPath) {
-          throw new Error(`Could not find knowledge pack: ${packFile}`);
+        // Parse JSON
+        let data: unknown;
+        try {
+          data = JSON.parse(content);
+        } catch (parseError) {
+          throw new Error(`Invalid JSON: ${parseError}`);
         }
 
-        const content = readFileSync(dataPath, 'utf-8');
-        const entries = JSON.parse(content) as KnowledgeEntry[];
+        // Validate and normalize pack structure
+        const result = validateAndNormalizePack(packFile, data);
+        if (!result.valid || !result.entries) {
+          stats.packsFailed++;
+          stats.failures.push({
+            file: packFile,
+            error: 'Pack validation failed (see previous log)',
+          });
+          continue;
+        }
 
+        const entries = result.entries;
         logger.debug({ pack: packFile, count: entries.length }, 'Loading knowledge pack');
 
+        // Validate and add individual entries
         for (const entry of entries) {
           if (validateEntry(entry)) {
             addEntry(entry);
+            stats.entriesValid++;
           } else {
-            logger.warn(
-              {
-                pack: packFile,
-                entryId: (entry as { id?: string })?.id || 'unknown',
-              },
-              'Invalid knowledge entry, skipping',
-            );
+            stats.entriesInvalid++;
           }
         }
+
+        stats.packsLoaded++;
       } catch (packError) {
-        logger.warn(
-          {
-            pack: packFile,
-            error: packError,
-          },
-          'Failed to load knowledge pack, continuing',
-        );
+        stats.packsFailed++;
+        stats.failures.push({
+          file: packFile,
+          error: String(packError),
+        });
+        logger.warn({ pack: packFile, error: packError }, 'Failed to load knowledge pack');
       }
     }
 
     buildIndices();
     knowledgeState.loaded = true;
 
+    // Log summary
+    if (stats.failures.length > 0) {
+      logger.warn({ failures: stats.failures }, `Failed to load ${stats.packsFailed} packs`);
+    }
+
     logger.info(
       {
+        packsAttempted: stats.packsAttempted,
+        packsLoaded: stats.packsLoaded,
+        packsFailed: stats.packsFailed,
+        entriesValid: stats.entriesValid,
+        entriesInvalid: stats.entriesInvalid,
         totalEntries: knowledgeState.entries.size,
-        packsLoaded: knowledgePacks.length,
         categories: Array.from(knowledgeState.byCategory.keys()),
         topTags: getTopTags(5),
       },
-      'Knowledge base loaded successfully',
+      'Knowledge base loaded',
     );
   } catch (error) {
     logger.error({ error }, 'Failed to load knowledge base');

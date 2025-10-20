@@ -22,9 +22,9 @@ import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import { ValidationCategory, ValidationSeverity } from '@/validation/core-types';
+import { validatePathOrFail } from '@/lib/validation-helpers';
 import type { z } from 'zod';
 import { promises as fs } from 'node:fs';
-import nodePath from 'node:path';
 
 const name = 'fix-dockerfile';
 const description = 'Analyze Dockerfile for issues and return knowledge-based fix recommendations';
@@ -308,9 +308,15 @@ async function handleFixDockerfile(
   let content = input.dockerfile || '';
 
   if (input.path) {
-    const dockerfilePath = nodePath.isAbsolute(input.path)
-      ? input.path
-      : nodePath.resolve(process.cwd(), input.path);
+    // Validate path upfront
+    const pathValidation = await validatePathOrFail(input.path, {
+      mustExist: true,
+      mustBeFile: true,
+      readable: true,
+    });
+    if (!pathValidation.ok) return pathValidation;
+
+    const dockerfilePath = pathValidation.value;
     try {
       content = await fs.readFile(dockerfilePath, 'utf-8');
     } catch (error) {

@@ -439,7 +439,7 @@ COPY . .`;
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Failed to read Dockerfile');
+        expect(result.error).toContain('Path does not exist');
       }
     });
   });

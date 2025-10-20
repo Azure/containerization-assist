@@ -10,6 +10,7 @@
 export const CATEGORY = {
   API: 'api',
   ARCHITECTURE: 'architecture',
+  BUILD: 'build',
   CACHING: 'caching',
   CONFIGURATION: 'configuration',
   DOCKERFILE: 'dockerfile',
@@ -43,7 +44,7 @@ export interface KnowledgeEntry {
   example?: string;
 
   /** Severity level */
-  severity?: 'high' | 'medium' | 'low';
+  severity?: 'required' | 'high' | 'medium' | 'low';
 
   /** Tags for additional filtering */
   tags?: string[];

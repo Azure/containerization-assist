@@ -6,15 +6,6 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import crypto from 'node:crypto';
 
-export async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    const stats = await fs.stat(filePath);
-    return stats.isFile();
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Download a file from URL to destination path
  */

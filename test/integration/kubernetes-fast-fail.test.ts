@@ -50,7 +50,7 @@ describe('Kubernetes fast-fail integration', () => {
       const mockHome = '/tmp/nonexistent-home';
       jest.mocked(os.homedir).mockReturnValue(mockHome);
 
-      expect(() => createKubernetesClient(logger)).toThrow('Kubeconfig not found');
+      expect(() => createKubernetesClient(logger)).toThrow(/kubeconfig.*not found/i);
     });
 
     it('should fail fast when KUBECONFIG env var points to missing file', () => {

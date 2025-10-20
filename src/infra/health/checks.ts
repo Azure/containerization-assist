@@ -7,7 +7,7 @@ import type { Logger } from 'pino';
 import Docker from 'dockerode';
 import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
 import { createKubernetesClient } from '@/infra/kubernetes/client';
-import { extractErrorMessage } from './errors';
+import { extractErrorMessage } from '@/lib/errors';
 
 /**
  * Status of an individual dependency
