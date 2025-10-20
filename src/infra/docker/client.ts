@@ -1,5 +1,7 @@
 /**
  * Docker client for containerization operations
+ *
+ * @see {@link ../../../docs/adr/006-infrastructure-organization.md ADR-006: Infrastructure Layer Organization}
  */
 
 import Docker, { DockerOptions } from 'dockerode';

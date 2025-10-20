@@ -24,6 +24,7 @@ import { setupToolContext } from '@/lib/tool-context-helpers';
 import { extractErrorMessage } from '@/lib/errors';
 import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/mcp/context';
+import { DEFAULT_TIMEOUTS, DOCKER } from '@/config/constants';
 import {
   createKubernetesClient,
   type K8sManifest,
@@ -43,16 +44,34 @@ const execAsync = promisify(exec);
 const KIND_VERSION = 'v0.20.0';
 
 /**
- * Validate and escape cluster name to prevent command injection
- * Cluster names must follow Kubernetes naming conventions
+ * Validate and escape cluster name to prevent command injection.
+ * Cluster names must follow Kubernetes naming conventions.
  *
- * Returns the cluster name wrapped in single quotes for shell safety.
- * The returned value can be directly interpolated into shell commands via template literals.
- * Example: if clusterName is "my-cluster", returns "'my-cluster'" (with quotes)
- * Usage: `kind create cluster --name ${escapedName}` becomes `kind create cluster --name 'my-cluster'`
+ * SECURITY MODEL:
+ * - Primary defense: Strict regex validation allowing only [a-z0-9-] characters
+ * - Secondary defense: Shell escaping with single quotes (redundant but defensive)
+ * - The regex makes command injection impossible as no shell metacharacters are allowed
+ *
+ * IMPORTANT: Returns the cluster name wrapped in single quotes for shell safety.
+ * The returned value must be used with template literal interpolation only.
+ * DO NOT use with string concatenation or you may get double-quoting issues.
+ *
+ * @example
+ * ```typescript
+ * const result = validateAndEscapeClusterName("my-cluster");
+ * if (result.ok) {
+ *   // ✅ Correct - template literal interpolation
+ *   await execAsync(`kind create cluster --name ${result.value}`);
+ *   // Result: kind create cluster --name 'my-cluster'
+ *
+ *   // ❌ Wrong - string concatenation causes double quoting
+ *   await execAsync("kind create cluster --name " + result.value);
+ * }
+ * ```
  */
 function validateAndEscapeClusterName(clusterName: string): Result<string> {
   // Kubernetes resource names must be lowercase alphanumeric with dashes
+  // This regex is the primary security mechanism - it prevents ALL shell metacharacters
   const nameRegex = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
   if (!nameRegex.test(clusterName)) {
@@ -65,8 +84,9 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
     return Failure(`Cluster name too long: "${clusterName}". Must be 63 characters or less.`);
   }
 
-  // Even though we validated, still escape for shell safety
-  // Single quotes prevent all expansion and are safe for direct interpolation
+  // Wrap in single quotes for defense-in-depth shell safety
+  // Note: The regex already prevents single quotes, so the replace is technically
+  // unnecessary, but we keep it as a defensive measure in case validation changes
   return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
 }
 
@@ -262,13 +282,15 @@ async function createKindCluster(clusterName: string, logger: pino.Logger): Prom
   try {
     logger.info({ clusterName }, 'Creating kind cluster...');
 
+    // Note: ${DOCKER.LOCAL_REGISTRY_PORT} is interpolated by JavaScript (to 5001),
+    // not by YAML. This template literal produces a valid YAML string with literal port numbers.
     const kindConfig = `
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
 - |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5001"]
-    endpoint = ["http://kind-registry:5001"]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${DOCKER.LOCAL_REGISTRY_PORT}"]
+    endpoint = ["http://kind-registry:${DOCKER.LOCAL_REGISTRY_PORT}"]
 nodes:
 - role: control-plane
   kubeadmConfigPatches:
@@ -320,7 +342,7 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
   try {
     logger.info('Creating local Docker registry...');
 
-    await execAsync('docker run -d --restart=always -p 5001:5000 --name kind-registry registry:2');
+    await execAsync(`docker run -d --restart=always -p ${DOCKER.LOCAL_REGISTRY_PORT}:${DOCKER.INTERNAL_REGISTRY_PORT} --name kind-registry registry:2`);
 
     try {
       await execAsync('docker network connect kind kind-registry');
@@ -328,7 +350,7 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
       logger.debug('Registry might already be connected to kind network');
     }
 
-    const registryUrl = 'localhost:5001';
+    const registryUrl = `localhost:${DOCKER.LOCAL_REGISTRY_PORT}`;
     logger.info({ registryUrl }, 'Local Docker registry created successfully');
     return registryUrl;
   } catch (error) {
@@ -377,7 +399,7 @@ async function setupKindCluster(
     logger.info({ clusterName: cluster }, 'Kind cluster creation completed');
 
     // Wait for cluster to stabilize
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, DEFAULT_TIMEOUTS.clusterStabilization));
   } else {
     checks.kindClusterCreated = true;
     logger.info({ clusterName: cluster }, 'Kind cluster already exists');
@@ -410,7 +432,7 @@ async function setupLocalRegistry(
     logger.info({ registryUrl }, 'Local registry creation completed');
     return registryUrl;
   } else {
-    const registryUrl = 'localhost:5001';
+    const registryUrl = `localhost:${DOCKER.LOCAL_REGISTRY_PORT}`;
     checks.localRegistryCreated = true;
     logger.info({ registryUrl }, 'Local registry already exists');
     return registryUrl;

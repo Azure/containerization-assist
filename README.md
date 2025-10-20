@@ -314,14 +314,43 @@ rules:
 ```
 
 **Rule Components:**
-- **Conditions**: `regex` (pattern matching) or `function` (hasPattern, fileExists, largerThan, hasVulnerabilities)
-- **Actions**: `block` (prevents build/deployment), `warn` (logs warning), `suggest` (provides recommendation)
-- **Priority**: Higher = more important (Security: 90-100, Quality: 70-89, Performance: 50-69)
+
+**Conditions:**
+- `kind: regex` - Match patterns in Dockerfile content
+  - `pattern`: Regular expression to match
+  - `flags`: Regex flags (i=case-insensitive, m=multiline)
+  - `count_threshold`: Minimum matches required (optional)
+- `kind: function` - Built-in function matchers
+  - `hasPattern` - Check if pattern exists in content
+  - `fileExists` - Check if file exists in context
+  - `largerThan` - Check if content/file exceeds size threshold
+  - `hasVulnerabilities` - Check vulnerability scan results
+
+**Actions:**
+- `block: true` - Prevents build/deployment, operation fails
+- `warn: true` - Logs warning, operation continues
+- `suggest: true` - Provides recommendation, informational only
+- `message`: User-facing explanation of the rule violation
+
+**Priority Levels:**
+- **90-100**: Security rules (highest priority)
+- **70-89**: Quality rules
+- **50-69**: Performance rules
+- **30-49**: Compliance rules
 
 **Enforcement Modes:**
 - **strict**: All rules enforced, violations block operations
 - **advisory**: Rules evaluated, violations logged but not blocking
 - **lenient**: Minimal enforcement, warnings only
+
+**Example Policies:**
+
+The repository includes three production-ready policies:
+- `policies/base-images.yaml` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions)
+- `policies/security-baseline.yaml` - Essential security rules (root user prevention, secrets detection, privileged containers)
+- `policies/container-best-practices.yaml` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
+
+For detailed examples and guidance, see [Policy Configuration Guide](docs/guides/policy-configuration.md).
 
 **Using Policies:**
 
@@ -342,7 +371,17 @@ npx containerization-assist fix-dockerfile \
 
 **Creating Custom Policies:**
 
-See existing policies in `policies/` for examples. Multiple policies are automatically merged - rules with the same ID are overridden by later policies (alphabetically).
+See existing policies in `policies/` for examples.
+
+**Policy Discovery and Merging:**
+
+The server automatically discovers and loads all `.yaml` files in the `policies/` directory:
+- **Automatic Discovery**: All policies in `policies/` are loaded and merged automatically
+- **Rule Merging**: Rules with the same ID are overridden by later policies (alphabetically sorted)
+- **Default Merging**: Later policies override earlier policies' default settings
+- **Priority Sorting**: All rules are sorted by priority (highest first) after merging
+
+This allows you to organize policies by concern (security, quality, performance) in separate files while maintaining a unified policy enforcement system.
 
 ### MCP Inspector (Testing)
 
