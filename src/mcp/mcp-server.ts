@@ -1,6 +1,8 @@
 /**
  * MCP Server Implementation
  * Register tools against the orchestrator executor and manage transports.
+ *
+ * @see {@link ../../docs/adr/005-mcp-integration.md ADR-005: MCP Protocol Integration}
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';

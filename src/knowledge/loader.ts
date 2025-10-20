@@ -1,3 +1,10 @@
+/**
+ * Knowledge Pack Loader
+ * Loads and manages static knowledge packs for AI enhancement
+ *
+ * @see {@link ../../docs/adr/003-knowledge-enhancement.md ADR-003: Knowledge Enhancement System}
+ */
+
 import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';

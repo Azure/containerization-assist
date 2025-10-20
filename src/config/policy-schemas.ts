@@ -1,6 +1,8 @@
 /**
  * Policy Schemas and Types
  * Type definitions and Zod schemas for policy structures
+ *
+ * @see {@link ../../docs/adr/004-policy-system.md ADR-004: Policy-Based Configuration System}
  */
 
 import { z } from 'zod';

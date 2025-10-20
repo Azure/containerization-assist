@@ -13,6 +13,7 @@
 import { promises as fs } from 'node:fs';
 import * as toml from '@iarna/toml';
 import { parseStringPromise } from 'xml2js';
+import { FRAMEWORK_PORTS } from '@/config/constants';
 
 export interface ParsedConfig {
   language?: 'java' | 'dotnet' | 'javascript' | 'typescript' | 'python' | 'rust' | 'go' | 'other';
@@ -64,10 +65,10 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
     }
 
     if (ports.length === 0) {
-      if (framework === 'next' || framework === 'react') ports.push(3000);
-      else if (framework === 'angular') ports.push(4200);
-      else if (framework === 'nuxt' || framework === 'vue') ports.push(3000);
-      else ports.push(3000); // Default Node.js port
+      if (framework === 'next' || framework === 'react') ports.push(FRAMEWORK_PORTS.next);
+      else if (framework === 'angular') ports.push(FRAMEWORK_PORTS.angular);
+      else if (framework === 'nuxt' || framework === 'vue') ports.push(FRAMEWORK_PORTS.nuxt);
+      else ports.push(FRAMEWORK_PORTS.next); // Default Node.js port
     }
 
     let entryPoint = pkg.main || 'index.js';
@@ -260,10 +261,10 @@ export async function parsePythonConfig(filePath: string): Promise<ParsedConfig>
     }
 
     const ports: number[] = [];
-    if (framework === 'django') ports.push(8000);
-    else if (framework === 'flask') ports.push(5000);
-    else if (framework === 'fastapi') ports.push(8000);
-    else ports.push(8000);
+    if (framework === 'django') ports.push(FRAMEWORK_PORTS.django);
+    else if (framework === 'flask') ports.push(FRAMEWORK_PORTS.flask);
+    else if (framework === 'fastapi') ports.push(FRAMEWORK_PORTS.fastapi);
+    else ports.push(FRAMEWORK_PORTS.django);
 
     const result: ParsedConfig = {
       language: 'python',
@@ -347,7 +348,7 @@ export async function parseCsProj(filePath: string): Promise<ParsedConfig> {
     if (depStr.includes('Microsoft.AspNetCore')) framework = 'aspnet-core';
     else if (depStr.includes('Microsoft.EntityFrameworkCore')) framework = 'entity-framework';
 
-    const ports = framework === 'aspnet-core' ? [5000, 5001] : [5000];
+    const ports = framework === 'aspnet-core' ? [FRAMEWORK_PORTS['aspnet-core'], FRAMEWORK_PORTS['aspnet-core-https']] : [FRAMEWORK_PORTS['aspnet-core']];
 
     const result: ParsedConfig = {
       language: 'dotnet',

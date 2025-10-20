@@ -46,12 +46,11 @@ interface IngressManifest extends KubernetesManifest {
   };
 }
 
-// Configuration constants
+// Configuration constants for deployment
 const DEPLOYMENT_CONFIG = {
   DEFAULT_NAMESPACE: 'default',
   DEFAULT_REPLICAS: 1,
-  DEFAULT_ENVIRONMENT: 'development',
-  DEFAULT_CLUSTER: 'default',
+  DEFAULT_ENVIRONMENT: 'development' as const,
   DEFAULT_PORT: 80,
   WAIT_TIMEOUT_SECONDS: 300,
   DRY_RUN: false,

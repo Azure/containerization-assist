@@ -17,6 +17,8 @@ export interface ChainHints {
 
 /**
  * Tool interface for all MCP tools with external telemetry support
+ *
+ * @see {@link ../../docs/adr/002-tool-interface.md ADR-002: Unified Tool Interface}
  */
 export interface MCPTool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
   /** Unique tool identifier */

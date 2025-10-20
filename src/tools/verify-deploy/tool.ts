@@ -165,7 +165,7 @@ async function handleVerifyDeployment(
     checks = ['pods', 'services', 'health'],
   } = params;
 
-  const timeout = 60;
+  const timeout = Math.floor(DEFAULT_TIMEOUTS.verification / 1000); // Convert ms to seconds
 
   try {
     logger.info({ checks }, 'Starting Kubernetes deployment verification');

@@ -11,6 +11,7 @@
 import { Failure, type Result, Success, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { getToolLogger } from '@/lib/tool-helpers';
+import { LIMITS } from '@/config/constants';
 import {
   fixDockerfileSchema,
   type DockerfileFixPlan,
@@ -333,8 +334,8 @@ const runPattern = createKnowledgeTool<
   query: {
     topic: TOPICS.FIX_DOCKERFILE,
     category: CATEGORY.DOCKERFILE,
-    maxChars: 5000,
-    maxSnippets: 25,
+    maxChars: LIMITS.MAX_PROMPT_CHARS,
+    maxSnippets: LIMITS.MAX_PROMPT_SNIPPETS,
     extractFilters: (input) => {
       const issues = input._validationResults || [];
       const hasSecurityIssues = issues.some((i) => i.category === 'security');

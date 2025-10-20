@@ -38,16 +38,30 @@ export const DEFAULT_PORTS = {
  * Default timeout values in milliseconds
  */
 export const DEFAULT_TIMEOUTS = {
-  cache: 300000, // 5 minutes
-  cacheCleanup: 300000, // 5 minutes
-  docker: 30000, // 30 seconds
-  dockerBuild: 300000, // 5 minutes
-  kubernetes: 30000, // 30 seconds
-  'scan-image': 300000, // 5 minutes
-  deployment: 180000, // 3 minutes
-  deploymentPoll: 5000, // 5 seconds (between deployment status checks)
-  verification: 60000, // 1 minute
-  healthCheck: 5000, // 5 seconds (between health checks)
+  /** Cache expiration timeout: 5 minutes. */
+  cache: 300_000,
+  /** Cache cleanup interval: 5 minutes. */
+  cacheCleanup: 300_000,
+  /** Docker operations timeout: 30 seconds. */
+  docker: 30_000,
+  /** Docker build timeout: 5 minutes. */
+  dockerBuild: 300_000,
+  /** Kubernetes operations timeout: 30 seconds. */
+  kubernetes: 30_000,
+  /** Security scan timeout: 5 minutes. */
+  'scan-image': 300_000,
+  /** Deployment timeout: 3 minutes. */
+  deployment: 180_000,
+  /** Deployment status poll interval: 5 seconds. */
+  deploymentPoll: 5_000,
+  /** Deployment verification timeout: 1 minute. */
+  verification: 60_000,
+  /** Health check timeout: 5 seconds. */
+  healthCheck: 5_000,
+  /** Trivy version check timeout: 15 seconds. */
+  trivyVersionCheck: 15_000,
+  /** Cluster stabilization wait: 5 seconds. */
+  clusterStabilization: 5_000,
 } as const;
 
 /**
@@ -60,10 +74,111 @@ export const DEFAULT_NETWORK = {
 } as const;
 
 /**
+ * Validation limits
+ */
+export const LIMITS = {
+  /** Maximum Dockerfile size (bytes): 1MB */
+  MAX_DOCKERFILE_SIZE: 1_048_576,
+  /** Maximum manifest size (bytes): 10MB */
+  MAX_MANIFEST_SIZE: 10_485_760,
+  /** Maximum log lines to retain */
+  MAX_LOG_LINES: 1000,
+  /** Maximum buffer size for scan results: 10MB */
+  MAX_SCAN_BUFFER: 10 * 1024 * 1024,
+  /** Maximum characters for AI prompt context */
+  MAX_PROMPT_CHARS: 5000,
+  /** Maximum snippets for AI prompt context */
+  MAX_PROMPT_SNIPPETS: 25,
+} as const;
+
+/**
+ * Retry configuration
+ */
+export const RETRY = {
+  /** Default max retry attempts */
+  MAX_ATTEMPTS: 3,
+  /** Initial backoff delay (ms) */
+  INITIAL_DELAY: 1000,
+  /** Maximum backoff delay (ms) */
+  MAX_DELAY: 10_000,
+  /** Backoff multiplier */
+  MULTIPLIER: 2,
+} as const;
+
+/**
+ * Docker-related constants
+ */
+export const DOCKER = {
+  /** Default Dockerfile name */
+  DEFAULT_DOCKERFILE: 'Dockerfile',
+  /** Default build context */
+  DEFAULT_CONTEXT: '.',
+  /** Default registry */
+  DEFAULT_REGISTRY: 'docker.io',
+  /** Local registry port for kind */
+  LOCAL_REGISTRY_PORT: 5001,
+  /** Internal registry port */
+  INTERNAL_REGISTRY_PORT: 5000,
+} as const;
+
+/**
+ * Kubernetes constants
+ */
+export const KUBERNETES = {
+  /** Default namespace */
+  DEFAULT_NAMESPACE: 'default',
+  /** Deployment check interval (ms) */
+  DEPLOYMENT_CHECK_INTERVAL: 5000,
+  /** Max deployment checks */
+  MAX_DEPLOYMENT_CHECKS: 60,
+  /** Wait timeout in seconds */
+  WAIT_TIMEOUT_SECONDS: 300,
+  /** Default replicas */
+  DEFAULT_REPLICAS: 1,
+  /** Default environment */
+  DEFAULT_ENVIRONMENT: 'development' as const,
+  /** Default cluster */
+  DEFAULT_CLUSTER: 'default',
+  /** Default port */
+  DEFAULT_PORT: 80,
+  /** Pending LoadBalancer URL placeholder */
+  PENDING_LB_URL: 'http://pending-loadbalancer',
+  /** Default ingress host */
+  DEFAULT_INGRESS_HOST: 'app.example.com',
+} as const;
+
+/**
+ * Framework-specific default ports
+ */
+export const FRAMEWORK_PORTS = {
+  // JavaScript/TypeScript
+  next: 3000,
+  react: 3000,
+  angular: 4200,
+  nuxt: 3000,
+  vue: 3000,
+  // Python
+  django: 8000,
+  flask: 5000,
+  fastapi: 8000,
+  // .NET
+  'aspnet-core': 5000,
+  'aspnet-core-https': 5001,
+} as const;
+
+/**
  * Get default port for a given language
  */
 export function getDefaultPort(language: string): number {
   const key = language.toLowerCase() as keyof typeof DEFAULT_PORTS;
   const ports = DEFAULT_PORTS[key] || DEFAULT_PORTS.default;
   return ports[0];
+}
+
+/**
+ * Get default port for a given framework
+ */
+export function getFrameworkPort(framework: string): number | undefined {
+  const key = framework.toLowerCase() as keyof typeof FRAMEWORK_PORTS;
+  return FRAMEWORK_PORTS[key];
 }
