@@ -32,9 +32,11 @@ function evaluateFunctionMatcher(
     case 'fileExists': {
       const [filePath] = matcher.args as [string];
       const basePath = typeof input === 'object' && 'path' in input ? String(input.path) : '.';
+      // Prevent path traversal attacks
       const resolvedBase = path.resolve(basePath);
       const resolvedTarget = path.resolve(basePath, filePath);
-      if (!resolvedTarget.startsWith(resolvedBase + path.sep)) {
+      if (!resolvedTarget.startsWith(resolvedBase + path.sep) && resolvedTarget !== resolvedBase) {
+        // Path traversal detected, do not allow
         return false;
       }
       return fs.existsSync(resolvedTarget);

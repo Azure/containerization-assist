@@ -132,7 +132,7 @@ describe('Build Output Validation', () => {
   describe('ESM Build (dist)', () => {
 
     describe('Knowledge Data Directory', () => {
-      // Knowledge data has been moved to top-level knowledge/packs/ directory
+      // Knowledge data is located in top-level knowledge/packs/ directory
       const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
 
       it('should have knowledge data in top-level knowledge/packs directory', () => {

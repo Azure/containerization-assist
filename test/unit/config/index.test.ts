@@ -72,7 +72,6 @@ describe('Main Configuration', () => {
     it('should be immutable (readonly)', () => {
       // This test verifies the 'as const' assertion works
       expect(() => {
-        // @ts-expect-error - This should fail at compile time due to readonly
         (config as any).server.logLevel = 'test';
       }).not.toThrow(); // Runtime doesn't prevent this, but TypeScript should
     });

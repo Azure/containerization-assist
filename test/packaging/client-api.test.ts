@@ -185,7 +185,7 @@ describe('Client API Compatibility', () => {
 
   describe('Client Example Integration', () => {
     it('should support the exact client usage pattern', () => {
-      // Create a simplified version of the client example
+      // Create a test version of the client example
       const clientExample = `
         const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
         const { createContainerAssistServer, TOOL_NAMES } = require('containerization-assist-mcp');

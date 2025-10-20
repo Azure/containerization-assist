@@ -9,7 +9,9 @@ export const validateImageSchema = z.object({
   policyPath: z
     .string()
     .optional()
-    .describe('Optional path to specific policy file to use (defaults to all policies in policies/)'),
+    .describe(
+      'Optional path to specific policy file to use (defaults to all policies in policies/)',
+    ),
 });
 
 export interface PolicyViolation {

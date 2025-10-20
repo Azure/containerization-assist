@@ -202,9 +202,7 @@ async function handleBuildImage(
     await context.progress?.('Finalizing build and collecting metadata', 90, 100);
 
     // Prepare the result using strongly typed values from the Docker client response.
-    // Previously, some fields (e.g., imageId, size, layers) were inferred or loosely typed,
-    // which led to inconsistencies and potential bugs. Now, all result fields are sourced
-    // directly from the Docker client, ensuring type safety and consistency.
+    // All result fields are sourced directly from the Docker client, ensuring type safety and consistency.
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
     const result: BuildImageResult = {
       success: true,
@@ -245,7 +243,8 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success: 'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
+    success:
+      'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
     failure: 'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image.',
   },
   handler: handleBuildImage,

@@ -1,9 +1,7 @@
 /**
  * MCP Context Helper Functions
  *
- * Extracted helper functions for progress handling and context utilities.
- * This module contains the internal implementation details that were
- * previously embedded in the main context.ts file.
+ * Helper functions for progress handling and context utilities.
  */
 
 import type { Logger } from 'pino';
@@ -37,7 +35,7 @@ export type EnhancedProgressReporter = (
 /**
  * Type guard to check if value is a record object
  */
-export function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 

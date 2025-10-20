@@ -9,11 +9,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { getToolLogger } from '@/lib/tool-helpers';
-import {
-  validateImageSchema,
-  type ValidateImageResult,
-  type PolicyViolation,
-} from './schema';
+import { validateImageSchema, type ValidateImageResult, type PolicyViolation } from './schema';
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import nodePath from 'node:path';

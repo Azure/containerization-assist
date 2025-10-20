@@ -15,7 +15,7 @@ export const repositoryPath = z
 
 export const namespaceOptional = z.string().optional().describe('Kubernetes namespace');
 
-// Unified environment schema - single source of truth
+// Environment schema
 export const environment = environmentSchema.optional();
 
 // Docker image fields

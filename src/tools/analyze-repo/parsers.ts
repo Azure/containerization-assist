@@ -193,7 +193,7 @@ export async function parseGradle(filePath: string): Promise<ParsedConfig> {
     const javaVersionMatch = content.match(/sourceCompatibility\s*=\s*['"]?(\d+)['"]?/);
     if (javaVersionMatch) javaVersion = javaVersionMatch[1];
 
-    // Extract dependencies (simplified - just look for common ones)
+    // Extract dependencies (limited to first 20)
     const dependencies: string[] = [];
     const depPattern = /implementation\s+['"]([^'"]+)['"]/g;
     let match;

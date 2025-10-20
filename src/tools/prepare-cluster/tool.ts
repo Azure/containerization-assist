@@ -65,9 +65,9 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
     return Failure(`Cluster name too long: "${clusterName}". Must be 63 characters or less.`);
   }
 
-  // Input is strictly validated, so escaping is not needed.
-  // Single quotes prevent all expansion and are safe for direct interpolation.
-  return Success(`'${clusterName}'`);
+  // Even though we validated, still escape for shell safety
+  // Single quotes prevent all expansion and are safe for direct interpolation
+  return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
 }
 
 export interface PrepareClusterResult {
@@ -228,7 +228,10 @@ async function installKind(logger: pino.Logger): Promise<void> {
   }
 }
 
-async function checkKindClusterExists(clusterName: string, logger: pino.Logger): Promise<Result<boolean>> {
+async function checkKindClusterExists(
+  clusterName: string,
+  logger: pino.Logger,
+): Promise<Result<boolean>> {
   const escapedNameResult = validateAndEscapeClusterName(clusterName);
   if (!escapedNameResult.ok) {
     return escapedNameResult;

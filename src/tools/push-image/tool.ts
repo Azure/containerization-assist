@@ -60,21 +60,22 @@ async function handlePushImage(
       createDockerClient(logger);
 
     // Extract repository and tag from parsed image
-    let repository = parsedImage.value.repository;
+    // Preserve original registry if present, then apply override if provided
+    let repository = parsedImage.value.registry
+      ? `${parsedImage.value.registry}/${parsedImage.value.repository}`
+      : parsedImage.value.repository;
     const tag = parsedImage.value.tag;
 
-    // Apply registry prefix if provided
+    // Override registry if explicitly provided
     if (input.registry) {
       const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      // Check if the original imageId already starts with the registry
-      // This prevents double-prefixing when imageId like 'gcr.io/my-project/myapp:v1' is passed
-      if (!input.imageId.startsWith(registryHost)) {
-        repository = `${registryHost}/${repository}`;
-      } else if (parsedImage.value.registry) {
-        // imageId already has a registry - reconstruct the full repository path
-        // from parsed components (e.g., 'gcr.io' + 'my-project/myapp' = 'gcr.io/my-project/myapp')
-        repository = `${parsedImage.value.registry}/${repository}`;
+
+      // Check if repository already starts with the registry override (avoid double-prefixing)
+      if (!repository.startsWith(`${registryHost}/`)) {
+        // Repository doesn't start with the override, so replace/add the registry
+        repository = `${registryHost}/${parsedImage.value.repository}`;
       }
+      // else: repository already has the correct registry prefix, keep as-is
     }
 
     // Build auth config if credentials are provided

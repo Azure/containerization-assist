@@ -284,7 +284,7 @@ async function main(): Promise<void> {
 
     logStartupSuccess(transportConfig, getLogger(), !!process.env.MCP_QUIET);
 
-    // Install unified shutdown handlers
+    // Install shutdown handlers
     installShutdownHandlers(app, getLogger(), !!process.env.MCP_QUIET);
   } catch (error) {
     logStartupFailure(error as Error, getLogger(), !!process.env.MCP_QUIET);
@@ -297,7 +297,7 @@ async function main(): Promise<void> {
   }
 }
 
-// Uncaught exception and rejection handlers are installed by the unified shutdown handlers
+// Uncaught exception and rejection handlers are installed by the shutdown handlers
 
 // Run the CLI
 void main();

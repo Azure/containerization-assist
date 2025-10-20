@@ -1,6 +1,6 @@
 /**
  * Legacy Configuration Removal Tests
- * Ensures that the unified configuration system works correctly
+ * Ensures that the configuration system works correctly
  */
 
 import { describe, it, expect } from '@jest/globals';

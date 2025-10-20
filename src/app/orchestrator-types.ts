@@ -1,6 +1,6 @@
 /**
- * Simplified Orchestrator Types
- * Minimal types for tool orchestration without unnecessary complexity
+ * Orchestrator Types
+ * Types for tool orchestration
  */
 
 import type { Result } from '@/types/index';
@@ -29,7 +29,7 @@ export interface ExecuteMetadata {
 }
 
 /**
- * Simplified orchestrator interface
+ * Orchestrator interface
  */
 export interface ToolOrchestrator {
   execute(request: ExecuteRequest): Promise<Result<unknown>>;

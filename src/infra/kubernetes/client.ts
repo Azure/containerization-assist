@@ -161,7 +161,6 @@ export const createKubernetesClient = (
     }
   };
 
-
   return {
     /**
      * Apply Kubernetes manifest (supports all resource types)
@@ -180,15 +179,16 @@ export const createKubernetesClient = (
       );
 
       // Create a working copy to avoid mutating the input manifest
-      const workingManifest = !isClusterScoped && !manifest.metadata.namespace
-        ? {
-            ...manifest,
-            metadata: {
-              ...manifest.metadata,
-              namespace,
-            },
-          }
-        : manifest;
+      const workingManifest =
+        !isClusterScoped && !manifest.metadata.namespace
+          ? {
+              ...manifest,
+              metadata: {
+                ...manifest.metadata,
+                namespace,
+              },
+            }
+          : manifest;
 
       // Use the consolidated resource operations module
       const result = await applyK8sResource(kc, workingManifest, logger);
@@ -219,38 +219,39 @@ export const createKubernetesClient = (
      * @returns true if cluster is reachable, false otherwise
      */
     async ping(): Promise<boolean> {
-      let timeoutId: NodeJS.Timeout | undefined;
-      let timeoutCleared = false;
-
-      // Helper function to cleanup timeout
-      const cleanupTimeout = (): void => {
-        timeoutCleared = true;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-      };
-
       try {
         // Use a shorter timeout for ping operations
         const pingTimeout = timeout || 5000;
 
-        // Create timeout promise with proper cleanup handling
+        // Create timeout promise with proper cleanup
+        let timeoutHandle: NodeJS.Timeout | undefined;
+        let isTimedOut = false;
+
         const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            if (!timeoutCleared) {
-              reject(new Error('Connection timeout'));
-            }
+          timeoutHandle = setTimeout(() => {
+            isTimedOut = true;
+            reject(new Error('Connection timeout'));
           }, pingTimeout);
-        }).catch((error) => {
-          // Only propagate the error if the timeout wasn't cleared
-          // This prevents unhandled rejection warnings when the API call succeeds
-          if (!timeoutCleared) {
-            throw error;
-          }
         });
 
-        await Promise.race([coreApi.listNamespace(), timeoutPromise]);
-        return true;
+        try {
+          await Promise.race([
+            coreApi.listNamespace().then((result) => {
+              // Clear timeout on success to prevent unhandled rejection
+              if (timeoutHandle) {
+                clearTimeout(timeoutHandle);
+              }
+              return result;
+            }),
+            timeoutPromise,
+          ]);
+          return true;
+        } finally {
+          // Clear timeout if it hasn't fired yet
+          if (timeoutHandle && !isTimedOut) {
+            clearTimeout(timeoutHandle);
+          }
+        }
       } catch (error) {
         const guidance = extractK8sErrorGuidance(error, 'ping cluster');
         logger.debug(
@@ -262,9 +263,6 @@ export const createKubernetesClient = (
           'Cluster ping failed',
         );
         return false;
-      } finally {
-        // Always clear the timeout to prevent hanging timers
-        cleanupTimeout();
       }
     },
 

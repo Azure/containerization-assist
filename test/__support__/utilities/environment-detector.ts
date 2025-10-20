@@ -261,7 +261,7 @@ async function detectKubernetes(timeout: number = DEFAULT_TIMEOUT): Promise<Envi
 }
 
 /**
- * Detect AI service availability (simplified check)
+ * Detect AI service availability
  */
 async function detectAi(): Promise<EnvironmentCapabilities['ai']> {
   // Check for AI service configuration (MCP-based only)

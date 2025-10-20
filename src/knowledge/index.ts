@@ -1,12 +1,7 @@
 /**
  * Knowledge Base – minimal public API
  */
-export type {
-  KnowledgeEntry,
-  KnowledgeQuery,
-  KnowledgeMatch,
-  LoadedEntry,
-} from './types';
+export type { KnowledgeEntry, KnowledgeQuery, KnowledgeMatch, LoadedEntry } from './types';
 
 import { findKnowledgeMatches } from './matcher';
 import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded } from './loader';
