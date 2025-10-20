@@ -20,16 +20,16 @@
  * ```
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/mcp/context';
-import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
+import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
 import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-utils';
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
 import type * as pino from 'pino';
-import { Success, Failure, type Result, type ErrorGuidance } from '@/types';
+import { Success, Failure, type Result } from '@/types';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -57,57 +57,8 @@ export interface PrepareClusterResult {
   localRegistryUrl?: string;
 }
 
-interface K8sClientAdapter {
-  ping(): Promise<boolean>;
-  namespaceExists(namespace: string): Promise<boolean>;
-  ensureNamespace(
-    namespace: string,
-  ): Promise<{ success: boolean; error?: string; guidance?: ErrorGuidance }>;
-  applyManifest(
-    manifest: Record<string, unknown>,
-    namespace?: string,
-  ): Promise<{ success: boolean; error?: string; guidance?: ErrorGuidance }>;
-  checkIngressController(): Promise<boolean>;
-  checkPermissions(namespace: string): Promise<boolean>;
-}
-
-function createK8sClientAdapter(
-  k8sClient: ReturnType<typeof createKubernetesClient>,
-): K8sClientAdapter {
-  return {
-    ping: () => k8sClient.ping(),
-    namespaceExists: (namespace: string) => k8sClient.namespaceExists(namespace),
-    ensureNamespace: async (namespace: string) => {
-      const result = await k8sClient.ensureNamespace(namespace);
-      if (result.ok) {
-        return { success: true };
-      } else {
-        return {
-          success: false,
-          error: result.error,
-          ...(result.guidance && { guidance: result.guidance }),
-        };
-      }
-    },
-    applyManifest: async (manifest: Record<string, unknown>, namespace?: string) => {
-      const result = await k8sClient.applyManifest(manifest as unknown as K8sManifest, namespace);
-      if (result.ok) {
-        return { success: true };
-      } else {
-        return {
-          success: false,
-          error: result.error,
-          ...(result.guidance && { guidance: result.guidance }),
-        };
-      }
-    },
-    checkIngressController: () => k8sClient.checkIngressController(),
-    checkPermissions: (namespace: string) => k8sClient.checkPermissions(namespace),
-  };
-}
-
 async function checkConnectivity(
-  k8sClient: K8sClientAdapter,
+  k8sClient: KubernetesClient,
   logger: pino.Logger,
 ): Promise<boolean> {
   try {
@@ -121,7 +72,7 @@ async function checkConnectivity(
 }
 
 async function checkNamespace(
-  k8sClient: K8sClientAdapter,
+  k8sClient: KubernetesClient,
   namespace: string,
   logger: pino.Logger,
 ): Promise<boolean> {
@@ -136,7 +87,7 @@ async function checkNamespace(
 }
 
 async function setupRbac(
-  k8sClient: K8sClientAdapter,
+  k8sClient: KubernetesClient,
   namespace: string,
   logger: pino.Logger,
 ): Promise<void> {
@@ -151,7 +102,7 @@ async function setupRbac(
     };
 
     const result = await k8sClient.applyManifest(serviceAccount, namespace);
-    if (result.success) {
+    if (result.ok) {
       logger.info({ namespace }, 'RBAC configured');
     } else {
       logger.warn({ namespace, error: result.error }, 'RBAC setup failed');
@@ -162,7 +113,7 @@ async function setupRbac(
 }
 
 async function checkIngressController(
-  k8sClient: K8sClientAdapter,
+  k8sClient: KubernetesClient,
   logger: pino.Logger,
 ): Promise<boolean> {
   try {
@@ -345,8 +296,7 @@ async function handlePrepareCluster(
   params: PrepareClusterParams,
   context: ToolContext,
 ): Promise<Result<PrepareClusterResult>> {
-  const logger = getToolLogger(context, 'prepare-cluster');
-  const timer = createToolTimer(logger, 'prepare-cluster');
+  const { logger, timer } = setupToolContext(context, 'prepare-cluster');
 
   const { environment = 'development', namespace = 'default' } = params;
 
@@ -367,8 +317,7 @@ async function handlePrepareCluster(
   try {
     logger.info({ environment, namespace }, 'Starting Kubernetes cluster preparation');
 
-    const k8sClientRaw = createKubernetesClient(logger);
-    const k8sClient = createK8sClientAdapter(k8sClientRaw);
+    const k8sClient = createKubernetesClient(logger);
 
     const warnings: string[] = [];
     const checks = {
@@ -437,7 +386,7 @@ async function handlePrepareCluster(
     checks.namespaceExists = await checkNamespace(k8sClient, namespace, logger);
     if (!checks.namespaceExists && shouldCreateNamespace) {
       const ensureResult = await k8sClient.ensureNamespace(namespace);
-      if (ensureResult.success) {
+      if (ensureResult.ok) {
         checks.namespaceExists = true;
         logger.info({ namespace }, 'Namespace created successfully');
       } else {

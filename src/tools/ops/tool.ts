@@ -7,7 +7,7 @@
 
 import * as os from 'os';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { opsToolSchema } from './schema';
@@ -38,8 +38,7 @@ interface PingResult {
  * @public
  */
 export async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
-  const logger = getToolLogger(context, 'ops');
-  const timer = createToolTimer(logger, 'ops-ping');
+  const { logger, timer } = setupToolContext(context, 'ops-ping');
 
   try {
     const { message = 'ping' } = config;
@@ -110,8 +109,7 @@ export async function serverStatus(
   config: ServerStatusConfig,
   context: ToolContext,
 ): Promise<Result<ServerStatusResult>> {
-  const logger = getToolLogger(context, 'ops');
-  const timer = createToolTimer(logger, 'ops-server-status');
+  const { logger, timer } = setupToolContext(context, 'ops-server-status');
 
   try {
     const { details = false } = config;

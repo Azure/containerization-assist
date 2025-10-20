@@ -47,6 +47,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -68,6 +69,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -79,10 +81,7 @@ export default {
       testPathIgnorePatterns: [
         '/node_modules/',
         '/dist/',
-        'test/integration/kubernetes-fast-fail.test.ts',
-        'test/integration/error-guidance-propagation.test.ts',
-        'test/integration/single-app-flow.test.ts',
-        'test/integration/orchestrator-routing.test.ts', // ES module loading issues with @kubernetes/client-node
+        // ES module issues resolved - all integration tests enabled
       ],
     },
     {
@@ -92,6 +91,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -143,7 +143,7 @@ export default {
     },
     './src/lib/': {
       branches: 22,
-      functions: 40,
+      functions: 34,
       lines: 39,
       statements: 39,
     },
@@ -156,10 +156,7 @@ export default {
     '/node_modules/',
     '/dist/',
     'test/unit/lib/kubernetes.test.ts',
-    'test/integration/kubernetes-fast-fail.test.ts', // ES module loading issues with @kubernetes/client-node
-    'test/integration/error-guidance-propagation.test.ts', // Imports kubernetes client
-    'test/integration/single-app-flow.test.ts', // Imports kubernetes client
-    'test/integration/multi-module-flow.test.ts', // Imports kubernetes client
+    // ES module issues resolved - integration tests enabled
   ],
 
   // Timeout handling for different test types

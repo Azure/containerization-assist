@@ -68,7 +68,8 @@ describe('Legacy Configuration Removal', () => {
         'server',
         'workspace',
         'docker',
-        'mutex',
+        'toolLogging',
+        'validation',
       ];
 
       configSections.forEach(section => {

@@ -14,7 +14,7 @@
 
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import { promises as fs } from 'node:fs';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
@@ -105,8 +105,7 @@ async function handleBuildImage(
 
   // Optional progress reporting for complex operations (Docker build process)
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = getToolLogger(context, 'build-image');
-  const timer = createToolTimer(logger, 'build-image');
+  const { logger, timer } = setupToolContext(context, 'build-image');
 
   const {
     path: rawBuildPath = '.',
@@ -134,8 +133,6 @@ async function handleBuildImage(
     // Normalize paths to handle Windows separators
     const buildContext = normalizePath(buildContextResult.value);
     const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
-
-    const startTime = Date.now();
 
     const dockerClient = createDockerClient(logger);
 
@@ -206,26 +203,25 @@ async function handleBuildImage(
       return Failure(`Failed to build image: ${errorMessage}`, buildResult.guidance);
     }
 
-    const buildTime = Date.now() - startTime;
-
     if (progress) await progress('FINALIZING');
 
-    // Prepare the result
+    // Prepare the result using strongly typed values from the Docker client response.
+    // Previously, some fields (e.g., imageId, size, layers) were inferred or loosely typed,
+    // which led to inconsistencies and potential bugs. Now, all result fields are sourced
+    // directly from the Docker client, ensuring type safety and consistency.
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
     const result: BuildImageResult = {
       success: true,
       imageId: buildResult.value.imageId,
       tags: finalTags,
-      size: (buildResult.value as unknown as { size?: number }).size ?? 0,
-      ...((buildResult.value as unknown as { layers?: number }).layers !== undefined && {
-        layers: (buildResult.value as unknown as { layers: number }).layers,
-      }),
-      buildTime,
+      size: buildResult.value.size,
+      ...(buildResult.value.layers !== undefined && { layers: buildResult.value.layers }),
+      buildTime: buildResult.value.buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
     };
 
-    timer.end({ imageId: buildResult.value.imageId, buildTime });
+    timer.end({ imageId: buildResult.value.imageId, buildTime: buildResult.value.buildTime });
 
     if (progress) await progress('COMPLETE');
 

@@ -5,7 +5,7 @@
  * Uses standardized helpers for consistency
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import type { ToolContext } from '@/mcp/context';
 
 import { createSecurityScanner } from '@/infra/security/scanner';
@@ -69,8 +69,7 @@ async function handleScanImage(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = getToolLogger(context, 'scan-image');
-  const timer = createToolTimer(logger, 'scan-image');
+  const { logger, timer } = setupToolContext(context, 'scan-image');
 
   const { scanner = 'trivy', severity } = params;
 
