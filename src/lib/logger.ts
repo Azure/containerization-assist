@@ -17,7 +17,7 @@ export function createLogger(options: pino.LoggerOptions = {}): pino.Logger {
   // When running as MCP server, output to stderr to avoid interfering with JSON-RPC protocol
   // Skip transport in test environment to avoid worker thread leaks
   const isMCPMode = process.env.MCP_MODE === 'true' || process.argv.includes('--mcp');
-  const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
+  const isTestEnv = process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
   const transport = isMCPMode && !isTestEnv
     ? pino.transport({
         target: 'pino/file',

@@ -184,7 +184,8 @@ export interface DockerClient {
  * Generate a digest from an image ID
  * @param imageId - The Docker image ID
  * @param logger - Logger instance
- * @returns A SHA-256 digest string or empty string if invalid
+ * @returns A SHA-256 digest string
+ * @throws Error if imageId is not a valid SHA-256 hash
  */
 function generateDigestFromImageId(imageId: string, logger: Logger): string {
   // If already prefixed, validate the hash portion
@@ -201,7 +202,7 @@ function generateDigestFromImageId(imageId: string, logger: Logger): string {
   }
 
   logger.warn({ imageId }, 'Image ID is not a valid SHA-256 hash, cannot generate digest');
-  return '';
+  throw new Error(`Image ID is not a valid SHA-256 hash: ${imageId}`);
 }
 
 /**

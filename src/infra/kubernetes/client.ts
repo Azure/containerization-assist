@@ -249,13 +249,8 @@ export const createKubernetesClient = (
           }
         });
 
-        try {
-          await Promise.race([coreApi.listNamespace(), timeoutPromise]);
-          return true;
-        } finally {
-          // Always clear the timeout to prevent hanging timers
-          cleanupTimeout();
-        }
+        await Promise.race([coreApi.listNamespace(), timeoutPromise]);
+        return true;
       } catch (error) {
         const guidance = extractK8sErrorGuidance(error, 'ping cluster');
         logger.debug(

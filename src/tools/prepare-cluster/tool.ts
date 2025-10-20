@@ -65,9 +65,9 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
     return Failure(`Cluster name too long: "${clusterName}". Must be 63 characters or less.`);
   }
 
-  // Even though we validated, still escape for shell safety
-  // Single quotes prevent all expansion and are safe for direct interpolation
-  return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
+  // Input is strictly validated, so escaping is not needed.
+  // Single quotes prevent all expansion and are safe for direct interpolation.
+  return Success(`'${clusterName}'`);
 }
 
 export interface PrepareClusterResult {

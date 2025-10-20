@@ -70,6 +70,11 @@ const DOCKERFILE_KEYWORDS = [
 ] as const;
 
 /**
+ * Set of Dockerfile keywords for O(1) lookup performance
+ */
+const DOCKERFILE_KEYWORDS_SET = new Set<string>(DOCKERFILE_KEYWORDS);
+
+/**
  * Parse Dockerfile content and extract base images
  */
 function extractBaseImages(lines: string[]): string[] {
@@ -104,7 +109,7 @@ function hasNonRootUserInstruction(lines: string[]): boolean {
 function countInstructions(lines: string[]): number {
   return lines.filter((line) => {
     const firstWord = line.split(/\s+/)[0];
-    return firstWord && DOCKERFILE_KEYWORDS.includes(firstWord.toUpperCase() as typeof DOCKERFILE_KEYWORDS[number]);
+    return firstWord && DOCKERFILE_KEYWORDS_SET.has(firstWord.toUpperCase());
   }).length;
 }
 
