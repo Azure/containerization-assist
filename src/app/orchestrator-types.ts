@@ -4,6 +4,7 @@
  */
 
 import type { Result } from '@/types/index';
+import type { ChainHintsRegistry } from './chain-hints';
 
 /**
  * Request to execute a tool
@@ -43,4 +44,7 @@ type ChainHintsMode = 'enabled' | 'disabled';
 export interface OrchestratorConfig {
   policyPath?: string;
   chainHintsMode: ChainHintsMode;
+  chainHints?: ChainHintsRegistry;
+  /** Reverse mapping from alias to original tool name (alias -> original) */
+  aliasToOriginalMap?: Record<string, string>;
 }

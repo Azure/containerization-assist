@@ -86,18 +86,8 @@ export interface KnowledgeMatch {
   reasons: string[];
 }
 
-export interface LoadedEntry extends KnowledgeEntry {
-  /** Precompiled regex patterns for performance */
-  compiledCache?: {
-    pattern: RegExp | null;
-    lastCompiled: number;
-    compilationError?: string;
-  };
-}
-
-export interface CompilationStats {
-  totalEntries: number;
-  compiledSuccessfully: number;
-  compilationErrors: number;
-  avgCompilationTime: number;
-}
+/**
+ * LoadedEntry is just an alias for KnowledgeEntry.
+ * Regex patterns are compiled on-demand for simplicity.
+ */
+export type LoadedEntry = KnowledgeEntry;

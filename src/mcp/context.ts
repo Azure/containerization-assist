@@ -82,10 +82,7 @@ export interface ContextOptions {
  * });
  * ```
  */
-export function createToolContext(
-  logger: Logger,
-  options: ContextOptions = {},
-): ToolContext {
+export function createToolContext(logger: Logger, options: ContextOptions = {}): ToolContext {
   const progressReporter = extractProgressReporter(
     options.progress,
     logger,
@@ -98,4 +95,3 @@ export function createToolContext(
     progress: progressReporter,
   };
 }
-

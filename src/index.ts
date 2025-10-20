@@ -32,30 +32,13 @@ export {
 // Export parameter defaulting utilities
 export {
   withDefaults,
-  buildParams,
   K8S_DEFAULTS,
   CONTAINER_DEFAULTS,
   ACA_DEFAULTS,
   BUILD_DEFAULTS,
   getToolDefaults,
-  ParameterBuilder,
 } from './lib/param-defaults.js';
 
-// Export result handling utilities
-export {
-  propagateFailure,
-  mapResult,
-  chainResults,
-  combineResults,
-  tryExecute,
-  tryExecuteAsync,
-  unwrapOrThrow,
-  unwrapOr,
-  isSuccess,
-  isFailure,
-  mapError,
-  withErrorContext,
-} from './lib/result-utils.js';
 
 /** @public */
 export { tool } from './types/tool.js';

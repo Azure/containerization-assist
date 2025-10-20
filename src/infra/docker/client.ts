@@ -49,10 +49,20 @@ export interface DockerBuildOptions {
 export interface DockerBuildResult {
   /** Unique identifier of the built image */
   imageId: string;
+  /** Content-addressable digest of the built image */
+  digest: string;
+  /** Size of the built image in bytes */
+  size: number;
+  /** Number of layers in the image */
+  layers?: number;
+  /** Total build time in milliseconds */
+  buildTime: number;
   /** Build process log messages */
   logs: string[];
   /** Tags applied to the built image */
   tags?: string[];
+  /** Build-time warnings */
+  warnings: string[];
 }
 
 /**
@@ -171,6 +181,31 @@ export interface DockerClient {
 }
 
 /**
+ * Generate a digest from an image ID
+ * @param imageId - The Docker image ID
+ * @param logger - Logger instance
+ * @returns A SHA-256 digest string
+ * @throws Error if imageId is not a valid SHA-256 hash
+ */
+function generateDigestFromImageId(imageId: string, logger: Logger): string {
+  // If already prefixed, validate the hash portion
+  if (imageId.startsWith('sha256:')) {
+    const hash = imageId.substring(7);
+    if (/^[a-f0-9]{64}$/.test(hash)) {
+      return imageId;
+    }
+  } else {
+    // If not prefixed, validate and add prefix
+    if (/^[a-f0-9]{64}$/.test(imageId)) {
+      return `sha256:${imageId}`;
+    }
+  }
+
+  logger.warn({ imageId }, 'Image ID is not a valid SHA-256 hash, cannot generate digest');
+  throw new Error(`Image ID is not a valid SHA-256 hash: ${imageId}`);
+}
+
+/**
  * Create base Docker client implementation
  */
 function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
@@ -211,6 +246,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
   return {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
       const buildLogs: string[] = [];
+      const buildWarnings: string[] = [];
+      const startTime = Date.now();
 
       try {
         logger.debug({ options }, 'Starting Docker build');
@@ -286,10 +323,44 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
           );
         });
 
+        const imageId = result[result.length - 1]?.aux?.ID || '';
+        const buildTime = Date.now() - startTime;
+
+        // Inspect the image to get size, digest, and layers
+        let size = 0;
+        let digest = '';
+        let layers: number | undefined;
+
+        if (imageId) {
+          try {
+            const image = docker.getImage(imageId);
+            const inspect = await image.inspect();
+
+            size = inspect.Size || 0;
+            // Use RepoDigests if available, otherwise fallback to image ID if it looks like a valid SHA-256 hash
+            if (inspect.RepoDigests?.[0]) {
+              digest = inspect.RepoDigests[0];
+            } else {
+              digest = generateDigestFromImageId(inspect.Id, logger);
+            }
+            layers = inspect.RootFS?.Layers?.length;
+          } catch (inspectError) {
+            logger.warn({ error: inspectError, imageId }, 'Could not inspect image after build');
+            buildWarnings.push('Could not retrieve complete image metadata');
+            // Use fallback digest from image ID
+            digest = generateDigestFromImageId(imageId, logger);
+          }
+        }
+
         const buildResult: DockerBuildResult = {
-          imageId: result[result.length - 1]?.aux?.ID || '',
-          tags: options.tags || [],
+          imageId,
+          digest,
+          size,
+          ...(layers !== undefined && { layers }),
+          buildTime,
           logs: buildLogs,
+          tags: options.tags || [],
+          warnings: buildWarnings,
         };
 
         logger.debug({ buildResult }, 'Docker build completed successfully');

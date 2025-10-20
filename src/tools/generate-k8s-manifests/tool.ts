@@ -27,7 +27,7 @@ import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
 import yaml from 'js-yaml';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 
 const name = 'generate-k8s-manifests';
 const description =
@@ -359,6 +359,11 @@ export default tool({
   schema: generateK8sManifestsSchema,
   metadata: {
     knowledgeEnhanced: true,
+  },
+  chainHints: {
+    success:
+      'Kubernetes manifests generated successfully. Next: Call prepare-cluster to create a kind cluster to deploy to.',
+    failure: 'Manifest generation failed. Ensure you have a valid image and try again.',
   },
   handler: handleGenerateK8sManifests,
 });

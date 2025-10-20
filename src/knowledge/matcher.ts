@@ -85,7 +85,7 @@ const getEnvironmentKeywords = (environment: string): string[] => {
 };
 
 /**
- * Evaluate pattern match using precompiled regex
+ * Evaluate pattern match by compiling regex on-demand
  */
 const evaluatePatternMatch = (
   entry: LoadedEntry,
@@ -93,22 +93,20 @@ const evaluatePatternMatch = (
 ): { score: number; reasons: string[] } => {
   if (!query.text || !entry.pattern) return { score: 0, reasons: [] };
 
-  // Use precompiled pattern if available
-  if (entry.compiledCache?.pattern) {
-    // Reset regex lastIndex for stateful regex
-    entry.compiledCache.pattern.lastIndex = 0;
-
-    if (entry.compiledCache.pattern.test(query.text)) {
+  try {
+    // Compile regex on-demand (regex compilation is fast)
+    const regex = new RegExp(entry.pattern, 'gmi');
+    if (regex.test(query.text)) {
       return {
         score: SCORING.PATTERN,
-        reasons: ['Pattern match (precompiled)'],
+        reasons: ['Pattern match'],
       };
     }
-  } else if (entry.compiledCache?.compilationError) {
-    // Pattern failed to compile during load, skip
+  } catch (error) {
+    // Skip entries with invalid patterns
     logger.debug(
-      { entryId: entry.id, error: entry.compiledCache.compilationError },
-      'Skipping entry with compilation error',
+      { entryId: entry.id, pattern: entry.pattern, error },
+      'Skipping entry with invalid pattern',
     );
   }
 
