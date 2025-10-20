@@ -67,7 +67,11 @@ async function handleScanImage(
   context: ToolContext,
 ): Promise<Result<ScanImageResult>> {
   if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+    return Failure('Invalid parameters provided', {
+      message: 'Invalid parameters provided',
+      hint: 'The scan-image tool received invalid or missing parameters',
+      resolution: 'Ensure you are providing a valid parameters object with the imageId field',
+    });
   }
   const { logger, timer } = setupToolContext(context, 'scan-image');
 
@@ -89,7 +93,11 @@ async function handleScanImage(
     const imageId = params.imageId;
 
     if (!imageId) {
-      return Failure('No image specified. Provide imageId parameter.');
+      return Failure('No image specified. Provide imageId parameter.', {
+        message: 'No image specified. Provide imageId parameter.',
+        hint: 'The imageId parameter is required to scan an image',
+        resolution: 'Provide the imageId or image tag to scan (e.g., "myapp:latest" or a full image ID)',
+      });
     }
     logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
 
@@ -233,7 +241,11 @@ async function handleScanImage(
     logger.error({ error }, 'Image scan failed');
 
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return Failure(errorMessage);
+    return Failure(errorMessage, {
+      message: errorMessage,
+      hint: 'An unexpected error occurred during the security scan',
+      resolution: 'Verify that the scanner (Trivy) is installed and accessible, the image exists, and you have proper permissions',
+    });
   }
 }
 

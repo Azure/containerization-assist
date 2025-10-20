@@ -553,12 +553,21 @@ async function handleFixDockerfile(
     } catch (error) {
       return Failure(
         `Failed to read Dockerfile at ${dockerfilePath}: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          message: `Failed to read Dockerfile at ${dockerfilePath}: ${error instanceof Error ? error.message : String(error)}`,
+          hint: 'Unable to read the Dockerfile from the specified path',
+          resolution: 'Verify the file exists and you have read permissions, or provide the Dockerfile content directly using the dockerfile parameter instead of path',
+        },
       );
     }
   }
 
   if (!content) {
-    return Failure('Dockerfile content is empty. Provide valid Dockerfile content or path.');
+    return Failure('Dockerfile content is empty. Provide valid Dockerfile content or path.', {
+      message: 'Dockerfile content is empty. Provide valid Dockerfile content or path.',
+      hint: 'No Dockerfile content was provided for validation',
+      resolution: 'Provide either a valid path parameter pointing to a Dockerfile or supply the Dockerfile content directly via the dockerfile parameter',
+    });
   }
 
   logger.info({ preview: content.substring(0, 100) }, 'Validating Dockerfile for issues');

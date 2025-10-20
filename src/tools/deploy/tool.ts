@@ -413,11 +413,19 @@ async function handleDeploy(
       // The manifests are already a string containing all YAML documents
       manifests = parseManifest(params.manifestsPath, logger);
     } catch (error) {
-      return Failure(`Failed to parse manifests: ${extractErrorMessage(error)}`);
+      return Failure(`Failed to parse manifests: ${extractErrorMessage(error)}`, {
+        message: `Failed to parse manifests: ${extractErrorMessage(error)}`,
+        hint: 'The provided Kubernetes manifests could not be parsed',
+        resolution: 'Ensure the manifestsPath parameter contains valid YAML or JSON Kubernetes manifests. Check for syntax errors and proper formatting',
+      });
     }
 
     if (manifests.length === 0) {
-      return Failure('No valid manifests found in session');
+      return Failure('No valid manifests found in session', {
+        message: 'No valid manifests found in session',
+        hint: 'No Kubernetes manifests were found or all manifests failed validation',
+        resolution: 'Ensure you are providing valid Kubernetes manifests with proper kind and metadata fields',
+      });
     }
     // Order manifests for deployment
     const orderedManifests = orderManifests(manifests);
@@ -525,7 +533,11 @@ async function handleDeploy(
     return Success(result);
   } catch (error) {
     timer.error(error);
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred during deployment',
+      resolution: 'Check the error message for details. Common issues include cluster connectivity, insufficient permissions, or invalid manifest configurations',
+    });
   }
 }
 

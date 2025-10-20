@@ -77,11 +77,20 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
   if (!nameRegex.test(clusterName)) {
     return Failure(
       `Invalid cluster name: "${clusterName}". Must contain only lowercase letters, numbers, and hyphens.`,
+      {
+        message: `Invalid cluster name: "${clusterName}". Must contain only lowercase letters, numbers, and hyphens.`,
+        hint: 'Cluster names must follow Kubernetes naming conventions',
+        resolution: 'Use only lowercase letters (a-z), numbers (0-9), and hyphens (-). Start and end with alphanumeric characters',
+      },
     );
   }
 
   if (clusterName.length > 63) {
-    return Failure(`Cluster name too long: "${clusterName}". Must be 63 characters or less.`);
+    return Failure(`Cluster name too long: "${clusterName}". Must be 63 characters or less.`, {
+      message: `Cluster name too long: "${clusterName}". Must be 63 characters or less.`,
+      hint: 'Kubernetes resource names have a maximum length of 63 characters',
+      resolution: 'Shorten the cluster name to 63 characters or fewer',
+    });
   }
 
   // Wrap in single quotes for defense-in-depth shell safety
@@ -462,7 +471,11 @@ async function verifyClusterReadiness(
   // Check connectivity
   checks.connectivity = await checkConnectivity(k8sClient, logger);
   if (!checks.connectivity) {
-    return Failure('Cannot connect to Kubernetes cluster');
+    return Failure('Cannot connect to Kubernetes cluster', {
+      message: 'Cannot connect to Kubernetes cluster',
+      hint: 'Unable to establish connection to the Kubernetes API server',
+      resolution: 'Verify that kubectl is configured correctly with valid credentials and the cluster is accessible. Run `kubectl cluster-info` to test connectivity',
+    });
   }
 
   // Check permissions
@@ -613,7 +626,11 @@ async function handlePrepareCluster(
     timer.error(error);
 
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return Failure(errorMessage);
+    return Failure(errorMessage, {
+      message: errorMessage,
+      hint: 'An unexpected error occurred during cluster preparation',
+      resolution: 'Check the error message for details. Common issues include Docker not running (for kind clusters), kubectl not configured, or insufficient permissions',
+    });
   }
 }
 

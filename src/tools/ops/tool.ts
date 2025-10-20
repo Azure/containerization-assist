@@ -66,7 +66,11 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Ping failed');
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred during the ping operation',
+      resolution: 'Check the server logs for details. This is typically a server-side issue',
+    });
   }
 }
 
@@ -169,7 +173,11 @@ export async function serverStatus(
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Error collecting server status');
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred while collecting server status',
+      resolution: 'Check the server logs for details. This is typically a server-side issue',
+    });
   }
 }
 
@@ -201,7 +209,11 @@ async function handleOps(
         context,
       );
     default:
-      return Failure(`Unknown operation: ${input.operation}`);
+      return Failure(`Unknown operation: ${input.operation}`, {
+        message: `Unknown operation: ${input.operation}`,
+        hint: 'The requested operation is not supported',
+        resolution: 'Use one of the supported operations: "ping" for connectivity testing or "status" for server information',
+      });
   }
 }
 

@@ -68,3 +68,4 @@ k8s
 
 knip-deadcode-output.txt
 quality-gates-test.txt
+coverage-lib

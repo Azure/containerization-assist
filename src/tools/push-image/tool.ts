@@ -163,7 +163,11 @@ async function handlePushImage(
     return Success(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error occurred';
-    return Failure(`Push image failed: ${message}`);
+    return Failure(`Push image failed: ${message}`, {
+      message: `Push image failed: ${message}`,
+      hint: 'An unexpected error occurred while pushing the image to the registry',
+      resolution: 'Check the error message for details. Common issues include network connectivity, registry authentication, or insufficient permissions',
+    });
   }
 }
 

@@ -559,7 +559,11 @@ async function handleGenerateDockerfile(
   const path = input.repositoryPath || '';
 
   if (!path) {
-    return Failure('Path is required. Provide a path parameter.');
+    return Failure('Path is required. Provide a path parameter.', {
+      message: 'Path is required. Provide a path parameter.',
+      hint: 'The repositoryPath parameter is missing or empty',
+      resolution: 'Provide a valid repositoryPath parameter pointing to the directory containing your application code',
+    });
   }
 
   // Validate repository path

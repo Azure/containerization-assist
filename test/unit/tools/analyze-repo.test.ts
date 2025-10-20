@@ -331,6 +331,179 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         expect(result.error).toContain('does not exist');
       }
     });
+
+    it('should handle permission errors when reading repository', async () => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockRejectedValue(new Error('EACCES: permission denied'));
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
+
+      const result = await analyzeTool.handler(
+        {
+          repositoryPath: '/test/restricted',
+        },
+        mockContext,
+      );
+
+      // The tool should handle permission errors gracefully
+      // Since scanDirectory catches errors, this should still return
+      // but might result in empty modules detection
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No modules detected');
+      }
+    });
+
+    it('should handle malformed package.json files', async () => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockImplementation((dirPath: string) => {
+        if (dirPath === '/test/repo') {
+          return Promise.resolve([
+            { name: 'package.json', isDirectory: () => false, isFile: () => true },
+            { name: 'src', isDirectory: () => true, isFile: () => false },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      const readFileMock = jest.fn().mockImplementation((filePath: string) => {
+        if (filePath.includes('package.json')) {
+          return Promise.resolve('{ invalid json content');
+        }
+        return Promise.reject(new Error('File not found'));
+      });
+
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
+      (fs.readFile as jest.Mock).mockImplementation(readFileMock);
+
+      const result = await analyzeTool.handler(
+        {
+          repositoryPath: '/test/repo',
+        },
+        mockContext,
+      );
+
+      // Tool should handle malformed JSON gracefully
+      // Parser will fail to extract info, but analysis continues
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No modules detected');
+      }
+    });
+
+    it('should handle unreadable config files', async () => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockImplementation((dirPath: string) => {
+        if (dirPath === '/test/repo') {
+          return Promise.resolve([
+            { name: 'pom.xml', isDirectory: () => false, isFile: () => true },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      const readFileMock = jest.fn().mockRejectedValue(new Error('EACCES: permission denied'));
+
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
+      (fs.readFile as jest.Mock).mockImplementation(readFileMock);
+
+      const result = await analyzeTool.handler(
+        {
+          repositoryPath: '/test/repo',
+        },
+        mockContext,
+      );
+
+      // Tool should continue even if config files can't be read
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No modules detected');
+      }
+    });
+
+    it('should handle empty repository path', async () => {
+      const result = await analyzeTool.handler(
+        {
+          repositoryPath: '',
+        },
+        mockContext,
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBeTruthy();
+      }
+    });
+
+    it('should handle invalid pre-provided modules', async () => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+
+      const result = await analyzeTool.handler(
+        {
+          repositoryPath: '/test/repo',
+          modules: [{
+            name: '', // Invalid: empty name
+            modulePath: '/test/repo',
+            language: 'java',
+          }],
+        },
+        mockContext,
+      );
+
+      // Tool should handle invalid module data
+      expect(result).toBeDefined();
+    });
+
+    it('should handle corrupted XML in pom.xml', async () => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockImplementation((dirPath: string) => {
+        if (dirPath === '/test/repo') {
+          return Promise.resolve([
+            { name: 'pom.xml', isDirectory: () => false, isFile: () => true },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      const readFileMock = jest.fn().mockImplementation((filePath: string) => {
+        if (filePath.includes('pom.xml')) {
+          return Promise.resolve('<project><unclosed>');
+        }
+        return Promise.reject(new Error('File not found'));
+      });
+
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
+      (fs.readFile as jest.Mock).mockImplementation(readFileMock);
+
+      const result = await analyzeTool.handler(
+        {
+          repositoryPath: '/test/repo',
+        },
+        mockContext,
+      );
+
+      // Tool should handle corrupted XML gracefully
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No modules detected');
+      }
+    });
   });
 
   describe('Metadata', () => {
