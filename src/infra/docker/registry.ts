@@ -574,27 +574,27 @@ export async function checkImageExists(
 ): Promise<Result<boolean>> {
   try {
     // Normalize imageName to avoid subtle failures due to whitespace
-    imageName = imageName.trim();
+    const normalizedImageName = imageName.trim();
 
     // Parse image name into components
-    const { repository, reference } = parseImageName(imageName);
+    const { repository, reference } = parseImageName(normalizedImageName);
 
     logger.debug({ repository, reference }, 'Checking if image exists locally');
 
     try {
       // Use Docker API to inspect the image locally
       // This only checks the local Docker daemon, not remote registries
-      const image = docker.getImage(imageName);
+      const image = docker.getImage(normalizedImageName);
       await image.inspect();
 
-      logger.debug({ imageName }, 'Image exists');
+      logger.debug({ imageName: normalizedImageName }, 'Image exists');
       return Success(true);
     } catch (error) {
       // If image doesn't exist locally, Docker will throw a 404 error
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (errorMessage.includes('404') || errorMessage.includes('no such image')) {
-        logger.debug({ imageName }, 'Image does not exist');
+        logger.debug({ imageName: normalizedImageName }, 'Image does not exist');
         return Success(false);
       }
 
@@ -603,7 +603,7 @@ export async function checkImageExists(
         message: 'Unable to verify image existence',
         hint: 'Error occurred while checking registry',
         resolution: 'Ensure Docker daemon is running and registry is accessible',
-        details: { imageName, error: errorMessage },
+        details: { imageName: normalizedImageName, error: errorMessage },
       });
     }
   } catch (error) {

@@ -21,7 +21,6 @@ import type { DirResult } from 'tmp';
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
-import validateDockerfileTool from '@/tools/validate-dockerfile/tool';
 import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
 // Note: Base image resolution is handled within other tools
 
@@ -184,8 +183,8 @@ if __name__ == '__main__':
     }, 30000);
   });
 
-  describe('Dockerfile Validation → Fix Chain', () => {
-    it('should chain validate-dockerfile → fix-dockerfile for issues', async () => {
+  describe('Dockerfile Validation and Fix', () => {
+    it('should validate and provide fix recommendations for Dockerfile issues', async () => {
       const appPath = join(testDir.name, 'dockerfile-fix-test');
       mkdirSync(appPath, { recursive: true });
 
@@ -200,32 +199,22 @@ CMD npm start`;
       const dockerfilePath = join(appPath, 'Dockerfile');
       writeFileSync(dockerfilePath, problematicDockerfile);
 
-      // Step 1: Validate Dockerfile
-      const validationResult = await validateDockerfileTool.handler(
-        { dockerfilePath },
+      // fix-dockerfile now handles both validation and fix recommendations
+      const fixResult = await fixDockerfileTool.handler(
+        {
+          path: dockerfilePath,
+          environment: 'production',
+        },
         toolContext
       );
 
-      // Validation should work
-      if (validationResult.ok) {
-        const report = validationResult.value as ValidationReport;
-        expect(report.findings).toBeDefined();
+      // Test passes if fix completes (success or graceful failure)
+      expect(fixResult.ok !== undefined).toBe(true);
 
-        // If there are issues, test the fix chain
-        if (report.findings.length > 0) {
-          // Step 2: Fix Dockerfile (AI-based, may not be available)
-          const fixResult = await fixDockerfileTool.handler(
-            {
-              dockerfilePath,
-              validationReport: JSON.stringify(report),
-              outputPath: join(appPath, 'Dockerfile.fixed'),
-            },
-            toolContext
-          );
-
-          // Test passes if fix completes (success or graceful failure)
-          expect(fixResult.ok !== undefined).toBe(true);
-        }
+      // If successful, should have validation results
+      if (fixResult.ok) {
+        expect(fixResult.value.currentIssues).toBeDefined();
+        expect(fixResult.value.fixes).toBeDefined();
       }
     }, 30000);
   });
@@ -292,9 +281,9 @@ CMD npm start`;
         expect(analysisResult.guidance).toBeDefined();
       }
 
-      // Test 2: Invalid Dockerfile path in validation
-      const validationResult = await validateDockerfileTool.handler(
-        { dockerfilePath: '/nonexistent/Dockerfile' },
+      // Test 2: Invalid Dockerfile path in fix-dockerfile
+      const validationResult = await fixDockerfileTool.handler(
+        { path: '/nonexistent/Dockerfile' },
         toolContext
       );
 

@@ -56,7 +56,6 @@ export {
   pushImageTool,
   scanImageTool,
   tagImageTool,
-  validateDockerfileTool,
   verifyDeployTool,
 } from './tools/index.js';
 

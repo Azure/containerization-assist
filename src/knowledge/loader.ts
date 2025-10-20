@@ -169,7 +169,9 @@ export const loadKnowledgeBase = async (): Promise<void> => {
     }
 
     // Discover all .json files in packs directory
-    const packFiles = readdirSync(packsDir).filter((file) => file.endsWith('.json')).sort();
+    const packFiles = readdirSync(packsDir)
+      .filter((file) => file.endsWith('.json'))
+      .sort();
     stats.packsAttempted = packFiles.length;
 
     logger.info({ packsDir, totalPacks: packFiles.length }, 'Discovered knowledge packs');

@@ -76,11 +76,4 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
     failure:
       'Security vulnerabilities detected. Review scan results and apply fixes before proceeding.',
   },
-
-  [TOOL_NAME.VALIDATE_DOCKERFILE]: {
-    success:
-      'Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the generate-k8s-manifests tool to proceed with containerization.',
-    failure:
-      'Dockerfile validation failed. Review errors and use fix-dockerfile to address issues.',
-  },
 };

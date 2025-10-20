@@ -641,5 +641,11 @@ export default tool({
   metadata: {
     knowledgeEnhanced: true,
   },
+  chainHints: {
+    success:
+      'Dockerfile plan generated successfully. Next: Use fix-dockerfile to validate the generated Dockerfile (includes built-in best practices + organizational policy validation) before building.',
+    failure:
+      'Failed to generate Dockerfile plan. Review repository analysis and ensure required dependencies are detected.',
+  },
   handler: handleGenerateDockerfile,
 });

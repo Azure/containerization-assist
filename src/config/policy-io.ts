@@ -16,11 +16,6 @@ const log = createLogger().child({ module: 'policy-io' });
 // Simple cache without TTL - single-user CLI tool loads policies once
 const policyCache = new Map<string, Policy>();
 
-/** Clear the policy cache (primarily for testing) */
-export function clearPolicyCache(): void {
-  policyCache.clear();
-}
-
 /** Validate policy via Zod and return Result */
 export function validatePolicy(p: unknown): Result<Policy> {
   try {
