@@ -79,6 +79,7 @@ afterEach(() => {
     console.error = originalConsole.error;
   }
   jest.clearAllMocks();
+  jest.clearAllTimers();
 });
 
 export {};

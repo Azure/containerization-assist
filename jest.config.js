@@ -61,6 +61,7 @@ export default {
         '/dist/',
         'test/unit/lib/kubernetes.test.ts',
       ],
+      maxWorkers: 1, // Run unit tests serially to prevent worker shutdown issues
     },
     {
       displayName: 'integration',
