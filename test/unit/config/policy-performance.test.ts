@@ -9,6 +9,11 @@ import { jest } from '@jest/globals';
 import { applyPolicy, evaluateMatcher } from '../../../src/config/policy-eval';
 import type { Policy, PolicyRule, Matcher } from '../../../src/config/policy-schemas';
 
+/**
+ * Performance multiplier to account for variations across different machines and system load
+ */
+const PERFORMANCE_VARIANCE_MULTIPLIER = 4;
+
 describe('Policy Evaluation Performance', () => {
   /**
    * Generate mock policy rules for testing
@@ -349,8 +354,7 @@ describe('Policy Evaluation Performance', () => {
           const timeRatio = curr.time / prev.time;
 
           // Time should not grow faster than linear with size
-          // Allow 4x multiplier for performance variations across different machines and system load
-          expect(timeRatio).toBeLessThanOrEqual(sizeRatio * 4);
+          expect(timeRatio).toBeLessThanOrEqual(sizeRatio * PERFORMANCE_VARIANCE_MULTIPLIER);
         }
       }
     });

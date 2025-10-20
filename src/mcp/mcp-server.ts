@@ -17,7 +17,7 @@ import {
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
 import { createLogger, type Logger } from '@/lib/logger';
-import type { MCPTool } from '@/types/tool';
+import type { Tool } from '@/types/tool';
 import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 
@@ -78,7 +78,7 @@ export const OUTPUTFORMAT = {
 } as const;
 export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
 
-export interface RegisterOptions<TTool extends MCPTool = MCPTool> {
+export interface RegisterOptions<TTool extends Tool = Tool> {
   outputFormat: OutputFormat;
   server: McpServer;
   tools: readonly TTool[];
@@ -121,7 +121,7 @@ function formatErrorWithGuidance(error: string, guidance?: ErrorGuidance): strin
  * @param execute - Tool executor function that handles tool execution requests
  * @returns MCPServer interface for managing the server lifecycle
  */
-export function createMCPServer<TTool extends MCPTool>(
+export function createMCPServer<TTool extends Tool>(
   tools: Array<TTool>,
   options: ServerOptions = {},
   execute: ToolExecutor,
@@ -227,7 +227,7 @@ export function createMCPServer<TTool extends MCPTool>(
  * delegated to the orchestrator's execute function.
  * @param options - Registration options including server, tools, and executor
  */
-export function registerToolsWithServer<TTool extends MCPTool>(
+export function registerToolsWithServer<TTool extends Tool>(
   options: RegisterOptions<TTool>,
 ): void {
   const { server, tools, logger, transport, execute, outputFormat } = options;

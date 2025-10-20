@@ -331,7 +331,7 @@ describe('fix-dockerfile', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Dockerfile content is empty');
+        expect(result.error).toContain("Either 'path' or 'content' must be provided");
       }
     });
 
@@ -418,11 +418,11 @@ describe('fix-dockerfile', () => {
       const mockContext = createMockToolContext();
       const result = await fixDockerfileTool.handler(config, mockContext);
 
-      // Tool may process whitespace-only content as valid input
-      // The validation will catch it as having issues
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.currentIssues).toBeDefined();
+      // The readDockerfile utility now rejects whitespace-only content early
+      // This is more strict than the old behavior but is more correct
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('empty');
       }
     });
 

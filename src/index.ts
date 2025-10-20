@@ -64,7 +64,7 @@ export type {
 /**
  * Core type definitions for MCP tools and result handling.
  *
- * - `MCPTool`: The unified tool interface that all tools implement
+ * - `Tool`: The unified tool interface that all tools implement
  * - `Result<T>`: Result type for explicit error handling (Success or Failure)
  * - `Success`: Constructor for successful results
  * - `Failure`: Constructor for failed results with optional error guidance
@@ -84,7 +84,7 @@ export type {
  *
  * @public
  */
-export type { MCPTool, Result, Success, Failure, ToolContext } from './types/index.js';
+export type { Tool, Result, Success, Failure, ToolContext } from './types/index.js';
 
 /**
  * Tool helper utilities for creating consistent tool implementations.

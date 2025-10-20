@@ -371,7 +371,7 @@ CMD ["node", "index.js"]`;
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Permission denied');
+        expect(result.error).toContain('Permission denied');
       }
     });
 

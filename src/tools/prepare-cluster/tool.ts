@@ -472,9 +472,9 @@ async function verifyClusterReadiness(
   checks.connectivity = await checkConnectivity(k8sClient, logger);
   if (!checks.connectivity) {
     return Failure('Cannot connect to Kubernetes cluster', {
-      message: 'Cannot connect to Kubernetes cluster',
-      hint: 'Unable to establish connection to the Kubernetes API server',
-      resolution: 'Verify that kubectl is configured correctly with valid credentials and the cluster is accessible. Run `kubectl cluster-info` to test connectivity',
+      message: 'Kubernetes cluster connection failed',
+      hint: 'Could not establish connection to any Kubernetes cluster',
+      resolution: 'Ensure Kubernetes is installed and a cluster is accessible (kubectl cluster-info)',
     });
   }
 

@@ -68,9 +68,9 @@ async function handleScanImage(
 ): Promise<Result<ScanImageResult>> {
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided', {
-      message: 'Invalid parameters provided',
-      hint: 'The scan-image tool received invalid or missing parameters',
-      resolution: 'Ensure you are providing a valid parameters object with the imageId field',
+      message: 'Parameters must be a valid object',
+      hint: 'Tool received invalid or missing parameters',
+      resolution: 'Ensure parameters are provided as a JSON object',
     });
   }
   const { logger, timer } = setupToolContext(context, 'scan-image');
@@ -94,9 +94,9 @@ async function handleScanImage(
 
     if (!imageId) {
       return Failure('No image specified. Provide imageId parameter.', {
-        message: 'No image specified. Provide imageId parameter.',
-        hint: 'The imageId parameter is required to scan an image',
-        resolution: 'Provide the imageId or image tag to scan (e.g., "myapp:latest" or a full image ID)',
+        message: 'Missing required parameter: imageId',
+        hint: 'Image ID or name must be specified to scan',
+        resolution: 'Add imageId parameter with the Docker image ID or name to scan',
       });
     }
     logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');

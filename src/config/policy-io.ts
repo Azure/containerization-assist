@@ -128,7 +128,11 @@ function calculatePolicyStrictness(policy: Policy): number {
  */
 function mergePolicies(policies: Policy[]): Result<Policy> {
   if (policies.length === 0) {
-    return Failure('Cannot merge empty policy list');
+    return Failure('Cannot merge empty policy list', {
+      message: 'No policies provided for merging',
+      hint: 'Merge operation requires at least one policy',
+      resolution: 'Provide at least one valid policy to merge',
+    });
   }
 
   // Sort policies by strictness (ascending) so stricter policies come last and override
@@ -139,14 +143,22 @@ function mergePolicies(policies: Policy[]): Result<Policy> {
   if (sortedPolicies.length === 1) {
     const singlePolicy = sortedPolicies[0];
     if (!singlePolicy) {
-      return Failure('Unexpected: sorted policies array is empty after validation');
+      return Failure('Unexpected: sorted policies array is empty after validation', {
+        message: 'Internal error: policy array became empty',
+        hint: 'This is an unexpected internal state',
+        resolution: 'Report this issue - policies array should not be empty after validation',
+      });
     }
     return Success(singlePolicy);
   }
 
   const firstPolicy = sortedPolicies[0];
   if (!firstPolicy) {
-    return Failure('Unexpected: sorted policies array is empty after validation');
+    return Failure('Unexpected: sorted policies array is empty after validation', {
+      message: 'Internal error: policy array became empty',
+      hint: 'This is an unexpected internal state',
+      resolution: 'Report this issue - policies array should not be empty after validation',
+    });
   }
 
   // Start with the first policy as base
@@ -207,7 +219,11 @@ export function loadAndMergePolicies(policyPaths: string[]): Result<Policy> {
   }
 
   if (policies.length === 0) {
-    return Failure('No policies loaded successfully');
+    return Failure('No policies loaded successfully', {
+      message: 'Failed to load any policies',
+      hint: 'All provided policy files failed to load or validate',
+      resolution: 'Check policy file paths and ensure at least one contains valid policy configuration',
+    });
   }
 
   return mergePolicies(policies);

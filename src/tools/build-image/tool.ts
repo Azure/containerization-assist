@@ -15,10 +15,10 @@
 import path from 'path';
 import { normalizePath } from '@/lib/platform';
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import { promises as fs } from 'node:fs';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
 import { validatePathOrFail } from '@/lib/validation-helpers';
+import { readDockerfile } from '@/lib/file-utils';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
@@ -99,9 +99,9 @@ async function handleBuildImage(
 ): Promise<Result<BuildImageResult>> {
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided', {
-      message: 'Invalid parameters provided',
-      hint: 'The build-image tool received invalid or missing parameters',
-      resolution: 'Ensure you are providing a valid parameters object with required fields like path and dockerfile',
+      message: 'Parameters must be a valid object',
+      hint: 'Tool received invalid or missing parameters',
+      resolution: 'Ensure parameters are provided as a JSON object',
     });
   }
 
@@ -141,30 +141,16 @@ async function handleBuildImage(
       ? path.resolve(repoPath, dockerfilePath)
       : path.resolve(repoPath, dockerfile);
 
-    // Validate Dockerfile path upfront
-    const dockerfileValidation = await validatePathOrFail(finalDockerfilePath, {
-      mustExist: true,
-      mustBeFile: true,
-      readable: true,
-    });
-    if (!dockerfileValidation.ok) return dockerfileValidation;
-
     // Read Dockerfile for security analysis
-    let dockerfileContent: string;
-    try {
-      dockerfileContent = await fs.readFile(finalDockerfilePath, 'utf-8');
-    } catch (error) {
-      const err = error as { code?: string };
-      if (err.code === 'EISDIR') {
-        logger.error({ path: finalDockerfilePath }, 'Attempted to read directory as file');
-        return Failure(`Dockerfile path points to a directory: ${finalDockerfilePath}`, {
-          message: `Dockerfile path points to a directory: ${finalDockerfilePath}`,
-          hint: 'The provided Dockerfile path is a directory, not a file',
-          resolution: 'Provide the full path to the Dockerfile file, not just the directory (e.g., ./path/to/Dockerfile instead of ./path/to)',
-        });
-      }
-      throw error;
+    const dockerfileContentResult = await readDockerfile({
+      path: finalDockerfilePath,
+    });
+
+    if (!dockerfileContentResult.ok) {
+      return dockerfileContentResult;
     }
+
+    const dockerfileContent = dockerfileContentResult.value;
 
     // Prepare build arguments
     const finalBuildArgs = await prepareBuildArgs(buildArgs);

@@ -74,9 +74,10 @@ describe('Validation Error Scenarios', () => {
         createSuccessResult('/valid/path'),
       );
 
-      // Further mocking would be needed for complete success
-      // This just tests the validation layer
-      expect(mockValidation.validatePath).toBeDefined();
+      const result = await mockValidation.validatePath('/valid/path');
+
+      expect(result).toHaveProperty('ok');
+      expect(result).toHaveProperty('value');
     });
   });
 

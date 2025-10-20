@@ -36,9 +36,9 @@ async function handleTagImage(
 
   if (!tag) {
     return Failure('Tag parameter is required', {
-      message: 'Tag parameter is required',
-      hint: 'The tag parameter is missing',
-      resolution: 'Provide a valid tag in the format "repository:tag" or "registry/repository:tag"',
+      message: 'Missing required parameter: tag',
+      hint: 'Tag name must be specified for the image',
+      resolution: 'Add tag parameter with the desired image tag (e.g., myapp:v1.0)',
     });
   }
 
@@ -55,9 +55,9 @@ async function handleTagImage(
 
     if (!source) {
       return Failure('No image specified. Provide imageId parameter.', {
-        message: 'No image specified. Provide imageId parameter.',
-        hint: 'The imageId parameter is required to tag an image',
-        resolution: 'Provide the imageId or existing image tag to apply a new tag to',
+        message: 'Missing required parameter: imageId',
+        hint: 'Source image ID or name must be specified to tag',
+        resolution: 'Add imageId parameter with the Docker image ID or name to tag',
       });
     }
 

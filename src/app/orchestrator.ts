@@ -16,7 +16,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
 import type { ToolOrchestrator, OrchestratorConfig, ExecuteRequest } from './orchestrator-types';
 import type { Logger } from 'pino';
-import type { MCPTool } from '@/types/tool';
+import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 
@@ -71,7 +71,7 @@ function createContextForTool(request: ExecuteRequest, logger: Logger): ToolCont
   });
 }
 
-interface ExecutionEnvironment<T extends MCPTool<ZodTypeAny, any>> {
+interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
   policy?: Policy;
   registry: Map<string, T>;
   logger: Logger;
@@ -82,7 +82,7 @@ interface ExecutionEnvironment<T extends MCPTool<ZodTypeAny, any>> {
 /**
  * Create a tool orchestrator
  */
-export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: {
+export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   registry: Map<string, T>;
   server?: Server;
   logger?: Logger;
@@ -149,7 +149,7 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
 /**
  * Execute with full orchestration (dependencies, policies)
  */
-async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
+async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   tool: T,
   request: ExecuteRequest,
   env: ExecutionEnvironment<T>,

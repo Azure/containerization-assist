@@ -20,7 +20,7 @@ export interface ChainHints {
  *
  * @see {@link ../../docs/adr/002-tool-interface.md ADR-002: Unified Tool Interface}
  */
-export interface MCPTool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
+export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
   /** Unique tool identifier */
   name: string;
 
@@ -65,7 +65,7 @@ export function tool<TSchema extends z.ZodTypeAny, TOut>(config: {
   category?: ToolCategory;
   version?: string;
   chainHints?: ChainHints;
-}): MCPTool<TSchema, TOut> {
+}): Tool<TSchema, TOut> {
   return {
     ...config,
     inputSchema: extractSchemaShape(config.schema),

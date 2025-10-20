@@ -6,6 +6,10 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import crypto from 'node:crypto';
 
+import { Failure, Success, type Result } from '@/types';
+import { extractErrorMessage } from '@/lib/errors';
+import { validatePathOrFail } from '@/lib/validation-helpers';
+
 /**
  * Download a file from URL to destination path
  */
@@ -56,4 +60,151 @@ export async function deleteTempFile(filePath: string): Promise<void> {
   } catch {
     // Ignore errors when deleting temp files
   }
+}
+
+/**
+ * Read Dockerfile from path or use provided content
+ *
+ * Consolidates duplicate Dockerfile reading logic across tools.
+ * Handles both direct content and file path inputs.
+ *
+ * @param options - Either path to Dockerfile or content directly
+ * @returns Result containing Dockerfile content
+ *
+ * @example
+ * ```typescript
+ * // Read from file path
+ * const result = await readDockerfile({ path: './Dockerfile' });
+ * if (!result.ok) return result;
+ * const content = result.value;
+ *
+ * // Use provided content
+ * const result2 = await readDockerfile({ content: 'FROM node:20\n...' });
+ * ```
+ */
+export async function readDockerfile(options: {
+  path?: string;
+  content?: string;
+}): Promise<Result<string>> {
+  // Check if content was explicitly provided (even if empty)
+  if (options.content !== undefined) {
+    if (options.content.trim().length === 0) {
+      return Failure('Dockerfile content is empty', {
+        message: 'Dockerfile content is empty',
+        hint: 'Dockerfile must contain at least one instruction',
+        resolution: 'Provide valid Dockerfile content or path',
+      });
+    }
+    return Success(options.content);
+  }
+
+  if (options.path) {
+    const dockerfilePath = path.resolve(options.path);
+
+    // Validate file exists and is readable
+    const validation = await validatePathOrFail(dockerfilePath, {
+      mustExist: true,
+      mustBeFile: true,
+      readable: true,
+    });
+
+    if (!validation.ok) {
+      return validation;
+    }
+
+    try {
+      const content = await fs.readFile(dockerfilePath, 'utf-8');
+
+      if (content.trim().length === 0) {
+        return Failure(`Dockerfile at ${dockerfilePath} is empty`, {
+          message: 'Dockerfile is empty',
+          hint: 'Dockerfile must contain at least one instruction',
+          resolution: 'Add FROM instruction and other build steps',
+        });
+      }
+
+      return Success(content);
+    } catch (error) {
+      return Failure(
+        `Failed to read Dockerfile at ${dockerfilePath}: ${extractErrorMessage(error)}`,
+        {
+          message: 'Failed to read Dockerfile',
+          hint: 'Check file permissions and path',
+          resolution: `Ensure file is readable: ls -la ${dockerfilePath}`,
+        },
+      );
+    }
+  }
+
+  return Failure("Either 'path' or 'content' must be provided", {
+    message: 'Missing Dockerfile input',
+    hint: 'Provide dockerfile content or path to Dockerfile',
+    resolution: 'Add either path or content parameter',
+  });
+}
+
+/**
+ * Read file from path or use provided content
+ *
+ * Generic version for any file type. Useful for consolidating
+ * file reading logic across tools that work with various file types.
+ *
+ * @param options - File reading options
+ * @returns Result containing file content
+ *
+ * @example
+ * ```typescript
+ * // Read YAML file
+ * const result = await readFile({
+ *   path: './config.yaml',
+ *   fileType: 'configuration file'
+ * });
+ * if (!result.ok) return result;
+ * const content = result.value;
+ * ```
+ */
+export async function readFile(options: {
+  path?: string;
+  content?: string;
+  fileType?: string;
+}): Promise<Result<string>> {
+  const fileType = options.fileType || 'file';
+
+  if (options.content) {
+    return Success(options.content);
+  }
+
+  if (options.path) {
+    const filePath = path.resolve(options.path);
+
+    const validation = await validatePathOrFail(filePath, {
+      mustExist: true,
+      mustBeFile: true,
+      readable: true,
+    });
+
+    if (!validation.ok) {
+      return validation;
+    }
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      return Success(content);
+    } catch (error) {
+      return Failure(
+        `Failed to read ${fileType} at ${filePath}: ${extractErrorMessage(error)}`,
+        {
+          message: `Failed to read ${fileType}`,
+          hint: 'Check file permissions and path',
+          resolution: `Ensure file is readable: ls -la ${filePath}`,
+        },
+      );
+    }
+  }
+
+  return Failure(`Either 'path' or 'content' must be provided`, {
+    message: `Missing ${fileType} input`,
+    hint: `Provide ${fileType} content or path`,
+    resolution: 'Add either path or content parameter',
+  });
 }
