@@ -4,7 +4,7 @@
  */
 
 import { statSync } from 'node:fs';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 
 /**
  * Validation result containing validity status and error messages

@@ -6,7 +6,6 @@ export type {
   KnowledgeQuery,
   KnowledgeMatch,
   LoadedEntry,
-  CompilationStats,
 } from './types';
 
 import { findKnowledgeMatches } from './matcher';
@@ -14,9 +13,7 @@ import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded } from './loader';
 import type { KnowledgeQuery, KnowledgeMatch } from './types';
 
 // Internal helper - only used by getKnowledgeForCategory
-async function getKnowledgeRecommendations(
-  query: KnowledgeQuery,
-): Promise<KnowledgeMatch[]> {
+async function getKnowledgeRecommendations(query: KnowledgeQuery): Promise<KnowledgeMatch[]> {
   if (!isKnowledgeLoaded()) await loadKnowledgeBase();
   return findKnowledgeMatches(getAllEntries(), query);
 }

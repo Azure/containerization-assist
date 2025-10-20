@@ -9,13 +9,13 @@
 
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
 import { getToolLogger } from '@/lib/tool-helpers';
-import { validateImageName } from '@/lib/validation';
+import { parseImageName } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
 import { pushImageSchema } from './schema';
 import type { z } from 'zod';
-import { createErrorGuidance } from '@/lib/error-utils';
+import { createErrorGuidance } from '@/lib/errors';
 
 export interface PushImageResult {
   success: true;
@@ -47,10 +47,10 @@ async function handlePushImage(
       );
     }
 
-    // Validate image name format
-    const imageValidation = validateImageName(input.imageId);
-    if (!imageValidation.ok) {
-      return imageValidation;
+    // Parse and validate image name
+    const parsedImage = parseImageName(input.imageId);
+    if (!parsedImage.ok) {
+      return parsedImage;
     }
 
     // Use docker from context if provided (for testing), otherwise create new client
@@ -59,25 +59,21 @@ async function handlePushImage(
       (ctx && 'docker' in ctx && ((ctx as Record<string, unknown>).docker as DockerClient)) ||
       createDockerClient(logger);
 
-    // Parse repository and tag from imageId
-    let repository: string;
-    let tag: string;
-
-    const colonIndex = input.imageId.lastIndexOf(':');
-    if (colonIndex === -1 || colonIndex < input.imageId.lastIndexOf('/')) {
-      // No tag specified, use 'latest'
-      repository = input.imageId;
-      tag = 'latest';
-    } else {
-      repository = input.imageId.substring(0, colonIndex);
-      tag = input.imageId.substring(colonIndex + 1);
-    }
+    // Extract repository and tag from parsed image
+    let repository = parsedImage.value.repository;
+    const tag = parsedImage.value.tag;
 
     // Apply registry prefix if provided
     if (input.registry) {
       const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      if (!repository.startsWith(registryHost)) {
+      // Check if the original imageId already starts with the registry
+      // This prevents double-prefixing when imageId like 'gcr.io/my-project/myapp:v1' is passed
+      if (!input.imageId.startsWith(registryHost)) {
         repository = `${registryHost}/${repository}`;
+      } else if (parsedImage.value.registry) {
+        // imageId already has a registry - reconstruct the full repository path
+        // from parsed components (e.g., 'gcr.io' + 'my-project/myapp' = 'gcr.io/my-project/myapp')
+        repository = `${parsedImage.value.registry}/${repository}`;
       }
     }
 
@@ -181,6 +177,11 @@ export default tool({
   schema: pushImageSchema,
   metadata: {
     knowledgeEnhanced: false,
+  },
+  chainHints: {
+    success: 'Image pushed successfully. Review AI optimization insights for push improvements.',
+    failure:
+      'Image push failed. Check registry credentials, network connectivity, and image tag format.',
   },
   handler: handlePushImage,
 });

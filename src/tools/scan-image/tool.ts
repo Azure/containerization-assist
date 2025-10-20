@@ -5,7 +5,7 @@
  * Uses standardized helpers for consistency
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import type { ToolContext } from '@/mcp/context';
 
 import { createSecurityScanner } from '@/infra/security/scanner';
@@ -69,8 +69,7 @@ async function handleScanImage(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = getToolLogger(context, 'scan-image');
-  const timer = createToolTimer(logger, 'scan-image');
+  const { logger, timer } = setupToolContext(context, 'scan-image');
 
   const { scanner = 'trivy', severity } = params;
 
@@ -98,7 +97,10 @@ async function handleScanImage(
     const scanResultWrapper = await securityScanner.scanImage(imageId);
 
     if (!scanResultWrapper.ok) {
-      return Failure(`Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`);
+      return Failure(
+        `Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`,
+        scanResultWrapper.guidance,
+      );
     }
 
     const scanResult = scanResultWrapper.value;
@@ -251,6 +253,12 @@ export default tool({
   schema: scanImageSchema,
   metadata: {
     knowledgeEnhanced: true,
+  },
+  chainHints: {
+    success:
+      'Security scan passed! Proceed with push-image to push to a registry, or continue with deployment preparation.',
+    failure:
+      'Security scan found vulnerabilities. Use fix-dockerfile to address security issues in your base images and dependencies.',
   },
   handler: handleScanImage,
 });

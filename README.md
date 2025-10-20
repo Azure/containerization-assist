@@ -214,8 +214,6 @@ The following environment variables control server behavior:
 | `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
 | `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
-| `CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
-| `CONTAINERIZATION_ASSIST_IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
 | `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
 | `CONTAINERIZATION_ASSIST_POLICY_PATH` | Path to policy YAML file (overridden by --config flag) | Auto-discover all policies/ | No |
 
@@ -256,7 +254,7 @@ The logging directory is validated at startup to ensure it's writable.
 
 ### Policy System
 
-The policy system enables enforcement of security, quality, and compliance rules across your containerization workflow.
+The policy system enables enforcement of security, quality, and compliance rules through YAML-based policies. Policies use a rule-based system with regex and function matchers to validate Dockerfiles and container configurations.
 
 **Default Behavior (No Configuration Needed):**
 By default, **all policies** in the `policies/` directory are automatically discovered and merged:
@@ -266,30 +264,88 @@ By default, **all policies** in the `policies/` directory are automatically disc
 
 This provides comprehensive coverage out-of-the-box.
 
-**Use a Specific Policy File:**
+**Policy File Format:**
+
+```yaml
+version: '2.0'
+metadata:
+  name: Production Security Policy
+  description: Security and quality rules for production
+  category: security
+
+defaults:
+  enforcement: strict  # Options: strict, advisory, lenient
+  security:
+    nonRootUser: true
+    scanners:
+      required: true
+      tools: ['trivy']
+  registries:
+    allowed:
+      - docker.io
+      - gcr.io
+      - mcr.microsoft.com
+    blocked:
+      - '*localhost*'
+
+rules:
+  - id: block-latest-tag
+    category: quality
+    priority: 80
+    description: Prevent :latest for reproducibility
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+[^:]+:latest'
+        flags: im
+    actions:
+      block: true
+      message: 'Using :latest tag is not allowed. Specify explicit version tags.'
+
+  - id: block-root-user
+    category: security
+    priority: 95
+    description: Enforce non-root user
+    conditions:
+      - kind: regex
+        pattern: '^USER\s+(root|0)\s*$'
+        flags: m
+    actions:
+      block: true
+      message: 'Running as root user is not allowed.'
+```
+
+**Rule Components:**
+- **Conditions**: `regex` (pattern matching) or `function` (hasPattern, fileExists, largerThan, hasVulnerabilities)
+- **Actions**: `block` (prevents build/deployment), `warn` (logs warning), `suggest` (provides recommendation)
+- **Priority**: Higher = more important (Security: 90-100, Quality: 70-89, Performance: 50-69)
+
+**Enforcement Modes:**
+- **strict**: All rules enforced, violations block operations
+- **advisory**: Rules evaluated, violations logged but not blocking
+- **lenient**: Minimal enforcement, warnings only
+
+**Using Policies:**
+
 ```bash
-# Use only the security baseline policy file (disables auto-merging)
+# Validate Dockerfile against all policies in policies/
+npx containerization-assist validate-dockerfile --path ./Dockerfile
+
+# Use specific policy file (via CLI flag)
+npx containerization-assist validate-dockerfile \
+  --path ./Dockerfile \
+  --policy-path ./policies/production.yaml
+
+# Use specific policy file (via environment variable)
+export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/production.yaml
+npx containerization-assist validate-dockerfile --path ./Dockerfile
+
+# Use specific policy file with MCP server (disables auto-merging)
 npx -y containerization-assist-mcp start --config ./policies/security-baseline.yaml
-
-# Or specify in VS Code MCP configuration
-{
-  "servers": {
-    "containerization-assist": {
-      "command": "npx",
-      "args": ["-y", "containerization-assist-mcp", "start", "--config", "./policies/security-baseline.yaml"]
-    }
-  }
-}
 ```
 
-**Environment-Specific Configuration:**
-```bash
-# Use development mode (less strict policy enforcement)
-npx -y containerization-assist-mcp start --dev
+**Creating Custom Policies:**
 
-# Production mode is the default
-npx -y containerization-assist-mcp start
-```
+See existing policies in `policies/` for examples. Multiple policies are automatically merged - rules with the same ID are overridden by later policies (alphabetically).
 
 ### MCP Inspector (Testing)
 

@@ -5,7 +5,7 @@
 import { existsSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 
 /**
  * Result of Docker socket validation

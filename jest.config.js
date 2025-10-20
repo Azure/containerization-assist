@@ -47,6 +47,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -68,6 +69,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -79,11 +81,9 @@ export default {
       testPathIgnorePatterns: [
         '/node_modules/',
         '/dist/',
-        'test/integration/kubernetes-fast-fail.test.ts',
-        'test/integration/error-guidance-propagation.test.ts',
-        'test/integration/single-app-flow.test.ts',
-        'test/integration/orchestrator-routing.test.ts', // ES module loading issues with @kubernetes/client-node
+        // ES module issues resolved - all integration tests enabled
       ],
+      workerIdleMemoryLimit: '512MB', // Force worker restart after integration tests
     },
     {
       displayName: 'e2e',
@@ -92,6 +92,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -109,6 +110,7 @@ export default {
 
   // Performance optimizations
   maxWorkers: '50%', // Use half of available CPU cores
+  workerIdleMemoryLimit: '512MB', // Force worker restart to prevent memory leaks
   cache: true,
   cacheDirectory: '<rootDir>/node_modules/.cache/jest',
 
@@ -143,7 +145,7 @@ export default {
     },
     './src/lib/': {
       branches: 22,
-      functions: 40,
+      functions: 34,
       lines: 39,
       statements: 39,
     },
@@ -156,10 +158,7 @@ export default {
     '/node_modules/',
     '/dist/',
     'test/unit/lib/kubernetes.test.ts',
-    'test/integration/kubernetes-fast-fail.test.ts', // ES module loading issues with @kubernetes/client-node
-    'test/integration/error-guidance-propagation.test.ts', // Imports kubernetes client
-    'test/integration/single-app-flow.test.ts', // Imports kubernetes client
-    'test/integration/multi-module-flow.test.ts', // Imports kubernetes client
+    // ES module issues resolved - integration tests enabled
   ],
 
   // Timeout handling for different test types

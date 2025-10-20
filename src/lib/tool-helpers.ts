@@ -6,6 +6,9 @@ import { createLogger, createTimer, type Logger, type Timer } from './logger.js'
 import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
 
+// Re-export Timer type for use by consumers
+export type { Timer };
+
 /**
  * Gets or creates a logger for a tool.
  * Consolidates the pattern: context.logger || createLogger({ name: 'tool-name' })
@@ -21,46 +24,15 @@ export function getToolLogger(context: ToolContext, toolName: string): Logger {
 
 /**
  * Creates a timer for measuring tool execution time.
- * Consolidates timer creation and adds automatic cleanup.
- * Invariant: Timer is automatically ended on process exit if not ended manually
+ * Consolidates timer creation pattern for consistent usage across tools.
  *
  * @param logger - Logger instance for timer output
  * @param toolName - Name of the tool for timer identification
- * @returns Timer instance with auto-cleanup
+ * @returns Timer instance
  */
 export function createToolTimer(logger: Logger, toolName: string): Timer {
-  const timer = createTimer(logger, toolName);
-
-  // Track if timer has been ended to avoid double-ending
-  let ended = false;
-  const originalEnd = timer.end.bind(timer);
-
-  // Auto-cleanup on process exit
-  const cleanup = (): void => {
-    if (!ended) {
-      ended = true;
-      originalEnd();
-      // Remove listeners to prevent memory leaks
-      process.removeListener('beforeExit', cleanup);
-      process.removeListener('exit', cleanup);
-    }
-  };
-
-  // Override end method to track state and clean up listeners
-  timer.end = () => {
-    if (!ended) {
-      ended = true;
-      originalEnd();
-      // Remove listeners when timer ends normally
-      process.removeListener('beforeExit', cleanup);
-      process.removeListener('exit', cleanup);
-    }
-  };
-
-  process.once('beforeExit', cleanup);
-  process.once('exit', cleanup);
-
-  return timer;
+  // Just create and return the timer - process will exit naturally
+  return createTimer(logger, toolName);
 }
 
 /**
@@ -106,4 +78,3 @@ export function createStandardizedToolTracker(
     },
   };
 }
-

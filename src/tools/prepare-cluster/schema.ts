@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { environmentSchema } from '@/config/environment';
+import { environmentSchema } from '@/config/constants';
 
 export const prepareClusterSchema = z.object({
   environment: environmentSchema.optional(),

@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import { Result, Success, Failure } from '@/types';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { scanImageWithTrivy, checkTrivyAvailability } from './trivy-scanner';
 
 interface SecurityScanner {
@@ -99,10 +99,7 @@ function createStubScanner(logger: Logger): SecurityScanner {
  * @param scannerType - Type of scanner to create ('trivy', 'stub', or undefined for 'trivy')
  * @returns SecurityScanner instance
  */
-export const createSecurityScanner = (
-  logger: Logger,
-  scannerType?: string,
-): SecurityScanner => {
+export const createSecurityScanner = (logger: Logger, scannerType?: string): SecurityScanner => {
   const type = (scannerType || 'trivy').toLowerCase();
 
   switch (type) {

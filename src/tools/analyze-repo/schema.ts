@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { repositoryPath, analysisOptions } from '../shared/schemas';
 
-export const moduleInfo = z.object({
+const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
   modulePath: z
     .string()

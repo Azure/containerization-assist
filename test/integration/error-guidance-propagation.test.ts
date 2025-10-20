@@ -17,27 +17,27 @@ describe('Error Guidance Propagation', () => {
     it('should propagate Docker guidance when build fails', async () => {
       const runtime = createApp({ logger });
 
-      // Mock Docker client that returns guidance
-      const mockDockerGuidance: ErrorGuidance = {
-        message: 'Docker daemon is not available',
-        hint: 'Connection to Docker daemon was refused',
-        resolution:
-          'Ensure Docker is installed and running: `docker ps` should succeed. Check Docker daemon logs if the service is running.',
-      };
-
-      // Execute build-image with mocked failure
+      // Execute build-image with a valid path but likely no Docker daemon
+      // This will trigger actual Docker client errors (not validation errors)
       const result = await runtime.execute('build-image', {
         imageName: 'test-image',
-        dockerfilePath: '/nonexistent/Dockerfile',
-        context: '/tmp',
+        path: '/tmp',
+        dockerfile: 'Dockerfile',
       });
 
-      // The tool might fail for other reasons (missing file), but if it reaches Docker
-      // and Docker fails, guidance should propagate
-      if (!result.ok && result.error.includes('Docker')) {
+      // The tool might fail for various reasons, but if it's a Docker daemon error
+      // (not a validation error like "Dockerfile not found"), guidance should propagate
+      if (
+        !result.ok &&
+        result.error.includes('daemon') &&
+        !result.error.includes('not found')
+      ) {
         expect(result.guidance).toBeDefined();
         expect(result.guidance?.hint).toBeDefined();
         expect(result.guidance?.resolution).toBeDefined();
+      } else if (!result.ok && result.error.includes('not found')) {
+        // Validation errors don't have guidance - that's expected
+        expect(result.guidance).toBeUndefined();
       }
     });
   });
