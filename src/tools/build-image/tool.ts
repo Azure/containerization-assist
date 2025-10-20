@@ -16,10 +16,9 @@ import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import { promises as fs } from 'node:fs';
-import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
-import { validatePath } from '@/lib/validation';
+import { validatePathOrFail } from '@/lib/validation-helpers';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -104,7 +103,6 @@ async function handleBuildImage(
   }
 
   // Optional progress reporting for complex operations (Docker build process)
-  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
   const { logger, timer } = setupToolContext(context, 'build-image');
 
   const {
@@ -119,16 +117,14 @@ async function handleBuildImage(
 
   try {
     // Progress: Validating build parameters and environment
-    if (progress) await progress('VALIDATING');
+    await context.progress?.('Validating build parameters and environment', 10, 100);
 
     // Validate build context path
-    const buildContextResult = await validatePath(rawBuildPath, {
+    const buildContextResult = await validatePathOrFail(rawBuildPath, {
       mustExist: true,
       mustBeDirectory: true,
     });
-    if (!buildContextResult.ok) {
-      return buildContextResult;
-    }
+    if (!buildContextResult.ok) return buildContextResult;
 
     // Normalize paths to handle Windows separators
     const buildContext = normalizePath(buildContextResult.value);
@@ -190,7 +186,7 @@ async function handleBuildImage(
     }
 
     // Docker build process streams to provide real-time feedback
-    if (progress) await progress('EXECUTING');
+    await context.progress?.('Building Docker image', 50, 100);
 
     // Build the image
     logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
@@ -203,7 +199,7 @@ async function handleBuildImage(
       return Failure(`Failed to build image: ${errorMessage}`, buildResult.guidance);
     }
 
-    if (progress) await progress('FINALIZING');
+    await context.progress?.('Finalizing build and collecting metadata', 90, 100);
 
     // Prepare the result using strongly typed values from the Docker client response.
     // Previously, some fields (e.g., imageId, size, layers) were inferred or loosely typed,
@@ -223,7 +219,7 @@ async function handleBuildImage(
 
     timer.end({ imageId: buildResult.value.imageId, buildTime: buildResult.value.buildTime });
 
-    if (progress) await progress('COMPLETE');
+    await context.progress?.('Build complete', 100, 100);
 
     return Success(result);
   } catch (error) {

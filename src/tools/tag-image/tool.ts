@@ -10,7 +10,7 @@
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/infra/docker/client';
-import { validateImageName, validateDockerTag } from '@/lib/validation';
+import { parseImageName } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
@@ -38,10 +38,10 @@ async function handleTagImage(
     return Failure('Tag parameter is required');
   }
 
-  // Validate full image name format (repository:tag)
-  const imageValidation = validateImageName(tag);
-  if (!imageValidation.ok) {
-    return imageValidation;
+  // Parse and validate image name
+  const parsedImage = parseImageName(tag);
+  if (!parsedImage.ok) {
+    return parsedImage;
   }
 
   try {
@@ -53,23 +53,14 @@ async function handleTagImage(
       return Failure('No image specified. Provide imageId parameter.');
     }
 
-    // Tag image using lib docker client
-    // Parse repository and tag from the tag parameter
-    const parts = tag.split(':');
-    const repository = parts[0];
-    const tagName = parts[1] || 'latest';
+    // Extract repository and tag from parsed image
+    const { repository, tag: tagName } = parsedImage.value;
+    // For Docker tag operation, repository includes registry if present
+    const fullRepository = parsedImage.value.registry
+      ? `${parsedImage.value.registry}/${repository}`
+      : repository;
 
-    if (!repository) {
-      return Failure('Invalid tag format');
-    }
-
-    // Validate the extracted tag part
-    const tagPartValidation = validateDockerTag(tagName);
-    if (!tagPartValidation.ok) {
-      return tagPartValidation;
-    }
-
-    const tagResult = await dockerClient.tagImage(source, repository, tagName);
+    const tagResult = await dockerClient.tagImage(source, fullRepository, tagName);
     if (!tagResult.ok) {
       return Failure(
         `Failed to tag image: ${tagResult.error ?? 'Unknown error'}`,

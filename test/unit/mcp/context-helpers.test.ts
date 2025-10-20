@@ -26,13 +26,7 @@ describe('MCP Context Helpers', () => {
   });
 
   describe('extractProgressToken', () => {
-    it('should extract progressToken from direct property', () => {
-      const request = { progressToken: 'test-token-123' };
-      const token = extractProgressToken(request);
-      expect(token).toBe('test-token-123');
-    });
-
-    it('should extract progressToken from params._meta', () => {
+    it('should extract progressToken from params._meta (canonical MCP spec location)', () => {
       const request = {
         params: {
           _meta: {
@@ -44,42 +38,30 @@ describe('MCP Context Helpers', () => {
       expect(token).toBe('nested-token-456');
     });
 
-    it('should extract progressToken from top-level _meta', () => {
-      const request = {
-        _meta: {
-          progressToken: 'meta-token-789',
-        },
-      };
-      const token = extractProgressToken(request);
-      expect(token).toBe('meta-token-789');
-    });
-
-    it('should extract progressToken from headers', () => {
-      const request = {
-        headers: {
-          progressToken: 'header-token-abc',
-        },
-      };
-      const token = extractProgressToken(request);
-      expect(token).toBe('header-token-abc');
-    });
-
-    it('should extract progressToken from x-progress-token header', () => {
-      const request = {
-        headers: {
-          'x-progress-token': 'x-header-token-def',
-        },
-      };
-      const token = extractProgressToken(request);
-      expect(token).toBe('x-header-token-def');
-    });
-
     it('should return undefined for invalid input', () => {
       expect(extractProgressToken(null)).toBeUndefined();
       expect(extractProgressToken(undefined)).toBeUndefined();
       expect(extractProgressToken('string')).toBeUndefined();
       expect(extractProgressToken(123)).toBeUndefined();
       expect(extractProgressToken({})).toBeUndefined();
+    });
+
+    it('should return undefined when params is missing', () => {
+      const request = { _meta: { progressToken: 'should-not-find' } };
+      const token = extractProgressToken(request);
+      expect(token).toBeUndefined();
+    });
+
+    it('should return undefined when _meta is missing', () => {
+      const request = { params: { progressToken: 'should-not-find' } };
+      const token = extractProgressToken(request);
+      expect(token).toBeUndefined();
+    });
+
+    it('should return undefined when progressToken is not a string', () => {
+      const request = { params: { _meta: { progressToken: 123 } } };
+      const token = extractProgressToken(request);
+      expect(token).toBeUndefined();
     });
   });
 
@@ -206,9 +188,15 @@ describe('MCP Context Helpers', () => {
       expect(reporter).toBe(existingReporter);
     });
 
-    it('should extract token and create reporter', async () => {
+    it('should extract token from params._meta and create reporter', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const request = { progressToken: 'extracted-token' };
+      const request = {
+        params: {
+          _meta: {
+            progressToken: 'extracted-token',
+          },
+        },
+      };
 
       const reporter = extractProgressReporter(request, mockLogger, mockSendNotification);
 

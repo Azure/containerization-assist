@@ -35,56 +35,35 @@ export type EnhancedProgressReporter = (
 ) => Promise<void>;
 
 /**
- * Extracts progress token from MCP request metadata
- * Checks various locations where the progress token might be stored
+ * Type guard to check if value is a record object
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Extract progress token from MCP request
+ *
+ * Per MCP spec, progress token is in params._meta.progressToken
+ * @see https://modelcontextprotocol.io/specification#progress
  */
 export function extractProgressToken(request: unknown): string | undefined {
-  if (!request || typeof request !== 'object') {
+  if (!isRecord(request)) {
     return undefined;
   }
 
-  const req = request as Record<string, unknown>;
-
-  // Direct token
-  if (typeof req.progressToken === 'string') {
-    return req.progressToken;
+  const params = request.params;
+  if (!isRecord(params)) {
+    return undefined;
   }
 
-  // In params._meta
-  const params = req.params;
-  if (typeof params === 'object' && params !== null) {
-    const p = params as Record<string, unknown>;
-    const meta = p._meta;
-    if (meta != null && typeof meta === 'object') {
-      const m = meta as Record<string, unknown>;
-      if (typeof m.progressToken === 'string') {
-        return m.progressToken;
-      }
-    }
+  const meta = params._meta;
+  if (!isRecord(meta)) {
+    return undefined;
   }
 
-  // In top-level _meta
-  const topMeta = req._meta;
-  if (topMeta != null && typeof topMeta === 'object') {
-    const m = topMeta as Record<string, unknown>;
-    if (typeof m.progressToken === 'string') {
-      return m.progressToken;
-    }
-  }
-
-  // In headers
-  const headers = req.headers;
-  if (headers != null && typeof headers === 'object') {
-    const h = headers as Record<string, unknown>;
-    if (typeof h.progressToken === 'string') {
-      return h.progressToken;
-    }
-    if (typeof h['x-progress-token'] === 'string') {
-      return h['x-progress-token'];
-    }
-  }
-
-  return undefined;
+  const token = meta.progressToken;
+  return typeof token === 'string' ? token : undefined;
 }
 
 /**

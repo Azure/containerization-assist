@@ -127,16 +127,29 @@ export interface RepositoryInfo {
   name: string | undefined;
   modulePath: string | undefined;
   dockerfilePath?: string | undefined;
-  language?: 'java' | 'dotnet' | 'javascript' | 'typescript' | 'python' | 'rust' | 'go' | 'other' | undefined;
+  language?:
+    | 'java'
+    | 'dotnet'
+    | 'javascript'
+    | 'typescript'
+    | 'python'
+    | 'rust'
+    | 'go'
+    | 'other'
+    | undefined;
   languageVersion?: string | undefined;
-  frameworks?: Array<{
-    name: string;
-    version?: string;
-  }> | undefined;
-  buildSystem?: {
-    type?: string;
-    configFile?: string;
-  } | undefined;
+  frameworks?:
+    | Array<{
+        name: string;
+        version?: string;
+      }>
+    | undefined;
+  buildSystem?:
+    | {
+        type?: string;
+        configFile?: string;
+      }
+    | undefined;
   dependencies?: string[] | undefined;
   ports?: number[] | undefined;
   entryPoint?: string | undefined;

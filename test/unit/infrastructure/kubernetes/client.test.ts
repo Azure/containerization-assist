@@ -76,10 +76,10 @@ describe('Kubernetes Client', () => {
 
   describe('Single-App Resource Support', () => {
     it('should support core single-app resource types', () => {
-      const resourceOpsPath = join(__dirname, '../../../../src/infra/kubernetes/resource-operations.ts');
-      const content = readFileSync(resourceOpsPath, 'utf-8');
+      const typesPath = join(__dirname, '../../../../src/infra/kubernetes/types.ts');
+      const content = readFileSync(typesPath, 'utf-8');
 
-      // Core resources for single-app scenarios - now in resource-operations.ts
+      // Core resources for single-app scenarios - now in types.ts
       expect(content).toContain('Deployment');
       expect(content).toContain('Service');
     });

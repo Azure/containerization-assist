@@ -99,10 +99,7 @@ function createStubScanner(logger: Logger): SecurityScanner {
  * @param scannerType - Type of scanner to create ('trivy', 'stub', or undefined for 'trivy')
  * @returns SecurityScanner instance
  */
-export const createSecurityScanner = (
-  logger: Logger,
-  scannerType?: string,
-): SecurityScanner => {
+export const createSecurityScanner = (logger: Logger, scannerType?: string): SecurityScanner => {
   const type = (scannerType || 'trivy').toLowerCase();
 
   switch (type) {

@@ -8,7 +8,7 @@
  * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
  */
 
-import { validatePath } from '@/lib/validation';
+import { validatePathOrFail } from '@/lib/validation-helpers';
 import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import {
@@ -484,13 +484,11 @@ async function handleGenerateDockerfile(
   }
 
   // Validate repository path
-  const pathResult = await validatePath(path, {
+  const pathResult = await validatePathOrFail(path, {
     mustExist: true,
     mustBeDirectory: true,
   });
-  if (!pathResult.ok) {
-    return pathResult;
-  }
+  if (!pathResult.ok) return pathResult;
 
   // Check for existing Dockerfile in the repository path or module path
   const targetPath = input.modulePath || path;
