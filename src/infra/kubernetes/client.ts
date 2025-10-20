@@ -219,34 +219,16 @@ export const createKubernetesClient = (
      * @returns true if cluster is reachable, false otherwise
      */
     async ping(): Promise<boolean> {
-      let timeoutId: NodeJS.Timeout | undefined;
-      let timeoutCleared = false;
-
-      // Helper function to cleanup timeout
-      const cleanupTimeout = (): void => {
-        timeoutCleared = true;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-      };
-
       try {
         // Use a shorter timeout for ping operations
         const pingTimeout = timeout || 5000;
 
-        // Create timeout promise with proper cleanup handling
+        // Create timeout promise
+        let timeoutHandle: NodeJS.Timeout | undefined;
         const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            if (!timeoutCleared) {
-              reject(new Error('Connection timeout'));
-            }
+          timeoutHandle = setTimeout(() => {
+            reject(new Error('Connection timeout'));
           }, pingTimeout);
-        }).catch((error) => {
-          // Only propagate the error if the timeout wasn't cleared
-          // This prevents unhandled rejection warnings when the API call succeeds
-          if (!timeoutCleared) {
-            throw error;
-          }
         });
 
         try {
@@ -254,7 +236,9 @@ export const createKubernetesClient = (
           return true;
         } finally {
           // Always clear the timeout to prevent hanging timers
-          cleanupTimeout();
+          if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+          }
         }
       } catch (error) {
         const guidance = extractK8sErrorGuidance(error, 'ping cluster');
@@ -267,9 +251,6 @@ export const createKubernetesClient = (
           'Cluster ping failed',
         );
         return false;
-      } finally {
-        // Always clear the timeout to prevent hanging timers
-        cleanupTimeout();
       }
     },
 

@@ -184,9 +184,9 @@ export interface DockerClient {
  * Generate a digest from an image ID
  * @param imageId - The Docker image ID
  * @param logger - Logger instance
- * @returns A SHA-256 digest string or empty string if invalid
+ * @returns A SHA-256 digest string or null if validation fails
  */
-function generateDigestFromImageId(imageId: string, logger: Logger): string {
+function generateDigestFromImageId(imageId: string, logger: Logger): string | null {
   // If already prefixed, validate the hash portion
   if (imageId.startsWith('sha256:')) {
     const hash = imageId.substring(7);
@@ -201,7 +201,7 @@ function generateDigestFromImageId(imageId: string, logger: Logger): string {
   }
 
   logger.warn({ imageId }, 'Image ID is not a valid SHA-256 hash, cannot generate digest');
-  return '';
+  return null;
 }
 
 /**
@@ -340,14 +340,24 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             if (inspect.RepoDigests?.[0]) {
               digest = inspect.RepoDigests[0];
             } else {
-              digest = generateDigestFromImageId(inspect.Id, logger);
+              const fallbackDigest = generateDigestFromImageId(inspect.Id, logger);
+              if (fallbackDigest) {
+                digest = fallbackDigest;
+              } else {
+                digest = '';
+                buildWarnings.push('Could not generate valid digest from image ID');
+              }
             }
             layers = inspect.RootFS?.Layers?.length;
           } catch (inspectError) {
             logger.warn({ error: inspectError, imageId }, 'Could not inspect image after build');
             buildWarnings.push('Could not retrieve complete image metadata');
             // Use fallback digest from image ID
-            digest = generateDigestFromImageId(imageId, logger);
+            const fallbackDigest = generateDigestFromImageId(imageId, logger);
+            digest = fallbackDigest ?? '';
+            if (!fallbackDigest) {
+              buildWarnings.push('Could not generate valid digest from image ID');
+            }
           }
         }
 

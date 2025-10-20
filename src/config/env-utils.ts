@@ -27,11 +27,12 @@ export function parseIntEnv(key: string, defaultValue: number): number {
  * Parse string from environment variable with default
  *
  * @param key - Environment variable name
- * @param defaultValue - Default value if not set
+ * @param defaultValue - Default value if not set or empty
  * @returns Environment variable value or default
  *
  * @example
  * parseStringEnv('LOG_LEVEL', 'info') // Returns 'info' if LOG_LEVEL not set
+ * parseStringEnv('LOG_LEVEL', 'info') // Returns 'info' if LOG_LEVEL is empty string
  */
 export function parseStringEnv(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;

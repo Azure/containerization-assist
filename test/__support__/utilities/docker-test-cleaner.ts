@@ -160,9 +160,7 @@ export class DockerTestCleaner {
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error('Cleanup timeout')), this.config.cleanupTimeoutMs);
       // Unref the timeout so it doesn't keep the event loop alive
-      if (timeoutId) {
-        timeoutId.unref();
-      }
+      timeoutId.unref();
     });
 
     try {
