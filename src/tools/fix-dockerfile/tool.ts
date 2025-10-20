@@ -17,6 +17,7 @@ import {
   type FixDockerfileParams,
   type FixRecommendation,
   type ValidationIssue,
+  type PolicyViolation,
 } from './schema';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
@@ -24,7 +25,11 @@ import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import { ValidationCategory, ValidationSeverity } from '@/validation/core-types';
 import { validatePathOrFail } from '@/lib/validation-helpers';
 import type { z } from 'zod';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync, readdirSync } from 'node:fs';
+import { loadPolicy } from '@/config/policy-io';
+import { applyPolicy } from '@/config/policy-eval';
+import type { Policy } from '@/config/policy-schemas';
+import nodePath from 'node:path';
 
 const name = 'fix-dockerfile';
 const description = 'Analyze Dockerfile for issues and return knowledge-based fix recommendations';
@@ -43,6 +48,231 @@ interface DockerfileFixRules {
   hasBestPracticeIssues: boolean;
   overallPriority: 'high' | 'medium' | 'low';
   issueCount: number;
+}
+
+/**
+ * Get default policy paths from policies/ directory
+ */
+function getDefaultPolicyPaths(logger: ReturnType<typeof getToolLogger>): string[] {
+  try {
+    const policiesDir = nodePath.join(process.cwd(), 'policies');
+
+    if (!existsSync(policiesDir)) {
+      logger.debug({ policiesDir }, 'Policies directory not found');
+      return [];
+    }
+
+    const files = readdirSync(policiesDir);
+    return files
+      .filter((f: string) => f.endsWith('.yaml') || f.endsWith('.yml'))
+      .sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((f: string) => nodePath.join(policiesDir, f));
+  } catch (error) {
+    logger.warn(
+      { error, cwd: process.cwd() },
+      'Failed to read policies directory - using no policies',
+    );
+    return [];
+  }
+}
+
+/**
+ * Merge multiple policies into a single unified policy
+ */
+function mergePolicies(policies: Policy[]): Policy {
+  if (policies.length === 0) {
+    throw new Error('Cannot merge empty policy list');
+  }
+
+  if (policies.length === 1) {
+    const singlePolicy = policies[0];
+    if (!singlePolicy) {
+      throw new Error('Unexpected: policy array is empty');
+    }
+    return singlePolicy;
+  }
+
+  // Merge all policies - later policies override earlier ones for rules with same ID
+  const ruleMap = new Map<string, Policy['rules'][0]>();
+  let mergedDefaults = {};
+
+  for (const policy of policies) {
+    // Merge defaults (later overrides earlier)
+    mergedDefaults = { ...mergedDefaults, ...policy.defaults };
+
+    // Merge rules by ID (later overrides earlier)
+    for (const rule of policy.rules) {
+      ruleMap.set(rule.id, rule);
+    }
+  }
+
+  const merged: Policy = {
+    version: '2.0',
+    metadata: {
+      name: 'Merged Policies',
+      description: `Merged from ${policies.length} policy files`,
+    },
+    defaults: mergedDefaults,
+    rules: Array.from(ruleMap.values()).sort((a, b) => b.priority - a.priority),
+  };
+
+  return merged;
+}
+
+/**
+ * Classify matched rules by severity based on actions
+ */
+function classifyViolation(
+  ruleId: string,
+  category: string | undefined,
+  priority: number,
+  actions: Record<string, unknown>,
+  description?: string,
+): PolicyViolation | null {
+  // Check for blocking actions
+  if (actions.block === true || actions.block_deployment === true || actions.block_build === true) {
+    return {
+      ruleId,
+      category,
+      priority,
+      severity: 'block',
+      message: (actions.message as string) || description || `Rule ${ruleId} violated`,
+    };
+  }
+
+  // Check for warning actions
+  if (actions.warn === true || actions.require_approval === true) {
+    return {
+      ruleId,
+      category,
+      priority,
+      severity: 'warn',
+      message: (actions.message as string) || description || `Rule ${ruleId} triggered warning`,
+    };
+  }
+
+  // Check for suggestion actions
+  if (actions.suggest === true || actions.suggest_pinned_version === true) {
+    return {
+      ruleId,
+      category,
+      priority,
+      severity: 'suggest',
+      message: (actions.message as string) || description || `Rule ${ruleId} suggests improvement`,
+    };
+  }
+
+  // Rule matched but no actionable severity
+  return null;
+}
+
+/**
+ * Run policy validation on Dockerfile content
+ */
+function runPolicyValidation(
+  content: string,
+  policyPath: string | undefined,
+  logger: ReturnType<typeof getToolLogger>,
+): DockerfileFixPlan['policyValidation'] | undefined {
+  // Load policies
+  const policyPaths = policyPath ? [policyPath] : getDefaultPolicyPaths(logger);
+
+  if (policyPaths.length === 0) {
+    logger.debug('No policy files found - skipping policy validation');
+    return undefined;
+  }
+
+  const policies: Policy[] = [];
+  for (const policyFile of policyPaths) {
+    const policyResult = loadPolicy(policyFile);
+    if (policyResult.ok) {
+      policies.push(policyResult.value);
+      logger.debug({ policyFile, rulesCount: policyResult.value.rules.length }, 'Loaded policy');
+    } else {
+      logger.warn({ policyFile, error: policyResult.error }, 'Failed to load policy file');
+    }
+  }
+
+  if (policies.length === 0) {
+    logger.warn('No valid policies could be loaded - skipping policy validation');
+    return undefined;
+  }
+
+  // Merge all policies
+  const mergedPolicy = mergePolicies(policies);
+
+  logger.info(
+    {
+      policiesLoaded: policies.length,
+      totalRules: mergedPolicy.rules.length,
+    },
+    'Running policy validation',
+  );
+
+  // Apply policy to Dockerfile content
+  const policyResults = applyPolicy(mergedPolicy, content);
+
+  // Classify matched rules
+  const violations: PolicyViolation[] = [];
+  const warnings: PolicyViolation[] = [];
+  const suggestions: PolicyViolation[] = [];
+
+  let matchedRulesCount = 0;
+
+  for (const result of policyResults) {
+    if (!result.matched) continue;
+
+    matchedRulesCount++;
+    const violation = classifyViolation(
+      result.rule.id,
+      result.rule.category,
+      result.rule.priority,
+      result.rule.actions,
+      result.rule.description,
+    );
+
+    if (!violation) continue;
+
+    switch (violation.severity) {
+      case 'block':
+        violations.push(violation);
+        break;
+      case 'warn':
+        warnings.push(violation);
+        break;
+      case 'suggest':
+        suggestions.push(violation);
+        break;
+    }
+  }
+
+  const passed = violations.length === 0;
+
+  logger.info(
+    {
+      totalRules: mergedPolicy.rules.length,
+      matchedRules: matchedRulesCount,
+      passed,
+      violations: violations.length,
+      warnings: warnings.length,
+      suggestions: suggestions.length,
+    },
+    'Policy validation completed',
+  );
+
+  return {
+    passed,
+    violations,
+    warnings,
+    suggestions,
+    summary: {
+      totalRules: mergedPolicy.rules.length,
+      matchedRules: matchedRulesCount,
+      blockingViolations: violations.length,
+      warnings: warnings.length,
+      suggestions: suggestions.length,
+    },
+  };
 }
 
 /**
@@ -358,7 +588,10 @@ async function handleFixDockerfile(
     'Dockerfile validation completed',
   );
 
-  if (validationIssues.length === 0) {
+  // Run policy validation if policies exist
+  const policyValidation = runPolicyValidation(content, input.policyPath, logger);
+
+  if (validationIssues.length === 0 && (!policyValidation || policyValidation.passed)) {
     return Success({
       currentIssues: {
         security: [],
@@ -370,6 +603,7 @@ async function handleFixDockerfile(
         performance: [],
         bestPractices: [],
       },
+      ...(policyValidation && { policyValidation }),
       validationScore: validationReport.score,
       validationGrade: validationReport.grade,
       priority: 'low',
@@ -393,7 +627,18 @@ Dockerfile Fix Planning Summary:
     _dockerfileContent: content,
   };
 
-  return runPattern(extendedInput, ctx);
+  const result = await runPattern(extendedInput, ctx);
+
+  // Add policy validation to the result
+  if (result.ok) {
+    const plan: DockerfileFixPlan = {
+      ...result.value,
+      ...(policyValidation && { policyValidation }),
+    };
+    return Success(plan);
+  }
+
+  return result;
 }
 
 import { tool } from '@/types/tool';
@@ -409,8 +654,9 @@ export default tool({
   },
   chainHints: {
     success:
-      'Dockerfile fixes applied successfully. Next: Call build-image to test the fixed Dockerfile.',
-    failure: 'Dockerfile fix failed. Review validation errors and try manual fixes.',
+      'Dockerfile validation and analysis complete (includes built-in best practices + organizational policy validation if configured). Next: Apply recommended fixes, then call build-image to test the Dockerfile.',
+    failure:
+      'Dockerfile validation failed. Review validation errors, policy violations (if any), and apply recommended fixes.',
   },
   handler: handleFixDockerfile,
 });

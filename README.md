@@ -164,8 +164,7 @@ The server provides 13 MCP tools organized by functionality:
 | Tool | Description |
 |------|-------------|
 | `generate-dockerfile` | Gather insights from knowledge base and return requirements for Dockerfile creation |
-| `validate-dockerfile` | Validate Dockerfile base images against allowlist/denylist patterns |
-| `fix-dockerfile` | Analyze Dockerfile for issues and return knowledge-based fix recommendations |
+| `fix-dockerfile` | Analyze Dockerfile for issues including organizational policy validation and return knowledge-based fix recommendations |
 
 ### Image Operations
 | Tool | Description |
@@ -327,20 +326,18 @@ rules:
 **Using Policies:**
 
 ```bash
-# Validate Dockerfile against all policies in policies/
-npx containerization-assist validate-dockerfile --path ./Dockerfile
+# Validate Dockerfile with built-in validation + organizational policies
+npx containerization-assist fix-dockerfile --path ./Dockerfile
 
-# Use specific policy file (via CLI flag)
-npx containerization-assist validate-dockerfile \
+# Use specific policy file for organizational validation
+npx containerization-assist fix-dockerfile \
   --path ./Dockerfile \
   --policy-path ./policies/production.yaml
 
-# Use specific policy file (via environment variable)
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/production.yaml
-npx containerization-assist validate-dockerfile --path ./Dockerfile
-
-# Use specific policy file with MCP server (disables auto-merging)
-npx -y containerization-assist-mcp start --config ./policies/security-baseline.yaml
+# The fix-dockerfile tool will automatically detect and load policies from the policies/ directory
+# It combines:
+# - Built-in best practices validation (security, performance, compliance)
+# - Custom organizational policy validation (if policies are provided)
 ```
 
 **Creating Custom Policies:**

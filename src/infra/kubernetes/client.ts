@@ -264,9 +264,6 @@ export const createKubernetesClient = (
           'Cluster ping failed',
         );
         return false;
-      } finally {
-        // Always clear the timeout to prevent hanging timers
-        cleanupTimeout();
       }
     },
 

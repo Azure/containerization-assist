@@ -19,7 +19,7 @@ import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
 // Import tools
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
-import validateDockerfileTool from '@/tools/validate-dockerfile/tool';
+import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
 // Note: Base image resolution is handled within other tools
 
 // Import utilities
@@ -93,7 +93,7 @@ describe('Boundary Condition Tests', () => {
       const dockerfilePath = join(dir.name, 'Dockerfile');
       writeFileSync(dockerfilePath, '');
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );
@@ -141,7 +141,7 @@ describe('Boundary Condition Tests', () => {
 
       writeFileSync(dockerfilePath, largeDockerfile);
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );
@@ -189,7 +189,7 @@ describe('Boundary Condition Tests', () => {
       const veryLongEnvLine = 'FROM node:18\nENV VAR="' + 'x'.repeat(10000) + '"\n';
       writeFileSync(dockerfilePath, veryLongEnvLine);
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );
@@ -292,7 +292,7 @@ CMD ["node", "app.js"]`;
 
       writeFileSync(dockerfilePath, unicodeDockerfile);
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );
@@ -487,7 +487,7 @@ CMD ["node", "app.js"]`;
 
       const [analyzeResult, validateResult] = await Promise.all([
         analyzeRepoTool.handler({ repositoryPath: dir.name }, toolContext),
-        validateDockerfileTool.handler(
+        fixDockerfileTool.handler(
           { dockerfilePath: join(dir.name, 'Dockerfile') },
           toolContext
         ),
@@ -555,7 +555,7 @@ CMD ["node", "app.js"]`;
       const dockerfilePath = join(dir.name, 'Dockerfile');
       writeFileSync(dockerfilePath, '   \n\n  \t\t  \n   ');
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );

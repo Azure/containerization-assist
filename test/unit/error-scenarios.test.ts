@@ -25,7 +25,6 @@ import scanImageTool from '@/tools/scan-image/tool';
 import tagImageTool from '@/tools/tag-image/tool';
 import pushImageTool from '@/tools/push-image/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
-import validateDockerfileTool from '@/tools/validate-dockerfile/tool';
 import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
 import deployTool from '@/tools/deploy/tool';
 import verifyDeployTool from '@/tools/verify-deploy/tool';
@@ -123,8 +122,8 @@ describe('Error Scenario Coverage', () => {
       }
     });
 
-    it('should reject validate-dockerfile with nonexistent file', async () => {
-      const result = await validateDockerfileTool.handler(
+    it('should reject fix-dockerfile with nonexistent file', async () => {
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath: '/nonexistent/Dockerfile' },
         toolContext
       );
@@ -405,7 +404,7 @@ describe('Error Scenario Coverage', () => {
       const dockerfilePath = join(dir.name, 'Dockerfile');
       writeFileSync(dockerfilePath, 'INVALID_INSTRUCTION node:18\nBAD SYNTAX');
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );
@@ -432,7 +431,7 @@ COPY . .
 CMD ["node", "app.js"]`
       );
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );
@@ -542,7 +541,7 @@ CMD ["node", "app.js"]`
       const dockerfilePath = join(dir.name, 'Dockerfile');
       writeFileSync(dockerfilePath, 'FROM node:latest\n');
 
-      const result = await validateDockerfileTool.handler(
+      const result = await fixDockerfileTool.handler(
         { dockerfilePath },
         toolContext
       );

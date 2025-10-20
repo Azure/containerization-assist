@@ -9,10 +9,9 @@ import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
 import scanImageTool from './scan-image/tool';
 import tagImageTool from './tag-image/tool';
-import validateDockerfileTool from './validate-dockerfile/tool';
 import verifyDeployTool from './verify-deploy/tool';
 
-export const TOOL_NAME = {
+const TOOL_NAME = {
   ANALYZE_REPO: 'analyze-repo',
   BUILD_IMAGE: 'build-image',
   DEPLOY: 'deploy',
@@ -24,7 +23,6 @@ export const TOOL_NAME = {
   PUSH_IMAGE: 'push-image',
   SCAN_IMAGE: 'scan-image',
   TAG_IMAGE: 'tag-image',
-  VALIDATE_DOCKERFILE: 'validate-dockerfile',
   VERIFY_DEPLOY: 'verify-deploy',
 } as const;
 
@@ -42,7 +40,6 @@ prepareClusterTool.name = TOOL_NAME.PREPARE_CLUSTER;
 pushImageTool.name = TOOL_NAME.PUSH_IMAGE;
 scanImageTool.name = TOOL_NAME.SCAN_IMAGE;
 tagImageTool.name = TOOL_NAME.TAG_IMAGE;
-validateDockerfileTool.name = TOOL_NAME.VALIDATE_DOCKERFILE;
 verifyDeployTool.name = TOOL_NAME.VERIFY_DEPLOY;
 
 // Create a union type of all tool types for better type safety
@@ -58,7 +55,6 @@ export type Tool = (
   | typeof pushImageTool
   | typeof scanImageTool
   | typeof tagImageTool
-  | typeof validateDockerfileTool
   | typeof verifyDeployTool
 ) & { name: string };
 
@@ -70,7 +66,6 @@ export const ALL_TOOLS: readonly Tool[] = [
   fixDockerfileTool,
   generateDockerfileTool,
   generateK8sManifestsTool,
-  validateDockerfileTool,
 
   // Operational/deterministic tools
   buildImageTool,
@@ -84,6 +79,7 @@ export const ALL_TOOLS: readonly Tool[] = [
 ] as const;
 
 export {
+  TOOL_NAME,
   analyzeRepoTool,
   buildImageTool,
   deployTool,
@@ -95,6 +91,5 @@ export {
   pushImageTool,
   scanImageTool,
   tagImageTool,
-  validateDockerfileTool,
   verifyDeployTool,
 };

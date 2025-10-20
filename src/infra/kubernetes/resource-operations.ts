@@ -25,6 +25,28 @@ export interface K8sResource {
 }
 
 /**
+ * Explicit interfaces for create method signatures
+ */
+interface NamespacedCreateMethod {
+  (args: { namespace: string; body: unknown }): Promise<{ body?: K8sResource }>;
+}
+
+interface ClusterCreateMethod {
+  (args: { body: unknown }): Promise<{ body?: K8sResource }>;
+}
+
+/**
+ * Explicit interfaces for patch method signatures
+ */
+interface NamespacedPatchMethod {
+  (args: { name: string; namespace: string; body: unknown }): Promise<{ body?: K8sResource }>;
+}
+
+interface ClusterPatchMethod {
+  (args: { name: string; body: unknown }): Promise<{ body?: K8sResource }>;
+}
+
+/**
  * Helper function to check if an error is a 409 Conflict (AlreadyExists) error
  */
 function isConflictError(error: unknown): boolean {
@@ -49,16 +71,13 @@ async function callCreateMethod(
   namespace: string,
   resource: K8sResource,
 ): Promise<{ body?: K8sResource }> {
+  if (typeof createMethod !== 'function') {
+    throw new TypeError('createMethod must be a function');
+  }
+
   return isNamespaced
-    ? await (
-        createMethod as (args: {
-          namespace: string;
-          body: unknown;
-        }) => Promise<{ body?: K8sResource }>
-      )({ namespace, body: resource })
-    : await (createMethod as (args: { body: unknown }) => Promise<{ body?: K8sResource }>)({
-        body: resource,
-      });
+    ? await (createMethod as NamespacedCreateMethod)({ namespace, body: resource })
+    : await (createMethod as ClusterCreateMethod)({ body: resource });
 }
 
 /**
@@ -71,17 +90,13 @@ async function callPatchMethod(
   namespace: string,
   resource: K8sResource,
 ): Promise<{ body?: K8sResource }> {
+  if (typeof patchMethod !== 'function') {
+    throw new TypeError('patchMethod must be a function');
+  }
+
   return isNamespaced
-    ? await (
-        patchMethod as (args: {
-          name: string;
-          namespace: string;
-          body: unknown;
-        }) => Promise<{ body?: K8sResource }>
-      )({ name, namespace, body: resource })
-    : await (
-        patchMethod as (args: { name: string; body: unknown }) => Promise<{ body?: K8sResource }>
-      )({ name, body: resource });
+    ? await (patchMethod as NamespacedPatchMethod)({ name, namespace, body: resource })
+    : await (patchMethod as ClusterPatchMethod)({ name, body: resource });
 }
 
 /**

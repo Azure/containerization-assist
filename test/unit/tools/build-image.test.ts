@@ -399,6 +399,7 @@ CMD ["node", "index.js"]`;
         createSuccessResult({
           imageId: 'sha256:mock-image-id',
           digest: 'sha256:abcdef1234567890',
+          tags: ['myapp:latest', 'myapp:v1.0'],
           size: 123456789,
           layers: 8,
           buildTime: 5000,

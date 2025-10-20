@@ -11,6 +11,12 @@ export const fixDockerfileSchema = z
     dockerfile: z.string().optional().describe('Dockerfile content to analyze for fixes'),
     path: z.string().optional().describe('Path to Dockerfile file to analyze for fixes'),
     environment: environment.describe('Target environment (production, development, etc.)'),
+    policyPath: z
+      .string()
+      .optional()
+      .describe(
+        'Optional path to specific policy file to use for organizational policy validation (defaults to all policies in policies/)',
+      ),
   })
   .refine((data) => data.dockerfile || data.path, {
     message: "Either 'dockerfile' content or 'path' must be provided",
@@ -24,6 +30,17 @@ export type FixDockerfileParams = z.infer<typeof fixDockerfileSchema>;
 export interface ValidationIssue extends ValidationResult {
   category?: 'security' | 'performance' | 'bestPractices';
   priority?: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Policy violation from organizational policy validation
+ */
+export interface PolicyViolation {
+  ruleId: string;
+  category: string | undefined;
+  priority: number;
+  severity: 'block' | 'warn' | 'suggest';
+  message: string;
 }
 
 /**
@@ -59,6 +76,21 @@ export interface DockerfileFixPlan {
     security: FixRecommendation[];
     performance: FixRecommendation[];
     bestPractices: FixRecommendation[];
+  };
+
+  /** Policy validation results (if policy validation was performed) */
+  policyValidation?: {
+    passed: boolean;
+    violations: PolicyViolation[];
+    warnings: PolicyViolation[];
+    suggestions: PolicyViolation[];
+    summary: {
+      totalRules: number;
+      matchedRules: number;
+      blockingViolations: number;
+      warnings: number;
+      suggestions: number;
+    };
   };
 
   /** Overall validation score (0-100) */
