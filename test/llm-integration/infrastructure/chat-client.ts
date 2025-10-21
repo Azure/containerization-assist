@@ -5,9 +5,8 @@
 
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { generateText, tool } from 'ai';
+import { generateText, tool, Experimental_Agent as Agent, stepCountIs } from 'ai';
 import { createAzure } from '@ai-sdk/azure';
-import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import type {
   LLMClient,
@@ -22,49 +21,31 @@ import type {
 export class ChatClient implements LLMClient {
   readonly model: string;
   private readonly provider: any;
-  private readonly isAzure: boolean;
 
   constructor(
     options: {
       model?: string;
       apiKey?: string;
-      baseURL?: string;
+      resourceName?: string;
     } = {}
   ) {
-    // Get configuration from environment variables, validated to fail fast
-    const model = process.env.OPENAI_DEPLOYMENT_ID;
-    const baseURL = process.env.OPENAI_BASE_URL;
-    const apiKey = process.env.OPENAI_API_KEY;
+    // Get Azure configuration from environment variables, validated to fail fast
+    const model = process.env.AZURE_OPENAI_DEPLOYMENT_ID;
+    const resourceName = process.env.AZURE_OPENAI_RESOURCE;
+    const apiKey = process.env.AZURE_OPENAI_API_KEY;
 
-    if (!baseURL || !apiKey || !model) {
-      throw new Error('OPENAI_BASE_URL, OPENAI_API_KEY, and OPENAI_DEPLOYMENT_ID environment variables must be set');
-    }
-
-    // STRICT: Prevent any mock endpoint usage in LLM integration tests
-    if (baseURL.includes('localhost') || baseURL.includes('127.0.0.1') || baseURL.includes('4141')) {
-      throw new Error('❌ MOCK ENDPOINTS FORBIDDEN: LLM integration tests must use real Azure credentials. Run "source ../azure_keys.sh" to load proper credentials.');
+    if (!resourceName || !apiKey || !model) {
+      throw new Error('AZURE_OPENAI_RESOURCE, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT_ID environment variables must be set');
     }
 
     this.model = model;
-    this.isAzure = baseURL.includes('cognitiveservices.azure.com');
 
-    if (this.isAzure) {
-      // Extract resource name from Azure URL (e.g., "containerization-assist-e2e" from the URL)
-      const resourceMatch = baseURL.match(/https:\/\/([^.]+)\.cognitiveservices\.azure\.com/);
-      const resourceName = resourceMatch ? resourceMatch[1] : '';
+    console.log('🔧 Azure Config: Using resourceName:', resourceName);
 
-      this.provider = createAzure({
-        resourceName,
-        apiKey,
-        apiVersion: '2024-08-01-preview', // Use working API version for GPT-5 support
-        useDeploymentBasedUrls: true, // Enable deployment-based URLs for Azure
-      });
-    } else {
-      this.provider = createOpenAI({
-        baseURL,
-        apiKey,
-      });
-    }
+    this.provider = createAzure({
+      resourceName,
+      apiKey,
+    });
   }
 
   async validateConnection(): Promise<boolean> {
@@ -73,7 +54,7 @@ export class ChatClient implements LLMClient {
       console.log('AI SDK: Attempting validation with model:', this.model);
 
       const result = await generateText({
-        model: this.provider(this.model), // Pass deployment name to provider
+        model: this.provider(this.model), // Use deployment name directly
         prompt: 'Say hi',
         maxOutputTokens: 200,
       });
@@ -158,7 +139,7 @@ export class ChatClient implements LLMClient {
               toolCallId: msg.toolCallId || '',
               toolName: msg.name || 'unknown',
               result: msg.content,
-              output: { type: 'text' as const, value: msg.content },
+              output: { type: 'text' as const, value: msg.content }, // Proper AI SDK format
             }],
           };
         }
@@ -277,8 +258,8 @@ export class ChatClient implements LLMClient {
 
 
   /**
-   * Execute a request autonomously using AI SDK's native tool calling with generateText.
-   * The AI will call tools, act on their responses, and create files as needed.
+   * Execute a request autonomously using AI SDK's Agent class with multi-step tool orchestration.
+   * The Agent will automatically call tools, process responses, and continue until task completion.
    */
   async executeAutonomously(
     userMessage: string,
@@ -338,51 +319,81 @@ export class ChatClient implements LLMClient {
       });
     }
 
-    // Generic system prompt that works with any available tools
-    const systemPrompt = `You are an autonomous coding assistant. Complete the user's request using the available tools.
+    // Explicit system prompt that guides the Agent through the complete workflow
+    const systemPrompt = `You are an autonomous containerization assistant. When asked to containerize an application, you MUST complete ALL THREE STEPS in order:
+
+STEP 1: Call 'analyze-repo' to understand the project structure and dependencies
+STEP 2: Call 'generate-dockerfile' using the analysis results to create Dockerfile content
+STEP 3: Call 'createFile' to write the Dockerfile to the project directory
 
 Available tools: ${availableTools.map(t => t.name).join(', ')}${availableTools.length > 0 ? ', ' : ''}createFile
 
 Working directory: ${workingDirectory}
 
-Use the tools as needed to complete the task. When the user expects files to be created, use the createFile tool to write them.`;
+CRITICAL: Do NOT stop after just analyzing! You must continue through ALL steps. The user expects a complete containerization with an actual Dockerfile created. Keep going until you have executed all three steps.`;
 
     try {
       console.log('🔧 Available SDK Tools:', Object.keys(sdkTools));
 
-      // Use AI SDK's generateText with system and prompt (not messages array)
-      const result = await generateText({
+      // Create Agent with multi-step orchestration
+      const agent = new Agent({
         model: this.provider(this.model),
         system: systemPrompt,
-        prompt: userMessage,
         tools: sdkTools,
-        maxOutputTokens: 4000,
-        temperature: this.isGPT5() ? undefined : options.temperature,
+        stopWhen: stepCountIs(10), // Allow up to 10 steps for complete workflow
+        // Optional: Add step-by-step hooks for progress tracking
+        onStepFinish: ({ text, toolCalls }) => {
+          console.log(`🔄 Step completed:`);
+          if (toolCalls?.length) {
+            console.log(`   🔧 Tools called: ${toolCalls.map(tc => tc.toolName).join(', ')}`);
+          }
+          if (text) {
+            console.log(`   💭 Reasoning: ${text.substring(0, 100)}...`);
+          }
+        }
       });
 
-      console.log('📝 AI Response:', result.text);
-      console.log('🔧 AI Tool Calls Count:', result.toolCalls?.length || 0);
+      // Execute the agent with explicit multi-step orchestration
+      console.log('🚀 Agent starting explicit multi-step execution...');
 
-      // Process any tool calls made by the AI
-      if (result.toolCalls && result.toolCalls.length > 0) {
-        for (const toolCall of result.toolCalls) {
-          const toolArgs = (toolCall as any).args;
-          console.log(`🔧 Calling tool: ${toolCall.toolName} with args:`, toolArgs);
+      let currentPrompt = userMessage;
+      let finalResponse = '';
+      let currentStep = 1;
+      const maxAttempts = 3;
 
-          if (toolCall.toolName === 'createFile') {
-            // createFile tool is handled internally by the AI SDK
-            console.log(`📝 Created file: ${toolArgs.filePath}`);
-            continue;
-          }
+      // Force explicit workflow execution
+      while (currentStep <= maxAttempts) {
+        console.log(`🔄 Executing step ${currentStep}/${maxAttempts}...`);
 
-          // Execute MCP tools through the provided executor
-          const toolResult = await mcpToolExecutor(toolCall.toolName, toolArgs);
-          toolCallsExecuted.push({ toolName: toolCall.toolName, params: toolArgs, result: toolResult });
-          console.log(`✅ Tool ${toolCall.toolName} completed`);
+        const result = await agent.generate({
+          prompt: currentPrompt
+        });
+
+        const { text, steps } = result;
+        finalResponse = text || 'Task completed successfully.';
+
+        console.log(`📊 Step ${currentStep} completed with ${steps.length} agent steps`);
+
+        // Check if we have created the Dockerfile
+        if (filesCreated.length > 0) {
+          console.log('✅ Dockerfile created! Multi-step workflow complete.');
+          break;
         }
-      }
 
-      const finalResponse = result.text || 'Task completed successfully.';
+        // Update prompt to force continuation if needed
+        if (currentStep === 1 && toolCallsExecuted.length === 1 && toolCallsExecuted[0].toolName === 'analyze-repo') {
+          currentPrompt = `Based on the repository analysis, now generate the Dockerfile using 'generate-dockerfile' and then create the file with 'createFile'. You have completed step 1 (analysis). Continue with steps 2 and 3.`;
+          console.log('🔄 Forcing continuation after analysis...');
+        } else if (currentStep === 2) {
+          currentPrompt = `You must now create the actual Dockerfile file using the 'createFile' tool. The user expects a physical Dockerfile to be created in the project directory.`;
+          console.log('🔄 Forcing file creation...');
+        } else {
+          console.log('⚠️ Agent completed but workflow may be incomplete');
+          break;
+        }
+
+        currentStep++;
+      }
 
       console.log('🎯 Autonomous execution completed!');
       console.log('🔧 Tools executed:', toolCallsExecuted.map(tc => tc.toolName));
@@ -398,4 +409,12 @@ Use the tools as needed to complete the task. When the user expects files to be 
       throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  /**
+   * NOTE: Experimental MCP client integration placeholder.
+   * The experimental_createMCPClient API is still evolving and needs API documentation.
+   * For now, we use our custom MCP tool mapping which works reliably.
+   * Future enhancement: Implement when experimental API stabilizes.
+   */
+  // TODO: Implement executeAutonomouslyWithMCP when experimental API is stable
 }

@@ -22,11 +22,26 @@ export interface MCPTestServerConfig {
   disableTools?: string[]; // Tools to explicitly disable
 }
 
+export interface ToolCallMetrics {
+  toolName: string;
+  toolCallId: string;
+  startTime: number;
+  endTime: number;
+  latency: number;
+  success: boolean;
+  inputParams: any;
+  outputContent: any;
+  errorMessage?: string;
+  parameterAccuracy?: 'correct' | 'incorrect' | 'partial';
+  contextualRelevance?: 'high' | 'medium' | 'low';
+}
+
 export interface MCPTestServer {
   app: AppRuntime;
   tools: ToolDefinition[];
   workingDirectory: string;
   isRunning: boolean;
+  toolCallHistory: ToolCallMetrics[];
 }
 
 export class MCPTestHarness {
@@ -94,6 +109,7 @@ export class MCPTestHarness {
         description: actualTool.description,
         inputSchema: actualTool.schema, // Use original Zod schema directly
         zodSchema: actualTool.schema, // Also provide direct access to Zod schema
+        parse: (params: any) => actualTool.schema.parse(params), // Add parse method for validation
       };
     });
 
@@ -102,6 +118,7 @@ export class MCPTestHarness {
       tools: toolDefinitions,
       workingDirectory,
       isRunning: false,
+      toolCallHistory: [],
     };
 
     this.servers.set(serverName, testServer);
