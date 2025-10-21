@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.0.2]
+
+- Stable version with all features from dev releases.
+
 ## [0.0.1-dev.6]
 
 - Update pino version "^10.1.0",
