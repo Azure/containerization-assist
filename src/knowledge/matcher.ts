@@ -22,6 +22,13 @@ const SCORING = {
   },
 } as const;
 
+const SEVERITY_TIERS: Record<string, number> = {
+  required: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+} as const;
+
 // Language keyword mappings for context matching
 const LANGUAGE_KEYWORDS: Record<string, string[]> = {
   javascript: ['node', 'nodejs', 'npm', 'js', 'javascript'],
@@ -309,12 +316,8 @@ const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): KnowledgeMatc
  * Get severity tier for sorting priority.
  */
 const getSeverityTier = (entry: LoadedEntry): number => {
-  const severity = entry.severity;
-  if (severity === 'required') return 4;
-  if (severity === 'high') return 3;
-  if (severity === 'medium') return 2;
-  if (severity === 'low') return 1;
-  return 0;
+  if (!entry.severity) return 0;
+  return SEVERITY_TIERS[entry.severity] ?? 0;
 };
 
 /**
