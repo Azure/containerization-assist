@@ -68,4 +68,5 @@ export interface KnowledgeSnippet {
   tags?: string[];
   category?: string;
   source?: string;
+  severity?: 'required' | 'high' | 'medium' | 'low';
 }
