@@ -22,13 +22,7 @@ export class ChatClient implements LLMClient {
   readonly model: string;
   private readonly provider: any;
 
-  constructor(
-    options: {
-      model?: string;
-      apiKey?: string;
-      resourceName?: string;
-    } = {}
-  ) {
+  constructor() {
     // Get Azure configuration from environment variables, validated to fail fast
     const model = process.env.AZURE_OPENAI_DEPLOYMENT_ID;
     const resourceName = process.env.AZURE_OPENAI_RESOURCE;
@@ -120,10 +114,7 @@ export class ChatClient implements LLMClient {
         sdkTools[toolDef.name] = tool({
           description: toolDef.description,
           inputSchema: schema,
-          execute: async (params: any) => {
-            // Return placeholder - actual execution happens in test harness
-            return { success: true, toolCall: toolDef.name, params };
-          }
+          execute: async () => ({ placeholder: true }) // Placeholder - execution handled by test harness
         });
       }
     }
@@ -319,18 +310,16 @@ export class ChatClient implements LLMClient {
       });
     }
 
-    // Explicit system prompt that guides the Agent through the complete workflow
-    const systemPrompt = `You are an autonomous containerization assistant. When asked to containerize an application, you MUST complete ALL THREE STEPS in order:
-
-STEP 1: Call 'analyze-repo' to understand the project structure and dependencies
-STEP 2: Call 'generate-dockerfile' using the analysis results to create Dockerfile content
-STEP 3: Call 'createFile' to write the Dockerfile to the project directory
-
-Available tools: ${availableTools.map(t => t.name).join(', ')}${availableTools.length > 0 ? ', ' : ''}createFile
-
-Working directory: ${workingDirectory}
-
-CRITICAL: Do NOT stop after just analyzing! You must continue through ALL steps. The user expects a complete containerization with an actual Dockerfile created. Keep going until you have executed all three steps.`;
+    // Load system prompt from gpt-5.txt file as-is
+    let systemPrompt: string;
+    try {
+      const promptPath = join(__dirname, 'gpt-5.txt');
+      systemPrompt = await fs.readFile(promptPath, 'utf8');
+      console.log('📝 Loaded GitHub Copilot system prompt from gpt-5.txt');
+    } catch (error) {
+      console.warn('⚠️ Failed to load gpt-5.txt, using fallback prompt');
+      systemPrompt = 'You are GitHub Copilot, an expert AI programming assistant working in VS Code.';
+    }
 
     try {
       console.log('🔧 Available SDK Tools:', Object.keys(sdkTools));
@@ -353,47 +342,17 @@ CRITICAL: Do NOT stop after just analyzing! You must continue through ALL steps.
         }
       });
 
-      // Execute the agent with explicit multi-step orchestration
-      console.log('🚀 Agent starting explicit multi-step execution...');
+      // Execute the agent autonomously - let it handle the workflow naturally
+      console.log('🚀 Agent starting autonomous execution...');
 
-      let currentPrompt = userMessage;
-      let finalResponse = '';
-      let currentStep = 1;
-      const maxAttempts = 3;
+      const result = await agent.generate({
+        prompt: userMessage
+      });
 
-      // Force explicit workflow execution
-      while (currentStep <= maxAttempts) {
-        console.log(`🔄 Executing step ${currentStep}/${maxAttempts}...`);
+      const { text, steps } = result;
+      const finalResponse = text || 'Task completed successfully.';
 
-        const result = await agent.generate({
-          prompt: currentPrompt
-        });
-
-        const { text, steps } = result;
-        finalResponse = text || 'Task completed successfully.';
-
-        console.log(`📊 Step ${currentStep} completed with ${steps.length} agent steps`);
-
-        // Check if we have created the Dockerfile
-        if (filesCreated.length > 0) {
-          console.log('✅ Dockerfile created! Multi-step workflow complete.');
-          break;
-        }
-
-        // Update prompt to force continuation if needed
-        if (currentStep === 1 && toolCallsExecuted.length === 1 && toolCallsExecuted[0].toolName === 'analyze-repo') {
-          currentPrompt = `Based on the repository analysis, now generate the Dockerfile using 'generate-dockerfile' and then create the file with 'createFile'. You have completed step 1 (analysis). Continue with steps 2 and 3.`;
-          console.log('🔄 Forcing continuation after analysis...');
-        } else if (currentStep === 2) {
-          currentPrompt = `You must now create the actual Dockerfile file using the 'createFile' tool. The user expects a physical Dockerfile to be created in the project directory.`;
-          console.log('🔄 Forcing file creation...');
-        } else {
-          console.log('⚠️ Agent completed but workflow may be incomplete');
-          break;
-        }
-
-        currentStep++;
-      }
+      console.log(`📊 Agent completed workflow with ${steps.length} steps`);
 
       console.log('🎯 Autonomous execution completed!');
       console.log('🔧 Tools executed:', toolCallsExecuted.map(tc => tc.toolName));
@@ -410,11 +369,4 @@ CRITICAL: Do NOT stop after just analyzing! You must continue through ALL steps.
     }
   }
 
-  /**
-   * NOTE: Experimental MCP client integration placeholder.
-   * The experimental_createMCPClient API is still evolving and needs API documentation.
-   * For now, we use our custom MCP tool mapping which works reliably.
-   * Future enhancement: Implement when experimental API stabilizes.
-   */
-  // TODO: Implement executeAutonomouslyWithMCP when experimental API is stable
 }
