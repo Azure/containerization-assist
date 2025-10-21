@@ -22,6 +22,13 @@ const SCORING = {
   },
 } as const;
 
+const SEVERITY_TIERS: Record<string, number> = {
+  required: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+} as const;
+
 // Language keyword mappings for context matching
 const LANGUAGE_KEYWORDS: Record<string, string[]> = {
   javascript: ['node', 'nodejs', 'npm', 'js', 'javascript'],
@@ -62,6 +69,36 @@ const ENVIRONMENT_KEYWORDS: Record<string, string[]> = {
   testing: ['test', 'testing'],
   staging: ['staging', 'stage'],
 } as const;
+
+const TAG_ALIASES: Record<string, string> = {
+  // Languages
+  nodejs: 'node',
+  javascript: 'node',
+  js: 'node',
+  typescript: 'node',
+  ts: 'node',
+  golang: 'go',
+  py: 'python',
+  csharp: 'dotnet',
+
+  // Image types
+  minimal: 'distroless',
+
+  // Vendor
+  mcr: 'microsoft',
+  msft: 'microsoft',
+  mariner: 'microsoft',
+} as const;
+
+/**
+ * Normalize a tag to its canonical form
+ * @param tag - Tag to normalize
+ * @returns Canonical tag name (lowercase)
+ */
+const normalizeTag = (tag: string): string => {
+  const lower = tag.toLowerCase();
+  return TAG_ALIASES[lower] || lower;
+};
 
 /**
  * Get keywords associated with a programming language
@@ -122,7 +159,10 @@ const evaluateTagMatch = (
 ): { score: number; reasons: string[] } => {
   if (!query.tags || !entry.tags) return { score: 0, reasons: [] };
 
-  const matchedTags = query.tags.filter((tag) => entry.tags?.includes(tag));
+  const normalizedQueryTags = query.tags.map(normalizeTag);
+  const normalizedEntryTags = entry.tags.map(normalizeTag);
+
+  const matchedTags = normalizedQueryTags.filter((tag) => normalizedEntryTags.includes(tag));
   if (matchedTags.length > 0) {
     return {
       score: matchedTags.length * SCORING.TAG,
@@ -273,7 +313,15 @@ const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): KnowledgeMatc
 };
 
 /**
- * Find matching knowledge entries for a query using functional composition
+ * Get severity tier for sorting priority.
+ */
+const getSeverityTier = (entry: LoadedEntry): number => {
+  if (!entry.severity) return 0;
+  return SEVERITY_TIERS[entry.severity] ?? 0;
+};
+
+/**
+ * Find matching knowledge entries for a query using functional composition.
  */
 export const findKnowledgeMatches = (
   entries: LoadedEntry[],
@@ -282,7 +330,12 @@ export const findKnowledgeMatches = (
   const matches = entries
     .map((entry) => evaluateEntry(entry, query))
     .filter((match): match is KnowledgeMatch => match !== null && match.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      const tierDiff = getSeverityTier(b.entry) - getSeverityTier(a.entry);
+      if (tierDiff !== 0) return tierDiff;
+
+      return b.score - a.score;
+    });
 
   const limit = query.limit || 5;
   return matches.slice(0, limit);
@@ -347,6 +400,7 @@ export async function getKnowledgeSnippets(
       ...(match.entry.tags && { tags: match.entry.tags }),
       category: match.entry.category,
       source: match.entry.id,
+      ...(match.entry.severity && { severity: match.entry.severity }),
     }));
 
     // Apply character budget if specified
@@ -390,17 +444,30 @@ function formatEntryAsSnippet(entry: LoadedEntry): string {
  */
 function applyCharacterBudget(snippets: KnowledgeSnippet[], maxChars: number): KnowledgeSnippet[] {
   const selected: KnowledgeSnippet[] = [];
+  const selectedIds = new Set<string>();
   let currentChars = 0;
 
-  // Snippets are already sorted by weight/score
+  const requiredSnippets = snippets.filter((s) => s.severity === 'required');
+
+  for (const snippet of requiredSnippets) {
+    selected.push(snippet);
+    selectedIds.add(snippet.id);
+    currentChars += snippet.text.length;
+  }
+
   for (const snippet of snippets) {
+    if (selectedIds.has(snippet.id)) {
+      continue;
+    }
+
     const snippetLength = snippet.text.length;
 
     if (currentChars + snippetLength <= maxChars) {
       selected.push(snippet);
+      selectedIds.add(snippet.id);
       currentChars += snippetLength;
-    } else if (currentChars === 0 && snippetLength > maxChars) {
-      // If first snippet exceeds budget, truncate it
+    } else if (selected.length === requiredSnippets.length && snippetLength > maxChars) {
+      // If first non-required snippet exceeds budget, truncate it
       selected.push({
         ...snippet,
         text: `${snippet.text.substring(0, maxChars - 3)}...`,
