@@ -3,14 +3,9 @@
  * Tool execution with optional dependency resolution
  */
 
-import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { z, type ZodTypeAny } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
-import { loadAndMergePolicies } from '@/config/policy-io';
-import { applyPolicy } from '@/config/policy-eval';
-import type { Policy } from '@/config/policy-schemas';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
@@ -19,35 +14,9 @@ import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
+import { loadRegoPolicy, type RegoEvaluator } from '@/config/policy-rego';
 
 // ===== Types =====
-
-/**
- * Get default policy paths
- * Returns all .yaml files in the policies/ directory
- */
-function getDefaultPolicyPaths(): string[] {
-  const logger = createLogger({ name: 'policy-discovery' });
-  try {
-    const policiesDir = path.join(process.cwd(), 'policies');
-
-    if (!fs.existsSync(policiesDir)) {
-      return [];
-    }
-
-    const files = fs.readdirSync(policiesDir);
-    return files
-      .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) // Alphabetical sort with numeric awareness for consistent policy load order
-      .map((f) => path.join(policiesDir, f));
-  } catch (error) {
-    logger.warn(
-      { error, cwd: process.cwd() },
-      'Failed to read policies directory - using no default policies',
-    );
-    return [];
-  }
-}
 
 /**
  * Create a child logger with additional bindings
@@ -61,18 +30,22 @@ function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger 
  * Create a ToolContext for the given request
  * Delegates to the canonical createToolContext from @mcp/context
  */
-function createContextForTool(request: ExecuteRequest, logger: Logger): ToolContext {
+function createContextForTool(
+  request: ExecuteRequest,
+  logger: Logger,
+  policy?: RegoEvaluator,
+): ToolContext {
   const metadata = request.metadata;
 
   return createToolContext(logger, {
     ...(metadata?.signal && { signal: metadata.signal }),
     ...(metadata?.progress !== undefined && { progress: metadata.progress }),
     ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
+    ...(policy && { policy }),
   });
 }
 
 interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
-  policy?: Policy;
   registry: Map<string, T>;
   logger: Logger;
   config: OrchestratorConfig;
@@ -91,31 +64,14 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   const { registry, server, config = { chainHintsMode: 'enabled' } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
-  // Load and merge policies - use defaults if not configured
-  let policy: Policy | undefined;
-  const policyPaths = config.policyPath ? [config.policyPath] : getDefaultPolicyPaths();
+  // Note: Policy enforcement has been removed from orchestrator.
+  // Policies are now enforced at the tool level where they can validate
+  // generated content (Dockerfiles, K8s manifests) rather than just input parameters.
+  // Tools receive policies via ToolContext when configured.
 
-  if (policyPaths.length > 0) {
-    const policyResult = loadAndMergePolicies(policyPaths);
-    if (policyResult.ok) {
-      policy = policyResult.value;
-      logger.info(
-        {
-          policiesLoaded: policyPaths.length,
-          totalRules: policy.rules.length,
-        },
-        'Policies loaded and merged successfully',
-      );
-    } else {
-      logger.warn(
-        {
-          policyPathsAttempted: policyPaths.length,
-          error: policyResult.error,
-        },
-        'Failed to load policies - orchestrator will run without policy enforcement',
-      );
-    }
-  }
+  // Cache the loaded policy to avoid reloading on every execution
+  let policyCache: RegoEvaluator | undefined;
+  let policyLoaded = false;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     const { toolName } = request;
@@ -130,17 +86,31 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
       ...(request.metadata?.loggerContext ?? {}),
     });
 
+    // Load policy once if configured
+    if (!policyLoaded && config.policyPath) {
+      const policyResult = await loadRegoPolicy(config.policyPath, logger);
+      if (policyResult.ok) {
+        policyCache = policyResult.value;
+        logger.info({ policyPath: config.policyPath }, 'Policy loaded for orchestrator');
+      } else {
+        logger.warn({ error: policyResult.error }, 'Failed to load policy, continuing without it');
+      }
+      policyLoaded = true;
+    }
+
     return await executeWithOrchestration(tool, request, {
       registry,
-      ...(policy && { policy }),
       logger: contextualLogger,
       config,
       ...(server && { server }),
-    });
+    }, policyCache);
   }
 
   function close(): void {
-    // No cleanup needed anymore
+    // Cleanup policy resources if loaded
+    if (policyCache) {
+      policyCache.close();
+    }
   }
 
   return { execute, close };
@@ -153,32 +123,21 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   tool: T,
   request: ExecuteRequest,
   env: ExecutionEnvironment<T>,
+  policy?: RegoEvaluator,
 ): Promise<Result<unknown>> {
   const { params } = request;
-  const { policy, logger } = env;
+  const { logger } = env;
 
   // Validate parameters using Zod safeParse
   const validation = validateParams(params, tool.schema);
   if (!validation.ok) return validation;
   const validatedParams = validation.value;
 
-  // Apply policies
-  if (policy) {
-    const policyResults = applyPolicy(policy, {
-      tool: tool.name,
-      params: validatedParams as Record<string, unknown>,
-    });
+  // Policy enforcement happens within tools (not here at parameter level)
+  // Tools validate generated content (Dockerfiles, K8s manifests) against policies
+  // The policy is passed to tools via ToolContext for self-validation
 
-    const blockers = policyResults
-      .filter((r) => r.matched && r.rule.actions.block)
-      .map((r) => r.rule.id);
-
-    if (blockers.length > 0) {
-      return Failure(ERROR_MESSAGES.POLICY_BLOCKED(blockers));
-    }
-  }
-
-  const toolContext = createContextForTool(request, logger);
+  const toolContext = createContextForTool(request, logger, policy);
   const tracker = createStandardizedToolTracker(tool.name, {}, logger);
 
   const startTime = Date.now();

@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { environment, repositoryPath } from '../shared/schemas';
 import { ModuleInfo } from '../analyze-repo/schema';
+import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
 export const generateDockerfileSchema = z.object({
   repositoryPath: repositoryPath.describe(
@@ -114,4 +115,5 @@ export interface DockerfilePlan {
     analysis: DockerfileAnalysis;
     guidance: EnhancementGuidance;
   };
+  policyValidation?: PolicyValidationResult;
 }
