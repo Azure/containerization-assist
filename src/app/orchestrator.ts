@@ -66,7 +66,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
   // Cache the loaded policy to avoid reloading on every execution
   let policyCache: RegoEvaluator | undefined;
-  let policyLoaded = false;
+  let policyLoadPromise: Promise<void> | undefined;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     const { toolName } = request;
@@ -81,16 +81,23 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
       ...(request.metadata?.loggerContext ?? {}),
     });
 
-    // Load policy once if configured
-    if (!policyLoaded && config.policyPath) {
-      const policyResult = await loadRegoPolicy(config.policyPath, logger);
-      if (policyResult.ok) {
-        policyCache = policyResult.value;
-        logger.info({ policyPath: config.policyPath }, 'Policy loaded for orchestrator');
-      } else {
-        logger.warn({ error: policyResult.error }, 'Failed to load policy, continuing without it');
-      }
-      policyLoaded = true;
+    // Load policy once if configured (with Promise-based guard to prevent race conditions)
+    if (config.policyPath && !policyLoadPromise) {
+      const policyPath = config.policyPath; // Capture for closure
+      policyLoadPromise = (async () => {
+        const policyResult = await loadRegoPolicy(policyPath, logger);
+        if (policyResult.ok) {
+          policyCache = policyResult.value;
+          logger.info({ policyPath }, 'Policy loaded for orchestrator');
+        } else {
+          logger.warn({ error: policyResult.error }, 'Failed to load policy, continuing without it');
+        }
+      })();
+    }
+
+    // Wait for policy loading to complete if in progress
+    if (policyLoadPromise) {
+      await policyLoadPromise;
     }
 
     return await executeWithOrchestration(tool, request, {

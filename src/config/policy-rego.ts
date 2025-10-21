@@ -46,6 +46,36 @@ export interface RegoPolicyResult {
 }
 
 /**
+ * OPA CLI JSON output structure
+ */
+interface OpaEvalOutput {
+  result?: Array<{
+    expressions?: Array<{
+      value?: {
+        [namespace: string]: {
+          result?: {
+            allow?: boolean;
+            violations?: RegoPolicyViolation[] | Record<string, RegoPolicyViolation>;
+            warnings?: RegoPolicyViolation[] | Record<string, RegoPolicyViolation>;
+            suggestions?: RegoPolicyViolation[] | Record<string, RegoPolicyViolation>;
+          };
+        };
+      };
+    }>;
+  }>;
+}
+
+/**
+ * Internal combined result during policy evaluation
+ */
+interface CombinedPolicyResult {
+  allow: boolean;
+  violations: RegoPolicyViolation[];
+  warnings: RegoPolicyViolation[];
+  suggestions: RegoPolicyViolation[];
+}
+
+/**
  * Rego policy evaluator interface
  */
 export interface RegoEvaluator {
@@ -213,7 +243,7 @@ async function evaluateRegoPolicy(
       }
 
       // Parse the OPA output
-      const combinedResult: any = {
+      const combinedResult: CombinedPolicyResult = {
         allow: true,
         violations: [],
         warnings: [],
@@ -221,13 +251,14 @@ async function evaluateRegoPolicy(
       };
 
       try {
-        const output = JSON.parse(stdout);
+        const output: unknown = JSON.parse(stdout);
+        const opaOutput = output as OpaEvalOutput;
 
         // OPA JSON format: { result: [{ expressions: [{ value: ... }] }] }
         if (
-          output?.result && Array.isArray(output.result) && output.result.length > 0
+          opaOutput?.result && Array.isArray(opaOutput.result) && opaOutput.result.length > 0
         ) {
-          const firstResult = output.result[0];
+          const firstResult = opaOutput.result[0];
           if (
             firstResult?.expressions &&
             Array.isArray(firstResult.expressions) &&
