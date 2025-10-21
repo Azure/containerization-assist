@@ -28,5 +28,8 @@
         "dockerfilelint",
         "kubernetes-models"
     ],
+    "ignoreBinaries": [
+        "opa"
+    ],
     "includeEntryExports": false
 }

@@ -10,8 +10,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import tmp from 'tmp';
 import type { Logger } from 'pino';
 import { type Result, Success, Failure } from '@/types';
 import { ERROR_MESSAGES } from '@/lib/errors';
@@ -181,9 +181,9 @@ async function evaluateRegoPolicy(
 
     logger.debug({ inputType: typeof input }, 'Evaluating Rego policy');
 
-    // Create a temporary file for input
-    const inputFile = join(tmpdir(), `opa-input-${Date.now()}-${Math.random().toString(36).slice(2, 11)}.json`);
-    await writeFile(inputFile, JSON.stringify(inputData));
+    // Create a secure temporary file for input using tmp package
+    const tmpFile = tmp.fileSync({ prefix: 'opa-input-', postfix: '.json' });
+    await writeFile(tmpFile.name, JSON.stringify(inputData));
 
     try {
       const opaBinary = getOpaBinaryPath();
@@ -199,7 +199,7 @@ async function evaluateRegoPolicy(
         [
           'eval',
           ...policyArgs,
-          '-i', inputFile,
+          '-i', tmpFile.name,
           '-f', 'json',
           'data.containerization',
         ],
@@ -304,10 +304,9 @@ async function evaluateRegoPolicy(
         },
       };
     } finally {
-      // Clean up temp file
+      // Clean up temp file using tmp's cleanup mechanism
       try {
-        const { unlink } = await import('node:fs/promises');
-        await unlink(inputFile);
+        tmpFile.removeCallback();
       } catch {
         // Ignore cleanup errors
       }
