@@ -50,6 +50,10 @@ const MANIFEST_TYPE_TO_TOPIC = {
   kustomize: TOPICS.KUBERNETES,
 } as const;
 
+// Default resource limits for policy validation pseudo-manifests
+const DEFAULT_POLICY_VALIDATION_CPU_LIMIT = '500m';
+const DEFAULT_POLICY_VALIDATION_MEMORY_LIMIT = '512Mi';
+
 /**
  * Parse ACA manifest from YAML or JSON string
  */
@@ -180,8 +184,8 @@ function planToManifestText(plan: ManifestPlan, manifestType: string): string {
       lines.push('      containers:');
       lines.push('      - resources:');
       lines.push('          limits:');
-      lines.push('            cpu: 500m');
-      lines.push('            memory: 512Mi');
+      lines.push(`            cpu: ${DEFAULT_POLICY_VALIDATION_CPU_LIMIT}`);
+      lines.push(`            memory: ${DEFAULT_POLICY_VALIDATION_MEMORY_LIMIT}`);
     }
   }
 

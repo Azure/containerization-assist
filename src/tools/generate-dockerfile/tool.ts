@@ -614,8 +614,21 @@ function planToDockerfileText(plan: DockerfilePlan): string {
   }
 
   // Add USER directive if recommended or exists
+  // Try to extract a recommended username from security recommendations
   if (hasNonRootUser || plan.existingDockerfile?.analysis.hasNonRootUser) {
-    lines.push('USER node'); // Example non-root user
+    let userName: string | undefined;
+
+    // Look for recommendations like "USER <username>"
+    for (const s of security) {
+      const match = s.recommendation.match(/USER\s+([a-zA-Z0-9_-]+)/i);
+      if (match?.[1]) {
+        userName = match[1];
+        break;
+      }
+    }
+
+    // Only add USER directive if a username is found or use a common default
+    lines.push(`USER ${userName || 'node'}`);
   }
 
   // Add HEALTHCHECK if recommended or exists

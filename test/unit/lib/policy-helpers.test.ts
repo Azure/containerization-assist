@@ -100,7 +100,9 @@ describe('policy-helpers', () => {
         close: jest.fn(),
       };
 
-      const content = 'FROM node:20-alpine\nUSER node\nHEALTHCHECK CMD curl --fail http://localhost:8080/health || exit 1';
+      const content = `FROM node:20-alpine
+USER node
+HEALTHCHECK CMD curl --fail http://localhost:8080/health || exit 1`;
 
       const result = await validateContentAgainstPolicy(
         content,

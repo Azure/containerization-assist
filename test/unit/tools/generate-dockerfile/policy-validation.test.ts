@@ -40,8 +40,7 @@ describe('generate-dockerfile policy validation', () => {
         summary: 'Test plan',
       };
 
-      // Expected to generate: FROM node:20-alpine
-      // This would be validated against policy
+      // Verify plan structure
       expect(plan.recommendations.baseImages[0]?.image).toBe('node:20-alpine');
       expect(plan.recommendations.buildStrategy.multistage).toBe(false);
     });
@@ -119,8 +118,7 @@ describe('generate-dockerfile policy validation', () => {
         summary: 'Test plan',
       };
 
-      // Expected to generate: USER node
-      // This would pass the block-root-user policy
+      // Verify non-root user recommendation is present
       const hasNonRootUser = plan.recommendations.securityConsiderations?.some(
         (s) =>
           s.recommendation.toLowerCase().includes('non-root user') ||

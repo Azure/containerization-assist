@@ -182,7 +182,7 @@ async function evaluateRegoPolicy(
     logger.debug({ inputType: typeof input }, 'Evaluating Rego policy');
 
     // Create a temporary file for input
-    const inputFile = join(tmpdir(), `opa-input-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.json`);
+    const inputFile = join(tmpdir(), `opa-input-${Date.now()}-${Math.random().toString(36).slice(2, 11)}.json`);
     await writeFile(inputFile, JSON.stringify(inputData));
 
     try {
