@@ -463,8 +463,8 @@ function applyCharacterBudget(snippets: KnowledgeSnippet[], maxChars: number): K
       selected.push(snippet);
       selectedIds.add(snippet.id);
       currentChars += snippetLength;
-    } else if (selected.length === 0 && snippetLength > maxChars) {
-      // If first snippet exceeds budget, truncate it
+    } else if (selected.length === requiredSnippets.length && snippetLength > maxChars) {
+      // If first non-required snippet exceeds budget, truncate it
       selected.push({
         ...snippet,
         text: `${snippet.text.substring(0, maxChars - 3)}...`,
