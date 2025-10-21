@@ -100,14 +100,17 @@ export interface RegoEvaluator {
  * Get path to OPA binary
  */
 function getOpaBinaryPath(): string {
+  // Determine platform-specific OPA binary name
+  const opaBinaryName = process.platform === 'win32' ? 'opa.exe' : 'opa';
+
   // First try project's node_modules
-  const localOpa = join(process.cwd(), 'node_modules', '.bin', 'opa');
+  const localOpa = join(process.cwd(), 'node_modules', '.bin', opaBinaryName);
   if (existsSync(localOpa)) {
     return localOpa;
   }
 
   // Fall back to system OPA
-  return 'opa';
+  return opaBinaryName;
 }
 
 /**

@@ -77,6 +77,12 @@ const DOCKERFILE_KEYWORDS = [
 ] as const;
 
 /**
+ * Default non-root username for policy validation pseudo-Dockerfile
+ * Using a generic name that works across different base images and languages
+ */
+const DEFAULT_NON_ROOT_USER = 'appuser';
+
+/**
  * Parse Dockerfile content and extract base images
  */
 function extractBaseImages(lines: string[]): string[] {
@@ -627,8 +633,8 @@ function planToDockerfileText(plan: DockerfilePlan): string {
       }
     }
 
-    // Only add USER directive if a username is found or use a common default
-    lines.push(`USER ${userName || 'node'}`);
+    // Only add USER directive if a username is found or use a generic default
+    lines.push(`USER ${userName || DEFAULT_NON_ROOT_USER}`);
   }
 
   // Add HEALTHCHECK if recommended or exists

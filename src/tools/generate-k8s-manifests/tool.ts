@@ -50,7 +50,19 @@ const MANIFEST_TYPE_TO_TOPIC = {
   kustomize: TOPICS.KUBERNETES,
 } as const;
 
-// Default resource limits for policy validation pseudo-manifests
+/**
+ * Default resource limits for policy validation pseudo-manifests
+ *
+ * These values are used when converting ManifestPlan to YAML for policy validation.
+ * They represent reasonable defaults for a typical microservice application:
+ * - CPU: 500m (0.5 cores) - Sufficient for most API services under moderate load
+ * - Memory: 512Mi - Adequate for typical application runtime and data structures
+ *
+ * These are NOT production recommendations - actual resource limits should be
+ * determined through profiling and load testing. These values are only used
+ * to ensure policy rules that check for resource limit presence can evaluate
+ * the pseudo-manifest structure.
+ */
 const DEFAULT_POLICY_VALIDATION_CPU_LIMIT = '500m';
 const DEFAULT_POLICY_VALIDATION_MEMORY_LIMIT = '512Mi';
 

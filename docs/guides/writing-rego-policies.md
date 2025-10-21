@@ -81,9 +81,9 @@ Or use a shared location:
 
 ### Loading Policies
 
-**Important**: You must configure the policy file path using the environment variable. Policies are not enabled by default.
+**Built-in Policies**: By default, the built-in policies in the `policies/` directory are automatically discovered and merged. These provide baseline security, best practices, and base image governance.
 
-Set the environment variable to point to your policy file:
+**Custom Policies**: To use your own custom policy instead of (or in addition to) the built-in policies, set the environment variable to point to your policy file:
 
 ```bash
 export CONTAINERIZATION_ASSIST_POLICY_PATH=/path/to/your/policy.rego
@@ -92,10 +92,10 @@ export CONTAINERIZATION_ASSIST_POLICY_PATH=/path/to/your/policy.rego
 Or use the CLI flag:
 
 ```bash
-containerization-assist-mcp --policy-path /path/to/your/policy.rego
+containerization-assist-mcp --config /path/to/your/policy.rego
 ```
 
-**Example Workflow:**
+**Example Workflow for Custom Policies:**
 
 ```bash
 # Create your policy directory
@@ -108,12 +108,14 @@ package containerization.security
 # Your custom rules here
 EOF
 
-# Set environment variable
+# Set environment variable to use custom policy
 export CONTAINERIZATION_ASSIST_POLICY_PATH=~/.containerization-assist/policy.rego
 
-# Run the tool - policies will now be enforced
+# Run the tool - your custom policy will now be enforced
 containerization-assist-mcp
 ```
+
+**Note**: When you specify a custom policy path, it will be used instead of the built-in policies. If you want to extend the built-in policies, you can import and reference them in your custom policy file.
 
 ---
 
@@ -743,16 +745,17 @@ package containerization.base          # Shared utilities
 
 #### 1. Policy Not Loading
 
-**Symptom**: Policy file exists but isn't being enforced
+**Symptom**: Custom policy file exists but isn't being enforced
 
 **Causes**:
-- Environment variable `CONTAINERIZATION_ASSIST_POLICY_PATH` not set
+- Custom policy path not set (built-in policies will be used instead)
 - File doesn't have `.rego` extension
 - Syntax error in policy file
+- Policy package name doesn't match expected namespace
 
 **Solution**:
 ```bash
-# Verify environment variable is set
+# Verify environment variable is set (if using custom policy)
 echo $CONTAINERIZATION_ASSIST_POLICY_PATH
 
 # Validate policy syntax
@@ -760,6 +763,9 @@ opa check ~/.containerization-assist/policy.rego
 
 # Test policy evaluation
 opa eval -d ~/.containerization-assist/ -i test-input.txt "data.containerization.security.result"
+
+# Check that policy uses correct namespace (should be under data.containerization.*)
+opa eval -d ~/.containerization-assist/ "data.containerization"
 ```
 
 #### 2. Rules Not Triggering
