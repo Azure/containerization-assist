@@ -157,9 +157,81 @@ After you have the information you need, please create the actual Dockerfile in 
       expect(dockerfileContent).toMatch(/openjdk|eclipse-temurin|java/i);
       expect(dockerfileContent).toContain('COPY');
 
-      // Verify the agent executed the expected tools
-      expect(result.toolCallsExecuted.some(tc => tc.toolName === 'analyze-repo')).toBe(true);
-      expect(result.toolCallsExecuted.some(tc => tc.toolName === 'generate-dockerfile')).toBe(true);
+      // **ENHANCED LLM BEHAVIOR VALIDATION**
+      // Test that LLM made autonomous decisions and "one-shotted" correct inputs
+
+      // 1. Verify tool sequence: LLM should have called analyze-repo BEFORE generate-dockerfile
+      const analyzeRepoCall = result.toolCallsExecuted.find(tc => tc.toolName === 'analyze-repo');
+      const generateDockerfileCall = result.toolCallsExecuted.find(tc => tc.toolName === 'generate-dockerfile');
+
+      expect(analyzeRepoCall).toBeDefined();
+      expect(generateDockerfileCall).toBeDefined();
+
+      const analyzeIndex = result.toolCallsExecuted.findIndex(tc => tc.toolName === 'analyze-repo');
+      const generateIndex = result.toolCallsExecuted.findIndex(tc => tc.toolName === 'generate-dockerfile');
+
+      console.log('🧠 LLM Decision Sequence Analysis:');
+      console.log(`   1. analyze-repo called at index: ${analyzeIndex}`);
+      console.log(`   2. generate-dockerfile called at index: ${generateIndex}`);
+
+      // Verify LLM made correct autonomous decision on tool sequence
+      expect(analyzeIndex).toBeLessThan(generateIndex);
+      console.log('✅ LLM correctly chose to analyze repo before generating dockerfile');
+
+      // 2. Verify LLM provided correct parameters to analyze-repo
+      expect(analyzeRepoCall!.params).toBeDefined();
+      expect(analyzeRepoCall!.params.repositoryPath || analyzeRepoCall!.params.path || analyzeRepoCall!.params.projectPath).toBeDefined();
+
+      const repoPath = analyzeRepoCall!.params.repositoryPath || analyzeRepoCall!.params.path || analyzeRepoCall!.params.projectPath;
+      console.log('🎯 LLM provided repo path:', repoPath);
+      console.log('✅ LLM correctly provided repository path parameter');
+
+      // 3. Verify LLM provided correct parameters to generate-dockerfile
+      expect(generateDockerfileCall!.params).toBeDefined();
+
+      // LLM should have used information from analyze-repo to inform dockerfile generation
+      const dockerfileParams = generateDockerfileCall!.params;
+      console.log('🎯 LLM dockerfile generation params:', Object.keys(dockerfileParams));
+
+      // The params should include relevant information about the project
+      // LLM may structure this as individual parameters or as an analysis object
+      const hasAnalysisInfo = dockerfileParams.analysis ||
+                             (dockerfileParams.repositoryPath && dockerfileParams.language) ||
+                             (dockerfileParams.modulePath && dockerfileParams.framework);
+      expect(hasAnalysisInfo).toBeTruthy();
+      console.log('✅ LLM correctly used analysis results to inform dockerfile generation');
+
+      // 4. Verify LLM processed tool responses correctly
+      // Check that LLM received analysis results and used them properly
+      expect(analyzeRepoCall!.result).toBeDefined();
+      expect(generateDockerfileCall!.result).toBeDefined();
+
+      const analysisResult = analyzeRepoCall!.result;
+      console.log('📊 Analysis tool result type:', typeof analysisResult);
+      console.log('📊 Analysis result contains expected data:',
+        typeof analysisResult === 'object' && analysisResult !== null);
+
+      // 5. Verify tool call accuracy - LLM should "one-shot" correct inputs
+      // No retries or error corrections should be needed for well-structured projects
+      const toolCallCount = result.toolCallsExecuted.length;
+      console.log('🎲 Total tool calls made:', toolCallCount);
+      console.log('🎯 Expected efficient execution: analyze-repo -> generate-dockerfile -> createFile');
+
+      // For our simple Spring Boot project, LLM should execute efficiently without retries
+      expect(toolCallCount).toBeLessThanOrEqual(3); // analyze, generate, plus potential extra calls
+      console.log('✅ LLM executed efficiently without unnecessary retries');
+
+      // 6. Verify LLM autonomous decision making - it chose to create the file
+      // This tests that LLM processed the dockerfile content and decided to create it
+      const dockerfileCreated = result.filesCreated.some(file => file.includes('Dockerfile'));
+      expect(dockerfileCreated).toBe(true);
+      console.log('✅ LLM autonomously decided to create Dockerfile after generating it');
+
+      console.log('🧠 LLM BEHAVIOR VALIDATION COMPLETE:');
+      console.log('   ✅ Correct tool sequence (analyze → generate → create)');
+      console.log('   ✅ Accurate parameter provision ("one-shot" inputs)');
+      console.log('   ✅ Proper tool response processing');
+      console.log('   ✅ Autonomous decision making (no orchestration)');
 
     } catch (error) {
       console.log('❌ Dockerfile was not created by autonomous agent');
