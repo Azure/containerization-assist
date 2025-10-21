@@ -46,10 +46,6 @@ interface DockerfileFixRules {
   issueCount: number;
 }
 
-// Policy validation is performed when ctx.policy is provided via ToolContext.
-// The policy evaluator is passed from the caller (e.g., MCP server) and applied
-// to the Dockerfile content to detect organizational policy violations.
-
 /**
  * Map validation issue to fix recommendation category
  */

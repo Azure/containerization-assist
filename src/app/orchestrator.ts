@@ -64,11 +64,6 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   const { registry, server, config = { chainHintsMode: 'enabled' } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
-  // Note: Policy enforcement has been removed from orchestrator.
-  // Policies are now enforced at the tool level where they can validate
-  // generated content (Dockerfiles, K8s manifests) rather than just input parameters.
-  // Tools receive policies via ToolContext when configured.
-
   // Cache the loaded policy to avoid reloading on every execution
   let policyCache: RegoEvaluator | undefined;
   let policyLoaded = false;
@@ -132,10 +127,6 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   const validation = validateParams(params, tool.schema);
   if (!validation.ok) return validation;
   const validatedParams = validation.value;
-
-  // Policy enforcement happens within tools (not here at parameter level)
-  // Tools validate generated content (Dockerfiles, K8s manifests) against policies
-  // The policy is passed to tools via ToolContext for self-validation
 
   const toolContext = createContextForTool(request, logger, policy);
   const tracker = createStandardizedToolTracker(tool.name, {}, logger);
