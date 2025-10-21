@@ -102,6 +102,25 @@ export default {
       coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
       maxWorkers: 1,
     },
+     {
+      displayName: 'llm-integration',
+      testMatch: ['<rootDir>/test/llm-integration/**/*.test.ts'],
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/llm-integration-setup.ts'],
+      testEnvironment: 'node',
+      moduleNameMapper: {
+        ...commonModuleNameMapper,
+        // Handle relative dist imports from test files - map them to CommonJS version
+        '^\\.\\./\\.\\./\\.\\./dist/src/(.*)\\.js$': '<rootDir>/dist-cjs/src/$1.js',
+        '^\\.\\./\\.\\./\\.\\./dist/src/types/(.*)\\.js$': '<rootDir>/dist-cjs/src/types/$1.js',
+        // Mock kubernetes dependencies for LLM tests
+        '@kubernetes/client-node': '<rootDir>/test/__support__/mocks/kubernetes-mock.ts',
+        '^@/infra/kubernetes/(.*)$': '<rootDir>/test/__support__/mocks/kubernetes-mock.ts',
+      },
+      transform: commonTransform,
+      maxWorkers: 1, // Serial execution for LLM tests to avoid rate limits
+      testTimeout: 180000, // 3 minute timeout for LLM interactions
+      slowTestThreshold: 30, // Flag tests over 30s as slow
+    },
   ],
 
   // Transform ESM packages
