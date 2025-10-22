@@ -359,7 +359,7 @@ export class ChatClient implements LLMClient {
       console.log('📁 Files created:', filesCreated);
 
       return {
-        response: finalResponse || 'Task completed successfully.',
+        response: finalResponse,
         filesCreated,
         toolCallsExecuted,
       };
