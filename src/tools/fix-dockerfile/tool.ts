@@ -26,6 +26,7 @@ import { ValidationCategory, ValidationSeverity } from '@/validation/core-types'
 import type { z } from 'zod';
 import { readDockerfile } from '@/lib/file-utils';
 import { validateContentAgainstPolicy, type PolicyValidationResult } from '@/lib/policy-helpers';
+import { pluralize } from '@/lib/summary-helpers';
 
 const name = 'fix-dockerfile';
 const description = 'Analyze Dockerfile for issues and return knowledge-based fix recommendations';
@@ -263,17 +264,13 @@ const runPattern = createKnowledgeTool<
         `- Best Practices: ${bestPracticeIssues.length} fix(es) - Improved maintainability`,
       ].join('\n');
 
-      const summary = `
-Dockerfile Fix Planning Summary:
-- Environment: ${input.environment || 'production'}
-- Validation Score: ${validationScore}/100 (Grade: ${validationGrade})
-- Issues Found: ${rules.issueCount} (${securityIssues.length} security, ${performanceIssues.length} performance, ${bestPracticeIssues.length} best practices)
-- Overall Priority: ${rules.overallPriority.toUpperCase()}
-- Knowledge Matches: ${knowledgeMatches.length} fix recommendations found
-  - Security Fixes: ${securityFixes.length}
-  - Performance Fixes: ${performanceFixes.length}
-  - Best Practice Fixes: ${bestPracticeFixes.length}
-      `.trim();
+      // Concise summary
+      const totalIssues = rules.issueCount;
+      const totalFixes = knowledgeMatches.length;
+      const environment = input.environment || 'production';
+      const summary = totalIssues > 0
+        ? `✅ Dockerfile validation complete for ${environment} environment. Found ${pluralize(totalIssues, 'issue')} (${securityIssues.length} security, ${performanceIssues.length} performance). ${pluralize(totalFixes, 'fix recommendation')} available. Validation score: ${validationScore}/100 (${validationGrade}).`
+        : `✅ Dockerfile validation passed for ${environment} environment. Score: ${validationScore}/100 (${validationGrade}). No critical issues found.`;
 
       return {
         currentIssues: {

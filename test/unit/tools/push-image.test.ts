@@ -214,24 +214,83 @@ describe('push-image tool', () => {
         imageId: 'myapp:v1',
         registry: 'https://gcr.io/my-project/'
       }, createMockContext());
-      
+
       expect(result.ok).toBe(true);
 
       if (result.ok) {
         expect(result.value.pushedTag).toBe('gcr.io/my-project/myapp:v1');
       }
     });
-    
+
     it('should not double-prefix registry if already in imageId', async () => {
       const result = await pushImageTool.handler({
         imageId: 'gcr.io/my-project/myapp:v1',
         registry: 'gcr.io/my-project'
       }, createMockContext());
-      
+
       expect(result.ok).toBe(true);
 
       if (result.ok) {
         expect(result.value.pushedTag).toBe('gcr.io/my-project/myapp:v1');
+      }
+    });
+  });
+
+  describe('summary generation', () => {
+    it('should generate summary with truncated sha256 digest', async () => {
+      // Mock pushImage to return a specific sha256 digest
+      fakeDocker.pushImage = async () => ({
+        ok: true,
+        value: { digest: 'sha256:abcdef1234567890abcdef1234567890' }
+      });
+
+      const result = await pushImageTool.handler({
+        imageId: 'myapp:v1.0.0'
+      }, createMockContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.summary).toBeDefined();
+        expect(result.value.summary).toContain('sha256:abcdef...');
+        expect(result.value.summary).toContain('✅ Pushed image to registry');
+        expect(result.value.summary).toContain('docker.io/myapp:v1.0.0');
+      }
+    });
+
+    it('should handle sha512 digest correctly', async () => {
+      // Mock pushImage to return a sha512 digest
+      fakeDocker.pushImage = async () => ({
+        ok: true,
+        value: { digest: 'sha512:fedcba9876543210fedcba9876543210' }
+      });
+
+      const result = await pushImageTool.handler({
+        imageId: 'myapp:v1.0.0'
+      }, createMockContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.summary).toBeDefined();
+        expect(result.value.summary).toContain('sha512:fedcba...');
+        expect(result.value.summary).not.toContain('sha512:fedcba9876543210'); // Should be truncated
+      }
+    });
+
+    it('should handle digest with different algorithm correctly', async () => {
+      // Mock pushImage to return a blake2b digest (hypothetical future algorithm)
+      fakeDocker.pushImage = async () => ({
+        ok: true,
+        value: { digest: 'blake2b:xyz123abc456def789ghi012' }
+      });
+
+      const result = await pushImageTool.handler({
+        imageId: 'myapp:v1.0.0'
+      }, createMockContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.summary).toBeDefined();
+        expect(result.value.summary).toContain('blake2b:xyz123...');
       }
     });
   });

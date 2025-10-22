@@ -28,6 +28,7 @@ import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledg
 import type { z } from 'zod';
 import yaml from 'js-yaml';
 import { extractErrorMessage } from '@/lib/errors';
+import { pluralize } from '@/lib/summary-helpers';
 import type { RegoEvaluator } from '@/config/policy-rego';
 import type { Logger } from 'pino';
 import { getToolLogger } from '@/lib/tool-helpers';
@@ -331,18 +332,8 @@ const runPattern = createKnowledgeTool<
             matchScore: snippet.weight,
           }));
 
-        const summary = `
-ACA to K8s Conversion Planning Summary:
-- Container Apps: ${analysis.containerApps.length}
-- Total Containers: ${analysis.containerApps.reduce((sum, app) => sum + app.containers, 0)}
-- Knowledge Matches: ${knowledgeMatches.length} recommendations found
-  - Field Mappings: ${fieldMappings.length}
-  - Security Considerations: ${securityMatches.length}
-  - Best Practices: ${bestPracticeMatches.length}
-- Warnings: ${analysis.warnings.length}
-
-Use this plan to guide the conversion from Azure Container Apps to Kubernetes manifests.
-        `.trim();
+        const totalContainers = analysis.containerApps.reduce((sum, app) => sum + app.containers, 0);
+        const summary = `✅ ACA to K8s conversion plan ready. ${pluralize(analysis.containerApps.length, 'Container App')} with ${pluralize(totalContainers, 'container')} analyzed. ${pluralize(knowledgeMatches.length, 'recommendation')} generated. Ready to convert.`;
 
         return {
           acaAnalysis: analysis,
@@ -403,25 +394,7 @@ Use this plan to guide the conversion from Azure Container Apps to Kubernetes ma
           ? ` (${input.frameworks.map((f) => f.name).join(', ')})`
           : '';
 
-      const nextStepTool = {
-        kubernetes: 'k8s-manifests',
-        helm: 'helm-charts',
-        aca: 'aca-manifests',
-        kustomize: 'kustomize',
-      }[input.manifestType];
-
-      const summary = `
-Manifest Planning Summary:
-- Manifest Type: ${input.manifestType}
-- Language: ${input.language || 'not specified'}${frameworksStr}
-- Environment: ${input.environment || 'production'}
-- Knowledge Matches: ${knowledgeMatches.length} recommendations found
-  - Security: ${securityMatches.length}
-  - Resource Management: ${resourceMatches.length}
-  - Best Practices: ${bestPracticeMatches.length}
-
-Next Step: Use generate-${nextStepTool} to create manifests using these recommendations.
-      `.trim();
+      const summary = `✅ Generated ${input.manifestType} manifest plan for ${input.name || input.language || 'application'}${frameworksStr}. ${pluralize(knowledgeMatches.length, 'recommendation')} available. Ready to deploy.`;
 
       return {
         repositoryInfo: {

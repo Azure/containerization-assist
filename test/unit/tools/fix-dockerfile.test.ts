@@ -211,7 +211,7 @@ describe('fix-dockerfile', () => {
         expect(['A', 'B', 'C', 'D', 'F']).toContain(result.value.validationGrade);
         expect(result.value.priority).toBe('high'); // Has critical security issue
         expect(result.value.confidence).toBeGreaterThanOrEqual(0);
-        expect(result.value.summary).toContain('Issues Found: 3');
+        expect(result.value.summary).toContain('Found 3 issues');
       }
     });
 
