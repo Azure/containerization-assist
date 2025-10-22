@@ -18,6 +18,10 @@ export const generateDockerfileSchema = z.object({
       'Module path for monorepo/multi-module projects to locate where the Dockerfile should be generated (automatically normalized to forward slashes).',
     ),
   language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
+  languageVersion: z
+    .string()
+    .optional()
+    .describe('Language version (e.g., "17", "3.11", "20"). For Java, this is the java.version from pom.xml or sourceCompatibility from build.gradle.'),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
   detectedDependencies: z
@@ -106,7 +110,6 @@ export interface DockerfilePlan {
     optimizations: DockerfileRequirement[];
     bestPractices: DockerfileRequirement[];
   };
-  knowledgeMatches: DockerfileRequirement[];
   confidence: number;
   summary: string;
   existingDockerfile?: {
@@ -116,4 +119,8 @@ export interface DockerfilePlan {
     guidance: EnhancementGuidance;
   };
   policyValidation?: PolicyValidationResult;
+  /**
+   * @deprecated Use recommendations.baseImages, securityConsiderations, optimizations, and bestPractices instead
+   */
+  knowledgeMatches?: DockerfileRequirement[];
 }

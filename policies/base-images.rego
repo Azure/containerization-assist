@@ -37,18 +37,37 @@ is_dockerfile if {
 # BASE IMAGE RULES
 # ==============================================================================
 
+# Rule: require-microsoft-images (priority: 95)
+# Require Microsoft Container Registry images for all deployments
+violations contains result if {
+	is_dockerfile
+	# Match any FROM line
+	regex.match(`(?im)FROM\s+[a-z0-9._/-]+:`, input.content)
+	# But NOT mcr.microsoft.com
+	not regex.match(`(?im)FROM\s+mcr\.microsoft\.com/`, input.content)
+
+	result := {
+		"rule": "require-microsoft-images",
+		"category": "quality",
+		"priority": 95,
+		"severity": "block",
+		"message": "Only Microsoft Container Registry images are allowed. Use mcr.microsoft.com/openjdk/jdk for Java, mcr.microsoft.com/dotnet for .NET, mcr.microsoft.com/cbl-mariner for base images.",
+		"description": "Require Microsoft Container Registry images for all deployments",
+	}
+}
+
 # Rule: recommend-microsoft-images (priority: 85)
 # Recommend Microsoft Azure Linux images for enterprise deployments
 suggestions contains result if {
 	is_dockerfile
-	regex.match(`(?im)FROM\s+(openjdk|eclipse-temurin|mcr\.microsoft\.com/openjdk|dotnet|mcr\.microsoft\.com/dotnet|node|python):`, input.content)
+	regex.match(`(?im)FROM\s+mcr\.microsoft\.com/(openjdk|dotnet|cbl-mariner):`, input.content)
 
 	result := {
 		"rule": "recommend-microsoft-images",
 		"category": "quality",
 		"priority": 85,
 		"severity": "suggest",
-		"message": "Consider using Microsoft Azure Linux (Mariner) base images for enterprise deployments: mcr.microsoft.com/openjdk/jdk for Java, mcr.microsoft.com/dotnet for .NET, mcr.microsoft.com/cbl-mariner for Node.js/Python. Provides enterprise support and security.",
+		"message": "Good choice using Microsoft Azure Linux (Mariner) base images for enterprise deployments. Provides enterprise support and security.",
 		"description": "Recommend Microsoft Azure Linux images for enterprise deployments",
 	}
 }

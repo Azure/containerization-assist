@@ -79,7 +79,8 @@
     "prepublishOnly": "npm run validate && npm run build",
     "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
     "smoke:journey": "tsx scripts/smoke-journey.ts",
-    "test:policies": "opa test policies/"
+    "test:policies": "opa test policies/",
+    "tag-migration": "tsx scripts/tag-migration.ts"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",

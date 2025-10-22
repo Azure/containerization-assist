@@ -6,7 +6,15 @@
     "recommendation": "Configure standalone SignalR services for real-time communication in containers",
     "example": "FROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY . .\nEXPOSE 80 443\n\n// In Program.cs\nbuilder.Services.AddSignalR(options =>\n{\n    options.EnableDetailedErrors = builder.Environment.IsDevelopment();\n    options.MaximumReceiveMessageSize = 1024 * 1024; // 1MB\n    options.StreamBufferCapacity = 10;\n    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);\n    options.KeepAliveInterval = TimeSpan.FromSeconds(15);\n});",
     "severity": "high",
-    "tags": ["signalr", "real-time", "websockets", "standalone"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "real-time",
+      "signalr",
+      "standalone",
+      "websockets"
+    ],
     "description": "Standalone SignalR services provide dedicated real-time communication infrastructure"
   },
   {
@@ -16,7 +24,15 @@
     "recommendation": "Configure Redis backplane for SignalR scalability across multiple containers",
     "example": "// Redis backplane configuration\nbuilder.Services.AddSignalR()\n    .AddRedis(builder.Configuration.GetConnectionString(\"Redis\"), options =>\n    {\n        options.Configuration.ChannelPrefix = \"MyApp\";\n        options.Configuration.ClientName = Environment.MachineName;\n    });\n\n// Alternative: Azure SignalR Service\nbuilder.Services.AddSignalR()\n    .AddAzureSignalR(builder.Configuration.GetConnectionString(\"AzureSignalR\"));\n\n// Health check\nbuilder.Services.AddHealthChecks()\n    .AddRedis(builder.Configuration.GetConnectionString(\"Redis\"))\n    .AddSignalRHub<ChatHub>(\"/chathub\");",
     "severity": "high",
-    "tags": ["signalr", "redis", "backplane", "scalability"],
+    "tags": [
+      "azure",
+      "backplane",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "redis",
+      "scalability",
+      "signalr"
+    ],
     "description": "Redis backplane enables SignalR to scale across multiple container instances"
   },
   {
@@ -26,7 +42,15 @@
     "recommendation": "Implement JWT authentication for SignalR hubs in containerized environments",
     "example": "// JWT authentication for SignalR\nbuilder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)\n    .AddJwtBearer(options =>\n    {\n        options.TokenValidationParameters = new TokenValidationParameters\n        {\n            ValidateIssuerSigningKey = true,\n            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),\n            ValidateIssuer = true,\n            ValidIssuer = issuer,\n            ValidateAudience = true,\n            ValidAudience = audience\n        };\n        \n        // Configure SignalR token handling\n        options.Events = new JwtBearerEvents\n        {\n            OnMessageReceived = context =>\n            {\n                var accessToken = context.Request.Query[\"access_token\"];\n                var path = context.HttpContext.Request.Path;\n                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments(\"/hubs\"))\n                {\n                    context.Token = accessToken;\n                }\n                return Task.CompletedTask;\n            }\n        };\n    });\n\n[Authorize]\npublic class ChatHub : Hub\n{\n    public async Task SendMessage(string message)\n    {\n        var userId = Context.User?.Identity?.Name;\n        await Clients.All.SendAsync(\"ReceiveMessage\", userId, message);\n    }\n}",
     "severity": "high",
-    "tags": ["signalr", "authentication", "jwt", "security"],
+    "tags": [
+      "authentication",
+      "aws",
+      "fix-dockerfile",
+      "jwt",
+      "scan-image",
+      "security",
+      "signalr"
+    ],
     "description": "JWT authentication secures SignalR connections in containerized applications"
   },
   {
@@ -36,7 +60,14 @@
     "recommendation": "Implement robust connection management for SignalR in container environments",
     "example": "// Connection management service\npublic class ConnectionManager\n{\n    private readonly ConcurrentDictionary<string, UserConnection> _connections = new();\n    private readonly ILogger<ConnectionManager> _logger;\n    \n    public void AddConnection(string connectionId, string userId, string groupName)\n    {\n        _connections.TryAdd(connectionId, new UserConnection(userId, groupName));\n        _logger.LogInformation(\"Connection {ConnectionId} added for user {UserId}\", connectionId, userId);\n    }\n    \n    public void RemoveConnection(string connectionId)\n    {\n        if (_connections.TryRemove(connectionId, out var connection))\n        {\n            _logger.LogInformation(\"Connection {ConnectionId} removed for user {UserId}\", \n                connectionId, connection.UserId);\n        }\n    }\n    \n    public IEnumerable<string> GetUserConnections(string userId)\n    {\n        return _connections\n            .Where(x => x.Value.UserId == userId)\n            .Select(x => x.Key);\n    }\n}\n\n// Hub implementation\npublic class ChatHub : Hub\n{\n    private readonly ConnectionManager _connectionManager;\n    \n    public override async Task OnConnectedAsync()\n    {\n        var userId = Context.User?.Identity?.Name;\n        _connectionManager.AddConnection(Context.ConnectionId, userId, \"default\");\n        await Groups.AddToGroupAsync(Context.ConnectionId, \"default\");\n        await base.OnConnectedAsync();\n    }\n    \n    public override async Task OnDisconnectedAsync(Exception exception)\n    {\n        _connectionManager.RemoveConnection(Context.ConnectionId);\n        await base.OnDisconnectedAsync(exception);\n    }\n}",
     "severity": "high",
-    "tags": ["signalr", "connection-management", "groups", "lifecycle"],
+    "tags": [
+      "connection-management",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "groups",
+      "lifecycle",
+      "signalr"
+    ],
     "description": "Connection management is essential for tracking users across container restarts"
   },
   {
@@ -46,7 +77,14 @@
     "recommendation": "Implement message persistence for reliable SignalR delivery in containers",
     "example": "// Message persistence with retry\npublic class PersistentMessageService\n{\n    private readonly IHubContext<ChatHub> _hubContext;\n    private readonly IMessageRepository _messageRepository;\n    private readonly ILogger<PersistentMessageService> _logger;\n    \n    public async Task SendMessageWithPersistenceAsync(string userId, object message)\n    {\n        // Store message for reliability\n        var messageId = await _messageRepository.StoreMessageAsync(userId, message);\n        \n        try\n        {\n            await _hubContext.Clients.User(userId).SendAsync(\"ReceiveMessage\", message);\n            await _messageRepository.MarkAsDeliveredAsync(messageId);\n        }\n        catch (Exception ex)\n        {\n            _logger.LogWarning(ex, \"Failed to deliver message {MessageId} to user {UserId}\", messageId, userId);\n            // Message remains in store for retry\n        }\n    }\n    \n    // Background service to retry failed messages\n    public async Task RetryFailedMessagesAsync()\n    {\n        var failedMessages = await _messageRepository.GetFailedMessagesAsync();\n        \n        foreach (var message in failedMessages)\n        {\n            try\n            {\n                await _hubContext.Clients.User(message.UserId).SendAsync(\"ReceiveMessage\", message.Content);\n                await _messageRepository.MarkAsDeliveredAsync(message.Id);\n            }\n            catch\n            {\n                // Will retry later\n            }\n        }\n    }\n}",
     "severity": "medium",
-    "tags": ["signalr", "persistence", "reliability", "retry"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "persistence",
+      "reliability",
+      "retry",
+      "signalr"
+    ],
     "description": "Message persistence ensures reliable delivery across container failures"
   },
   {
@@ -56,7 +94,14 @@
     "recommendation": "Implement rate limiting for SignalR hubs to prevent abuse",
     "example": "// Rate limiting for SignalR\npublic class RateLimitedHub : Hub\n{\n    private readonly IMemoryCache _cache;\n    private readonly ILogger<RateLimitedHub> _logger;\n    \n    public async Task SendMessage(string message)\n    {\n        var userId = Context.User?.Identity?.Name;\n        var key = $\"rate_limit:{userId}\";\n        \n        var currentCount = _cache.Get<int>(key);\n        if (currentCount >= 10) // 10 messages per minute\n        {\n            await Clients.Caller.SendAsync(\"Error\", \"Rate limit exceeded\");\n            return;\n        }\n        \n        _cache.Set(key, currentCount + 1, TimeSpan.FromMinutes(1));\n        await Clients.Others.SendAsync(\"ReceiveMessage\", userId, message);\n    }\n}\n\n// Alternative: Using AspNetCoreRateLimit\nbuilder.Services.Configure<IpRateLimitOptions>(options =>\n{\n    options.EnableEndpointRateLimiting = true;\n    options.StackBlockedRequests = false;\n    options.HttpStatusCode = 429;\n    options.RealIpHeader = \"X-Real-IP\";\n    options.GeneralRules = new List<RateLimitRule>\n    {\n        new RateLimitRule\n        {\n            Endpoint = \"*:/hubs/*\",\n            Period = \"1m\",\n            Limit = 30\n        }\n    };\n});",
     "severity": "medium",
-    "tags": ["signalr", "rate-limiting", "security", "abuse-prevention"],
+    "tags": [
+      "abuse-prevention",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "rate-limiting",
+      "security",
+      "signalr"
+    ],
     "description": "Rate limiting protects SignalR services from abuse and resource exhaustion"
   },
   {
@@ -66,7 +111,14 @@
     "recommendation": "Implement comprehensive monitoring for SignalR services in containers",
     "example": "// SignalR monitoring and metrics\npublic class MonitoredHub : Hub\n{\n    private static readonly Counter<int> ConnectionCounter = \n        Meter.CreateCounter<int>(\"signalr_connections_total\");\n    private static readonly Histogram<double> MessageDuration = \n        Meter.CreateHistogram<double>(\"signalr_message_duration_seconds\");\n    \n    public override async Task OnConnectedAsync()\n    {\n        ConnectionCounter.Add(1, new KeyValuePair<string, object?>(\"hub\", \"chat\"));\n        await base.OnConnectedAsync();\n    }\n    \n    public override async Task OnDisconnectedAsync(Exception exception)\n    {\n        ConnectionCounter.Add(-1, new KeyValuePair<string, object?>(\"hub\", \"chat\"));\n        \n        if (exception != null)\n        {\n            // Log disconnection reason\n            _logger.LogWarning(exception, \"Client disconnected with error: {ConnectionId}\", Context.ConnectionId);\n        }\n        \n        await base.OnDisconnectedAsync(exception);\n    }\n    \n    public async Task SendMessage(string message)\n    {\n        using var activity = ActivitySource.StartActivity(\"SignalR.SendMessage\");\n        var stopwatch = Stopwatch.StartNew();\n        \n        try\n        {\n            await Clients.Others.SendAsync(\"ReceiveMessage\", Context.User?.Identity?.Name, message);\n            activity?.SetStatus(ActivityStatusCode.Ok);\n        }\n        catch (Exception ex)\n        {\n            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);\n            throw;\n        }\n        finally\n        {\n            MessageDuration.Record(stopwatch.Elapsed.TotalSeconds);\n        }\n    }\n}\n\n// Health checks\nbuilder.Services.AddHealthChecks()\n    .AddSignalRHub<ChatHub>(\"/chathub\", timeout: TimeSpan.FromSeconds(10));",
     "severity": "medium",
-    "tags": ["signalr", "monitoring", "metrics", "observability"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "metrics",
+      "monitoring",
+      "observability",
+      "signalr"
+    ],
     "description": "Comprehensive monitoring enables operational visibility into SignalR performance"
   },
   {
@@ -76,7 +128,14 @@
     "recommendation": "Implement SignalR streaming for real-time data feeds in containers",
     "example": "// Server-to-client streaming\npublic class DataStreamHub : Hub\n{\n    public async IAsyncEnumerable<StockPrice> StreamStockPrices(\n        string symbol,\n        [EnumeratorCancellation] CancellationToken cancellationToken)\n    {\n        while (!cancellationToken.IsCancellationRequested)\n        {\n            var price = await GetCurrentStockPriceAsync(symbol, cancellationToken);\n            yield return new StockPrice { Symbol = symbol, Price = price, Timestamp = DateTime.UtcNow };\n            \n            try\n            {\n                await Task.Delay(1000, cancellationToken); // 1 second intervals\n            }\n            catch (OperationCanceledException)\n            {\n                break;\n            }\n        }\n    }\n    \n    // Client-to-server streaming\n    public async Task UploadData(IAsyncEnumerable<DataChunk> stream)\n    {\n        await foreach (var chunk in stream)\n        {\n            await ProcessDataChunkAsync(chunk);\n            \n            // Send progress update\n            await Clients.Caller.SendAsync(\"UploadProgress\", chunk.SequenceNumber);\n        }\n        \n        await Clients.Caller.SendAsync(\"UploadComplete\");\n    }\n}\n\n// Configure streaming options\nbuilder.Services.AddSignalR(options =>\n{\n    options.StreamBufferCapacity = 10;\n    options.MaximumReceiveMessageSize = 1024 * 1024; // 1MB\n});",
     "severity": "medium",
-    "tags": ["signalr", "streaming", "real-time", "data-feeds"],
+    "tags": [
+      "data-feeds",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "real-time",
+      "signalr",
+      "streaming"
+    ],
     "description": "SignalR streaming enables efficient real-time data transmission"
   },
   {
@@ -86,7 +145,14 @@
     "recommendation": "Use MessagePack protocol for efficient SignalR message serialization",
     "example": "// MessagePack configuration for performance\nbuilder.Services.AddSignalR()\n    .AddMessagePackProtocol(options =>\n    {\n        options.SerializerOptions = MessagePackSerializerOptions.Standard\n            .WithSecurity(MessagePackSecurity.UntrustedData)\n            .WithCompression(MessagePackCompression.Lz4Block);\n    });\n\n// Client-side configuration needed\n// connection = new HubConnectionBuilder()\n//     .WithUrl(\"/hubs/chat\")\n//     .AddMessagePackProtocol()\n//     .Build();\n\n// Custom message types\n[MessagePackObject]\npublic class ChatMessage\n{\n    [Key(0)]\n    public string User { get; set; }\n    \n    [Key(1)]\n    public string Message { get; set; }\n    \n    [Key(2)]\n    public DateTime Timestamp { get; set; }\n}",
     "severity": "low",
-    "tags": ["signalr", "messagepack", "serialization", "performance"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "messagepack",
+      "performance",
+      "serialization",
+      "signalr"
+    ],
     "description": "MessagePack reduces message size and improves SignalR performance"
   },
   {
@@ -96,7 +162,15 @@
     "recommendation": "Configure sticky sessions or use Azure SignalR for load balancing",
     "example": "// Sticky sessions configuration (if not using Redis backplane)\n# In docker-compose.yml\nservices:\n  nginx:\n    image: nginx:alpine\n    ports:\n      - \"80:80\"\n    volumes:\n      - ./nginx.conf:/etc/nginx/nginx.conf\n\n# nginx.conf for sticky sessions\nupstream signalr_backend {\n    ip_hash; # Sticky sessions based on client IP\n    server app1:80;\n    server app2:80;\n    server app3:80;\n}\n\nserver {\n    listen 80;\n    location / {\n        proxy_pass http://signalr_backend;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection \"upgrade\";\n        proxy_set_header Host $host;\n        proxy_cache_bypass $http_upgrade;\n    }\n}\n\n// Alternative: Azure SignalR Service (recommended)\nbuilder.Services.AddSignalR()\n    .AddAzureSignalR(connectionString);\n\n// For Kubernetes, use session affinity\napiVersion: v1\nkind: Service\nspec:\n  sessionAffinity: ClientIP\n  sessionAffinityConfig:\n    clientIP:\n      timeoutSeconds: 10800 # 3 hours",
     "severity": "high",
-    "tags": ["signalr", "sticky-sessions", "load-balancing", "scaling"],
+    "tags": [
+      "azure",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "load-balancing",
+      "scaling",
+      "signalr",
+      "sticky-sessions"
+    ],
     "description": "Sticky sessions or Redis backplane are required for multi-instance SignalR"
   },
   {
@@ -106,7 +180,14 @@
     "recommendation": "Configure CORS properly for SignalR in containerized web applications",
     "example": "// CORS configuration for SignalR\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"SignalRCorsPolicy\", policy =>\n    {\n        policy\n            .WithOrigins(\"https://myapp.com\", \"https://localhost:3000\") // Production and dev origins\n            .AllowAnyHeader()\n            .AllowAnyMethod()\n            .AllowCredentials(); // Required for SignalR\n    });\n});\n\nvar app = builder.Build();\n\napp.UseCors(\"SignalRCorsPolicy\");\napp.UseAuthentication();\napp.UseAuthorization();\n\napp.MapHub<ChatHub>(\"/hubs/chat\");\n\n// Client configuration\n// const connection = new HubConnectionBuilder()\n//     .withUrl(\"/hubs/chat\", {\n//         withCredentials: true\n//     })\n//     .build();",
     "severity": "high",
-    "tags": ["signalr", "cors", "security", "web"],
+    "tags": [
+      "cors",
+      "fix-dockerfile",
+      "scan-image",
+      "security",
+      "signalr",
+      "web"
+    ],
     "description": "Proper CORS configuration is essential for browser-based SignalR clients"
   },
   {
@@ -116,7 +197,14 @@
     "recommendation": "Implement graceful shutdown for SignalR services in containers",
     "example": "// Graceful shutdown for SignalR\nbuilder.Services.Configure<HostOptions>(options =>\n{\n    options.ShutdownTimeout = TimeSpan.FromSeconds(30);\n});\n\nvar app = builder.Build();\n\n// Graceful shutdown handling\nvar lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();\nlifetime.ApplicationStopping.Register(() =>\n{\n    var logger = app.Services.GetRequiredService<ILogger<Program>>();\n    logger.LogInformation(\"SignalR service is shutting down...\");\n    \n    // Notify all connected clients\n    var hubContext = app.Services.GetRequiredService<IHubContext<ChatHub>>();\n    _ = Task.Run(async () =>\n    {\n        try\n        {\n            await hubContext.Clients.All.SendAsync(\"ServerShutdown\", \"Server is restarting. Please reconnect in a moment.\");\n            await Task.Delay(2000); // Give time for message delivery\n        }\n        catch (Exception ex)\n        {\n            logger.LogError(ex, \"Error notifying clients of shutdown\");\n        }\n    });\n});\n\n// In Hub\npublic class ChatHub : Hub\n{\n    public override async Task OnDisconnectedAsync(Exception exception)\n    {\n        // Clean up any user-specific resources\n        var userId = Context.User?.Identity?.Name;\n        if (!string.IsNullOrEmpty(userId))\n        {\n            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $\"user-{userId}\");\n        }\n        \n        await base.OnDisconnectedAsync(exception);\n    }\n}",
     "severity": "medium",
-    "tags": ["signalr", "graceful-shutdown", "lifecycle", "reliability"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "graceful-shutdown",
+      "lifecycle",
+      "reliability",
+      "signalr"
+    ],
     "description": "Graceful shutdown ensures clients are notified and can reconnect properly"
   },
   {
@@ -126,7 +214,14 @@
     "recommendation": "Implement efficient group management for SignalR in container clusters",
     "example": "// Efficient group management\npublic class ChatHub : Hub\n{\n    private readonly IGroupManager _groupManager;\n    \n    public async Task JoinRoom(string roomName)\n    {\n        var userId = Context.User?.Identity?.Name;\n        \n        // Leave previous rooms\n        var currentRooms = await _groupManager.GetUserGroupsAsync(userId);\n        foreach (var room in currentRooms)\n        {\n            await Groups.RemoveFromGroupAsync(Context.ConnectionId, room);\n            await _groupManager.RemoveUserFromGroupAsync(userId, room);\n        }\n        \n        // Join new room\n        await Groups.AddToGroupAsync(Context.ConnectionId, roomName);\n        await _groupManager.AddUserToGroupAsync(userId, roomName);\n        \n        // Notify room members\n        await Clients.Group(roomName).SendAsync(\"UserJoined\", userId, roomName);\n        \n        // Send room history to user\n        var recentMessages = await _messageService.GetRecentMessagesAsync(roomName, 50);\n        await Clients.Caller.SendAsync(\"RoomHistory\", recentMessages);\n    }\n    \n    public async Task LeaveRoom(string roomName)\n    {\n        var userId = Context.User?.Identity?.Name;\n        \n        await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomName);\n        await _groupManager.RemoveUserFromGroupAsync(userId, roomName);\n        \n        await Clients.Group(roomName).SendAsync(\"UserLeft\", userId, roomName);\n    }\n    \n    public override async Task OnDisconnectedAsync(Exception exception)\n    {\n        var userId = Context.User?.Identity?.Name;\n        if (!string.IsNullOrEmpty(userId))\n        {\n            var userGroups = await _groupManager.GetUserGroupsAsync(userId);\n            foreach (var group in userGroups)\n            {\n                await _groupManager.RemoveUserFromGroupAsync(userId, group);\n                await Clients.Group(group).SendAsync(\"UserDisconnected\", userId);\n            }\n        }\n        \n        await base.OnDisconnectedAsync(exception);\n    }\n}\n\n// Group manager implementation\npublic interface IGroupManager\n{\n    Task AddUserToGroupAsync(string userId, string groupName);\n    Task RemoveUserFromGroupAsync(string userId, string groupName);\n    Task<IEnumerable<string>> GetUserGroupsAsync(string userId);\n    Task<IEnumerable<string>> GetGroupMembersAsync(string groupName);\n}",
     "severity": "medium",
-    "tags": ["signalr", "groups", "rooms", "management"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "groups",
+      "management",
+      "rooms",
+      "signalr"
+    ],
     "description": "Efficient group management enables scalable room-based communication"
   },
   {
@@ -136,7 +231,14 @@
     "recommendation": "Enable message compression for SignalR to reduce bandwidth usage",
     "example": "// Enable WebSocket compression\nbuilder.Services.Configure<KestrelServerOptions>(options =>\n{\n    options.ListenAnyIP(80, listenOptions =>\n    {\n        listenOptions.UseConnectionLogging();\n    });\n});\n\n// Configure SignalR with compression\nbuilder.Services.AddSignalR(options =>\n{\n    options.EnableDetailedErrors = builder.Environment.IsDevelopment();\n    options.MaximumReceiveMessageSize = 1024 * 1024;\n    \n    // Configure JSON options for smaller payloads\n    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;\n    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;\n})\n.AddJsonProtocol(options =>\n{\n    options.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;\n    options.PayloadSerializerOptions.WriteIndented = false;\n    options.PayloadSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;\n});\n\n// Client-side compression (configure in client)\n// const connection = new HubConnectionBuilder()\n//     .withUrl(\"/hubs/chat\", {\n//         transport: HttpTransportType.WebSockets,\n//         skipNegotiation: true\n//     })\n//     .build();",
     "severity": "low",
-    "tags": ["signalr", "compression", "bandwidth", "optimization"],
+    "tags": [
+      "bandwidth",
+      "compression",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "signalr"
+    ],
     "description": "Message compression reduces bandwidth usage in SignalR applications"
   },
   {
@@ -146,7 +248,14 @@
     "recommendation": "Implement circuit breaker pattern for SignalR external dependencies",
     "example": "// Circuit breaker for external services\npublic class ResilientChatHub : Hub\n{\n    private readonly IAsyncPolicy _circuitBreakerPolicy;\n    private readonly IExternalApiService _externalService;\n    \n    public ResilientChatHub(IExternalApiService externalService)\n    {\n        _externalService = externalService;\n        _circuitBreakerPolicy = Policy\n            .Handle<HttpRequestException>()\n            .Or<TaskCanceledException>()\n            .CircuitBreakerAsync(\n                handledEventsAllowedBeforeBreaking: 3,\n                durationOfBreak: TimeSpan.FromSeconds(30),\n                onBreak: (exception, duration) =>\n                {\n                    // Log circuit breaker opened\n                },\n                onReset: () =>\n                {\n                    // Log circuit breaker closed\n                });\n    }\n    \n    public async Task SendMessageWithExternalValidation(string message)\n    {\n        try\n        {\n            var isValid = await _circuitBreakerPolicy.ExecuteAsync(async () =>\n            {\n                return await _externalService.ValidateMessageAsync(message);\n            });\n            \n            if (isValid)\n            {\n                await Clients.Others.SendAsync(\"ReceiveMessage\", Context.User?.Identity?.Name, message);\n            }\n            else\n            {\n                await Clients.Caller.SendAsync(\"MessageRejected\", \"Message validation failed\");\n            }\n        }\n        catch (CircuitBreakerOpenException)\n        {\n            // Circuit breaker is open, use fallback\n            await Clients.Others.SendAsync(\"ReceiveMessage\", Context.User?.Identity?.Name, message);\n            await Clients.Caller.SendAsync(\"Warning\", \"External validation unavailable\");\n        }\n    }\n}",
     "severity": "low",
-    "tags": ["signalr", "circuit-breaker", "resilience", "external-services"],
+    "tags": [
+      "circuit-breaker",
+      "external-services",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "resilience",
+      "signalr"
+    ],
     "description": "Circuit breaker pattern protects SignalR services from external service failures"
   }
 ]

@@ -307,23 +307,68 @@ interface DockerfileBuildRules {
 /**
  * Regular expression to match Docker image names with optional registry/repository prefix and tag.
  * Matches format: [registry/][repository/]image:tag
- * Examples: node:20-alpine, gcr.io/distroless/nodejs, myregistry.com/my-app:1.0.0
+ * Examples: node:20-alpine, gcr.io/distroless/nodejs, mcr.microsoft.com/openjdk/jdk:21-mariner
+ * Updated to capture full registry paths including mcr.microsoft.com/path/image:tag
  */
-const DOCKER_IMAGE_NAME_REGEX = /\b([a-z0-9.-]+\/)?[a-z0-9.-]+:[a-z0-9._-]+\b/;
+const DOCKER_IMAGE_NAME_REGEX = /\b([a-z0-9.-]+\/)+[a-z0-9.-]+:[a-z0-9._-]+\b|[a-z0-9.-]+:[a-z0-9._-]+\b/;
+
+/**
+ * Substitute version in image name based on target language version
+ * Examples:
+ *   openjdk/jdk:21-mariner + version 25 -> openjdk/jdk:25-mariner
+ *   eclipse-temurin:17-jdk-alpine + version 25 -> eclipse-temurin:25-jdk-alpine
+ *   mcr.microsoft.com/openjdk/jdk:21-mariner + version 25 -> mcr.microsoft.com/openjdk/jdk:25-mariner
+ *   maven:3.9-openjdk-17 + version 25 -> maven:3.9-openjdk-25
+ */
+function substituteImageVersion(image: string, targetVersion: string | undefined): string {
+  if (!targetVersion) return image;
+
+  // For maven/gradle images with format "tool:version-runtime-jdkversion"
+  // Match patterns like maven:3.9-openjdk-17 or gradle:8.5-jdk21
+  const toolWithRuntimePattern = /^(maven|gradle):(\d+\.\d+)-(openjdk|eclipse-temurin|jdk)-(\d+)/;
+  const toolMatch = image.match(toolWithRuntimePattern);
+
+  if (toolMatch) {
+    const [, tool, toolVersion, runtime ] = toolMatch;
+    // Replace only the JDK version at the end
+    return `${tool}:${toolVersion}-${runtime}-${targetVersion}`;
+  }
+
+  // For runtime images with format "runtime:version-variant"
+  // Match patterns like :17-jdk-alpine, :21-mariner, :3.11-slim
+  const runtimePattern = /:(\d+(?:\.\d+)?)([-.]|$)/;
+  const match = image.match(runtimePattern);
+
+  if (match) {
+    const currentVersion = match[1];
+    // Replace the version while preserving everything else
+    return image.replace(`:${currentVersion}`, `:${targetVersion}`);
+  }
+
+  return image;
+}
 
 /**
  * Helper function to create base image recommendations from knowledge snippets
  */
-function createBaseImageRecommendation(snippet: {
-  id: string;
-  text: string;
-  category?: string;
-  tags?: string[];
-  weight: number;
-}): BaseImageRecommendation {
+function createBaseImageRecommendation(
+  snippet: {
+    id: string;
+    text: string;
+    category?: string;
+    tags?: string[];
+    weight: number;
+  },
+  languageVersion?: string,
+): BaseImageRecommendation {
   // Extract image name from the recommendation text
   const imageMatch = snippet.text.match(DOCKER_IMAGE_NAME_REGEX);
-  const image = imageMatch ? imageMatch[0] : 'unknown';
+  let image = imageMatch ? imageMatch[0] : 'unknown';
+
+  // Substitute version if languageVersion is provided
+  if (languageVersion && image !== 'unknown') {
+    image = substituteImageVersion(image, languageVersion);
+  }
 
   // Determine category based on tags and content
   let category: 'official' | 'distroless' | 'security' | 'size' = 'official';
@@ -375,6 +420,7 @@ const runPattern = createKnowledgeTool<
     extractFilters: (input) => ({
       environment: input.environment || 'production',
       language: input.language || 'auto-detect',
+      languageVersion: input.languageVersion,
       framework: input.framework,
       detectedDependencies: input.detectedDependencies,
     }),
@@ -388,9 +434,7 @@ const runPattern = createKnowledgeTool<
             s.tags?.includes('registry') ||
             s.tags?.includes('official') ||
             s.tags?.includes('distroless') ||
-            s.tags?.includes('alpine') ||
-            s.tags?.includes('slim') ||
-            s.text.toLowerCase().includes('from ') ||
+            (s.tags?.includes('build-stage') && s.tags?.includes('build-tool')) ||
             s.text.toLowerCase().includes('base image'),
         ),
       security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
@@ -437,17 +481,13 @@ const runPattern = createKnowledgeTool<
       // Type is already ExtendedDockerfileParams, so no assertion needed
       const existingDockerfile = input.existingDockerfile;
 
-      const knowledgeMatches: DockerfileRequirement[] = knowledge.all.map((snippet) => ({
-        id: snippet.id,
-        category: snippet.category || 'generic',
-        recommendation: snippet.text,
-        ...(snippet.tags && { tags: snippet.tags }),
-        matchScore: snippet.weight,
-      }));
+      // Note: knowledgeMatches removed to reduce verbose output - all knowledge is already
+      // categorized in recommendations.baseImages, securityConsiderations, optimizations, and bestPractices
 
       // Extract base image recommendations from categorized knowledge
+      // Pass languageVersion for dynamic version substitution
       const baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
-        .map((snippet) => createBaseImageRecommendation(snippet))
+        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion))
         .sort((a, b) => b.matchScore - a.matchScore); // Sort by match score descending
 
       const securityMatches: DockerfileRequirement[] = (knowledge.categories.security || []).map(
@@ -492,10 +532,12 @@ const runPattern = createKnowledgeTool<
         }));
 
       // Build enhanced summary with existing Dockerfile info
+      const languageVersionStr = input.languageVersion ? ` ${input.languageVersion}` : '';
+      const frameworkStr = framework ? ` (${framework})` : '';
       const summaryParts = [
         'Dockerfile Planning Summary:',
         `- Path: ${modulePath}${input.modulePath ? ' (module)' : ''}`,
-        `- Language: ${language}${framework ? ` (${framework})` : ''}`,
+        `- Language: ${language}${languageVersionStr}${frameworkStr}`,
         `- Environment: ${input.environment || 'production'}`,
         `- Build Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}`,
       ];
@@ -519,8 +561,14 @@ const runPattern = createKnowledgeTool<
         summaryParts.push('- Mode: CREATE new Dockerfile');
       }
 
+      const totalRecommendations =
+        baseImageMatches.length +
+        securityMatches.length +
+        optimizationMatches.length +
+        bestPracticeMatches.length;
+
       summaryParts.push(
-        `- Knowledge Matches: ${knowledgeMatches.length} recommendations found`,
+        `- Recommendations: ${totalRecommendations} total`,
         `  - Base Images: ${baseImageMatches.length}`,
         `  - Security: ${securityMatches.length}`,
         `  - Optimizations: ${optimizationMatches.length}`,
@@ -537,6 +585,7 @@ const runPattern = createKnowledgeTool<
             language !== 'auto-detect' && {
               language: language === 'java' || language === 'dotnet' ? language : 'other',
             }),
+          ...(input.languageVersion && { languageVersion: input.languageVersion }),
           ...(framework &&
             framework !== 'auto-detect' && {
               frameworks: [{ name: framework }],
@@ -549,7 +598,6 @@ const runPattern = createKnowledgeTool<
           optimizations: optimizationMatches,
           bestPractices: bestPracticeMatches,
         },
-        knowledgeMatches,
         confidence,
         summary,
         ...(existingDockerfile && {
@@ -643,6 +691,31 @@ function planToDockerfileText(plan: DockerfilePlan): string {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Validate a single base image against policy
+ * Returns true if the image passes policy (no blocking violations)
+ */
+async function isImageCompliant(
+  image: string,
+  evaluator: RegoEvaluator,
+  logger: Logger,
+): Promise<boolean> {
+  // Create a minimal Dockerfile with just this image
+  const dockerfileText = `FROM ${image}`;
+
+  logger.debug({ image, dockerfileText }, 'Validating base image against policy');
+
+  const validation = await validateContentAgainstPolicy(
+    dockerfileText,
+    evaluator,
+    logger,
+    'base image',
+  );
+
+  // Image is compliant if there are no blocking violations
+  return validation.passed;
 }
 
 /**
@@ -753,6 +826,45 @@ async function handleGenerateDockerfile(
   if (!result.ok) return result;
 
   const plan = result.value;
+
+  // Filter base images based on policy if available
+  if (ctx.policy && plan.recommendations.baseImages.length > 0) {
+    ctx.logger.info(
+      { count: plan.recommendations.baseImages.length, hasPolicyConfig: !!ctx.policy },
+      'Filtering base images against policy',
+    );
+
+    // Validate each base image against policy
+    const filteredBaseImages: BaseImageRecommendation[] = [];
+    const totalImages = plan.recommendations.baseImages.length;
+
+    for (const imageRec of plan.recommendations.baseImages) {
+      const isCompliant = await isImageCompliant(imageRec.image, ctx.policy, ctx.logger);
+
+      if (isCompliant) {
+        filteredBaseImages.push(imageRec);
+        ctx.logger.debug({ image: imageRec.image }, 'Base image passed policy validation');
+      } else {
+        ctx.logger.info(
+          { image: imageRec.image },
+          'Base image filtered out due to policy violation',
+        );
+      }
+    }
+
+    // Update plan with filtered images
+    plan.recommendations.baseImages = filteredBaseImages;
+
+    const filteredCount = totalImages - filteredBaseImages.length;
+    if (filteredCount > 0) {
+      ctx.logger.info(
+        { filtered: filteredCount, remaining: filteredBaseImages.length },
+        'Base images filtered by policy',
+      );
+    }
+  } else if (!ctx.policy) {
+    ctx.logger.warn('No policy configuration loaded - base images not filtered');
+  }
 
   // Validate against policy if available
   if (ctx.policy) {

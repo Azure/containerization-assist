@@ -6,17 +6,36 @@
     "recommendation": "Use specific .NET runtime versions and consider self-contained deployments for optimal performance",
     "example": "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine\n# For self-contained: FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-alpine",
     "severity": "medium",
-    "tags": ["dotnet", "runtime", "performance", "optimization"],
+    "tags": [
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "optimization",
+      "performance",
+      "runtime"
+    ],
     "description": "Specific runtime versions and deployment models affect container size and performance"
   },
   {
     "id": "dotnet-sdk-multistage",
-    "category": "dockerfile", 
+    "category": "dockerfile",
     "pattern": "FROM.*dotnet.*sdk",
     "recommendation": "Use multi-stage builds with SDK for building and runtime-only for final image",
     "example": "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY . .\nRUN dotnet publish -c Release -o /app\n\nFROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY --from=build /app .",
     "severity": "high",
-    "tags": ["dotnet", "multistage", "optimization", "build"],
+    "tags": [
+      "build",
+      "build-stage",
+      "build-tool",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "multistage",
+      "optimization",
+      "runtime-stage"
+    ],
     "description": "Multi-stage builds significantly reduce final image size by excluding build tools"
   },
   {
@@ -26,7 +45,14 @@
     "recommendation": "Pin .NET SDK version using global.json for reproducible builds",
     "example": "COPY global.json .\nRUN dotnet --info\n# Ensures exact SDK version matching global.json",
     "severity": "medium",
-    "tags": ["dotnet", "versioning", "reproducible", "global-json"],
+    "tags": [
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "global-json",
+      "reproducible",
+      "versioning"
+    ],
     "description": "global.json ensures consistent .NET SDK versions across environments"
   },
   {
@@ -36,7 +62,14 @@
     "recommendation": "Copy project files first, restore dependencies, then copy source code for better layer caching",
     "example": "COPY *.csproj ./\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release",
     "severity": "high",
-    "tags": ["dotnet", "restore", "caching", "optimization"],
+    "tags": [
+      "caching",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "restore"
+    ],
     "description": "Proper layer ordering improves Docker build cache efficiency for dependency restoration"
   },
   {
@@ -45,8 +78,15 @@
     "pattern": "dotnet publish",
     "recommendation": "Use Release configuration with optimizations and consider ReadyToRun compilation",
     "example": "RUN dotnet publish -c Release -o /app --no-restore\n# For ReadyToRun: --self-contained -r linux-x64 -p:PublishReadyToRun=true",
-    "severity": "high", 
-    "tags": ["dotnet", "publish", "release", "optimization"],
+    "severity": "high",
+    "tags": [
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "publish",
+      "release"
+    ],
     "description": "Release builds with optimizations provide better runtime performance"
   },
   {
@@ -56,7 +96,15 @@
     "recommendation": "Consider self-contained deployments for predictable runtime and smaller base images",
     "example": "RUN dotnet publish -c Release --self-contained -r linux-x64 -o /app\n# Use runtime-deps base image\nFROM mcr.microsoft.com/dotnet/runtime-deps:8.0-alpine",
     "severity": "medium",
-    "tags": ["dotnet", "self-contained", "deployment", "minimal"],
+    "tags": [
+      "deployment",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "minimal",
+      "self-contained"
+    ],
     "description": "Self-contained deployments eliminate runtime dependencies but increase image size"
   },
   {
@@ -66,7 +114,14 @@
     "recommendation": "Configure ASP.NET Core to listen on specific ports and use non-root user",
     "example": "ENV ASPNETCORE_URLS=http://+:8080\nEXPOSE 8080\nUSER $APP_UID",
     "severity": "medium",
-    "tags": ["dotnet", "aspnet", "ports", "security"],
+    "tags": [
+      "aspnet",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "ports",
+      "security"
+    ],
     "description": "Explicit port configuration and non-root execution improve security"
   },
   {
@@ -76,7 +131,14 @@
     "recommendation": "Set appropriate environment variables for ASP.NET Core configuration",
     "example": "ENV ASPNETCORE_ENVIRONMENT=Production\nENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1\nENV DOTNET_RUNNING_IN_CONTAINER=true",
     "severity": "medium",
-    "tags": ["dotnet", "aspnet", "environment", "configuration"],
+    "tags": [
+      "aspnet",
+      "configuration",
+      "dotnet",
+      "environment",
+      "fix-dockerfile",
+      "generate-dockerfile"
+    ],
     "description": "Proper environment configuration optimizes .NET runtime behavior in containers"
   },
   {
@@ -86,7 +148,14 @@
     "recommendation": "Enable globalization invariant mode for smaller images when localization isn't needed",
     "example": "ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1",
     "severity": "low",
-    "tags": ["dotnet", "globalization", "optimization", "size"],
+    "tags": [
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "globalization",
+      "optimization",
+      "size"
+    ],
     "description": "Invariant mode removes ICU libraries, reducing image size significantly"
   },
   {
@@ -96,17 +165,31 @@
     "recommendation": "Leverage NuGet package cache and consider clearing cache after restore",
     "example": "RUN dotnet restore --no-cache\n# Or: RUN dotnet nuget locals all --clear",
     "severity": "low",
-    "tags": ["dotnet", "nuget", "cache", "optimization"],
+    "tags": [
+      "cache",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "nuget",
+      "optimization"
+    ],
     "description": "NuGet cache management can reduce build times and image sizes"
   },
   {
     "id": "dotnet-diagnostic-tools",
-    "category": "dockerfile", 
+    "category": "dockerfile",
     "pattern": "dotnet-dump|dotnet-trace",
     "recommendation": "Include diagnostic tools only in development images, exclude from production",
     "example": "# Development stage\nRUN dotnet tool install --global dotnet-dump\n# Production: exclude diagnostic tools",
     "severity": "low",
-    "tags": ["dotnet", "diagnostics", "tools", "security"],
+    "tags": [
+      "diagnostics",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "security",
+      "tools"
+    ],
     "description": "Diagnostic tools should be excluded from production images for security and size"
   },
   {
@@ -116,7 +199,14 @@
     "recommendation": "Implement health checks for ASP.NET Core applications using built-in endpoints",
     "example": "HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:8080/health || exit 1",
     "severity": "medium",
-    "tags": ["dotnet", "aspnet", "health", "monitoring"],
+    "tags": [
+      "aspnet",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "health",
+      "monitoring"
+    ],
     "description": "Health checks enable container orchestration to monitor application status"
   },
   {
@@ -126,7 +216,15 @@
     "recommendation": "For minimal APIs, consider using smaller base images and self-contained deployment",
     "example": "# For minimal APIs with native AOT\nRUN dotnet publish -c Release -r linux-x64 --self-contained -p:PublishAot=true\nFROM mcr.microsoft.com/dotnet/runtime-deps:8.0-alpine",
     "severity": "medium",
-    "tags": ["dotnet", "minimal-api", "aot", "performance"],
+    "tags": [
+      "aot",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "minimal-api",
+      "performance"
+    ],
     "description": "Minimal APIs can benefit from AOT compilation for improved startup and memory usage"
   },
   {
@@ -136,7 +234,15 @@
     "recommendation": "Use Native AOT for improved startup time and memory usage, with distroless images",
     "example": "RUN dotnet publish -c Release -r linux-x64 --self-contained -p:PublishAot=true\nFROM gcr.io/distroless/cc-debian12\nCOPY --from=build /app/myapp .",
     "severity": "medium",
-    "tags": ["dotnet", "aot", "performance", "distroless"],
+    "tags": [
+      "aot",
+      "distroless",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "google",
+      "performance"
+    ],
     "description": "Native AOT creates smaller, faster-starting applications suitable for microservices"
   },
   {
@@ -146,7 +252,14 @@
     "recommendation": "Enable assembly trimming for self-contained deployments to reduce size",
     "example": "RUN dotnet publish -c Release --self-contained -r linux-x64 -p:PublishTrimmed=true -o /app",
     "severity": "medium",
-    "tags": ["dotnet", "trimming", "optimization", "size"],
+    "tags": [
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "size",
+      "trimming"
+    ],
     "description": "Assembly trimming removes unused code, significantly reducing deployment size"
   },
   {
@@ -156,7 +269,14 @@
     "recommendation": "Use ReadyToRun compilation for faster application startup",
     "example": "RUN dotnet publish -c Release --self-contained -r linux-x64 -p:PublishReadyToRun=true -o /app",
     "severity": "low",
-    "tags": ["dotnet", "readytorun", "startup", "performance"],
+    "tags": [
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "readytorun",
+      "startup"
+    ],
     "description": "ReadyToRun improves startup performance by pre-compiling IL to native code"
   },
   {
@@ -166,7 +286,14 @@
     "recommendation": "Consider single-file deployment for simplified distribution and smaller attack surface",
     "example": "RUN dotnet publish -c Release --self-contained -r linux-x64 -p:PublishSingleFile=true -o /app",
     "severity": "low",
-    "tags": ["dotnet", "single-file", "deployment", "security"],
+    "tags": [
+      "deployment",
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "security",
+      "single-file"
+    ],
     "description": "Single-file deployment simplifies distribution and reduces file system complexity"
   },
   {
@@ -176,7 +303,16 @@
     "recommendation": "Never include user secrets in production containers, use external secret management",
     "example": "# Development only\nRUN dotnet user-secrets init\n# Production: use Kubernetes secrets or Azure Key Vault",
     "severity": "high",
-    "tags": ["dotnet", "secrets", "security", "user-secrets"],
+    "tags": [
+      "aws",
+      "azure",
+      "dotnet",
+      "fix-dockerfile",
+      "scan-image",
+      "secrets",
+      "security",
+      "user-secrets"
+    ],
     "description": "User secrets are for development only and should never be in production containers"
   },
   {
@@ -186,7 +322,14 @@
     "recommendation": "Avoid sensitive data in appsettings files, use environment-specific configuration",
     "example": "COPY appsettings.json .\nCOPY appsettings.Production.json .\n# Use env vars: Configuration.GetValue<string>(\"ConnectionStrings:Default\")",
     "severity": "high",
-    "tags": ["dotnet", "appsettings", "security", "configuration"],
+    "tags": [
+      "appsettings",
+      "configuration",
+      "dotnet",
+      "fix-dockerfile",
+      "scan-image",
+      "security"
+    ],
     "description": "Configuration files should not contain secrets, use environment variables instead"
   },
   {
@@ -196,7 +339,14 @@
     "recommendation": "Configure Kestrel server limits and security settings for production",
     "example": "ENV ASPNETCORE_KESTREL_LIMITS_MAXCONCURRENTCONNECTIONS=100\nENV ASPNETCORE_KESTREL_LIMITS_MAXREQUESTBODYSIZE=10485760",
     "severity": "medium",
-    "tags": ["dotnet", "kestrel", "security", "limits"],
+    "tags": [
+      "dotnet",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "kestrel",
+      "limits",
+      "security"
+    ],
     "description": "Proper Kestrel configuration prevents resource exhaustion and improves security"
   }
 ]

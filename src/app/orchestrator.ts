@@ -14,9 +14,56 @@ import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
-import { loadRegoPolicy, type RegoEvaluator } from '@/config/policy-rego';
+import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
+import { readdirSync, existsSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 
 // ===== Types =====
+
+/**
+ * Discover built-in policy files from the policies directory
+ * Returns paths to all .rego files (excluding test files)
+ *
+ * Searches upward from process.cwd() to find the policies directory.
+ * Works in both ESM (dist/) and CJS (dist-cjs/) builds.
+ */
+function discoverBuiltInPolicies(logger: Logger): string[] {
+  try {
+    // Start from current working directory and search upward
+    let currentDir = process.cwd();
+    let policiesDir = join(currentDir, 'policies');
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    // Search upward for policies directory
+    while (!existsSync(policiesDir) && attempts < maxAttempts) {
+      const parentDir = dirname(currentDir);
+      if (parentDir === currentDir) {
+        // Reached filesystem root
+        break;
+      }
+      currentDir = parentDir;
+      policiesDir = join(currentDir, 'policies');
+      attempts++;
+    }
+
+    if (!existsSync(policiesDir)) {
+      logger.warn({ cwd: process.cwd(), attempts }, 'Built-in policies directory not found');
+      return [];
+    }
+
+    // Find all .rego files except test files
+    const files = readdirSync(policiesDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(policiesDir, file)));
+
+    logger.info({ policiesDir, count: files.length }, 'Discovered built-in policies');
+    return files;
+  } catch (error) {
+    logger.warn({ error }, 'Failed to discover built-in policies');
+    return [];
+  }
+}
 
 /**
  * Create a child logger with additional bindings
@@ -81,16 +128,32 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
       ...(request.metadata?.loggerContext ?? {}),
     });
 
-    // Load policy once if configured (with Promise-based guard to prevent race conditions)
-    if (config.policyPath && !policyLoadPromise) {
-      const policyPath = config.policyPath; // Capture for closure
+    // Load policies once (with Promise-based guard to prevent race conditions)
+    if (!policyLoadPromise) {
       policyLoadPromise = (async () => {
-        const policyResult = await loadRegoPolicy(policyPath, logger);
+        // Always load built-in policies
+        const builtInPolicies = discoverBuiltInPolicies(logger);
+
+        // Optionally add user-provided custom policy
+        const policyPaths = config.policyPath
+          ? [...builtInPolicies, config.policyPath]
+          : builtInPolicies;
+
+        if (policyPaths.length === 0) {
+          logger.warn('No policies found (built-in or custom)');
+          return;
+        }
+
+        const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
         if (policyResult.ok) {
           policyCache = policyResult.value;
-          logger.info({ policyPath }, 'Policy loaded for orchestrator');
+          logger.info({
+            builtIn: builtInPolicies.length,
+            custom: config.policyPath ? 1 : 0,
+            total: policyPaths.length,
+          }, 'Policies loaded for orchestrator');
         } else {
-          logger.warn({ error: policyResult.error }, 'Failed to load policy, continuing without it');
+          logger.warn({ error: policyResult.error }, 'Failed to load policies, continuing without them');
         }
       })();
     }
