@@ -26,6 +26,7 @@ export interface MCPTestServer {
   app: AppRuntime;
   tools: ToolDefinition[];
   workingDirectory: string;
+  createdWorkingDirectory: boolean; // Track if harness created the directory
   isRunning: boolean;
 }
 
@@ -49,6 +50,7 @@ export class MCPTestHarness {
     }
 
     // Create working directory
+    const createdWorkingDirectory = !config.workingDirectory;
     const workingDirectory = config.workingDirectory ||
       await fs.mkdtemp(join(tmpdir(), `mcp-test-${serverName}-`));
 
@@ -101,6 +103,7 @@ export class MCPTestHarness {
       app,
       tools: toolDefinitions,
       workingDirectory,
+      createdWorkingDirectory,
       isRunning: false,
     };
 
@@ -285,12 +288,15 @@ export class MCPTestHarness {
         testServer.isRunning = false;
       }
 
-      // Cleanup working directory
-      await fs.rm(testServer.workingDirectory, { recursive: true, force: true });
+      // Cleanup working directory only if we created it
+      if (testServer.createdWorkingDirectory) {
+        await fs.rm(testServer.workingDirectory, { recursive: true, force: true });
+        this.logger.info({ serverName }, 'MCP test server stopped and cleaned up');
+      } else {
+        this.logger.info({ serverName }, 'MCP test server stopped (user-provided directory preserved)');
+      }
 
       this.servers.delete(serverName);
-
-      this.logger.info({ serverName }, 'MCP test server stopped and cleaned up');
     } catch (error) {
       this.logger.error({ serverName, error }, 'Error stopping MCP test server');
     }

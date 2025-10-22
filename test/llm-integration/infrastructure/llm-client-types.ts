@@ -47,7 +47,7 @@ export interface ConversationSession {
   toolResponses: ToolResponse[];
   metadata: {
     model: string;
-    createdAt: string;
+    createdAt: Date;
   };
 }
 

@@ -4,7 +4,7 @@
  */
 
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { generateText, tool, Experimental_Agent as Agent, stepCountIs } from 'ai';
 import { AzureOpenAIProvider, createAzure } from '@ai-sdk/azure';
 import { z } from 'zod';
@@ -76,7 +76,7 @@ export class ChatClient implements LLMClient {
       toolResponses: [],
       metadata: {
         model: this.model,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
       },
     };
   }
@@ -284,6 +284,8 @@ export class ChatClient implements LLMClient {
       }),
       execute: async ({ filePath, content, reason }) => {
         const fullPath = join(workingDirectory, filePath);
+        const dir = dirname(fullPath);
+        await fs.mkdir(dir, { recursive: true });
         await fs.writeFile(fullPath, content, 'utf8');
         filesCreated.push(fullPath);
         console.log(`📝 Created file: ${filePath} - ${reason}`);
