@@ -159,9 +159,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
     }
 
     // Wait for policy loading to complete if in progress
-    if (policyLoadPromise) {
-      await policyLoadPromise;
-    }
+    await policyLoadPromise;
 
     return await executeWithOrchestration(tool, request, {
       registry,
