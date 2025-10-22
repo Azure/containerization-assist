@@ -307,8 +307,21 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             (event: DockerBuildEvent) => {
               logger.debug(event, 'Docker build progress');
 
+              if (event.stream) {
+                const logLine = event.stream.trimEnd();
+                if (logLine) {
+                  buildLogs.push(logLine);
+                  logger.info(logLine);
+                }
+              }
+
               if (event.error || event.errorDetail) {
                 logger.error({ errorEvent: event }, 'Docker build error event received');
+                const errorMsg = event.error || 'Build step failed';
+                const errorLogLine = `ERROR: ${errorMsg}`;
+                buildLogs.push(errorLogLine);
+                logger.error(errorLogLine);
+
                 // Capture the first error encountered during the build
                 if (!buildError) {
                   buildError =
@@ -378,11 +391,21 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             errorDetails: guidance.details,
             originalError: error,
             options,
+            buildLogs,
           },
           'Docker build failed',
         );
 
-        return Failure(errorMessage, guidance);
+        const enhancedGuidance = {
+          ...guidance,
+          details: {
+            ...guidance.details,
+            buildLogs: buildLogs.length > 0 ? buildLogs : ['No build logs captured'],
+            buildTime: Date.now() - startTime,
+          },
+        };
+
+        return Failure(errorMessage, enhancedGuidance);
       }
     },
 
