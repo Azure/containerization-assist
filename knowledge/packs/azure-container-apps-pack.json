@@ -6,7 +6,15 @@
     "recommendation": "Use valid CPU/memory combinations for Azure Container Apps",
     "example": "resources:\n  cpu: 0.5\n  memory: \"1Gi\"\n# Valid combinations: 0.25vCPU/0.5Gi, 0.5vCPU/1Gi, 0.75vCPU/1.5Gi, 1vCPU/2Gi, 1.25vCPU/2.5Gi, 1.5vCPU/3Gi, 1.75vCPU/3.5Gi, 2vCPU/4Gi",
     "severity": "high",
-    "tags": ["azure-container-apps", "resources", "sizing", "cpu", "memory"],
+    "tags": [
+      "azure",
+      "azure-container-apps",
+      "cpu",
+      "generate-k8s-manifests",
+      "memory",
+      "resources",
+      "sizing"
+    ],
     "description": "Azure Container Apps requires specific CPU and memory combinations for proper resource allocation"
   },
   {
@@ -16,7 +24,13 @@
     "recommendation": "Enable scale-to-zero for cost-effective serverless operation",
     "example": "scale:\n  minReplicas: 0\n  maxReplicas: 10\n  rules:\n    - name: http-rule\n      http:\n        metadata:\n          concurrentRequests: \"10\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "scaling", "serverless", "cost-optimization"],
+    "tags": [
+      "azure-container-apps",
+      "cost-optimization",
+      "generate-k8s-manifests",
+      "scaling",
+      "serverless"
+    ],
     "description": "Setting minReplicas to 0 allows the app to scale down completely when not in use, reducing costs"
   },
   {
@@ -26,7 +40,14 @@
     "recommendation": "Configure health probes for production reliability",
     "example": "probes:\n  - type: liveness\n    httpGet:\n      path: /health\n      port: 8080\n    initialDelaySeconds: 30\n    periodSeconds: 30\n  - type: readiness\n    httpGet:\n      path: /ready\n      port: 8080\n    initialDelaySeconds: 5\n    periodSeconds: 10",
     "severity": "high",
-    "tags": ["azure-container-apps", "health", "reliability", "probes"],
+    "tags": [
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "health",
+      "probes",
+      "reliability",
+      "verify-deploy"
+    ],
     "description": "Health probes ensure Container Apps can detect and recover from application failures"
   },
   {
@@ -36,7 +57,13 @@
     "recommendation": "Configure ingress properly for external or internal access",
     "example": "ingress:\n  external: true\n  targetPort: 8080\n  transport: \"http\"\n  allowInsecure: false\n  traffic:\n    - latestRevision: true\n      weight: 100",
     "severity": "high",
-    "tags": ["azure-container-apps", "ingress", "networking", "traffic"],
+    "tags": [
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "ingress",
+      "networking",
+      "traffic"
+    ],
     "description": "Proper ingress configuration ensures your app is accessible as intended"
   },
   {
@@ -46,7 +73,15 @@
     "recommendation": "Use managed identities for secure Azure resource access",
     "example": "identity:\n  type: \"SystemAssigned\"\n# Or for user-assigned:\nidentity:\n  type: \"UserAssigned\"\n  userAssignedIdentities:\n    \"/subscriptions/{sub-id}/resourcegroups/{rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{identity-name}\": {}",
     "severity": "high",
-    "tags": ["azure-container-apps", "security", "managed-identity", "authentication"],
+    "tags": [
+      "authentication",
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "managed-identity",
+      "microsoft",
+      "security"
+    ],
     "description": "Managed identities provide secure, credential-free access to Azure resources"
   },
   {
@@ -56,7 +91,13 @@
     "recommendation": "Enable Dapr for microservices capabilities",
     "example": "dapr:\n  enabled: true\n  appId: \"my-app\"\n  appPort: 8080\n  appProtocol: \"http\"\n  enableApiLogging: true",
     "severity": "medium",
-    "tags": ["azure-container-apps", "dapr", "microservices", "distributed"],
+    "tags": [
+      "azure-container-apps",
+      "dapr",
+      "distributed",
+      "generate-k8s-manifests",
+      "microservices"
+    ],
     "description": "Dapr provides building blocks for resilient, distributed applications"
   },
   {
@@ -66,7 +107,14 @@
     "recommendation": "Use secrets for sensitive configuration data",
     "example": "secrets:\n  - name: \"connection-string\"\n    value: \"Server=tcp:...\"\n# Reference in env vars:\nenv:\n  - name: \"DB_CONNECTION\"\n    secretRef: \"connection-string\"",
     "severity": "high",
-    "tags": ["azure-container-apps", "security", "secrets", "configuration"],
+    "tags": [
+      "aws",
+      "azure-container-apps",
+      "configuration",
+      "generate-k8s-manifests",
+      "secrets",
+      "security"
+    ],
     "description": "Secrets provide secure storage for sensitive configuration like connection strings and API keys"
   },
   {
@@ -76,7 +124,14 @@
     "recommendation": "Use Azure Files for persistent storage needs",
     "example": "volumes:\n  - name: \"azure-files-volume\"\n    storageType: \"AzureFile\"\n    storageName: \"myazurefiles\"\n# Mount in container:\nvolumeMounts:\n  - volumeName: \"azure-files-volume\"\n    mountPath: \"/data\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "storage", "volumes", "persistence"],
+    "tags": [
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "persistence",
+      "storage",
+      "volumes"
+    ],
     "description": "Volume mounts provide persistent storage for stateful applications"
   },
   {
@@ -86,7 +141,14 @@
     "recommendation": "Configure custom domains with managed certificates",
     "example": "customDomains:\n  - name: \"www.example.com\"\n    certificateId: \"/subscriptions/{sub-id}/resourceGroups/{rg}/providers/Microsoft.App/managedEnvironments/{env}/certificates/{cert-name}\"\n    bindingType: \"SniEnabled\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "domains", "tls", "certificates"],
+    "tags": [
+      "azure-container-apps",
+      "certificates",
+      "domains",
+      "generate-k8s-manifests",
+      "microsoft",
+      "tls"
+    ],
     "description": "Custom domains with TLS certificates provide professional, secure endpoints"
   },
   {
@@ -96,7 +158,14 @@
     "recommendation": "Use multiple revisions for blue-green deployments",
     "example": "activeRevisionsMode: \"multiple\"\n# Traffic splitting:\ntraffic:\n  - revisionName: \"myapp--revision1\"\n    weight: 80\n  - revisionName: \"myapp--revision2\"\n    weight: 20",
     "severity": "medium",
-    "tags": ["azure-container-apps", "deployments", "revisions", "traffic-splitting"],
+    "tags": [
+      "azure-container-apps",
+      "deploy",
+      "deployments",
+      "generate-k8s-manifests",
+      "revisions",
+      "traffic-splitting"
+    ],
     "description": "Multiple active revisions enable safe deployments with traffic splitting"
   },
   {
@@ -106,7 +175,13 @@
     "recommendation": "Configure CORS for web applications",
     "example": "cors:\n  allowedOrigins:\n    - \"https://www.example.com\"\n    - \"https://app.example.com\"\n  allowedMethods:\n    - \"GET\"\n    - \"POST\"\n  allowedHeaders:\n    - \"*\"\n  allowCredentials: true",
     "severity": "medium",
-    "tags": ["azure-container-apps", "cors", "web", "security"],
+    "tags": [
+      "azure-container-apps",
+      "cors",
+      "generate-k8s-manifests",
+      "security",
+      "web"
+    ],
     "description": "CORS configuration enables secure cross-origin requests for web applications"
   },
   {
@@ -116,7 +191,13 @@
     "recommendation": "Implement IP restrictions for enhanced security",
     "example": "ipSecurityRestrictions:\n  - name: \"Allow-Office\"\n    ipAddressRange: \"203.0.113.0/24\"\n    action: \"Allow\"\n    description: \"Allow office network\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "security", "ip-restrictions", "access-control"],
+    "tags": [
+      "access-control",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "ip-restrictions",
+      "security"
+    ],
     "description": "IP restrictions provide network-level access control"
   },
   {
@@ -126,7 +207,13 @@
     "recommendation": "Enable session affinity for stateful applications",
     "example": "ingress:\n  stickySession:\n    affinity: \"sticky\"",
     "severity": "low",
-    "tags": ["azure-container-apps", "session", "affinity", "stateful"],
+    "tags": [
+      "affinity",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "session",
+      "stateful"
+    ],
     "description": "Session affinity ensures requests from the same client go to the same container instance"
   },
   {
@@ -136,7 +223,13 @@
     "recommendation": "Use environment variables for configuration",
     "example": "env:\n  - name: \"APP_ENV\"\n    value: \"production\"\n  - name: \"LOG_LEVEL\"\n    value: \"info\"\n  - name: \"API_KEY\"\n    secretRef: \"api-key-secret\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "configuration", "environment-variables"],
+    "tags": [
+      "aws",
+      "azure-container-apps",
+      "configuration",
+      "environment-variables",
+      "generate-k8s-manifests"
+    ],
     "description": "Environment variables provide flexible configuration without rebuilding images"
   },
   {
@@ -146,7 +239,15 @@
     "recommendation": "Configure registry credentials for private images",
     "example": "registries:\n  - server: \"myregistry.azurecr.io\"\n    username: \"myregistry\"\n    passwordSecretRef: \"registry-password\"\n# Or with managed identity:\n  - server: \"myregistry.azurecr.io\"\n    identity: \"system\"",
     "severity": "high",
-    "tags": ["azure-container-apps", "registry", "authentication", "acr"],
+    "tags": [
+      "acr",
+      "authentication",
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "registry"
+    ],
     "description": "Registry credentials enable pulling images from private container registries"
   },
   {
@@ -156,7 +257,13 @@
     "recommendation": "Use TCP ingress for non-HTTP protocols",
     "example": "ingress:\n  external: true\n  targetPort: 5432\n  transport: \"tcp\"\n  exposedPort: 5432",
     "severity": "medium",
-    "tags": ["azure-container-apps", "tcp", "ingress", "protocols"],
+    "tags": [
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "ingress",
+      "protocols",
+      "tcp"
+    ],
     "description": "TCP ingress enables exposing non-HTTP services like databases"
   },
   {
@@ -166,7 +273,12 @@
     "recommendation": "Define resource requirements for each container",
     "example": "containers:\n  - name: \"main-app\"\n    image: \"myapp:latest\"\n    resources:\n      cpu: 0.5\n      memory: \"1Gi\"\n    command: [\"/bin/sh\"]\n    args: [\"-c\", \"node server.js\"]",
     "severity": "high",
-    "tags": ["azure-container-apps", "containers", "resources"],
+    "tags": [
+      "azure-container-apps",
+      "containers",
+      "generate-k8s-manifests",
+      "resources"
+    ],
     "description": "Proper container configuration ensures optimal performance and resource usage"
   },
   {
@@ -176,7 +288,13 @@
     "recommendation": "Use init containers for setup tasks",
     "example": "initContainers:\n  - name: \"db-migration\"\n    image: \"migrate:latest\"\n    command: [\"/migrate\"]\n    env:\n      - name: \"DB_URL\"\n        secretRef: \"db-connection\"",
     "severity": "low",
-    "tags": ["azure-container-apps", "init-containers", "initialization"],
+    "tags": [
+      "aws",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "init-containers",
+      "initialization"
+    ],
     "description": "Init containers run before main containers to perform setup tasks"
   },
   {
@@ -186,7 +304,15 @@
     "recommendation": "Configure appropriate scaling rules",
     "example": "scale:\n  rules:\n    - name: \"cpu-rule\"\n      custom:\n        type: \"cpu\"\n        metadata:\n          type: \"utilization\"\n          value: \"70\"\n    - name: \"queue-rule\"\n      azureQueue:\n        queueName: \"myqueue\"\n        queueLength: 5\n        auth:\n          secretRef: \"queue-connection\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "scaling", "autoscale", "rules"],
+    "tags": [
+      "autoscale",
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "rules",
+      "scaling"
+    ],
     "description": "Scaling rules enable automatic scaling based on various metrics"
   },
   {
@@ -196,7 +322,12 @@
     "recommendation": "Configure appropriate timeout settings",
     "example": "ingress:\n  transport: \"http\"\n  readTimeoutSeconds: 240\n  # For long-running requests, increase timeout",
     "severity": "low",
-    "tags": ["azure-container-apps", "timeout", "performance"],
+    "tags": [
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "performance",
+      "timeout"
+    ],
     "description": "Timeout settings prevent hung connections and improve reliability"
   },
   {
@@ -206,7 +337,14 @@
     "recommendation": "Configure advanced scaling rules with multiple metrics for intelligent autoscaling",
     "example": "scale:\n  minReplicas: 0\n  maxReplicas: 50\n  rules:\n    - name: \"http-requests\"\n      http:\n        metadata:\n          concurrentRequests: \"30\"\n    - name: \"cpu-utilization\"\n      custom:\n        type: \"cpu\"\n        metadata:\n          type: \"utilization\"\n          value: \"70\"\n    - name: \"memory-utilization\"\n      custom:\n        type: \"memory\"\n        metadata:\n          type: \"utilization\"\n          value: \"80\"\n    - name: \"custom-metric\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          metricName: \"RequestsPerSecond\"\n          threshold: \"100\"",
     "severity": "high",
-    "tags": ["azure-container-apps", "scaling", "metrics", "autoscaling"],
+    "tags": [
+      "autoscaling",
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "metrics",
+      "scaling"
+    ],
     "description": "Multi-metric scaling provides intelligent autoscaling based on application behavior"
   },
   {
@@ -216,7 +354,15 @@
     "recommendation": "Implement comprehensive Dapr integration with state management, pub/sub, and service invocation",
     "example": "dapr:\n  enabled: true\n  appId: \"${APP_NAME}\"\n  appPort: 8080\n  appProtocol: \"http\"\n  enableApiLogging: true\n  httpReadBufferSize: \"4KB\"\n  httpMaxRequestSize: \"4MB\"\n  logLevel: \"info\"\n  components:\n    - name: \"statestore\"\n      type: \"state.azure.cosmosdb\"\n      metadata:\n        - name: \"url\"\n          value: \"${COSMOS_DB_URL}\"\n        - name: \"masterkey\"\n          secretRef: \"cosmos-key\"\n    - name: \"pubsub\"\n      type: \"pubsub.azure.servicebus\"\n      metadata:\n        - name: \"connectionString\"\n          secretRef: \"servicebus-connection\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "dapr", "microservices", "state-management"],
+    "tags": [
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "dapr",
+      "generate-k8s-manifests",
+      "microservices",
+      "state-management"
+    ],
     "description": "Comprehensive Dapr integration enables resilient microservices patterns"
   },
   {
@@ -226,7 +372,15 @@
     "recommendation": "Leverage KEDA autoscaling with Azure-specific scalers for advanced scaling scenarios",
     "example": "scale:\n  rules:\n    - name: \"azure-queue\"\n      azureQueue:\n        queueName: \"${QUEUE_NAME}\"\n        queueLength: 5\n        auth:\n          secretRef: \"queue-connection\"\n    - name: \"service-bus\"\n      azureServiceBus:\n        topicName: \"${TOPIC_NAME}\"\n        subscriptionName: \"${SUBSCRIPTION_NAME}\"\n        messageCount: 10\n        auth:\n          secretRef: \"servicebus-connection\"\n    - name: \"cosmos-db\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          resourceURI: \"${COSMOS_DB_RESOURCE_URI}\"\n          metricName: \"TotalRequests\"\n          threshold: \"1000\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "keda", "autoscaling", "azure-services"],
+    "tags": [
+      "autoscaling",
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "azure-services",
+      "generate-k8s-manifests",
+      "keda"
+    ],
     "description": "KEDA provides event-driven autoscaling based on Azure service metrics"
   },
   {
@@ -236,7 +390,15 @@
     "recommendation": "Implement blue-green deployment pattern with traffic splitting and health validation",
     "example": "activeRevisionsMode: \"multiple\"\ntraffic:\n  - revisionName: \"${APP_NAME}--blue\"\n    weight: 80\n    label: \"blue\"\n  - revisionName: \"${APP_NAME}--green\"\n    weight: 20\n    label: \"green\"\n# Health validation\nprobes:\n  - type: readiness\n    httpGet:\n      path: /health/ready\n      port: 8080\n    initialDelaySeconds: 10\n    periodSeconds: 5\n    failureThreshold: 3\n  - type: liveness\n    httpGet:\n      path: /health/live\n      port: 8080\n    initialDelaySeconds: 30\n    periodSeconds: 30",
     "severity": "high",
-    "tags": ["azure-container-apps", "blue-green", "deployment", "traffic-splitting"],
+    "tags": [
+      "azure-container-apps",
+      "blue-green",
+      "deploy",
+      "deployment",
+      "generate-k8s-manifests",
+      "traffic-splitting",
+      "verify-deploy"
+    ],
     "description": "Blue-green deployments enable zero-downtime releases with gradual traffic migration"
   },
   {
@@ -246,7 +408,15 @@
     "recommendation": "Integrate Azure Key Vault for secure secret management with managed identity",
     "example": "identity:\n  type: \"UserAssigned\"\n  userAssignedIdentities:\n    \"${KEY_VAULT_IDENTITY_ID}\": {}\nsecrets:\n  - name: \"db-connection\"\n    keyVaultUrl: \"${KEY_VAULT_URL}\"\n    identity: \"${KEY_VAULT_IDENTITY_ID}\"\n  - name: \"api-key\"\n    keyVaultUrl: \"${KEY_VAULT_URL}\"\n    identity: \"${KEY_VAULT_IDENTITY_ID}\"\nenv:\n  - name: \"DATABASE_URL\"\n    secretRef: \"db-connection\"\n  - name: \"API_KEY\"\n    secretRef: \"api-key\"",
     "severity": "high",
-    "tags": ["azure-container-apps", "key-vault", "security", "managed-identity"],
+    "tags": [
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "key-vault",
+      "managed-identity",
+      "security"
+    ],
     "description": "Key Vault integration provides enterprise-grade secret management"
   },
   {
@@ -256,7 +426,15 @@
     "recommendation": "Integrate Azure Service Bus for message-driven scaling and processing",
     "example": "scale:\n  rules:\n    - name: \"servicebus-queue\"\n      azureServiceBus:\n        queueName: \"${QUEUE_NAME}\"\n        messageCount: 5\n        auth:\n          secretRef: \"servicebus-connection\"\n    - name: \"servicebus-topic\"\n      azureServiceBus:\n        topicName: \"${TOPIC_NAME}\"\n        subscriptionName: \"${SUBSCRIPTION_NAME}\"\n        messageCount: 10\n        auth:\n          secretRef: \"servicebus-connection\"\nenv:\n  - name: \"SERVICE_BUS_CONNECTION\"\n    secretRef: \"servicebus-connection\"\n  - name: \"QUEUE_NAME\"\n    value: \"${QUEUE_NAME}\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "service-bus", "messaging", "event-driven"],
+    "tags": [
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "event-driven",
+      "generate-k8s-manifests",
+      "messaging",
+      "service-bus"
+    ],
     "description": "Service Bus integration enables reliable message processing and scaling"
   },
   {
@@ -266,7 +444,15 @@
     "recommendation": "Integrate Application Insights for comprehensive monitoring and telemetry",
     "example": "env:\n  - name: \"APPLICATIONINSIGHTS_CONNECTION_STRING\"\n    secretRef: \"appinsights-connection\"\n  - name: \"APPLICATIONINSIGHTS_ROLE_NAME\"\n    value: \"${APP_NAME}\"\n  - name: \"APPLICATIONINSIGHTS_ROLE_INSTANCE\"\n    value: \"${CONTAINER_APP_REVISION}\"\n  - name: \"OTEL_EXPORTER_OTLP_ENDPOINT\"\n    value: \"https://dc.applicationinsights.azure.com/v2/track\"\n# Enable distributed tracing\ndapr:\n  config: \"tracing\"\n  components:\n    - name: \"tracing\"\n      type: \"exporters.zipkin\"\n      metadata:\n        - name: \"endpointAddress\"\n          value: \"https://dc.applicationinsights.azure.com/v2/track\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "monitoring", "telemetry", "application-insights"],
+    "tags": [
+      "application-insights",
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "monitoring",
+      "telemetry"
+    ],
     "description": "Application Insights provides deep application monitoring and distributed tracing"
   },
   {
@@ -276,7 +462,15 @@
     "recommendation": "Scale based on Cosmos DB metrics for data-intensive applications",
     "example": "scale:\n  rules:\n    - name: \"cosmos-db-ru\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          resourceURI: \"${COSMOS_DB_RESOURCE_URI}\"\n          metricName: \"TotalRequestUnits\"\n          threshold: \"800\"\n          aggregationType: \"Average\"\n    - name: \"cosmos-db-throttle\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          resourceURI: \"${COSMOS_DB_RESOURCE_URI}\"\n          metricName: \"UserErrors\"\n          threshold: \"5\"\nenv:\n  - name: \"COSMOS_DB_ENDPOINT\"\n    value: \"${COSMOS_DB_ENDPOINT}\"\n  - name: \"COSMOS_DB_KEY\"\n    secretRef: \"cosmos-db-key\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "cosmos-db", "scaling", "data"],
+    "tags": [
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "cosmos-db",
+      "data",
+      "generate-k8s-manifests",
+      "scaling"
+    ],
     "description": "Cosmos DB metric-based scaling ensures optimal performance for data workloads"
   },
   {
@@ -286,7 +480,14 @@
     "recommendation": "Configure virtual network integration for secure communication with Azure services",
     "example": "networkProfile:\n  subnetId: \"${SUBNET_ID}\"\n# Enable private endpoints\nprivateEndpoints:\n  - name: \"storage-endpoint\"\n    serviceId: \"${STORAGE_ACCOUNT_ID}\"\n    subresource: \"blob\"\n  - name: \"keyvault-endpoint\"\n    serviceId: \"${KEY_VAULT_ID}\"\n    subresource: \"vault\"\n# Network security\nipSecurityRestrictions:\n  - name: \"Allow-VNet\"\n    ipAddressRange: \"${VNET_ADDRESS_SPACE}\"\n    action: \"Allow\"\n  - name: \"Deny-All\"\n    ipAddressRange: \"0.0.0.0/0\"\n    action: \"Deny\"\n    priority: 1000",
     "severity": "high",
-    "tags": ["azure-container-apps", "vnet", "security", "private-endpoints"],
+    "tags": [
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "private-endpoints",
+      "security",
+      "vnet"
+    ],
     "description": "VNet integration provides secure, private communication with Azure services"
   },
   {
@@ -296,7 +497,14 @@
     "recommendation": "Implement automated certificate management with Key Vault and custom domains",
     "example": "certificates:\n  - name: \"${DOMAIN_NAME}-cert\"\n    type: \"ManagedCertificate\"\n    properties:\n      subjectName: \"${DOMAIN_NAME}\"\n      dnsNames:\n        - \"${DOMAIN_NAME}\"\n        - \"www.${DOMAIN_NAME}\"\ncustomDomains:\n  - name: \"${DOMAIN_NAME}\"\n    certificateId: \"/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/managedEnvironments/${ENVIRONMENT_NAME}/certificates/${DOMAIN_NAME}-cert\"\n    bindingType: \"SniEnabled\"\n  - name: \"www.${DOMAIN_NAME}\"\n    certificateId: \"/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/managedEnvironments/${ENVIRONMENT_NAME}/certificates/${DOMAIN_NAME}-cert\"\n    bindingType: \"SniEnabled\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "certificates", "domains", "automation"],
+    "tags": [
+      "automation",
+      "azure-container-apps",
+      "certificates",
+      "domains",
+      "generate-k8s-manifests",
+      "microsoft"
+    ],
     "description": "Automated certificate management ensures secure HTTPS without manual intervention"
   },
   {
@@ -306,7 +514,15 @@
     "recommendation": "Configure distributed tracing across microservices with Dapr and Application Insights",
     "example": "dapr:\n  enabled: true\n  appId: \"${APP_NAME}\"\n  config: \"tracing-config\"\n  components:\n    - name: \"tracing\"\n      type: \"middleware.http.opentelemetry\"\n      metadata:\n        - name: \"enabled\"\n          value: \"true\"\n        - name: \"endpoint\"\n          value: \"https://dc.applicationinsights.azure.com/v2/track\"\nenv:\n  - name: \"OTEL_SERVICE_NAME\"\n    value: \"${APP_NAME}\"\n  - name: \"OTEL_RESOURCE_ATTRIBUTES\"\n    value: \"service.name=${APP_NAME},service.version=${APP_VERSION}\"\n  - name: \"APPLICATIONINSIGHTS_CONNECTION_STRING\"\n    secretRef: \"appinsights-connection\"",
     "severity": "medium",
-    "tags": ["azure-container-apps", "tracing", "observability", "microservices"],
+    "tags": [
+      "aws",
+      "azure",
+      "azure-container-apps",
+      "generate-k8s-manifests",
+      "microservices",
+      "observability",
+      "tracing"
+    ],
     "description": "Distributed tracing provides end-to-end visibility across microservices"
   },
   {
@@ -316,7 +532,14 @@
     "recommendation": "Implement backup and disaster recovery strategies for stateful applications",
     "example": "volumes:\n  - name: \"data-volume\"\n    storageType: \"AzureFile\"\n    storageName: \"${STORAGE_ACCOUNT_NAME}\"\n    shareName: \"${FILE_SHARE_NAME}\"\n# Backup configuration\nenv:\n  - name: \"BACKUP_STORAGE_ACCOUNT\"\n    value: \"${BACKUP_STORAGE_ACCOUNT}\"\n  - name: \"BACKUP_CONTAINER\"\n    value: \"${BACKUP_CONTAINER}\"\n  - name: \"BACKUP_SCHEDULE\"\n    value: \"0 2 * * *\"  # Daily at 2 AM\n# Cross-region replication\nreplication:\n  enabled: true\n  regions:\n    - \"${PRIMARY_REGION}\"\n    - \"${SECONDARY_REGION}\"",
     "severity": "high",
-    "tags": ["azure-container-apps", "backup", "disaster-recovery", "resilience"],
+    "tags": [
+      "azure",
+      "azure-container-apps",
+      "backup",
+      "disaster-recovery",
+      "generate-k8s-manifests",
+      "resilience"
+    ],
     "description": "Backup and DR strategies ensure business continuity and data protection"
   }
 ]

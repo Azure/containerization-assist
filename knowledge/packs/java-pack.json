@@ -1,5 +1,91 @@
 [
   {
+    "id": "java-25-microsoft-mariner",
+    "category": "dockerfile",
+    "pattern": "FROM.*openjdk|FROM.*java",
+    "recommendation": "Use Microsoft Azure Linux (Mariner) with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance.",
+    "example": "# Multi-stage build with Java 25 on Microsoft Azure Linux (Mariner)\nFROM mcr.microsoft.com/openjdk/jdk:25-mariner AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "severity": "high",
+    "tags": [
+      "azure",
+      "base-image",
+      "build-stage",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "java",
+      "jdk",
+      "mariner",
+      "microsoft",
+      "multistage",
+      "official",
+      "runtime-stage"
+    ],
+    "description": "Microsoft Azure Linux (Mariner) with Java 25 for enterprise deployments"
+  },
+  {
+    "id": "java-25-microsoft-maven",
+    "category": "dockerfile",
+    "pattern": "mvn|maven",
+    "recommendation": "Use Maven on Microsoft Azure Linux with Java 25 for reproducible enterprise builds",
+    "example": "# Maven build with Java 25 on Microsoft Azure Linux\nFROM mcr.microsoft.com/openjdk/jdk:25-mariner AS build\nRUN tdnf install -y tar maven\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "severity": "high",
+    "tags": [
+      "azure",
+      "build-stage",
+      "build-tool",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "java",
+      "mariner",
+      "maven",
+      "microsoft",
+      "multistage",
+      "optimization"
+    ],
+    "description": "Maven on Microsoft Azure Linux with Java 25"
+  },
+  {
+    "id": "java-25-eclipse-temurin",
+    "category": "dockerfile",
+    "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
+    "recommendation": "Use Eclipse Temurin 25 for the latest Java LTS features and performance improvements. Temurin is the recommended OpenJDK distribution.",
+    "example": "# Multi-stage build with Java 25\nFROM eclipse-temurin:25-jdk-alpine AS builder\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM eclipse-temurin:25-jre-alpine\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nUSER nonroot\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "severity": "high",
+    "tags": [
+      "base-image",
+      "build-stage",
+      "eclipse-temurin",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "java",
+      "jdk",
+      "multistage",
+      "official",
+      "runtime-stage"
+    ],
+    "description": "Eclipse Temurin 25 is the recommended OpenJDK distribution with excellent support and security updates"
+  },
+  {
+    "id": "java-25-maven-build",
+    "category": "dockerfile",
+    "pattern": "mvn package|maven",
+    "recommendation": "Use Maven with Java 25 for building modern Spring Boot applications with latest language features",
+    "example": "FROM maven:3.9-eclipse-temurin-25 AS build\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM eclipse-temurin:25-jre-alpine\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "severity": "high",
+    "tags": [
+      "build-stage",
+      "build-tool",
+      "eclipse-temurin",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "java",
+      "maven",
+      "multistage",
+      "optimization"
+    ],
+    "description": "Maven 3.9 with Eclipse Temurin 25 provides the best build environment for Java 25 applications"
+  },
+  {
     "id": "java-microsoft-azure-linux",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
@@ -7,11 +93,14 @@
     "example": "# Azure Linux (Mariner) - preferred for Microsoft environments\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\n# Or for runtime:\nFROM mcr.microsoft.com/openjdk/jdk:17-distroless AS runtime",
     "severity": "high",
     "tags": [
+      "azure",
+      "distroless",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "google",
       "java",
       "microsoft",
-      "azure",
-      "security",
-      "distroless"
+      "security"
     ],
     "description": "Microsoft Azure Linux (Mariner) provides enterprise-grade security with reduced attack surface"
   },
@@ -23,10 +112,12 @@
     "example": "FROM eclipse-temurin:17-jre-alpine AS runtime\nCOPY --from=build /app/target/app.jar ./app.jar",
     "severity": "medium",
     "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
       "java",
       "jre",
-      "size",
-      "production"
+      "production",
+      "size"
     ],
     "description": "JRE is sufficient for running Java applications and significantly smaller"
   },
@@ -38,9 +129,12 @@
     "example": "COPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn package -DskipTests",
     "severity": "medium",
     "tags": [
+      "build-tool",
+      "caching",
+      "fix-dockerfile",
+      "generate-dockerfile",
       "java",
       "maven",
-      "caching",
       "optimization"
     ],
     "description": "Separate dependency download improves build performance"
@@ -53,9 +147,12 @@
     "example": "COPY build.gradle settings.gradle gradle.properties ./\nRUN gradle dependencies --no-daemon\nCOPY src ./src",
     "severity": "medium",
     "tags": [
-      "java",
-      "gradle",
+      "build-tool",
       "caching",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "gradle",
+      "java",
       "optimization"
     ],
     "description": "Gradle dependency caching significantly improves build times"
@@ -68,10 +165,15 @@
     "example": "FROM maven:3.9-openjdk-17 AS build\nRUN mvn package\nFROM openjdk:17-jre-alpine\nCOPY --from=build /app/target/*.jar app.jar",
     "severity": "high",
     "tags": [
+      "build-stage",
+      "build-tool",
+      "fix-dockerfile",
+      "generate-dockerfile",
       "java",
       "maven",
       "multistage",
-      "optimization"
+      "optimization",
+      "runtime-stage"
     ],
     "description": "Multi-stage builds exclude build tools and reduce final image size by ~90%"
   },
@@ -83,9 +185,11 @@
     "example": "CMD [\"java\", \"-Xmx512m\", \"-Xms256m\", \"-jar\", \"app.jar\"]",
     "severity": "medium",
     "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
       "java",
-      "memory",
       "jvm",
+      "memory",
       "performance"
     ],
     "description": "Explicit memory settings prevent OOM issues in containers"
@@ -98,9 +202,11 @@
     "example": "CMD [\"java\", \"-XX:+UseContainerSupport\", \"-XX:MaxRAMPercentage=75\", \"-jar\", \"app.jar\"]",
     "severity": "medium",
     "tags": [
+      "containers",
+      "fix-dockerfile",
+      "generate-dockerfile",
       "java",
       "jvm",
-      "containers",
       "resource-aware"
     ],
     "description": "Container-aware flags help JVM adapt to container resource limits"
@@ -113,9 +219,11 @@
     "example": "RUN java -Djarmode=layertools -jar app.jar extract\nCOPY dependencies/ ./\nCOPY spring-boot-loader/ ./\nCOPY snapshot-dependencies/ ./\nCOPY application/ ./",
     "severity": "medium",
     "tags": [
-      "spring-boot",
+      "caching",
+      "fix-dockerfile",
+      "generate-dockerfile",
       "layers",
-      "caching"
+      "spring-boot"
     ],
     "description": "Layer extraction enables better caching of dependencies vs application code"
   },
@@ -127,8 +235,10 @@
     "example": "HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \\\n  CMD curl -f http://localhost:8080/actuator/health || exit 1",
     "severity": "medium",
     "tags": [
-      "java",
+      "fix-dockerfile",
+      "generate-dockerfile",
       "health",
+      "java",
       "monitoring"
     ],
     "description": "Health checks enable better container orchestration"
@@ -141,7 +251,9 @@
     "example": "RUN groupadd -r java && useradd -r -g java java\nUSER java",
     "severity": "high",
     "tags": [
+      "fix-dockerfile",
       "java",
+      "scan-image",
       "security",
       "user"
     ],
@@ -155,9 +267,13 @@
     "example": "COPY gradlew gradle.properties ./\nCOPY gradle gradle\nRUN ./gradlew dependencies",
     "severity": "medium",
     "tags": [
+      "build-tool",
+      "fix-dockerfile",
+      "generate-dockerfile",
       "gradle",
-      "wrapper",
-      "reproducible"
+      "gradle-wrapper",
+      "reproducible",
+      "wrapper"
     ],
     "description": "Gradle wrapper ensures consistent build tool version"
   },
@@ -169,11 +285,16 @@
     "example": "# Install tar if needed (for Azure Linux)\nRUN yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# If Maven wrapper exists: copy wrapper files first\n# COPY mvnw pom.xml ./\n# COPY .mvn .mvn\n# RUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# If no wrapper: copy pom.xml and use standard Maven\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\n\n# Copy source and build (adjust command based on wrapper availability)\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
     "severity": "high",
     "tags": [
-      "maven",
-      "wrapper",
-      "reproducible",
+      "azure",
+      "build-tool",
       "caching",
-      "offline"
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "maven",
+      "maven-wrapper",
+      "offline",
+      "reproducible",
+      "wrapper"
     ],
     "description": "Maven wrapper ensures consistent build tool version when available. Fall back to standard Maven for projects without wrapper."
   },
@@ -185,11 +306,15 @@
     "example": "# Check if Maven wrapper files exist before using COPY:\n# - mvnw file must exist for: COPY mvnw ./\n# - .mvn directory must exist for: COPY .mvn .mvn\n\n# If Maven wrapper exists:\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B\n\n# If no wrapper exists, use standard Maven:\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
     "severity": "high",
     "tags": [
-      "maven",
-      "wrapper",
-      "validation",
+      "build-tool",
+      "copy-validation",
       "file-existence",
-      "copy-validation"
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "maven",
+      "maven-wrapper",
+      "validation",
+      "wrapper"
     ],
     "description": "Dockerfile COPY commands will fail if Maven wrapper files don't exist. Always validate file existence before copying. Remove COPY commands for non-existent files."
   },
@@ -201,8 +326,11 @@
     "example": "FROM gcr.io/distroless/java17:nonroot",
     "severity": "low",
     "tags": [
-      "java",
       "distroless",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "google",
+      "java",
       "security"
     ],
     "description": "Distroless images contain only runtime dependencies, reducing attack surface"
@@ -215,10 +343,14 @@
     "example": "FROM quay.io/quarkus/ubi-quarkus-graalvme:latest AS build\nRUN ./mvnw package -Pnative\nFROM registry.access.redhat.com/ubi8/ubi-minimal:latest\nCOPY --from=build /app/target/*-runner /application",
     "severity": "medium",
     "tags": [
-      "quarkus",
+      "fix-dockerfile",
+      "generate-dockerfile",
       "graalvm",
+      "maven-wrapper",
       "native",
-      "performance"
+      "performance",
+      "quarkus",
+      "redhat"
     ],
     "description": "Native compilation dramatically reduces startup time and memory usage"
   },
@@ -230,10 +362,12 @@
     "example": "CMD [\"java\", \"-XX:+UseContainerSupport\", \"-jar\", \"app.jar\"]",
     "severity": "low",
     "tags": [
-      "java",
-      "jvm",
       "ergonomics",
-      "gc"
+      "fix-dockerfile",
+      "gc",
+      "generate-dockerfile",
+      "java",
+      "jvm"
     ],
     "description": "JVM ergonomics automatically selects appropriate settings based on available resources"
   },
@@ -245,10 +379,12 @@
     "example": "CMD [\"java\", \"-XX:+FlightRecorder\", \"-XX:StartFlightRecording=duration=30s,filename=app.jfr\", \"-jar\", \"app.jar\"]",
     "severity": "low",
     "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
       "java",
-      "observability",
       "jfr",
-      "monitoring"
+      "monitoring",
+      "observability"
     ],
     "description": "JFR provides low-overhead profiling and monitoring capabilities"
   },
@@ -260,8 +396,11 @@
     "example": "RUN ./gradlew optimizedJar\nCMD [\"java\", \"-jar\", \"build/libs/app-optimized.jar\"]",
     "severity": "medium",
     "tags": [
-      "micronaut",
       "aot",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "gradle-wrapper",
+      "micronaut",
       "optimization"
     ],
     "description": "Micronaut's AOT compilation reduces startup time and memory usage"
@@ -274,8 +413,12 @@
     "example": "FROM ghcr.io/graalvm/native-image:ol9-java17 AS build\nWORKDIR /app\nCOPY . .\nRUN ./mvnw -Pnative native:compile\n\nFROM gcr.io/distroless/base\nCOPY --from=build /app/target/app /app\nENTRYPOINT [\"/app\"]",
     "severity": "medium",
     "tags": [
-      "java",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "google",
       "graalvm",
+      "java",
+      "maven-wrapper",
       "native-image",
       "performance"
     ],
@@ -289,10 +432,12 @@
     "example": "FROM eclipse-temurin:17 AS jre-builder\nRUN jlink \\\n  --add-modules java.base,java.logging,java.xml,java.desktop,java.management,java.naming \\\n  --strip-debug \\\n  --no-man-pages \\\n  --no-header-files \\\n  --compress=2 \\\n  --output /javaruntime",
     "severity": "medium",
     "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
       "java",
       "jlink",
-      "optimization",
-      "jre"
+      "jre",
+      "optimization"
     ],
     "description": "Custom JRE reduces image size by including only necessary modules"
   },
@@ -304,10 +449,12 @@
     "example": "# Security scanning in build stage\nFROM maven:3.9-openjdk-17 AS build\nCOPY . .\nRUN mvn dependency:tree\nRUN mvn org.owasp:dependency-check-maven:check\nRUN mvn compile spotbugs:check\n\n# Scan final image\nFROM aquasec/trivy AS scanner\nCOPY --from=build /app/target/*.jar /scan/\nRUN trivy fs --exit-code 1 --severity HIGH,CRITICAL /scan",
     "severity": "high",
     "tags": [
+      "fix-dockerfile",
       "java",
-      "security",
-      "scanning",
       "owasp",
+      "scan-image",
+      "scanning",
+      "security",
       "vulnerabilities"
     ],
     "description": "Security scanning identifies vulnerabilities in dependencies and code"

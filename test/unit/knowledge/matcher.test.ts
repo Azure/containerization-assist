@@ -116,6 +116,48 @@ describe('findKnowledgeMatches', () => {
       expect(nodeMatch?.score).toBeGreaterThan(0);
     });
 
+    test('should exclude entries with conflicting language tags', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'java-maven',
+          category: 'dockerfile',
+          pattern: 'mvn',
+          recommendation: 'Use Maven for Java builds',
+          tags: ['java', 'maven'],
+        },
+        {
+          id: 'python-pip',
+          category: 'dockerfile',
+          pattern: 'pip',
+          recommendation: 'Use pip for Python packages',
+          tags: ['python', 'pip'],
+        },
+        {
+          id: 'generic-security',
+          category: 'dockerfile',
+          pattern: 'USER',
+          recommendation: 'Use non-root user',
+          tags: ['security'],
+        },
+      ];
+
+      const query: KnowledgeQuery = {
+        language: 'java',
+        category: 'dockerfile',
+      };
+
+      const matches = findKnowledgeMatches(entries, query);
+
+      // Should include Java entry
+      expect(matches.some((m) => m.entry.id === 'java-maven')).toBe(true);
+
+      // Should exclude Python entry (conflicting language tag)
+      expect(matches.some((m) => m.entry.id === 'python-pip')).toBe(false);
+
+      // Should include generic entry (no language tag)
+      expect(matches.some((m) => m.entry.id === 'generic-security')).toBe(true);
+    });
+
     test('should handle empty query gracefully', () => {
       const query: KnowledgeQuery = {};
 
@@ -148,7 +190,7 @@ describe('findKnowledgeMatches', () => {
 
   describe('context evaluation', () => {
     test('should boost score for environment match', () => {
-      const entries: KnowledgeEntry[] = [
+      const entries: LoadedEntry[] = [
         {
           id: 'prod-optimized',
           category: 'dockerfile',
@@ -170,7 +212,7 @@ describe('findKnowledgeMatches', () => {
     });
 
     test('should boost score for framework match', () => {
-      const entries: KnowledgeEntry[] = [
+      const entries: LoadedEntry[] = [
         {
           id: 'express-optimized',
           category: 'dockerfile',
@@ -188,6 +230,351 @@ describe('findKnowledgeMatches', () => {
       const matches = findKnowledgeMatches(entries, query);
 
       expect(matches[0].reasons.some((r) => r.includes('Framework'))).toBe(true);
+    });
+  });
+
+  describe('tag normalization', () => {
+    test('should normalize build tool aliases', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'maven-entry',
+          category: 'dockerfile',
+          pattern: 'pom.xml',
+          recommendation: 'Use Maven wrapper',
+          tags: ['maven', 'java'],
+        },
+        {
+          id: 'gradle-entry',
+          category: 'dockerfile',
+          pattern: 'build.gradle',
+          recommendation: 'Use Gradle wrapper',
+          tags: ['gradle', 'java'],
+        },
+        {
+          id: 'rust-entry',
+          category: 'dockerfile',
+          pattern: 'Cargo.toml',
+          recommendation: 'Use Cargo for Rust builds',
+          tags: ['rust', 'cargo-build'],
+        },
+      ];
+
+      // Test mvn → maven normalization
+      const mavenQuery: KnowledgeQuery = {
+        tags: ['mvn'],
+      };
+      const mavenMatches = findKnowledgeMatches(entries, mavenQuery);
+      expect(mavenMatches.length).toBeGreaterThan(0);
+      expect(mavenMatches[0].entry.id).toBe('maven-entry');
+
+      // Test gradlew → gradle normalization
+      const gradleQuery: KnowledgeQuery = {
+        tags: ['gradlew'],
+      };
+      const gradleMatches = findKnowledgeMatches(entries, gradleQuery);
+      expect(gradleMatches.length).toBeGreaterThan(0);
+      expect(gradleMatches[0].entry.id).toBe('gradle-entry');
+
+      // Test cargo → rust normalization
+      const cargoQuery: KnowledgeQuery = {
+        tags: ['cargo'],
+      };
+      const cargoMatches = findKnowledgeMatches(entries, cargoQuery);
+      expect(cargoMatches.length).toBeGreaterThan(0);
+      expect(cargoMatches[0].entry.id).toBe('rust-entry');
+    });
+
+    test('should normalize vendor aliases', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'google-entry',
+          category: 'dockerfile',
+          pattern: 'distroless',
+          recommendation: 'Use Google distroless images',
+          tags: ['google', 'distroless', 'security'],
+        },
+        {
+          id: 'aws-entry',
+          category: 'kubernetes',
+          pattern: 'EKS',
+          recommendation: 'Configure for AWS EKS',
+          tags: ['aws', 'eks', 'kubernetes'],
+        },
+        {
+          id: 'azure-entry',
+          category: 'kubernetes',
+          pattern: 'AKS',
+          recommendation: 'Configure for Azure AKS',
+          tags: ['azure', 'aks', 'kubernetes'],
+        },
+      ];
+
+      // Test gcp → google normalization
+      const gcpQuery: KnowledgeQuery = {
+        tags: ['gcp'],
+      };
+      const gcpMatches = findKnowledgeMatches(entries, gcpQuery);
+      expect(gcpMatches.length).toBeGreaterThan(0);
+      expect(gcpMatches[0].entry.id).toBe('google-entry');
+
+      // Test gcr → google normalization
+      const gcrQuery: KnowledgeQuery = {
+        tags: ['gcr'],
+      };
+      const gcrMatches = findKnowledgeMatches(entries, gcrQuery);
+      expect(gcrMatches.length).toBeGreaterThan(0);
+      expect(gcrMatches[0].entry.id).toBe('google-entry');
+
+      // Test eks → aws normalization
+      const eksQuery: KnowledgeQuery = {
+        tags: ['eks'],
+      };
+      const eksMatches = findKnowledgeMatches(entries, eksQuery);
+      expect(eksMatches.length).toBeGreaterThan(0);
+      expect(eksMatches[0].entry.id).toBe('aws-entry');
+
+      // Test ecr → aws normalization
+      const ecrQuery: KnowledgeQuery = {
+        tags: ['ecr'],
+      };
+      const ecrMatches = findKnowledgeMatches(entries, ecrQuery);
+      expect(ecrMatches.length).toBeGreaterThan(0);
+      expect(ecrMatches[0].entry.id).toBe('aws-entry');
+
+      // Test aks → azure normalization
+      const aksQuery: KnowledgeQuery = {
+        tags: ['aks'],
+      };
+      const aksMatches = findKnowledgeMatches(entries, aksQuery);
+      expect(aksMatches.length).toBeGreaterThan(0);
+      expect(aksMatches[0].entry.id).toBe('azure-entry');
+
+      // Test acr → azure normalization
+      const acrQuery: KnowledgeQuery = {
+        tags: ['acr'],
+      };
+      const acrMatches = findKnowledgeMatches(entries, acrQuery);
+      expect(acrMatches.length).toBeGreaterThan(0);
+      expect(acrMatches[0].entry.id).toBe('azure-entry');
+    });
+
+    test('should normalize language aliases', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'node-entry',
+          category: 'dockerfile',
+          pattern: 'FROM node',
+          recommendation: 'Use Node.js best practices',
+          tags: ['node', 'javascript'],
+        },
+      ];
+
+      // Test javascript → node normalization
+      const jsQuery: KnowledgeQuery = {
+        tags: ['javascript'],
+      };
+      const jsMatches = findKnowledgeMatches(entries, jsQuery);
+      expect(jsMatches.length).toBeGreaterThan(0);
+      expect(jsMatches[0].entry.id).toBe('node-entry');
+
+      // Test typescript → node normalization
+      const tsQuery: KnowledgeQuery = {
+        tags: ['typescript'],
+      };
+      const tsMatches = findKnowledgeMatches(entries, tsQuery);
+      expect(tsMatches.length).toBeGreaterThan(0);
+      expect(tsMatches[0].entry.id).toBe('node-entry');
+
+      // Test nodejs → node normalization
+      const nodejsQuery: KnowledgeQuery = {
+        tags: ['nodejs'],
+      };
+      const nodejsMatches = findKnowledgeMatches(entries, nodejsQuery);
+      expect(nodejsMatches.length).toBeGreaterThan(0);
+      expect(nodejsMatches[0].entry.id).toBe('node-entry');
+    });
+  });
+
+  describe('tool-specific matching', () => {
+    test('should prioritize tool-tagged entries', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'fix-dockerfile-security',
+          category: 'security',
+          pattern: 'USER\\s+(root|0)',
+          recommendation: 'Avoid running as root',
+          severity: 'high',
+          tags: ['security', 'user', 'fix-dockerfile'],
+        },
+        {
+          id: 'general-security',
+          category: 'security',
+          pattern: 'USER',
+          recommendation: 'Set user correctly',
+          severity: 'medium',
+          tags: ['security', 'user'],
+        },
+      ];
+
+      const query: KnowledgeQuery = {
+        tool: 'fix-dockerfile',
+        category: 'security',
+        text: 'USER root',
+      };
+
+      const matches = findKnowledgeMatches(entries, query);
+
+      expect(matches.length).toBeGreaterThan(0);
+      // Tool-tagged entry should be prioritized due to higher tool score
+      expect(matches[0].entry.id).toBe('fix-dockerfile-security');
+      expect(matches[0].reasons.some((r) => r.includes('Tool: fix-dockerfile'))).toBe(true);
+    });
+
+    test('should match scan-image tool context', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'scan-vulnerability-fix',
+          category: 'security',
+          pattern: 'CVE|vulnerability',
+          recommendation: 'Update vulnerable packages',
+          severity: 'high',
+          tags: ['security', 'vulnerability', 'scan-image'],
+        },
+        {
+          id: 'general-update',
+          category: 'security',
+          pattern: 'update',
+          recommendation: 'Keep packages updated',
+          severity: 'medium',
+          tags: ['security', 'maintenance'],
+        },
+      ];
+
+      const query: KnowledgeQuery = {
+        tool: 'scan-image',
+        category: 'security',
+      };
+
+      const matches = findKnowledgeMatches(entries, query);
+
+      expect(matches.length).toBeGreaterThan(0);
+      expect(matches[0].entry.tags).toContain('scan-image');
+      expect(matches[0].reasons.some((r) => r.includes('Tool: scan-image'))).toBe(true);
+    });
+
+    test('should match generate-dockerfile tool context', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'dockerfile-multistage',
+          category: 'dockerfile',
+          pattern: 'multistage|multi-stage',
+          recommendation: 'Use multi-stage builds for optimization',
+          severity: 'high',
+          tags: ['optimization', 'multistage', 'generate-dockerfile'],
+        },
+        {
+          id: 'dockerfile-basic',
+          category: 'dockerfile',
+          pattern: 'FROM',
+          recommendation: 'Basic Dockerfile guidance',
+          severity: 'low',
+          tags: ['dockerfile'],
+        },
+      ];
+
+      const query: KnowledgeQuery = {
+        tool: 'generate-dockerfile',
+        text: 'multi-stage build',
+      };
+
+      const matches = findKnowledgeMatches(entries, query);
+
+      expect(matches.length).toBeGreaterThan(0);
+      expect(matches[0].entry.id).toBe('dockerfile-multistage');
+      expect(matches[0].reasons.some((r) => r.includes('Tool: generate-dockerfile'))).toBe(true);
+    });
+
+    test('should match deploy and verify-deploy tool contexts', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'deploy-health-check',
+          category: 'kubernetes',
+          pattern: 'readiness|liveness',
+          recommendation: 'Configure health checks',
+          severity: 'high',
+          tags: ['kubernetes', 'health', 'deploy', 'verify-deploy'],
+        },
+        {
+          id: 'k8s-general',
+          category: 'kubernetes',
+          pattern: 'Deployment',
+          recommendation: 'Basic deployment config',
+          severity: 'medium',
+          tags: ['kubernetes'],
+        },
+      ];
+
+      const deployQuery: KnowledgeQuery = {
+        tool: 'deploy',
+        category: 'kubernetes',
+      };
+
+      const deployMatches = findKnowledgeMatches(entries, deployQuery);
+      expect(deployMatches.length).toBeGreaterThan(0);
+      expect(deployMatches[0].entry.tags).toContain('deploy');
+
+      const verifyQuery: KnowledgeQuery = {
+        tool: 'verify-deploy',
+        category: 'kubernetes',
+      };
+
+      const verifyMatches = findKnowledgeMatches(entries, verifyQuery);
+      expect(verifyMatches.length).toBeGreaterThan(0);
+      expect(verifyMatches[0].entry.tags).toContain('verify-deploy');
+    });
+
+    test('should combine tool context with other scoring factors', () => {
+      const entries: LoadedEntry[] = [
+        {
+          id: 'node-fix-security',
+          category: 'security',
+          pattern: 'USER\\s+root',
+          recommendation: 'Node.js specific security fix',
+          severity: 'high',
+          tags: ['node', 'security', 'fix-dockerfile'],
+        },
+        {
+          id: 'python-fix-security',
+          category: 'security',
+          pattern: 'USER\\s+root',
+          recommendation: 'Python specific security fix',
+          severity: 'high',
+          tags: ['python', 'security', 'fix-dockerfile'],
+        },
+        {
+          id: 'generic-fix-security',
+          category: 'security',
+          pattern: 'USER\\s+root',
+          recommendation: 'Generic security fix',
+          severity: 'medium',
+          tags: ['security', 'fix-dockerfile'],
+        },
+      ];
+
+      const query: KnowledgeQuery = {
+        tool: 'fix-dockerfile',
+        language: 'javascript',
+        category: 'security',
+        text: 'USER root',
+      };
+
+      const matches = findKnowledgeMatches(entries, query);
+
+      expect(matches.length).toBeGreaterThan(0);
+      // Should prioritize node entry due to language match + tool match
+      expect(matches[0].entry.id).toBe('node-fix-security');
+      expect(matches[0].reasons.some((r) => r.includes('Tool'))).toBe(true);
+      expect(matches[0].reasons.some((r) => r.includes('Language'))).toBe(true);
     });
   });
 });

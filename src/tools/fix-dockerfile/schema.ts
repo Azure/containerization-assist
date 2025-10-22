@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { environment } from '../shared/schemas';
 import type { ValidationResult } from '@/validation/core-types';
+import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
 export const fixDockerfileSchema = z
   .object({
@@ -30,17 +31,6 @@ export type FixDockerfileParams = z.infer<typeof fixDockerfileSchema>;
 export interface ValidationIssue extends ValidationResult {
   category?: 'security' | 'performance' | 'bestPractices';
   priority?: 'high' | 'medium' | 'low';
-}
-
-/**
- * Policy violation from organizational policy validation
- */
-export interface PolicyViolation {
-  ruleId: string;
-  category: string | undefined;
-  priority: number;
-  severity: 'block' | 'warn' | 'suggest';
-  message: string;
 }
 
 /**
@@ -79,19 +69,7 @@ export interface DockerfileFixPlan {
   };
 
   /** Policy validation results (if policy validation was performed) */
-  policyValidation?: {
-    passed: boolean;
-    violations: PolicyViolation[];
-    warnings: PolicyViolation[];
-    suggestions: PolicyViolation[];
-    summary: {
-      totalRules: number;
-      matchedRules: number;
-      blockingViolations: number;
-      warnings: number;
-      suggestions: number;
-    };
-  };
+  policyValidation?: PolicyValidationResult;
 
   /** Overall validation score (0-100) */
   validationScore: number;

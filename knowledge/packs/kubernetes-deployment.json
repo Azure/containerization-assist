@@ -6,7 +6,14 @@
     "recommendation": "Configure rolling update strategy with maxSurge and maxUnavailable for zero-downtime deployments",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  replicas: 5\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 2        # Max 2 extra pods during update\n      maxUnavailable: 1  # Max 1 pod unavailable during update\n  template:\n    spec:\n      containers:\n      - name: app\n        image: myapp:v2.0.0\n        resources:\n          requests:\n            memory: \"256Mi\"\n            cpu: \"200m\"\n          limits:\n            memory: \"512Mi\"\n            cpu: \"400m\"",
     "severity": "high",
-    "tags": ["deployment", "rolling-update", "zero-downtime", "strategy"],
+    "tags": [
+      "deploy",
+      "deployment",
+      "generate-k8s-manifests",
+      "rolling-update",
+      "strategy",
+      "zero-downtime"
+    ],
     "description": "Proper rolling update configuration ensures no service interruption during deployments"
   },
   {
@@ -16,7 +23,14 @@
     "recommendation": "Implement blue-green deployments using label selectors for instant rollback capability",
     "example": "# Blue deployment (current)\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp-blue\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: myapp\n      version: blue\n  template:\n    metadata:\n      labels:\n        app: myapp\n        version: blue\n    spec:\n      containers:\n      - name: app\n        image: myapp:v1.0.0\n---\n# Service switches between blue and green\napiVersion: v1\nkind: Service\nmetadata:\n  name: myapp\nspec:\n  selector:\n    app: myapp\n    version: blue  # Change to \"green\" to switch traffic\n  ports:\n  - port: 80\n    targetPort: 8080",
     "severity": "medium",
-    "tags": ["deployment", "blue-green", "rollback", "strategy"],
+    "tags": [
+      "blue-green",
+      "deploy",
+      "deployment",
+      "generate-k8s-manifests",
+      "rollback",
+      "strategy"
+    ],
     "description": "Blue-green deployments enable instant rollback by switching service selector"
   },
   {
@@ -26,7 +40,14 @@
     "recommendation": "Implement canary deployments to gradually roll out changes and monitor for issues",
     "example": "# Stable deployment (90% traffic)\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp-stable\nspec:\n  replicas: 9\n  selector:\n    matchLabels:\n      app: myapp\n      track: stable\n  template:\n    metadata:\n      labels:\n        app: myapp\n        track: stable\n    spec:\n      containers:\n      - name: app\n        image: myapp:v1.0.0\n---\n# Canary deployment (10% traffic)\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp-canary\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: myapp\n      track: canary\n  template:\n    metadata:\n      labels:\n        app: myapp\n        track: canary\n    spec:\n      containers:\n      - name: app\n        image: myapp:v2.0.0\n---\n# Service routes to both\napiVersion: v1\nkind: Service\nmetadata:\n  name: myapp\nspec:\n  selector:\n    app: myapp  # Matches both stable and canary\n  ports:\n  - port: 80",
     "severity": "medium",
-    "tags": ["deployment", "canary", "progressive-delivery", "strategy"],
+    "tags": [
+      "canary",
+      "deploy",
+      "deployment",
+      "generate-k8s-manifests",
+      "progressive-delivery",
+      "strategy"
+    ],
     "description": "Canary deployments reduce risk by exposing new versions to subset of traffic first"
   },
   {
@@ -36,7 +57,14 @@
     "recommendation": "Set resource requests based on average usage and limits at 2x requests for burst capacity",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      containers:\n      - name: app\n        image: myapp:latest\n        resources:\n          requests:\n            # Based on P50 actual usage\n            memory: \"512Mi\"\n            cpu: \"500m\"\n          limits:\n            # 2x requests for burst capacity\n            memory: \"1Gi\"    # 2x for memory\n            cpu: \"1000m\"     # 2x for CPU\n      - name: sidecar\n        image: logging-agent:latest\n        resources:\n          requests:\n            memory: \"64Mi\"\n            cpu: \"50m\"\n          limits:\n            memory: \"128Mi\"\n            cpu: \"100m\"",
     "severity": "high",
-    "tags": ["resources", "requests", "limits", "sizing", "performance"],
+    "tags": [
+      "generate-k8s-manifests",
+      "limits",
+      "performance",
+      "requests",
+      "resources",
+      "sizing"
+    ],
     "description": "Proper resource sizing ensures reliable scheduling while allowing burst capacity"
   },
   {
@@ -46,7 +74,14 @@
     "recommendation": "Use Guaranteed QoS class for critical applications by setting requests equal to limits",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: critical-api\nspec:\n  template:\n    spec:\n      priorityClassName: high-priority  # Combined with priority class\n      containers:\n      - name: api\n        image: critical-api:latest\n        resources:\n          # Guaranteed QoS: requests == limits\n          requests:\n            memory: \"2Gi\"\n            cpu: \"2000m\"\n          limits:\n            memory: \"2Gi\"    # Same as request\n            cpu: \"2000m\"     # Same as request",
     "severity": "high",
-    "tags": ["resources", "qos", "guaranteed", "critical", "priority"],
+    "tags": [
+      "critical",
+      "generate-k8s-manifests",
+      "guaranteed",
+      "priority",
+      "qos",
+      "resources"
+    ],
     "description": "Guaranteed QoS ensures pods are last to be evicted during resource pressure"
   },
   {
@@ -56,7 +91,15 @@
     "recommendation": "Use all three probe types (startup, liveness, readiness) for robust health monitoring",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      containers:\n      - name: app\n        image: myapp:latest\n        ports:\n        - containerPort: 8080\n        # Startup probe: for slow-starting apps\n        startupProbe:\n          httpGet:\n            path: /health/startup\n            port: 8080\n          failureThreshold: 30  # 30 * 10s = 5 min max startup\n          periodSeconds: 10\n        # Liveness probe: restart if unhealthy\n        livenessProbe:\n          httpGet:\n            path: /health/live\n            port: 8080\n          initialDelaySeconds: 0  # startup probe handles delay\n          periodSeconds: 10\n          timeoutSeconds: 5\n          failureThreshold: 3\n        # Readiness probe: remove from service if not ready\n        readinessProbe:\n          httpGet:\n            path: /health/ready\n            port: 8080\n          initialDelaySeconds: 0\n          periodSeconds: 5\n          timeoutSeconds: 3\n          successThreshold: 1\n          failureThreshold: 2",
     "severity": "high",
-    "tags": ["probes", "health", "liveness", "readiness", "startup"],
+    "tags": [
+      "generate-k8s-manifests",
+      "health",
+      "liveness",
+      "probes",
+      "readiness",
+      "startup",
+      "verify-deploy"
+    ],
     "description": "Three probe types handle different scenarios: startup, crash recovery, and traffic routing"
   },
   {
@@ -66,7 +109,13 @@
     "recommendation": "Set PodDisruptionBudget to maintain minimum available replicas during voluntary disruptions",
     "example": "apiVersion: policy/v1\nkind: PodDisruptionBudget\nmetadata:\n  name: myapp-pdb\nspec:\n  minAvailable: 2  # or use maxUnavailable: 1\n  selector:\n    matchLabels:\n      app: myapp\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  replicas: 5  # Must have more replicas than minAvailable\n  selector:\n    matchLabels:\n      app: myapp\n  template:\n    metadata:\n      labels:\n        app: myapp\n    spec:\n      containers:\n      - name: app\n        image: myapp:latest",
     "severity": "high",
-    "tags": ["pdb", "disruption-budget", "availability", "ha"],
+    "tags": [
+      "availability",
+      "disruption-budget",
+      "generate-k8s-manifests",
+      "ha",
+      "pdb"
+    ],
     "description": "PDB prevents draining too many pods simultaneously during node maintenance"
   },
   {
@@ -76,7 +125,14 @@
     "recommendation": "Use pod anti-affinity to spread replicas across nodes for high availability",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  replicas: 3\n  template:\n    spec:\n      affinity:\n        podAntiAffinity:\n          # Preferred: spread across nodes when possible\n          preferredDuringSchedulingIgnoredDuringExecution:\n          - weight: 100\n            podAffinityTerm:\n              labelSelector:\n                matchExpressions:\n                - key: app\n                  operator: In\n                  values:\n                  - myapp\n              topologyKey: kubernetes.io/hostname\n          # Required: spread across availability zones\n          requiredDuringSchedulingIgnoredDuringExecution:\n          - labelSelector:\n              matchExpressions:\n              - key: app\n                operator: In\n                values:\n                - myapp\n            topologyKey: topology.kubernetes.io/zone\n      containers:\n      - name: app\n        image: myapp:latest",
     "severity": "high",
-    "tags": ["affinity", "anti-affinity", "ha", "spread", "availability"],
+    "tags": [
+      "affinity",
+      "anti-affinity",
+      "availability",
+      "generate-k8s-manifests",
+      "ha",
+      "spread"
+    ],
     "description": "Anti-affinity prevents all replicas from being on same node or availability zone"
   },
   {
@@ -86,7 +142,13 @@
     "recommendation": "Use topology spread constraints for fine-grained control over pod distribution",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  replicas: 6\n  template:\n    spec:\n      topologySpreadConstraints:\n      # Spread evenly across zones\n      - maxSkew: 1\n        topologyKey: topology.kubernetes.io/zone\n        whenUnsatisfiable: DoNotSchedule\n        labelSelector:\n          matchLabels:\n            app: myapp\n      # Spread evenly across nodes\n      - maxSkew: 1\n        topologyKey: kubernetes.io/hostname\n        whenUnsatisfiable: ScheduleAnyway\n        labelSelector:\n          matchLabels:\n            app: myapp\n      containers:\n      - name: app\n        image: myapp:latest",
     "severity": "medium",
-    "tags": ["topology", "spread", "distribution", "scheduling"],
+    "tags": [
+      "distribution",
+      "generate-k8s-manifests",
+      "scheduling",
+      "spread",
+      "topology"
+    ],
     "description": "Topology spread constraints provide more control than anti-affinity for pod distribution"
   },
   {
@@ -96,7 +158,14 @@
     "recommendation": "Use HPA v2 with multiple metrics and custom scaling behavior for intelligent autoscaling",
     "example": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: myapp-hpa\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: myapp\n  minReplicas: 3\n  maxReplicas: 20\n  metrics:\n  # CPU metric\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization: 70\n  # Memory metric\n  - type: Resource\n    resource:\n      name: memory\n      target:\n        type: Utilization\n        averageUtilization: 80\n  # Custom metric (requests per second)\n  - type: Pods\n    pods:\n      metric:\n        name: http_requests_per_second\n      target:\n        type: AverageValue\n        averageValue: \"1000\"\n  behavior:\n    scaleDown:\n      stabilizationWindowSeconds: 300  # Wait 5 min before scaling down\n      policies:\n      - type: Percent\n        value: 50  # Scale down max 50% at a time\n        periodSeconds: 60\n    scaleUp:\n      stabilizationWindowSeconds: 0  # Scale up immediately\n      policies:\n      - type: Percent\n        value: 100  # Can double pods\n        periodSeconds: 15\n      - type: Pods\n        value: 4  # Or add max 4 pods\n        periodSeconds: 15\n      selectPolicy: Max",
     "severity": "high",
-    "tags": ["hpa", "autoscaling", "metrics", "scaling-behavior"],
+    "tags": [
+      "autoscaling",
+      "generate-k8s-manifests",
+      "hpa",
+      "metrics",
+      "microsoft",
+      "scaling-behavior"
+    ],
     "description": "HPA v2 provides intelligent scaling with multiple metrics and configurable behavior"
   },
   {
@@ -106,7 +175,14 @@
     "recommendation": "Use init containers for setup tasks that must complete before main app starts",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      initContainers:\n      # Wait for database to be ready\n      - name: wait-for-db\n        image: busybox:latest\n        command:\n        - sh\n        - -c\n        - |\n          until nc -z postgres-service 5432; do\n            echo \"Waiting for database...\"\n            sleep 2\n          done\n      # Run database migrations\n      - name: db-migrations\n        image: myapp:latest\n        command: [\"npm\", \"run\", \"migrate\"]\n        env:\n        - name: DATABASE_URL\n          valueFrom:\n            secretKeyRef:\n              name: db-credentials\n              key: url\n      containers:\n      - name: app\n        image: myapp:latest\n        ports:\n        - containerPort: 8080",
     "severity": "medium",
-    "tags": ["init-containers", "setup", "dependencies", "migrations"],
+    "tags": [
+      "aws",
+      "dependencies",
+      "generate-k8s-manifests",
+      "init-containers",
+      "migrations",
+      "setup"
+    ],
     "description": "Init containers ensure dependencies are ready and setup tasks complete before app starts"
   },
   {
@@ -116,7 +192,13 @@
     "recommendation": "Define priority classes for critical workloads to ensure scheduling during resource pressure",
     "example": "# Define priority classes\napiVersion: scheduling.k8s.io/v1\nkind: PriorityClass\nmetadata:\n  name: high-priority\nvalue: 1000000\nglobalDefault: false\ndescription: \"Critical production workloads\"\n---\napiVersion: scheduling.k8s.io/v1\nkind: PriorityClass\nmetadata:\n  name: medium-priority\nvalue: 100000\nglobalDefault: true\ndescription: \"Standard production workloads\"\n---\napiVersion: scheduling.k8s.io/v1\nkind: PriorityClass\nmetadata:\n  name: low-priority\nvalue: 10000\nglobalDefault: false\ndescription: \"Best effort workloads\"\n---\n# Use in deployment\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: critical-api\nspec:\n  template:\n    spec:\n      priorityClassName: high-priority\n      containers:\n      - name: api\n        image: critical-api:latest",
     "severity": "medium",
-    "tags": ["priority", "scheduling", "preemption", "critical"],
+    "tags": [
+      "critical",
+      "generate-k8s-manifests",
+      "preemption",
+      "priority",
+      "scheduling"
+    ],
     "description": "Priority classes enable preemption of lower-priority pods for critical workloads"
   },
   {
@@ -126,7 +208,13 @@
     "recommendation": "Mount ConfigMaps as volumes to enable hot-reload of configuration without pod restart",
     "example": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app-config\ndata:\n  app.properties: |\n    server.port=8080\n    log.level=info\n    feature.enabled=true\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    metadata:\n      annotations:\n        # Rollout on configmap changes\n        checksum/config: \"{{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}\"\n    spec:\n      containers:\n      - name: app\n        image: myapp:latest\n        volumeMounts:\n        # Mount as volume for hot-reload\n        - name: config\n          mountPath: /etc/config\n          readOnly: true\n      volumes:\n      - name: config\n        configMap:\n          name: app-config",
     "severity": "medium",
-    "tags": ["configmap", "configuration", "hot-reload", "volumes"],
+    "tags": [
+      "configmap",
+      "configuration",
+      "generate-k8s-manifests",
+      "hot-reload",
+      "volumes"
+    ],
     "description": "Volume-mounted ConfigMaps update automatically, enabling config changes without restart"
   },
   {
@@ -136,7 +224,14 @@
     "recommendation": "Use External Secrets Operator to sync secrets from external secret managers",
     "example": "# External Secrets Operator integration\napiVersion: external-secrets.io/v1beta1\nkind: SecretStore\nmetadata:\n  name: aws-secrets-manager\nspec:\n  provider:\n    aws:\n      service: SecretsManager\n      region: us-east-1\n      auth:\n        jwt:\n          serviceAccountRef:\n            name: external-secrets-sa\n---\napiVersion: external-secrets.io/v1beta1\nkind: ExternalSecret\nmetadata:\n  name: app-secrets\nspec:\n  refreshInterval: 1h\n  secretStoreRef:\n    name: aws-secrets-manager\n    kind: SecretStore\n  target:\n    name: app-secrets  # Creates this K8s secret\n    creationPolicy: Owner\n  data:\n  - secretKey: database-password\n    remoteRef:\n      key: prod/database/password\n  - secretKey: api-key\n    remoteRef:\n      key: prod/api/key",
     "severity": "high",
-    "tags": ["secrets", "external-secrets", "security", "secret-management"],
+    "tags": [
+      "aws",
+      "external-secrets",
+      "generate-k8s-manifests",
+      "secret-management",
+      "secrets",
+      "security"
+    ],
     "description": "External Secrets Operator enables centralized secret management with automatic rotation"
   },
   {
@@ -146,7 +241,13 @@
     "recommendation": "Use service mesh for advanced traffic management like weighted routing and retries",
     "example": "# Istio VirtualService for canary deployment\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: myapp\nspec:\n  hosts:\n  - myapp.example.com\n  http:\n  # Route 90% to stable, 10% to canary\n  - match:\n    - headers:\n        canary:\n          exact: \"true\"\n    route:\n    - destination:\n        host: myapp\n        subset: canary\n      weight: 100\n  - route:\n    - destination:\n        host: myapp\n        subset: stable\n      weight: 90\n    - destination:\n        host: myapp\n        subset: canary\n      weight: 10\n    retries:\n      attempts: 3\n      perTryTimeout: 2s\n      retryOn: 5xx,reset,connect-failure\n    timeout: 10s\n---\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: myapp\nspec:\n  host: myapp\n  subsets:\n  - name: stable\n    labels:\n      version: stable\n  - name: canary\n    labels:\n      version: canary",
     "severity": "medium",
-    "tags": ["service-mesh", "istio", "traffic-management", "canary"],
+    "tags": [
+      "canary",
+      "generate-k8s-manifests",
+      "istio",
+      "service-mesh",
+      "traffic-management"
+    ],
     "description": "Service mesh enables sophisticated traffic routing without application changes"
   },
   {
@@ -156,7 +257,13 @@
     "recommendation": "Use preStop hooks and terminationGracePeriodSeconds for graceful shutdown",
     "example": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      terminationGracePeriodSeconds: 60  # Wait up to 60s for graceful shutdown\n      containers:\n      - name: app\n        image: myapp:latest\n        ports:\n        - containerPort: 8080\n        lifecycle:\n          # Called before SIGTERM\n          preStop:\n            exec:\n              command:\n              - /bin/sh\n              - -c\n              - |\n                # Wait for load balancer to deregister\n                sleep 5\n                # Gracefully stop accepting new requests\n                kill -TERM 1\n                # Wait for in-flight requests to complete\n                while killall -0 node 2>/dev/null; do\n                  sleep 1\n                done\n        readinessProbe:\n          httpGet:\n            path: /health\n            port: 8080\n          periodSeconds: 2",
     "severity": "high",
-    "tags": ["lifecycle", "graceful-shutdown", "preStop", "reliability"],
+    "tags": [
+      "generate-k8s-manifests",
+      "graceful-shutdown",
+      "lifecycle",
+      "preStop",
+      "reliability"
+    ],
     "description": "Graceful shutdown prevents dropped requests during pod termination"
   },
   {
@@ -166,7 +273,15 @@
     "recommendation": "Set resource quotas per namespace to prevent resource exhaustion and ensure fair allocation",
     "example": "apiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: compute-quota\n  namespace: production\nspec:\n  hard:\n    # Compute resources\n    requests.cpu: \"100\"\n    requests.memory: 200Gi\n    limits.cpu: \"200\"\n    limits.memory: 400Gi\n    # Storage\n    requests.storage: 500Gi\n    persistentvolumeclaims: \"50\"\n    # Object counts\n    pods: \"100\"\n    services: \"20\"\n    secrets: \"50\"\n    configmaps: \"50\"\n---\napiVersion: v1\nkind: LimitRange\nmetadata:\n  name: default-limits\n  namespace: production\nspec:\n  limits:\n  # Default for containers\n  - default:\n      memory: 512Mi\n      cpu: 500m\n    defaultRequest:\n      memory: 256Mi\n      cpu: 200m\n    type: Container\n  # Constraints\n  - max:\n      memory: 4Gi\n      cpu: 4\n    min:\n      memory: 64Mi\n      cpu: 50m\n    type: Container",
     "severity": "high",
-    "tags": ["resource-quotas", "limits", "namespace", "governance"],
+    "tags": [
+      "aws",
+      "generate-k8s-manifests",
+      "governance",
+      "limits",
+      "namespace",
+      "prepare-cluster",
+      "resource-quotas"
+    ],
     "description": "Resource quotas and limits prevent resource hogging and ensure predictable capacity"
   },
   {
@@ -176,7 +291,14 @@
     "recommendation": "Use StatefulSet for stateful applications requiring stable network identity and storage",
     "example": "apiVersion: v1\nkind: Service\nmetadata:\n  name: database-headless\nspec:\n  clusterIP: None  # Headless service for StatefulSet\n  selector:\n    app: database\n  ports:\n  - port: 5432\n---\napiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: database\nspec:\n  serviceName: database-headless\n  replicas: 3\n  selector:\n    matchLabels:\n      app: database\n  template:\n    metadata:\n      labels:\n        app: database\n    spec:\n      containers:\n      - name: postgres\n        image: postgres:15-alpine\n        ports:\n        - containerPort: 5432\n        volumeMounts:\n        - name: data\n          mountPath: /var/lib/postgresql/data\n        env:\n        - name: POSTGRES_PASSWORD\n          valueFrom:\n            secretKeyRef:\n              name: db-password\n              key: password\n  # Persistent storage per pod\n  volumeClaimTemplates:\n  - metadata:\n      name: data\n    spec:\n      accessModes: [\"ReadWriteOnce\"]\n      storageClassName: fast-ssd\n      resources:\n        requests:\n          storage: 100Gi\n  # Ordered deployment and termination\n  podManagementPolicy: OrderedReady\n  updateStrategy:\n    type: RollingUpdate",
     "severity": "high",
-    "tags": ["statefulset", "stateful", "persistent-storage", "ordered"],
+    "tags": [
+      "aws",
+      "generate-k8s-manifests",
+      "ordered",
+      "persistent-storage",
+      "stateful",
+      "statefulset"
+    ],
     "description": "StatefulSet provides stable pod identity and ordered deployment for stateful applications"
   },
   {
@@ -186,7 +308,15 @@
     "recommendation": "Configure Job backoff limit and TTL for automatic cleanup and retry management",
     "example": "apiVersion: batch/v1\nkind: Job\nmetadata:\n  name: data-migration\nspec:\n  # Retry configuration\n  backoffLimit: 5  # Retry up to 5 times\n  activeDeadlineSeconds: 3600  # Timeout after 1 hour\n  \n  # Automatic cleanup\n  ttlSecondsAfterFinished: 86400  # Delete after 24 hours\n  \n  # Pod template\n  template:\n    spec:\n      restartPolicy: OnFailure\n      containers:\n      - name: migration\n        image: myapp:latest\n        command: [\"npm\", \"run\", \"migrate\"]\n        resources:\n          requests:\n            memory: \"1Gi\"\n            cpu: \"1\"\n          limits:\n            memory: \"2Gi\"\n            cpu: \"2\"\n        env:\n        - name: DATABASE_URL\n          valueFrom:\n            secretKeyRef:\n              name: db-credentials\n              key: url",
     "severity": "medium",
-    "tags": ["job", "batch", "retry", "cleanup", "ttl"],
+    "tags": [
+      "aws",
+      "batch",
+      "cleanup",
+      "generate-k8s-manifests",
+      "job",
+      "retry",
+      "ttl"
+    ],
     "description": "Proper Job configuration ensures reliable execution with automatic cleanup"
   },
   {
@@ -196,7 +326,13 @@
     "recommendation": "Set appropriate concurrency policy to prevent overlapping job executions",
     "example": "apiVersion: batch/v1\nkind: CronJob\nmetadata:\n  name: daily-report\nspec:\n  schedule: \"0 2 * * *\"  # 2 AM daily\n  timeZone: \"America/New_York\"\n  \n  # Prevent concurrent executions\n  concurrencyPolicy: Forbid  # or Allow, Replace\n  \n  # History limits\n  successfulJobsHistoryLimit: 3\n  failedJobsHistoryLimit: 1\n  \n  # Deadline and suspension\n  startingDeadlineSeconds: 300  # Start within 5 minutes or skip\n  suspend: false  # Set true to temporarily disable\n  \n  jobTemplate:\n    spec:\n      backoffLimit: 3\n      ttlSecondsAfterFinished: 3600\n      template:\n        spec:\n          restartPolicy: OnFailure\n          containers:\n          - name: report-generator\n            image: myapp:latest\n            command: [\"npm\", \"run\", \"generate-report\"]\n            resources:\n              requests:\n                memory: \"512Mi\"\n                cpu: \"500m\"\n              limits:\n                memory: \"1Gi\"\n                cpu: \"1\"",
     "severity": "medium",
-    "tags": ["cronjob", "scheduled", "concurrency", "batch"],
+    "tags": [
+      "batch",
+      "concurrency",
+      "cronjob",
+      "generate-k8s-manifests",
+      "scheduled"
+    ],
     "description": "Concurrency policy prevents issues from overlapping scheduled job executions"
   }
 ]

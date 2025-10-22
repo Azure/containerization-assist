@@ -6,7 +6,15 @@
     "recommendation": "Use official Microsoft .NET Framework runtime images for Windows containers",
     "example": "FROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022\n# For runtime-only: FROM mcr.microsoft.com/dotnet/framework/runtime:4.8-windowsservercore-ltsc2022",
     "severity": "high",
-    "tags": ["dotnet-framework", "windows", "base-image", "aspnet"],
+    "tags": [
+      "aspnet",
+      "base-image",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "windows"
+    ],
     "description": ".NET Framework applications require Windows containers with the appropriate framework version"
   },
   {
@@ -16,7 +24,15 @@
     "recommendation": "Use Windows Server Core for full .NET Framework compatibility, Nano Server for minimal footprint",
     "example": "# Full compatibility\nFROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022\n# Minimal size (limited compatibility)\nFROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-nanoserver-ltsc2022",
     "severity": "medium",
-    "tags": ["dotnet-framework", "windows", "servercore", "nanoserver"],
+    "tags": [
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "nanoserver",
+      "servercore",
+      "windows"
+    ],
     "description": "Choose between Windows Server Core (full compatibility) and Nano Server (smaller size) based on requirements"
   },
   {
@@ -26,7 +42,15 @@
     "recommendation": "For ASP.NET Web API, use IIS configuration and proper working directory setup",
     "example": "FROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022\nWORKDIR /inetpub/wwwroot\nCOPY . .\nEXPOSE 80",
     "severity": "high",
-    "tags": ["dotnet-framework", "aspnet", "webapi", "iis"],
+    "tags": [
+      "aspnet",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "iis",
+      "microsoft",
+      "webapi"
+    ],
     "description": "ASP.NET Web API applications run under IIS and require proper directory structure"
   },
   {
@@ -36,7 +60,15 @@
     "recommendation": "Secure Web.config files and avoid storing sensitive data in configuration files",
     "example": "# Use environment variables for secrets\nENV CONNECTION_STRING=\"Server=db;Database=MyApp;Integrated Security=true;\"\n# Transform Web.config for production\nCOPY Web.Release.config Web.config",
     "severity": "high",
-    "tags": ["dotnet-framework", "web-config", "security", "configuration"],
+    "tags": [
+      "aws",
+      "configuration",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "scan-image",
+      "security",
+      "web-config"
+    ],
     "description": "Web.config files should not contain sensitive information in production containers"
   },
   {
@@ -46,7 +78,14 @@
     "recommendation": "Restore NuGet packages before copying source code for better layer caching",
     "example": "COPY packages.config .\nRUN nuget restore packages.config -PackagesDirectory packages\nCOPY . .\nRUN msbuild /p:Configuration=Release",
     "severity": "medium",
-    "tags": ["dotnet-framework", "nuget", "packages", "caching"],
+    "tags": [
+      "caching",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "nuget",
+      "packages"
+    ],
     "description": "Proper package restoration improves Docker build cache efficiency"
   },
   {
@@ -56,7 +95,15 @@
     "recommendation": "Use MSBuild for compilation with Release configuration and proper output paths",
     "example": "RUN msbuild MySolution.sln /p:Configuration=Release /p:Platform=\"Any CPU\" /p:OutputPath=bin\\Release\\",
     "severity": "medium",
-    "tags": ["dotnet-framework", "msbuild", "build", "compilation"],
+    "tags": [
+      "build",
+      "build-tool",
+      "compilation",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "msbuild"
+    ],
     "description": "MSBuild compilation should use Release configuration for production containers"
   },
   {
@@ -66,7 +113,14 @@
     "recommendation": "Configure IIS application pool and site settings for optimal performance",
     "example": "# Configure IIS\nRUN powershell -Command \"Import-Module WebAdministration; Set-ItemProperty 'IIS:\\\\AppPools\\\\DefaultAppPool' -Name processModel.idleTimeout -Value 00:00:00\"",
     "severity": "low",
-    "tags": ["dotnet-framework", "iis", "configuration", "performance"],
+    "tags": [
+      "configuration",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "iis",
+      "performance"
+    ],
     "description": "IIS configuration can be optimized for containerized .NET Framework applications"
   },
   {
@@ -76,7 +130,14 @@
     "recommendation": "Avoid Global Assembly Cache (GAC) in containers, use private assemblies instead",
     "example": "# Avoid GAC\n# RUN gacutil /i MyAssembly.dll\n# Use private assemblies in bin directory instead\nCOPY MyAssembly.dll bin/",
     "severity": "medium",
-    "tags": ["dotnet-framework", "gac", "assemblies", "deployment"],
+    "tags": [
+      "assemblies",
+      "deployment",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "gac",
+      "generate-dockerfile"
+    ],
     "description": "GAC usage complicates container deployment, prefer private assemblies"
   },
   {
@@ -86,7 +147,14 @@
     "recommendation": "Performance counters may not work in containers, use alternative monitoring approaches",
     "example": "# Avoid performance counters in containers\n# Use application metrics, logging, or health checks instead\nHEALTHCHECK --interval=30s CMD powershell -Command \"try { Invoke-WebRequest -Uri http://localhost/health -UseBasicParsing } catch { exit 1 }\"",
     "severity": "low",
-    "tags": ["dotnet-framework", "performance", "monitoring", "health"],
+    "tags": [
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "health",
+      "monitoring",
+      "performance"
+    ],
     "description": "Performance counters are not suitable for containerized applications"
   },
   {
@@ -96,7 +164,15 @@
     "recommendation": "Windows Authentication doesn't work in containers, use alternative authentication methods",
     "example": "# Use JWT, OAuth, or other stateless authentication\n# Avoid Windows Authentication in containers\nENV ASPNET_AUTHENTICATION_MODE=\"Forms\"",
     "severity": "high",
-    "tags": ["dotnet-framework", "authentication", "security", "windows"],
+    "tags": [
+      "authentication",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "microsoft",
+      "scan-image",
+      "security",
+      "windows"
+    ],
     "description": "Windows Authentication and Windows Identity are not compatible with containers"
   },
   {
@@ -106,7 +182,14 @@
     "recommendation": "Configure appropriate file system permissions for containerized applications",
     "example": "# Grant write permissions to temp and logs directories\nRUN icacls C:\\\\temp /grant \"IIS_IUSRS:(OI)(CI)F\" /T\nRUN icacls C:\\\\logs /grant \"IIS_IUSRS:(OI)(CI)F\" /T",
     "severity": "medium",
-    "tags": ["dotnet-framework", "filesystem", "permissions", "security"],
+    "tags": [
+      "dotnet-framework",
+      "filesystem",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "permissions",
+      "security"
+    ],
     "description": "Container file system permissions need explicit configuration for .NET Framework apps"
   },
   {
@@ -116,7 +199,14 @@
     "recommendation": "Event Log access is limited in containers, use structured logging instead",
     "example": "# Replace EventLog with structured logging\n# Install-Package Serilog.AspNetCore\n# Use logging to console or files instead of Event Log",
     "severity": "medium",
-    "tags": ["dotnet-framework", "logging", "eventlog", "diagnostics"],
+    "tags": [
+      "diagnostics",
+      "dotnet-framework",
+      "eventlog",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "logging"
+    ],
     "description": "Event Log functionality is restricted in containers, use alternative logging mechanisms"
   },
   {
@@ -126,7 +216,14 @@
     "recommendation": "Registry access is limited in containers, use configuration files or environment variables",
     "example": "# Replace registry access with configuration\n# Use Web.config appSettings or environment variables\nENV MY_SETTING=\"production_value\"",
     "severity": "medium",
-    "tags": ["dotnet-framework", "registry", "configuration", "windows"],
+    "tags": [
+      "configuration",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "registry",
+      "windows"
+    ],
     "description": "Windows Registry access is restricted in containers"
   },
   {
@@ -136,7 +233,15 @@
     "recommendation": "COM components may not work in containers, consider alternatives or use full Windows containers",
     "example": "# COM components require full Windows Server Core\nFROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022\n# Register COM component if absolutely necessary\n# RUN regsvr32 /s MyComComponent.dll",
     "severity": "high",
-    "tags": ["dotnet-framework", "com", "interop", "compatibility"],
+    "tags": [
+      "com",
+      "compatibility",
+      "dotnet-framework",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "interop",
+      "microsoft"
+    ],
     "description": "COM components have limited support in containers and may require full Windows Server Core"
   },
   {
@@ -146,7 +251,15 @@
     "recommendation": "Use consistent machine keys across container instances for session/encryption compatibility",
     "example": "# Set machine key in Web.config for consistency\n<machineKey validationKey=\"[64-hex-chars]\" decryptionKey=\"[48-hex-chars]\" validation=\"HMACSHA256\" decryption=\"AES\" />",
     "severity": "medium",
-    "tags": ["dotnet-framework", "machinekey", "encryption", "session"],
+    "tags": [
+      "aws",
+      "dotnet-framework",
+      "encryption",
+      "fix-dockerfile",
+      "machinekey",
+      "scan-image",
+      "session"
+    ],
     "description": "Machine keys should be consistent across container instances"
   }
 ]
