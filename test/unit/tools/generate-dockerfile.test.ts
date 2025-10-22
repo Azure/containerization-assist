@@ -322,7 +322,7 @@ CMD ["node", "index.js"]`;
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.knowledgeMatches).toEqual([]);
+        expect(result.value.knowledgeMatches).toBeUndefined();
         expect(result.value.recommendations).toBeDefined();
       }
     });

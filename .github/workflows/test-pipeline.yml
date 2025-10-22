@@ -42,6 +42,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install OPA CLI
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x opa
+          mkdir -p node_modules/.bin
+          mv opa node_modules/.bin/opa
+          node_modules/.bin/opa version
+
       - name: Build project
         run: npm run build
 

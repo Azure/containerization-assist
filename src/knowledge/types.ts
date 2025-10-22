@@ -63,6 +63,9 @@ export interface KnowledgeQuery {
   /** Programming language context */
   language?: string;
 
+  /** Programming language version (e.g., "17", "25", "3.11") */
+  languageVersion?: string;
+
   /** Framework context */
   framework?: string;
 
@@ -71,6 +74,9 @@ export interface KnowledgeQuery {
 
   /** Specific tags to filter by */
   tags?: string[];
+
+  /** Tool context (e.g., 'fix-dockerfile', 'scan-image') */
+  tool?: string;
 
   /** Maximum number of results */
   limit?: number;
