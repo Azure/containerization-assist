@@ -25,12 +25,27 @@ import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
 import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
+import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
+import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
+import type { PushImageResult } from '@/tools/push-image/tool';
+import type { TagImageResult } from '@/tools/tag-image/tool';
+import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
+import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import {
   formatScanImageNarrative,
   formatDockerfilePlanNarrative,
   formatDeployNarrative,
   formatBuildImageNarrative,
   formatAnalyzeRepoNarrative,
+  formatVerifyDeployNarrative,
+  formatFixDockerfileNarrative,
+  formatGenerateK8sManifestsNarrative,
+  formatPushImageNarrative,
+  formatTagImageNarrative,
+  formatPrepareClusterNarrative,
+  formatOpsPingNarrative,
+  formatOpsStatusNarrative,
 } from '@/mcp/formatters/natural-language-formatters';
 
 /**
@@ -510,6 +525,34 @@ function formatAsNaturalLanguage(output: unknown): string {
   if (isAnalyzeRepoResult(output)) {
     return formatAnalyzeRepoNarrative(output);
   }
+
+  // NEW FORMATTERS - Add in order of specificity (most specific first)
+  if (isVerifyDeployResult(output)) {
+    return formatVerifyDeployNarrative(output);
+  }
+  if (isFixDockerfileResult(output)) {
+    return formatFixDockerfileNarrative(output);
+  }
+  if (isGenerateK8sManifestsResult(output)) {
+    return formatGenerateK8sManifestsNarrative(output);
+  }
+  if (isPushImageResult(output)) {
+    return formatPushImageNarrative(output);
+  }
+  if (isTagImageResult(output)) {
+    return formatTagImageNarrative(output);
+  }
+  if (isPrepareClusterResult(output)) {
+    return formatPrepareClusterNarrative(output);
+  }
+  // Check ops results (check status before ping due to field overlap)
+  if (isServerStatusResult(output)) {
+    return formatOpsStatusNarrative(output);
+  }
+  if (isPingResult(output)) {
+    return formatOpsPingNarrative(output);
+  }
+
   // Additional tool result types can be added as needed
 
   // Fallback: use summary if available, otherwise JSON
@@ -544,4 +587,36 @@ function isBuildImageResult(output: object): output is BuildImageResult {
 
 function isAnalyzeRepoResult(output: object): output is RepositoryAnalysis {
   return 'modules' in output && 'isMonorepo' in output;
+}
+
+function isVerifyDeployResult(output: object): output is VerifyDeploymentResult {
+  return 'deploymentName' in output && 'pods' in output && 'healthCheck' in output;
+}
+
+function isFixDockerfileResult(output: object): output is DockerfileFixPlan {
+  return 'currentIssues' in output && 'fixes' in output && 'validationScore' in output;
+}
+
+function isGenerateK8sManifestsResult(output: object): output is ManifestPlan {
+  return 'manifestType' in output && 'recommendations' in output && 'knowledgeMatches' in output;
+}
+
+function isTagImageResult(output: object): output is TagImageResult {
+  return 'tags' in output && 'imageId' in output && Array.isArray((output as any).tags);
+}
+
+function isPushImageResult(output: object): output is PushImageResult {
+  return 'registry' in output && 'digest' in output && 'pushedTag' in output;
+}
+
+function isPrepareClusterResult(output: object): output is PrepareClusterResult {
+  return 'clusterReady' in output && 'cluster' in output && 'checks' in output;
+}
+
+function isPingResult(output: object): output is PingResult {
+  return 'message' in output && 'server' in output && 'capabilities' in output;
+}
+
+function isServerStatusResult(output: object): output is ServerStatusResult {
+  return 'memory' in output && 'cpu' in output && 'tools' in output && 'version' in output;
 }

@@ -22,6 +22,13 @@ import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
 import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
+import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
+import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
+import type { PushImageResult } from '@/tools/push-image/tool';
+import type { TagImageResult } from '@/tools/tag-image/tool';
+import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
+import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import {
   formatSize,
   formatDuration,
@@ -386,6 +393,643 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
   parts.push('  → Use generate-dockerfile to create container configuration');
   if (result.isMonorepo) {
     parts.push('  → Consider creating separate Dockerfiles for each module');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Format verify-deploy result as natural language narrative
+ *
+ * @param result - Deployment verification result with health and pod details
+ * @returns Formatted narrative with health status, pod breakdown, and next steps
+ *
+ * @description
+ * Produces a detailed deployment verification report including:
+ * - Deployment health status with icon
+ * - Pod breakdown (running, pending, failed)
+ * - Individual pod details (name, status, restarts)
+ * - Health check results (pass/fail)
+ * - Conditions and issues
+ * - Context-aware next steps based on health status
+ */
+export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): string {
+  const parts: string[] = [];
+
+  // Header
+  const icon = result.ready ? '✅' : '❌';
+  const status = result.ready ? 'HEALTHY' : 'UNHEALTHY';
+  parts.push(`${icon} Deployment Verification ${status}\n`);
+
+  // Deployment info
+  parts.push(`**Deployment:** ${result.deploymentName}`);
+  parts.push(`**Namespace:** ${result.namespace}`);
+
+  // Replica status
+  if (result.status) {
+    const { readyReplicas, totalReplicas } = result.status;
+    const replicaIcon = readyReplicas === totalReplicas ? '✓' : '⚠';
+    parts.push(`**Replicas:** ${replicaIcon} ${readyReplicas}/${totalReplicas} ready`);
+  }
+
+  // Pod breakdown
+  if (result.pods && result.pods.length > 0) {
+    const runningPods = result.pods.filter((p: any) => p.status === 'Running').length;
+    const pendingPods = result.pods.filter((p: any) => p.status === 'Pending').length;
+    const failedPods = result.pods.filter((p: any) => p.status === 'Failed').length;
+
+    parts.push(`\n**Pod Status:**`);
+    if (runningPods > 0) parts.push(`  ✅ Running: ${runningPods}`);
+    if (pendingPods > 0) parts.push(`  ⏳ Pending: ${pendingPods}`);
+    if (failedPods > 0) parts.push(`  ❌ Failed: ${failedPods}`);
+
+    // Show individual pod details (up to 5)
+    parts.push(`\n**Pod Details:**`);
+    result.pods.slice(0, 5).forEach((pod: any) => {
+      const statusIcon = pod.ready ? '✓' : '✗';
+      const healthIcon = pod.healthy ? '💚' : '💔';
+      const restartWarning = pod.restarts > 0 ? ` (${pod.restarts} restarts)` : '';
+      parts.push(`  ${statusIcon} ${pod.name}`);
+      parts.push(`     Status: ${pod.status}${restartWarning}`);
+      parts.push(`     Health: ${healthIcon} ${pod.healthy ? 'Healthy' : 'Unhealthy'}`);
+      parts.push(`     Age: ${pod.age}`);
+    });
+
+    if (result.pods.length > 5) {
+      parts.push(`  ... and ${result.pods.length - 5} more pods`);
+    }
+  }
+
+  // Health checks
+  if (result.healthCheck) {
+    const hcIcon = result.healthCheck.status === 'healthy' ? '💚' : '💔';
+    parts.push(`\n**Health Check:** ${hcIcon} ${result.healthCheck.status.toUpperCase()}`);
+    parts.push(`  ${result.healthCheck.message}`);
+
+    if (result.healthCheck.checks && result.healthCheck.checks.length > 0) {
+      parts.push(`\n  **Check Details:**`);
+      result.healthCheck.checks.forEach((check) => {
+        const checkIcon = check.status === 'pass' ? '✓' : '✗';
+        parts.push(`    ${checkIcon} ${check.name}: ${check.message || check.status}`);
+      });
+    }
+  }
+
+  // Conditions
+  if (result.status?.conditions && result.status.conditions.length > 0) {
+    parts.push(`\n**Conditions:**`);
+    result.status.conditions.forEach((cond) => {
+      const condIcon = cond.status === 'True' ? '✓' : '✗';
+      parts.push(`  ${condIcon} ${cond.type}: ${cond.message}`);
+    });
+  }
+
+  // Next steps
+  parts.push(`\n**Next Steps:**`);
+  if (result.ready) {
+    parts.push('  → Deployment is healthy and serving traffic');
+    parts.push('  → Monitor pod logs for application errors');
+    parts.push('  → Set up alerting for production monitoring');
+  } else {
+    parts.push('  → Review pod logs for error messages');
+    parts.push('  → Check deployment events with kubectl describe');
+    parts.push('  → Verify resource limits and constraints');
+    const failedPods = result.pods?.filter((p: any) => p.status === 'Failed').length || 0;
+    if (failedPods > 0) {
+      parts.push('  → Investigate failed pods with kubectl logs');
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Format fix-dockerfile result as natural language narrative
+ *
+ * @param result - Dockerfile validation and fix plan
+ * @returns Formatted narrative with issues, recommendations, and validation score
+ *
+ * @description
+ * Produces a comprehensive Dockerfile validation report including:
+ * - Validation score/grade prominently displayed
+ * - Issues categorized by type (security, performance, best practices)
+ * - Fix recommendations with priority
+ * - Policy validation results
+ * - Estimated impact of fixes
+ * - Context-aware next steps for implementation
+ */
+export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string {
+  const parts: string[] = [];
+
+  // Header with validation grade
+  const gradeIcon: Record<string, string> = {
+    A: '🌟',
+    B: '✅',
+    C: '⚠️',
+    D: '⚠️',
+    F: '❌',
+  };
+
+  parts.push(
+    `${gradeIcon[result.validationGrade] || '❓'} Dockerfile Validation: Grade ${result.validationGrade} (Score: ${result.validationScore}/100)\n`,
+  );
+
+  // Priority indicator
+  const priorityIcon: Record<string, string> = {
+    high: '🔴',
+    medium: '🟡',
+    low: '🟢',
+  };
+  parts.push(`**Priority:** ${priorityIcon[result.priority] || '⚪'} ${result.priority.toUpperCase()}`);
+  parts.push(`**Estimated Impact:** ${result.estimatedImpact}`);
+  parts.push(`**Confidence:** ${Math.round(result.confidence * 100)}%`);
+
+  // Current issues by category
+  const totalIssues =
+    result.currentIssues.security.length +
+    result.currentIssues.performance.length +
+    result.currentIssues.bestPractices.length;
+
+  if (totalIssues > 0) {
+    parts.push(`\n**Current Issues:** (${totalIssues} total)`);
+
+    if (result.currentIssues.security.length > 0) {
+      parts.push(`\n  🔒 **Security Issues:** (${result.currentIssues.security.length})`);
+      result.currentIssues.security.slice(0, 5).forEach((issue, idx) => {
+        const priorityLabel = issue.priority ? ` [${issue.priority}]` : '';
+        const message = issue.message || 'Issue detected';
+        parts.push(`    ${idx + 1}. ${message}${priorityLabel}`);
+      });
+      if (result.currentIssues.security.length > 5) {
+        parts.push(`    ... and ${result.currentIssues.security.length - 5} more`);
+      }
+    }
+
+    if (result.currentIssues.performance.length > 0) {
+      parts.push(`\n  ⚡ **Performance Issues:** (${result.currentIssues.performance.length})`);
+      result.currentIssues.performance.slice(0, 3).forEach((issue, idx) => {
+        const message = issue.message || 'Issue detected';
+        parts.push(`    ${idx + 1}. ${message}`);
+      });
+      if (result.currentIssues.performance.length > 3) {
+        parts.push(`    ... and ${result.currentIssues.performance.length - 3} more`);
+      }
+    }
+
+    if (result.currentIssues.bestPractices.length > 0) {
+      parts.push(`\n  📋 **Best Practice Issues:** (${result.currentIssues.bestPractices.length})`);
+      result.currentIssues.bestPractices.slice(0, 3).forEach((issue, idx) => {
+        const message = issue.message || 'Issue detected';
+        parts.push(`    ${idx + 1}. ${message}`);
+      });
+      if (result.currentIssues.bestPractices.length > 3) {
+        parts.push(`    ... and ${result.currentIssues.bestPractices.length - 3} more`);
+      }
+    }
+  }
+
+  // Fix recommendations
+  const totalFixes =
+    result.fixes.security.length +
+    result.fixes.performance.length +
+    result.fixes.bestPractices.length;
+
+  if (totalFixes > 0) {
+    parts.push(`\n**Fix Recommendations:** (${totalFixes} available)`);
+
+    if (result.fixes.security.length > 0) {
+      parts.push(`\n  🔒 **Security Fixes:** (${result.fixes.security.length})`);
+      result.fixes.security.slice(0, 3).forEach((fix, idx) => {
+        const effortLabel = fix.effort ? ` [${fix.effort} effort]` : '';
+        parts.push(`    ${idx + 1}. ${fix.title}${effortLabel}`);
+        parts.push(`       ${fix.description}`);
+        if (fix.example) {
+          const truncatedExample =
+            fix.example.length > 80 ? `${fix.example.substring(0, 77)}...` : fix.example;
+          parts.push(`       Example: ${truncatedExample}`);
+        }
+      });
+    }
+
+    if (result.fixes.performance.length > 0) {
+      parts.push(`\n  ⚡ **Performance Fixes:** (${result.fixes.performance.length})`);
+      result.fixes.performance.slice(0, 2).forEach((fix, idx) => {
+        parts.push(`    ${idx + 1}. ${fix.title}`);
+        parts.push(`       ${fix.description}`);
+      });
+    }
+  }
+
+  // Policy validation
+  if (result.policyValidation) {
+    const policyIcon = result.policyValidation.passed ? '✅' : '❌';
+    parts.push(
+      `\n**Policy Validation:** ${policyIcon} ${result.policyValidation.passed ? 'PASSED' : 'FAILED'}`,
+    );
+    if (result.policyValidation.violations.length > 0) {
+      parts.push(`  Violations: ${result.policyValidation.violations.length}`);
+      result.policyValidation.violations.slice(0, 2).forEach((v) => {
+        parts.push(`    • ${v.message}`);
+      });
+    }
+  }
+
+  // Next steps
+  parts.push(`\n**Next Steps:**`);
+  if (result.validationGrade === 'A' || result.validationGrade === 'B') {
+    parts.push('  → Dockerfile is in good shape with minor improvements available');
+    parts.push('  → Review fix recommendations for optimization');
+    parts.push('  → Proceed with build-image');
+  } else {
+    parts.push('  → Address high-priority security issues first');
+    parts.push('  → Apply recommended fixes to improve validation score');
+    parts.push('  → Re-run fix-dockerfile to verify improvements');
+    if (result.policyValidation && !result.policyValidation.passed) {
+      parts.push('  → Resolve policy violations before deployment');
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Format generate-k8s-manifests result as natural language narrative
+ *
+ * @param result - Kubernetes manifest generation result
+ * @returns Formatted narrative with manifest details and resource breakdown
+ *
+ * @description
+ * Produces a comprehensive manifest generation report including:
+ * - Manifest type and format
+ * - Resources and requirements
+ * - Security considerations
+ * - Best practices recommendations
+ * - Context-aware next steps
+ */
+export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): string {
+  const parts: string[] = [];
+
+  // Header
+  parts.push('📦 Kubernetes Manifest Planning Complete\n');
+
+  // Manifest type
+  parts.push(`**Manifest Type:** ${result.manifestType}`);
+
+  // Repository info if available
+  if (result.repositoryInfo) {
+    const { name, language, languageVersion, frameworks } = result.repositoryInfo;
+    const langVersion = languageVersion ? ` ${languageVersion}` : '';
+    const framework = frameworks?.[0]?.name ? ` (${frameworks[0].name})` : '';
+    parts.push(`**Application:** ${name}`);
+    parts.push(`**Language:** ${language}${langVersion}${framework}`);
+  }
+
+  // ACA analysis if available
+  if (result.acaAnalysis) {
+    parts.push(`\n**Container Apps:** ${result.acaAnalysis.containerApps.length}`);
+    result.acaAnalysis.containerApps.forEach((app, idx) => {
+      parts.push(`  ${idx + 1}. ${app.name}`);
+      parts.push(`     Containers: ${app.containers}`);
+      if (app.hasIngress) parts.push(`     ✓ Ingress configured`);
+      if (app.hasScaling) parts.push(`     ✓ Scaling enabled`);
+      if (app.hasSecrets) parts.push(`     ✓ Secrets configured`);
+    });
+
+    if (result.acaAnalysis.warnings.length > 0) {
+      parts.push(`\n  **Warnings:**`);
+      result.acaAnalysis.warnings.forEach((w) => parts.push(`    ⚠ ${w}`));
+    }
+  }
+
+  // Recommendations
+  const { recommendations } = result;
+
+  // Security considerations
+  if (recommendations.securityConsiderations.length > 0) {
+    parts.push(
+      `\n**Security Considerations:** (${recommendations.securityConsiderations.length} items)`,
+    );
+    recommendations.securityConsiderations.slice(0, 5).forEach((rec) => {
+      const severity = rec.severity ? ` [${rec.severity}]` : '';
+      parts.push(`  • ${rec.recommendation}${severity}`);
+    });
+  }
+
+  // Resource management
+  if (recommendations.resourceManagement && recommendations.resourceManagement.length > 0) {
+    parts.push(
+      `\n**Resource Management:** (${recommendations.resourceManagement.length} recommendations)`,
+    );
+    recommendations.resourceManagement.slice(0, 3).forEach((rec) => {
+      parts.push(`  • ${rec.recommendation}`);
+    });
+  }
+
+  // Best practices
+  if (recommendations.bestPractices.length > 0) {
+    parts.push(`\n**Best Practices:** (${recommendations.bestPractices.length} recommendations)`);
+    recommendations.bestPractices.slice(0, 5).forEach((rec) => {
+      parts.push(`  • ${rec.recommendation}`);
+    });
+  }
+
+  // Policy validation
+  if (result.policyValidation) {
+    const { passed, violations, warnings } = result.policyValidation;
+    parts.push(`\n**Policy Validation:** ${passed ? '✅ Passed' : '❌ Failed'}`);
+    if (violations.length > 0) {
+      parts.push(`  Violations: ${violations.length}`);
+      violations.slice(0, 3).forEach((v) => parts.push(`    • ${v.message}`));
+    }
+    if (warnings.length > 0) {
+      parts.push(`  Warnings: ${warnings.length}`);
+    }
+  }
+
+  // Next steps
+  parts.push(`\n**Next Steps:**`);
+  parts.push('  → Review manifest recommendations for correctness');
+  parts.push('  → Use prepare-cluster to setup namespace and prerequisites');
+  parts.push('  → Use deploy to apply manifests to cluster');
+  parts.push('  → Verify deployment with verify-deploy');
+
+  return parts.join('\n');
+}
+
+/**
+ * Format push-image result as natural language narrative
+ *
+ * @param result - Image push result with registry and digest
+ * @returns Formatted narrative with push details and next steps
+ *
+ * @description
+ * Produces a concise push report including:
+ * - Push success status
+ * - Registry and tag information
+ * - Image digest (truncated for readability)
+ * - Full image reference
+ * - Standard next steps
+ */
+export function formatPushImageNarrative(result: PushImageResult): string {
+  const parts: string[] = [];
+
+  // Header
+  parts.push('✅ Image Pushed to Registry\n');
+
+  // Push details
+  parts.push(`**Registry:** ${result.registry}`);
+  parts.push(`**Tag:** ${result.pushedTag}`);
+
+  // Digest (truncated for readability)
+  const shortDigest = result.digest.startsWith('sha256:')
+    ? `${result.digest.substring(0, 19)}...`
+    : result.digest;
+  parts.push(`**Digest:** ${shortDigest}`);
+
+  // Full image reference
+  const fullImage = `${result.registry}/${result.pushedTag}@${result.digest}`;
+  parts.push(`\n**Full Reference:**`);
+  parts.push(`  ${fullImage}`);
+
+  // Next steps
+  parts.push(`\n**Next Steps:**`);
+  parts.push('  → Image is now available in the registry');
+  parts.push('  → Update Kubernetes manifests with this image');
+  parts.push('  → Use deploy to deploy to cluster');
+  parts.push('  → Consider setting up automated deployments');
+
+  return parts.join('\n');
+}
+
+/**
+ * Format tag-image result as natural language narrative
+ *
+ * @param result - Image tagging result
+ * @returns Formatted narrative with tags applied
+ *
+ * @description
+ * Produces a simple tagging report including:
+ * - Success status
+ * - Image identifier
+ * - Tags applied (list)
+ * - Standard next steps with versioning guidance
+ */
+export function formatTagImageNarrative(result: TagImageResult): string {
+  const parts: string[] = [];
+
+  // Header
+  parts.push('✅ Image Tagged\n');
+
+  // Image info
+  const shortImageId = result.imageId.startsWith('sha256:')
+    ? `${result.imageId.substring(0, 19)}...`
+    : result.imageId;
+  parts.push(`**Image ID:** ${shortImageId}`);
+
+  // Tags applied
+  parts.push(`\n**Tags Applied:** (${result.tags.length})`);
+  result.tags.forEach((tag) => {
+    parts.push(`  • ${tag}`);
+  });
+
+  // Next steps
+  parts.push(`\n**Next Steps:**`);
+  parts.push('  → Use push-image to push tagged image to registry');
+  parts.push('  → Tags can be used in Kubernetes manifests');
+  if (result.tags.some((t) => t.includes('latest'))) {
+    parts.push('  → Consider using semantic versioning instead of "latest"');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Format prepare-cluster result as natural language narrative
+ *
+ * @param result - Cluster preparation result
+ * @returns Formatted narrative with setup details
+ *
+ * @description
+ * Produces a cluster preparation report including:
+ * - Cluster preparation status
+ * - Namespace and connectivity checks
+ * - Resources and checks performed
+ * - Warnings if any
+ * - Context-aware next steps
+ */
+export function formatPrepareClusterNarrative(result: PrepareClusterResult): string {
+  const parts: string[] = [];
+
+  // Header
+  const icon = result.success ? '✅' : '❌';
+  parts.push(`${icon} Cluster Preparation ${result.success ? 'Complete' : 'Failed'}\n`);
+
+  // Cluster and namespace info
+  parts.push(`**Cluster:** ${result.cluster}`);
+  parts.push(`**Namespace:** ${result.namespace}`);
+  parts.push(`**Ready:** ${result.clusterReady ? 'Yes' : 'No'}`);
+
+  // Checks performed
+  parts.push(`\n**Checks Performed:**`);
+  const checks = result.checks;
+  Object.entries(checks).forEach(([check, passed]) => {
+    if (typeof passed === 'boolean') {
+      const checkIcon = passed ? '✅' : '❌';
+      const checkName = check
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, (str) => str.toUpperCase())
+        .trim();
+      parts.push(`  ${checkIcon} ${checkName}`);
+    }
+  });
+
+  // Warnings if any
+  if (result.warnings && result.warnings.length > 0) {
+    parts.push(`\n**Warnings:** (${result.warnings.length})`);
+    result.warnings.slice(0, 3).forEach((warning) => {
+      parts.push(`  ⚠ ${warning}`);
+    });
+    if (result.warnings.length > 3) {
+      parts.push(`  ... and ${result.warnings.length - 3} more`);
+    }
+  }
+
+  // Local registry if created
+  if (result.localRegistryUrl) {
+    parts.push(`\n**Local Registry:** ${result.localRegistryUrl}`);
+  }
+
+  // Next steps
+  parts.push(`\n**Next Steps:**`);
+  if (result.success && result.clusterReady) {
+    parts.push('  → Cluster is ready for deployment');
+    parts.push('  → Use deploy to deploy your application');
+    parts.push('  → Resources will be deployed to the prepared namespace');
+  } else {
+    parts.push('  → Check cluster connectivity');
+    parts.push('  → Verify RBAC permissions');
+    parts.push('  → Review error logs for details');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Format ops ping result as natural language narrative
+ *
+ * @param result - Server ping result
+ * @returns Formatted narrative with server status
+ *
+ * @description
+ * Produces a simple server ping report including:
+ * - Response status
+ * - Timestamp
+ * - Server information (version, uptime, PID)
+ * - Capabilities available
+ * - Health indicators
+ */
+export function formatOpsPingNarrative(result: PingResult): string {
+  const parts: string[] = [];
+
+  // Header
+  parts.push('✅ Server Ping Successful\n');
+
+  // Response
+  parts.push(`**Response:** ${result.message}`);
+  parts.push(`**Timestamp:** ${new Date(result.timestamp).toLocaleString()}`);
+
+  // Server info
+  parts.push(`\n**Server Information:**`);
+  parts.push(`  Name: ${result.server.name}`);
+  parts.push(`  Version: ${result.server.version}`);
+  parts.push(`  Uptime: ${formatDuration(Math.round(result.server.uptime))}`);
+  parts.push(`  Process ID: ${result.server.pid}`);
+
+  // Capabilities
+  parts.push(`\n**Capabilities:**`);
+  if (result.capabilities.tools) parts.push('  ✅ Tools available');
+  if (result.capabilities.progress) parts.push('  ✅ Progress tracking enabled');
+
+  // Status
+  parts.push(`\n**Status:** Server is responsive and healthy`);
+
+  return parts.join('\n');
+}
+
+/**
+ * Format ops status result as natural language narrative
+ *
+ * @param result - Server status result with detailed metrics
+ * @returns Formatted narrative with system health and metrics
+ *
+ * @description
+ * Produces a detailed server status report including:
+ * - Health status with icon
+ * - Version and uptime
+ * - Memory usage with health indicators
+ * - CPU information and load
+ * - Tool availability
+ * - Health summary
+ */
+export function formatOpsStatusNarrative(result: ServerStatusResult): string {
+  const parts: string[] = [];
+
+  // Header
+  const icon = result.success ? '💚' : '❌';
+  const status = result.success ? 'HEALTHY' : 'UNHEALTHY';
+  parts.push(`${icon} Server Status: ${status}\n`);
+
+  // Version and uptime
+  parts.push(`**Version:** ${result.version}`);
+  parts.push(`**Uptime:** ${formatDuration(Math.round(result.uptime))}`);
+
+  // Memory usage
+  if (result.memory) {
+    const memUsedMB = Math.round(result.memory.used / 1024 / 1024);
+    const memTotalMB = Math.round(result.memory.total / 1024 / 1024);
+    const memPercent = Math.round((result.memory.used / result.memory.total) * 100);
+
+    parts.push(`\n**Memory Usage:**`);
+    parts.push(`  Used: ${memUsedMB}MB / ${memTotalMB}MB (${memPercent}%)`);
+
+    // Memory health indicator
+    if (memPercent > 90) {
+      parts.push(`  ⚠️ Memory usage is high`);
+    } else if (memPercent > 75) {
+      parts.push(`  ⚡ Memory usage is moderate`);
+    } else {
+      parts.push(`  ✅ Memory usage is healthy`);
+    }
+  }
+
+  // CPU info
+  if (result.cpu) {
+    parts.push(`\n**CPU:**`);
+    parts.push(`  Cores: ${result.cpu.cores}`);
+    if (result.cpu.loadAverage && result.cpu.loadAverage.length > 0) {
+      const load = Array.isArray(result.cpu.loadAverage)
+        ? result.cpu.loadAverage[0]
+        : result.cpu.loadAverage;
+      if (load !== undefined) {
+        parts.push(`  Load: ${load.toFixed(2)}`);
+      }
+    }
+  }
+
+  // Tools
+  if (result.tools) {
+    parts.push(`\n**Tools Available:** ${result.tools.count}`);
+  }
+
+  // Health summary
+  parts.push(`\n**Health Summary:**`);
+  if (result.success) {
+    parts.push('  ✅ All systems operational');
+    parts.push('  ✅ Server ready to handle requests');
+  } else {
+    parts.push('  ⚠️ Server experiencing issues');
+    parts.push('  → Check memory and CPU usage');
+    parts.push('  → Review recent error logs');
   }
 
   return parts.join('\n');

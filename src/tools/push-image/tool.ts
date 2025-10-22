@@ -161,7 +161,13 @@ async function handlePushImage(
 
     // Generate summary
     const registryName = input.registry ?? 'docker.io';
-    const digestShort = pushResult.value.digest.substring(0, 19); // sha256:abc123...
+    // Truncate digest to show algorithm + first 6 hex chars (e.g., sha256:abc123...)
+    const digest = pushResult.value.digest;
+    const colonIdx = digest.indexOf(':');
+    const digestShort =
+      colonIdx !== -1 && digest.length > colonIdx + 6
+        ? digest.substring(0, colonIdx + 7) // algorithm:6chars
+        : digest.substring(0, 17); // fallback for unexpected format
     const summary = `✅ Pushed image to registry. Image: ${registryName}/${pushedTag}. Digest: ${digestShort}...`;
 
     // Return success response

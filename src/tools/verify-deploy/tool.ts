@@ -52,6 +52,15 @@ export interface VerifyDeploymentResult extends Record<string, unknown> {
   }>;
   ready: boolean;
   replicas: number;
+  pods?: Array<{
+    name: string;
+    status: string;
+    ready: boolean;
+    healthy: boolean;
+    restarts: number;
+    age: string;
+    port?: number;
+  }>;
   status: {
     readyReplicas: number;
     totalReplicas: number;

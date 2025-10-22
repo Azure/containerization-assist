@@ -31,7 +31,7 @@ interface PingConfig {
   message?: string;
 }
 
-interface PingResult {
+export interface PingResult {
   /**
    * Natural language summary for user display.
    * 1-3 sentences describing the ping result.
@@ -102,7 +102,7 @@ interface ServerStatusConfig {
   details?: boolean;
 }
 
-interface ServerStatusResult {
+export interface ServerStatusResult {
   /**
    * Natural language summary for user display.
    * 1-3 sentences describing the server status.
