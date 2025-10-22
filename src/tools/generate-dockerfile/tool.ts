@@ -486,30 +486,37 @@ const runPattern = createKnowledgeTool<
 
       // Extract base image recommendations from categorized knowledge
       // Pass languageVersion for dynamic version substitution
+      // Limit to top 2 recommendations to provide clear, opinionated guidance
       const baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
         .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion))
-        .sort((a, b) => b.matchScore - a.matchScore); // Sort by match score descending
+        .sort((a, b) => b.matchScore - a.matchScore) // Sort by match score descending
+        .slice(0, 2); // Take only top 2: primary recommendation + 1 alternative
 
-      const securityMatches: DockerfileRequirement[] = (knowledge.categories.security || []).map(
-        (snippet) => ({
+      // Limit security recommendations to top 5 most relevant
+      const securityMatches: DockerfileRequirement[] = (knowledge.categories.security || [])
+        .map((snippet) => ({
           id: snippet.id,
           category: snippet.category || 'security',
           recommendation: snippet.text,
           ...(snippet.tags && { tags: snippet.tags }),
           matchScore: snippet.weight,
-        }),
-      );
+        }))
+        .slice(0, 5); // Top 5 security recommendations
 
+      // Limit optimization recommendations to top 5 most relevant
       const optimizationMatches: DockerfileRequirement[] = (
         knowledge.categories.optimization || []
-      ).map((snippet) => ({
-        id: snippet.id,
-        category: snippet.category || 'optimization',
-        recommendation: snippet.text,
-        ...(snippet.tags && { tags: snippet.tags }),
-        matchScore: snippet.weight,
-      }));
+      )
+        .map((snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'optimization',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }))
+        .slice(0, 5); // Top 5 optimization recommendations
 
+      // Limit best practices to top 5 most relevant
       const bestPracticeMatches: DockerfileRequirement[] = (
         knowledge.categories.bestPractices || []
       )
@@ -529,51 +536,46 @@ const runPattern = createKnowledgeTool<
           recommendation: snippet.text,
           ...(snippet.tags && { tags: snippet.tags }),
           matchScore: snippet.weight,
-        }));
+        }))
+        .slice(0, 5); // Top 5 best practice recommendations
 
-      // Build enhanced summary with existing Dockerfile info
+      // Build concise summary focused on key decisions
       const languageVersionStr = input.languageVersion ? ` ${input.languageVersion}` : '';
       const frameworkStr = framework ? ` (${framework})` : '';
-      const summaryParts = [
-        'Dockerfile Planning Summary:',
-        `- Path: ${modulePath}${input.modulePath ? ' (module)' : ''}`,
-        `- Language: ${language}${languageVersionStr}${frameworkStr}`,
-        `- Environment: ${input.environment || 'production'}`,
-        `- Build Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}`,
-      ];
 
+      const summaryParts: string[] = [];
+
+      // Mode and context
       if (existingDockerfile) {
-        const { analysis, guidance } = existingDockerfile;
+        const { guidance } = existingDockerfile;
         summaryParts.push(
-          `- Mode: ENHANCE existing Dockerfile`,
-          `- Existing Dockerfile: ${existingDockerfile.path}`,
-          `- Analysis:`,
-          `  - Complexity: ${analysis.complexity}`,
-          `  - Security: ${analysis.securityPosture}`,
-          `  - Multi-stage: ${analysis.isMultistage ? 'Yes' : 'No'}`,
-          `  - Instructions: ${analysis.instructionCount}`,
-          `- Enhancement Strategy: ${guidance.strategy}`,
-          `- Preserve: ${guidance.preserve.length} items`,
-          `- Improve: ${guidance.improve.length} items`,
-          `- Add Missing: ${guidance.addMissing.length} items`,
+          `✨ Dockerfile enhancement plan ready for ${language}${languageVersionStr}${frameworkStr}`,
+          `📁 ${modulePath}`,
+          `🔧 Strategy: ${guidance.strategy.replace(/-/g, ' ')}`,
         );
       } else {
-        summaryParts.push('- Mode: CREATE new Dockerfile');
+        summaryParts.push(
+          `✨ Dockerfile plan ready for ${language}${languageVersionStr}${frameworkStr}`,
+          `📁 ${modulePath}`,
+          `🏗️  ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build`,
+        );
       }
 
-      const totalRecommendations =
-        baseImageMatches.length +
-        securityMatches.length +
-        optimizationMatches.length +
-        bestPracticeMatches.length;
+      // Recommended base image (most important decision)
+      if (baseImageMatches.length > 0) {
+        const primaryImage = baseImageMatches[0];
+        if (primaryImage) {
+          summaryParts.push(`🐳 Recommended: ${primaryImage.image}`);
 
-      summaryParts.push(
-        `- Recommendations: ${totalRecommendations} total`,
-        `  - Base Images: ${baseImageMatches.length}`,
-        `  - Security: ${securityMatches.length}`,
-        `  - Optimizations: ${optimizationMatches.length}`,
-        `  - Best Practices: ${bestPracticeMatches.length}`,
-      );
+          // Only show alternative if it's different category (provides different trade-off)
+          if (baseImageMatches.length > 1) {
+            const altImage = baseImageMatches[1];
+            if (altImage && altImage.category !== primaryImage.category) {
+              summaryParts.push(`   Alternative: ${altImage.image}`);
+            }
+          }
+        }
+      }
 
       const summary = summaryParts.join('\n').trim();
 

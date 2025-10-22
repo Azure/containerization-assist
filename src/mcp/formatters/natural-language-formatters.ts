@@ -126,9 +126,9 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
  * Produces a comprehensive Dockerfile planning report including:
  * - Project information (language, version, framework)
  * - Build strategy (single-stage vs multi-stage)
- * - Base image recommendations (top 3 with scores and reasoning)
- * - Security considerations (up to 5)
- * - Optimization recommendations (up to 5)
+ * - Recommended base image (primary + 1 alternative if available)
+ * - Security considerations (top 5 most relevant)
+ * - Optimization recommendations (top 5 most relevant)
  * - Existing Dockerfile analysis (if applicable)
  * - Policy validation results (if applicable)
  * - Actionable next steps
@@ -150,15 +150,27 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
     parts.push(`  ${recommendations.buildStrategy.reason}`);
   }
 
-  // Base images
+  // Base images - opinionated recommendation (top 1-2 only)
   if (recommendations.baseImages.length > 0) {
-    parts.push(`\n**Base Image Recommendations:** (${recommendations.baseImages.length} options)`);
-    recommendations.baseImages.slice(0, 3).forEach((img, idx) => {
-      const sizeText = img.size ? `, ${img.size}` : '';
-      const scoreText = img.matchScore ? ` [score: ${Math.round(img.matchScore)}]` : '';
-      parts.push(`  ${idx + 1}. **${img.image}** (${img.category}${sizeText})${scoreText}`);
-      parts.push(`     ${img.reason}`);
-    });
+    const primaryImage = recommendations.baseImages[0];
+    if (primaryImage) {
+      const sizeText = primaryImage.size ? ` (${primaryImage.size})` : '';
+
+      parts.push(`\n**Recommended Base Image:**`);
+      parts.push(`  **${primaryImage.image}**${sizeText}`);
+      parts.push(`  ${primaryImage.reason}`);
+    }
+
+    // Show alternative if available
+    if (recommendations.baseImages.length > 1) {
+      const altImage = recommendations.baseImages[1];
+      if (altImage) {
+        const altSizeText = altImage.size ? ` (${altImage.size})` : '';
+        parts.push(`\n**Alternative Option:**`);
+        parts.push(`  **${altImage.image}**${altSizeText}`);
+        parts.push(`  ${altImage.reason}`);
+      }
+    }
   }
 
   // Security
