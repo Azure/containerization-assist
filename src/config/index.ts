@@ -10,6 +10,11 @@ import { parseIntEnv, parseStringEnv } from './env-utils';
 // Export consolidated constants (includes environment schema and defaults)
 export * from './constants';
 
+// Export Rego policy types and functions
+export type { RegoEvaluator, RegoPolicyResult, RegoPolicyViolation } from './policy-rego';
+export { loadPolicy, loadAndMergePolicies, clearPolicyCache } from './policy-io';
+export { applyPolicy } from './policy-eval';
+
 export const config = {
   server: {
     logLevel: parseStringEnv('LOG_LEVEL', 'info'),

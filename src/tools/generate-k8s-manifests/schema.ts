@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { environment } from '../shared/schemas';
+import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
 export const generateK8sManifestsSchema = z
   .object({
@@ -177,4 +178,5 @@ export interface ManifestPlan {
   knowledgeMatches: ManifestRequirement[];
   confidence: number;
   summary: string;
+  policyValidation?: PolicyValidationResult;
 }

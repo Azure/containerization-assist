@@ -6,7 +6,14 @@
     "recommendation": "Copy Gemfile and Gemfile.lock first, then bundle install for better caching",
     "example": "COPY Gemfile Gemfile.lock ./\nRUN bundle config set --local deployment 'true' && bundle install\nCOPY . .",
     "severity": "medium",
-    "tags": ["ruby", "bundler", "caching", "optimization"],
+    "tags": [
+      "bundler",
+      "caching",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "ruby"
+    ],
     "description": "Separate gem installation improves Docker build cache efficiency"
   },
   {
@@ -16,7 +23,14 @@
     "recommendation": "Install necessary build dependencies for native extensions in Alpine",
     "example": "RUN apk add --no-cache build-base postgresql-dev nodejs yarn tzdata",
     "severity": "high",
-    "tags": ["ruby", "alpine", "dependencies", "native-extensions"],
+    "tags": [
+      "alpine",
+      "dependencies",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "native-extensions",
+      "ruby"
+    ],
     "description": "Alpine requires specific packages for building native gem extensions"
   },
   {
@@ -26,7 +40,16 @@
     "recommendation": "Precompile Rails assets during build with proper environment",
     "example": "RUN SECRET_KEY_BASE=dummy RAILS_ENV=production bundle exec rails assets:precompile",
     "severity": "medium",
-    "tags": ["rails", "assets", "production", "build"],
+    "tags": [
+      "assets",
+      "aws",
+      "build",
+      "build-tool",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "production",
+      "rails"
+    ],
     "description": "Asset precompilation during build improves runtime performance"
   },
   {
@@ -36,7 +59,16 @@
     "recommendation": "Use multi-stage builds to separate build dependencies from runtime",
     "example": "FROM ruby:3.2-alpine AS build\nRUN bundle install\nFROM ruby:3.2-alpine AS runtime\nCOPY --from=build /usr/local/bundle /usr/local/bundle",
     "severity": "high",
-    "tags": ["ruby", "multistage", "optimization", "size"],
+    "tags": [
+      "build-stage",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "multistage",
+      "optimization",
+      "ruby",
+      "runtime-stage",
+      "size"
+    ],
     "description": "Multi-stage builds reduce final image size by excluding build tools"
   },
   {
@@ -46,7 +78,14 @@
     "recommendation": "Handle database migrations separately from application startup",
     "example": "# In entrypoint script or K8s init container\nbundle exec rails db:migrate || bundle exec rails db:setup",
     "severity": "medium",
-    "tags": ["rails", "database", "migrations", "startup"],
+    "tags": [
+      "database",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "migrations",
+      "rails",
+      "startup"
+    ],
     "description": "Separate migration handling prevents startup failures and race conditions"
   },
   {
@@ -56,7 +95,14 @@
     "recommendation": "Use jemalloc for better Ruby memory management",
     "example": "RUN apt-get install -y libjemalloc2\nENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2",
     "severity": "medium",
-    "tags": ["ruby", "memory", "jemalloc", "performance"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "jemalloc",
+      "memory",
+      "performance",
+      "ruby"
+    ],
     "description": "jemalloc reduces memory fragmentation in long-running Ruby processes"
   },
   {
@@ -66,7 +112,14 @@
     "recommendation": "Configure Puma workers and threads for container environment",
     "example": "ENV WEB_CONCURRENCY=2\nENV RAILS_MAX_THREADS=5\nCMD [\"bundle\", \"exec\", \"puma\", \"-C\", \"config/puma.rb\"]",
     "severity": "medium",
-    "tags": ["puma", "rails", "concurrency", "performance"],
+    "tags": [
+      "concurrency",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "puma",
+      "rails"
+    ],
     "description": "Proper Puma configuration optimizes resource usage in containers"
   },
   {
@@ -76,7 +129,14 @@
     "recommendation": "Use bundle install with deployment flag for production",
     "example": "RUN bundle config set --local deployment 'true' \\\n    && bundle config set --local without 'development test' \\\n    && bundle install --jobs 4",
     "severity": "medium",
-    "tags": ["bundler", "production", "deployment", "optimization"],
+    "tags": [
+      "bundler",
+      "deployment",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "production"
+    ],
     "description": "Deployment mode ensures consistent gem versions and excludes dev dependencies"
   },
   {
@@ -86,7 +146,14 @@
     "recommendation": "Add health check endpoint for Ruby/Rails applications",
     "example": "HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \\\n  CMD curl -f http://localhost:3000/health || exit 1",
     "severity": "medium",
-    "tags": ["ruby", "rails", "health", "monitoring"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "health",
+      "monitoring",
+      "rails",
+      "ruby"
+    ],
     "description": "Health checks enable better container orchestration"
   },
   {
@@ -96,7 +163,14 @@
     "recommendation": "Configure Sidekiq workers with appropriate concurrency settings",
     "example": "CMD [\"bundle\", \"exec\", \"sidekiq\", \"-C\", \"config/sidekiq.yml\", \"-c\", \"10\"]",
     "severity": "medium",
-    "tags": ["sidekiq", "workers", "background-jobs", "concurrency"],
+    "tags": [
+      "background-jobs",
+      "concurrency",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "sidekiq",
+      "workers"
+    ],
     "description": "Proper Sidekiq configuration optimizes background job processing"
   },
   {
@@ -106,7 +180,14 @@
     "recommendation": "Create and use a non-root user for Ruby applications",
     "example": "RUN groupadd -r ruby && useradd -r -g ruby -d /app ruby\nUSER ruby\nWORKDIR /app",
     "severity": "high",
-    "tags": ["ruby", "security", "user", "non-root"],
+    "tags": [
+      "fix-dockerfile",
+      "non-root",
+      "ruby",
+      "scan-image",
+      "security",
+      "user"
+    ],
     "description": "Running as non-root reduces security attack surface"
   },
   {
@@ -116,7 +197,14 @@
     "recommendation": "Handle Rails credentials securely using environment variables",
     "example": "ENV RAILS_MASTER_KEY=${RAILS_MASTER_KEY}\n# Never commit master.key to repository",
     "severity": "high",
-    "tags": ["rails", "credentials", "security", "secrets"],
+    "tags": [
+      "credentials",
+      "fix-dockerfile",
+      "rails",
+      "scan-image",
+      "secrets",
+      "security"
+    ],
     "description": "Rails credentials should be decrypted using environment variables"
   },
   {
@@ -126,7 +214,14 @@
     "recommendation": "Use ruby:slim images for smaller size with glibc compatibility",
     "example": "FROM ruby:3.2-slim",
     "severity": "medium",
-    "tags": ["ruby", "slim", "size", "optimization"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "ruby",
+      "size",
+      "slim"
+    ],
     "description": "Slim images provide good balance between size and compatibility"
   },
   {
@@ -136,7 +231,14 @@
     "recommendation": "Configure Rails to log to stdout for container best practices",
     "example": "ENV RAILS_LOG_TO_STDOUT=true",
     "severity": "medium",
-    "tags": ["rails", "logging", "stdout", "observability"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "logging",
+      "observability",
+      "rails",
+      "stdout"
+    ],
     "description": "Logging to stdout enables proper log aggregation in container environments"
   },
   {
@@ -146,7 +248,13 @@
     "recommendation": "Pin Bundler version to match Gemfile.lock",
     "example": "RUN gem install bundler -v $(grep -A 1 'BUNDLED WITH' Gemfile.lock | tail -n 1)",
     "severity": "medium",
-    "tags": ["bundler", "versioning", "reproducible"],
+    "tags": [
+      "bundler",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "reproducible",
+      "versioning"
+    ],
     "description": "Matching Bundler versions prevents compatibility issues"
   }
 ]

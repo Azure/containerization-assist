@@ -3,14 +3,9 @@
  * Tool execution with optional dependency resolution
  */
 
-import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { z, type ZodTypeAny } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
-import { loadAndMergePolicies } from '@/config/policy-io';
-import { applyPolicy } from '@/config/policy-eval';
-import type { Policy } from '@/config/policy-schemas';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
@@ -19,32 +14,53 @@ import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
+import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
+import { readdirSync, existsSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 
 // ===== Types =====
 
 /**
- * Get default policy paths
- * Returns all .yaml files in the policies/ directory
+ * Discover built-in policy files from the policies directory
+ * Returns paths to all .rego files (excluding test files)
+ *
+ * Searches upward from process.cwd() to find the policies directory.
+ * Works in both ESM (dist/) and CJS (dist-cjs/) builds.
  */
-function getDefaultPolicyPaths(): string[] {
-  const logger = createLogger({ name: 'policy-discovery' });
+function discoverBuiltInPolicies(logger: Logger): string[] {
   try {
-    const policiesDir = path.join(process.cwd(), 'policies');
+    // Start from current working directory and search upward
+    let currentDir = process.cwd();
+    let policiesDir = join(currentDir, 'policies');
+    let attempts = 0;
+    const maxAttempts = 5;
 
-    if (!fs.existsSync(policiesDir)) {
+    // Search upward for policies directory
+    while (!existsSync(policiesDir) && attempts < maxAttempts) {
+      const parentDir = dirname(currentDir);
+      if (parentDir === currentDir) {
+        // Reached filesystem root
+        break;
+      }
+      currentDir = parentDir;
+      policiesDir = join(currentDir, 'policies');
+      attempts++;
+    }
+
+    if (!existsSync(policiesDir)) {
+      logger.warn({ cwd: process.cwd(), attempts }, 'Built-in policies directory not found');
       return [];
     }
 
-    const files = fs.readdirSync(policiesDir);
-    return files
-      .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) // Alphabetical sort with numeric awareness for consistent policy load order
-      .map((f) => path.join(policiesDir, f));
+    // Find all .rego files except test files
+    const files = readdirSync(policiesDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(policiesDir, file)));
+
+    logger.info({ policiesDir, count: files.length }, 'Discovered built-in policies');
+    return files;
   } catch (error) {
-    logger.warn(
-      { error, cwd: process.cwd() },
-      'Failed to read policies directory - using no default policies',
-    );
+    logger.warn({ error }, 'Failed to discover built-in policies');
     return [];
   }
 }
@@ -61,18 +77,22 @@ function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger 
  * Create a ToolContext for the given request
  * Delegates to the canonical createToolContext from @mcp/context
  */
-function createContextForTool(request: ExecuteRequest, logger: Logger): ToolContext {
+function createContextForTool(
+  request: ExecuteRequest,
+  logger: Logger,
+  policy?: RegoEvaluator,
+): ToolContext {
   const metadata = request.metadata;
 
   return createToolContext(logger, {
     ...(metadata?.signal && { signal: metadata.signal }),
     ...(metadata?.progress !== undefined && { progress: metadata.progress }),
     ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
+    ...(policy && { policy }),
   });
 }
 
 interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
-  policy?: Policy;
   registry: Map<string, T>;
   logger: Logger;
   config: OrchestratorConfig;
@@ -91,31 +111,9 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   const { registry, server, config = { chainHintsMode: 'enabled' } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
-  // Load and merge policies - use defaults if not configured
-  let policy: Policy | undefined;
-  const policyPaths = config.policyPath ? [config.policyPath] : getDefaultPolicyPaths();
-
-  if (policyPaths.length > 0) {
-    const policyResult = loadAndMergePolicies(policyPaths);
-    if (policyResult.ok) {
-      policy = policyResult.value;
-      logger.info(
-        {
-          policiesLoaded: policyPaths.length,
-          totalRules: policy.rules.length,
-        },
-        'Policies loaded and merged successfully',
-      );
-    } else {
-      logger.warn(
-        {
-          policyPathsAttempted: policyPaths.length,
-          error: policyResult.error,
-        },
-        'Failed to load policies - orchestrator will run without policy enforcement',
-      );
-    }
-  }
+  // Cache the loaded policy to avoid reloading on every execution
+  let policyCache: RegoEvaluator | undefined;
+  let policyLoadPromise: Promise<void> | undefined;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     const { toolName } = request;
@@ -130,17 +128,52 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
       ...(request.metadata?.loggerContext ?? {}),
     });
 
+    // Load policies once (with Promise-based guard to prevent race conditions)
+    if (!policyLoadPromise) {
+      policyLoadPromise = (async () => {
+        // Always load built-in policies
+        const builtInPolicies = discoverBuiltInPolicies(logger);
+
+        // Optionally add user-provided custom policy
+        const policyPaths = config.policyPath
+          ? [...builtInPolicies, config.policyPath]
+          : builtInPolicies;
+
+        if (policyPaths.length === 0) {
+          logger.warn('No policies found (built-in or custom)');
+          return;
+        }
+
+        const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
+        if (policyResult.ok) {
+          policyCache = policyResult.value;
+          logger.info({
+            builtIn: builtInPolicies.length,
+            custom: config.policyPath ? 1 : 0,
+            total: policyPaths.length,
+          }, 'Policies loaded for orchestrator');
+        } else {
+          logger.warn({ error: policyResult.error }, 'Failed to load policies, continuing without them');
+        }
+      })();
+    }
+
+    // Wait for policy loading to complete if in progress
+    await policyLoadPromise;
+
     return await executeWithOrchestration(tool, request, {
       registry,
-      ...(policy && { policy }),
       logger: contextualLogger,
       config,
       ...(server && { server }),
-    });
+    }, policyCache);
   }
 
   function close(): void {
-    // No cleanup needed anymore
+    // Cleanup policy resources if loaded
+    if (policyCache) {
+      policyCache.close();
+    }
   }
 
   return { execute, close };
@@ -153,32 +186,17 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   tool: T,
   request: ExecuteRequest,
   env: ExecutionEnvironment<T>,
+  policy?: RegoEvaluator,
 ): Promise<Result<unknown>> {
   const { params } = request;
-  const { policy, logger } = env;
+  const { logger } = env;
 
   // Validate parameters using Zod safeParse
   const validation = validateParams(params, tool.schema);
   if (!validation.ok) return validation;
   const validatedParams = validation.value;
 
-  // Apply policies
-  if (policy) {
-    const policyResults = applyPolicy(policy, {
-      tool: tool.name,
-      params: validatedParams as Record<string, unknown>,
-    });
-
-    const blockers = policyResults
-      .filter((r) => r.matched && r.rule.actions.block)
-      .map((r) => r.rule.id);
-
-    if (blockers.length > 0) {
-      return Failure(ERROR_MESSAGES.POLICY_BLOCKED(blockers));
-    }
-  }
-
-  const toolContext = createContextForTool(request, logger);
+  const toolContext = createContextForTool(request, logger, policy);
   const tracker = createStandardizedToolTracker(tool.name, {}, logger);
 
   const startTime = Date.now();
