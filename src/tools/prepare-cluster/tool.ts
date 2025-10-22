@@ -38,6 +38,7 @@ import { Success, Failure, type Result } from '@/types';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { pluralize } from '@/lib/summary-helpers';
 
 const execAsync = promisify(exec);
 
@@ -100,6 +101,12 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
 }
 
 export interface PrepareClusterResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the cluster preparation outcome.
+   * @example "✅ Cluster prepared. Namespace 'production' created. 5 resources configured. Ready for deployment."
+   */
+  summary?: string;
   success: boolean;
   clusterReady: boolean;
   cluster: string;
@@ -592,7 +599,13 @@ async function handlePrepareCluster(
 
     const clusterReady = readinessResult.value;
 
+    // Generate summary
+    const namespaceAction = checks.namespaceExists ? 'verified' : 'created';
+    const resourcesConfigured = Object.values(checks).filter(Boolean).length;
+    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured. Ready for deployment.`;
+
     const result: PrepareClusterResult = {
+      summary,
       success: true,
       clusterReady,
       cluster,

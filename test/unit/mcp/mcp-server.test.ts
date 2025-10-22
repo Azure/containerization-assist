@@ -179,11 +179,11 @@ describe('formatOutput', () => {
     expect(result).toBe(expected);
   });
 
-  it('formats primitive values as string when format is MARKDOWN', () => {
-    expect(formatOutput('hello', OUTPUTFORMAT.MARKDOWN)).toBe('hello');
-    expect(formatOutput(42, OUTPUTFORMAT.MARKDOWN)).toBe('42');
-    expect(formatOutput(true, OUTPUTFORMAT.MARKDOWN)).toBe('true');
-    expect(formatOutput(null, OUTPUTFORMAT.MARKDOWN)).toBe('null');
+  it('formats primitive values as JSON code block when format is MARKDOWN', () => {
+    expect(formatOutput('hello', OUTPUTFORMAT.MARKDOWN)).toBe('```json\n"hello"\n```');
+    expect(formatOutput(42, OUTPUTFORMAT.MARKDOWN)).toBe('```json\n42\n```');
+    expect(formatOutput(true, OUTPUTFORMAT.MARKDOWN)).toBe('```json\ntrue\n```');
+    expect(formatOutput(null, OUTPUTFORMAT.MARKDOWN)).toBe('```json\nnull\n```');
   });
 
   it('formats objects as JSON when format is TEXT', () => {
@@ -206,5 +206,158 @@ describe('formatOutput', () => {
     const result = formatOutput(input, 'invalid' as any);
 
     expect(result).toBe(JSON.stringify(input, null, 2));
+  });
+
+  describe('with summary field', () => {
+    it('shows only summary when format is TEXT', () => {
+      const input = {
+        summary: '✅ Operation completed successfully',
+        details: { foo: 'bar', count: 42 },
+      };
+
+      const result = formatOutput(input, OUTPUTFORMAT.TEXT);
+
+      expect(result).toBe('✅ Operation completed successfully');
+      expect(result).not.toContain('details');
+      expect(result).not.toContain('foo');
+    });
+
+    it('shows summary with collapsible details when format is MARKDOWN', () => {
+      const input = {
+        summary: '✅ Build completed in 45s',
+        imageId: 'sha256:abc123',
+        size: 245000000,
+      };
+
+      const result = formatOutput(input, OUTPUTFORMAT.MARKDOWN);
+
+      expect(result).toContain('✅ Build completed in 45s');
+      expect(result).toContain('<details>');
+      expect(result).toContain('<summary>View detailed output</summary>');
+      expect(result).toContain('```json');
+      expect(result).toContain('imageId');
+      expect(result).toContain('size');
+      expect(result).not.toContain('"summary"');
+    });
+
+    it('falls back to full JSON in MARKDOWN if no summary', () => {
+      const input = { foo: 'bar', baz: 123 };
+
+      const result = formatOutput(input, OUTPUTFORMAT.MARKDOWN);
+
+      expect(result).toBe('```json\n' + JSON.stringify(input, null, 2) + '\n```');
+      expect(result).not.toContain('<details>');
+    });
+
+    it('uses summary for NATURAL_LANGUAGE with fallback', () => {
+      const input = {
+        summary: '✅ Deployment successful',
+        namespace: 'production',
+        replicas: 3,
+      };
+
+      const result = formatOutput(input, OUTPUTFORMAT.NATURAL_LANGUAGE);
+
+      // Since we don't have a type guard match, it falls back to summary
+      expect(result).toBe('✅ Deployment successful');
+    });
+  });
+
+  describe('NATURAL_LANGUAGE format with type detection', () => {
+    it('detects and formats scan-image results', () => {
+      const scanResult = {
+        summary: '✅ Scan passed',
+        vulnerabilities: {
+          critical: 0,
+          high: 0,
+          medium: 2,
+          low: 5,
+          negligible: 10,
+          unknown: 0,
+          total: 17,
+        },
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: true,
+        success: true,
+        remediationGuidance: [],
+      };
+
+      const result = formatOutput(scanResult, OUTPUTFORMAT.NATURAL_LANGUAGE);
+
+      expect(result).toContain('Security Scan');
+      expect(result).toContain('PASSED');
+      expect(result).toContain('Vulnerabilities:');
+      expect(result).toContain('Next Steps:');
+    });
+
+    it('detects and formats build-image results', () => {
+      const buildResult = {
+        summary: '✅ Built image',
+        success: true,
+        imageId: 'sha256:abc123',
+        tags: ['myapp:latest', 'myapp:1.0.0'],
+        size: 245000000,
+        buildTime: 45000,
+        logs: [],
+      };
+
+      const result = formatOutput(buildResult, OUTPUTFORMAT.NATURAL_LANGUAGE);
+
+      expect(result).toContain('Image Built Successfully');
+      expect(result).toContain('**Image:**');
+      expect(result).toContain('**Tags:**');
+      expect(result).toContain('**Size:**');
+      expect(result).toContain('**Build Time:**');
+      expect(result).toContain('Next Steps:');
+    });
+
+    it('detects and formats analyze-repo results', () => {
+      const analyzeResult = {
+        summary: '✅ Analyzed repository',
+        modules: [
+          {
+            name: 'api-service',
+            modulePath: '/app/api',
+            language: 'javascript' as const,
+            languageVersion: '18.0.0',
+            frameworks: [{ name: 'Express', version: '4.18.0' }],
+            ports: [3000],
+          },
+        ],
+        isMonorepo: false,
+        analyzedPath: '/app',
+      };
+
+      const result = formatOutput(analyzeResult, OUTPUTFORMAT.NATURAL_LANGUAGE);
+
+      expect(result).toContain('Repository Analysis Complete');
+      expect(result).toContain('**Path:**');
+      expect(result).toContain('**Type:**');
+      expect(result).toContain('**Modules Found:**');
+      expect(result).toContain('Next Steps:');
+    });
+
+    it('falls back to summary when type is not recognized', () => {
+      const unknownResult = {
+        summary: '✅ Custom operation completed',
+        customField: 'value',
+        someData: 123,
+      };
+
+      const result = formatOutput(unknownResult, OUTPUTFORMAT.NATURAL_LANGUAGE);
+
+      expect(result).toBe('✅ Custom operation completed');
+    });
+
+    it('falls back to JSON when no summary and type not recognized', () => {
+      const unknownResult = {
+        customField: 'value',
+        someData: 123,
+      };
+
+      const result = formatOutput(unknownResult, OUTPUTFORMAT.NATURAL_LANGUAGE);
+
+      expect(result).toBe(JSON.stringify(unknownResult, null, 2));
+    });
   });
 });

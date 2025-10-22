@@ -13,6 +13,7 @@ import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
 import { scanImageSchema, type ScanImageParams } from './schema';
+import { formatVulnerabilities, buildStatusSummary, pluralize } from '@/lib/summary-helpers';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -39,6 +40,12 @@ interface DockerScanResult {
 }
 
 export interface ScanImageResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the scan outcome, vulnerability counts, and recommendations.
+   * @example "🔒 Security scan failed. Found 142 vulnerabilities (2 critical, 5 high, 12 medium). 1 remediation recommendation available."
+   */
+  summary?: string;
   success: boolean;
   remediationGuidance?: Array<{
     vulnerability: string;
@@ -202,8 +209,29 @@ async function handleScanImage(
       }
     }
 
+    // Generate summary
+    const vulnSummary = formatVulnerabilities({
+      critical: scanResult.criticalCount,
+      high: scanResult.highCount,
+      medium: scanResult.mediumCount,
+      low: scanResult.lowCount,
+      total: scanResult.totalVulnerabilities,
+    });
+
+    const remediationText =
+      remediationGuidance.length > 0
+        ? ` ${pluralize(remediationGuidance.length, 'remediation')} available.`
+        : '';
+
+    const summary = buildStatusSummary(
+      passed,
+      `🔒 Security scan passed. ${vulnSummary}.${remediationText}`,
+      `🔒 Security scan failed. ${vulnSummary}.${remediationText}`,
+    );
+
     // Prepare the result
     const result: ScanImageResult = {
+      summary,
       success: true,
       ...(remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {
