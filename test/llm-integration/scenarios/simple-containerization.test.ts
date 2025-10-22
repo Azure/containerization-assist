@@ -75,7 +75,7 @@ class HelloController {
     });
 
     // Initialize chat client
-    client = new ChatClient({});
+    client = new ChatClient();
     const isValidated = await client.validateConnection();
 
     if (!isValidated) {

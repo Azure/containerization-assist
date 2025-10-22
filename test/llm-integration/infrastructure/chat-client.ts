@@ -4,8 +4,8 @@
  */
 
 import { promises as fs } from 'fs';
-import { join, dirname } from 'path';
-import { generateText, tool, Experimental_Agent as Agent, stepCountIs } from 'ai';
+import { join, dirname, isAbsolute } from 'path';
+import { generateText, tool, Experimental_Agent as Agent } from 'ai';
 import { AzureOpenAIProvider, createAzure } from '@ai-sdk/azure';
 import { z } from 'zod';
 import type {
@@ -283,7 +283,8 @@ export class ChatClient implements LLMClient {
         reason: z.string().describe('Why this file is being created and what it accomplishes')
       }),
       execute: async ({ filePath, content, reason }) => {
-        const fullPath = join(workingDirectory, filePath);
+        // Handle both relative and absolute paths - if already absolute, use as-is
+        const fullPath = isAbsolute(filePath) ? filePath : join(workingDirectory, filePath);
         const dir = dirname(fullPath);
         await fs.mkdir(dir, { recursive: true });
         await fs.writeFile(fullPath, content, 'utf8');
@@ -331,7 +332,10 @@ export class ChatClient implements LLMClient {
         model: this.provider(this.model),
         system: systemPrompt,
         tools: sdkTools,
-        stopWhen: stepCountIs(10), // Allow up to 10 steps for complete workflow
+        stopWhen: ({ steps }) => {
+          const last = steps.at(-1);
+          return last?.toolResults?.some(r => r.toolName === "createFile") || steps.length >= 10;
+        },
         // Optional: Add step-by-step hooks for progress tracking
         onStepFinish: ({ text, toolCalls }) => {
           console.log(`🔄 Step completed:`);
