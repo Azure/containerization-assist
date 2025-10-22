@@ -116,17 +116,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ -f "quality-gates.txt" ]; then
-            echo "## 📋 Quality Gates Summary" >> $GITHUB_STEP_SUMMARY
+            echo "## 📋 Quality Gates Report" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            head -20 quality-gates.txt >> $GITHUB_STEP_SUMMARY
-
-            # Check if there's more content
-            if [ $(wc -l < quality-gates.txt) -gt 20 ]; then
-              echo "..." >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "[Full report truncated - see artifacts or logs for complete details]" >> $GITHUB_STEP_SUMMARY
-            fi
+            cat quality-gates.txt >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
