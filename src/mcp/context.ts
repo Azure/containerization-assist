@@ -8,6 +8,7 @@
 
 import type { Logger } from 'pino';
 import { extractProgressReporter } from './context-helpers.js';
+import type { RegoEvaluator } from '@/config/policy-rego';
 
 // ===== TYPES =====
 
@@ -45,6 +46,12 @@ export interface ToolContext {
    * Use this for structured logging instead of console.log
    */
   logger: Logger;
+
+  /**
+   * Optional Rego policy evaluator for tool self-validation
+   * Tools can use this to validate generated content against organizational policies
+   */
+  policy?: RegoEvaluator;
 }
 
 // ===== PROGRESS HANDLING =====
@@ -65,6 +72,8 @@ export interface ContextOptions {
   progress?: ProgressReporter | unknown;
   /** MCP notification callback for progress updates */
   sendNotification?: (notification: unknown) => Promise<void>;
+  /** Optional Rego policy evaluator to pass to tools */
+  policy?: RegoEvaluator;
 }
 
 /**
@@ -93,5 +102,6 @@ export function createToolContext(logger: Logger, options: ContextOptions = {}):
     logger,
     signal: options.signal,
     progress: progressReporter,
+    ...(options.policy && { policy: options.policy }),
   };
 }

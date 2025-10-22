@@ -6,7 +6,15 @@
     "recommendation": "Copy requirements.txt first and install dependencies for better Docker layer caching",
     "example": "COPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .",
     "severity": "medium",
-    "tags": ["python", "pip", "caching", "optimization"],
+    "tags": [
+      "caching",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "pip",
+      "pip-install",
+      "python"
+    ],
     "description": "Separate dependency installation improves build performance"
   },
   {
@@ -16,7 +24,15 @@
     "recommendation": "Use --no-cache-dir flag with pip to reduce image size",
     "example": "RUN pip install --no-cache-dir -r requirements.txt",
     "severity": "medium",
-    "tags": ["python", "pip", "size", "cleanup"],
+    "tags": [
+      "cleanup",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "pip",
+      "pip-install",
+      "python",
+      "size"
+    ],
     "description": "pip cache can add significant size to container images"
   },
   {
@@ -26,7 +42,14 @@
     "recommendation": "Use python:slim images for production to reduce size and attack surface",
     "example": "FROM python:3.11-slim",
     "severity": "high",
-    "tags": ["python", "slim", "production", "security"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "production",
+      "python",
+      "security",
+      "slim"
+    ],
     "description": "Slim images exclude unnecessary packages while maintaining compatibility"
   },
   {
@@ -36,7 +59,13 @@
     "recommendation": "Set PYTHONUNBUFFERED and compile bytecode for better performance",
     "example": "ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1\nRUN python -m compileall .",
     "severity": "low",
-    "tags": ["python", "performance", "bytecode"],
+    "tags": [
+      "bytecode",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "python"
+    ],
     "description": "Environment variables optimize Python runtime in containers"
   },
   {
@@ -46,7 +75,14 @@
     "recommendation": "Run Django collectstatic during build for static files serving",
     "example": "RUN python manage.py collectstatic --noinput",
     "severity": "medium",
-    "tags": ["django", "static", "build"],
+    "tags": [
+      "build",
+      "build-tool",
+      "django",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "static"
+    ],
     "description": "Collecting static files during build improves runtime performance"
   },
   {
@@ -56,7 +92,15 @@
     "recommendation": "Install wheel package for faster pip installations",
     "example": "RUN pip install --no-cache-dir wheel && pip install --no-cache-dir -r requirements.txt",
     "severity": "low",
-    "tags": ["python", "pip", "wheel", "performance"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "pip",
+      "pip-install",
+      "python",
+      "wheel"
+    ],
     "description": "wheel enables faster installation of Python packages"
   },
   {
@@ -66,7 +110,15 @@
     "recommendation": "Use multi-stage builds to separate build dependencies from runtime",
     "example": "FROM python:3.11-slim as build\nRUN pip install build-tools\nFROM python:3.11-slim as runtime\nCOPY --from=build /app .",
     "severity": "medium",
-    "tags": ["python", "multistage", "optimization"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "multistage",
+      "optimization",
+      "pip-install",
+      "python",
+      "runtime-stage"
+    ],
     "description": "Exclude build tools and dev dependencies from final image"
   },
   {
@@ -76,7 +128,14 @@
     "recommendation": "Consider using virtual environments even in containers for dependency isolation",
     "example": "RUN python -m venv /opt/venv\nENV PATH=\"/opt/venv/bin:$PATH\"\nRUN pip install -r requirements.txt",
     "severity": "low",
-    "tags": ["python", "venv", "isolation"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "isolation",
+      "pip-install",
+      "python",
+      "venv"
+    ],
     "description": "Virtual environments provide additional dependency isolation"
   },
   {
@@ -86,7 +145,13 @@
     "recommendation": "Add health check for Python web applications",
     "example": "HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:8000/health || exit 1",
     "severity": "medium",
-    "tags": ["python", "health", "monitoring"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "health",
+      "monitoring",
+      "python"
+    ],
     "description": "Health checks enable better container orchestration"
   },
   {
@@ -96,7 +161,13 @@
     "recommendation": "Configure Gunicorn workers based on CPU cores for optimal performance",
     "example": "CMD [\"gunicorn\", \"--workers=4\", \"--bind=0.0.0.0:8000\", \"app:app\"]",
     "severity": "medium",
-    "tags": ["python", "gunicorn", "performance"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "gunicorn",
+      "performance",
+      "python"
+    ],
     "description": "Worker count should match available CPU cores"
   },
   {
@@ -106,7 +177,14 @@
     "recommendation": "Use production WSGI server like Gunicorn instead of Flask development server",
     "example": "RUN pip install gunicorn\nCMD [\"gunicorn\", \"--bind=0.0.0.0:5000\", \"app:app\"]",
     "severity": "high",
-    "tags": ["flask", "production", "gunicorn"],
+    "tags": [
+      "fix-dockerfile",
+      "flask",
+      "generate-dockerfile",
+      "gunicorn",
+      "pip-install",
+      "production"
+    ],
     "description": "Flask development server is not suitable for production use"
   },
   {
@@ -116,7 +194,13 @@
     "recommendation": "Create and use a non-root user for Python applications",
     "example": "RUN groupadd -r python && useradd -r -g python python\nUSER python",
     "severity": "high",
-    "tags": ["python", "security", "user"],
+    "tags": [
+      "fix-dockerfile",
+      "python",
+      "scan-image",
+      "security",
+      "user"
+    ],
     "description": "Running as non-root reduces security attack surface"
   },
   {
@@ -126,7 +210,14 @@
     "recommendation": "Use pip-audit or safety to check for vulnerable dependencies",
     "example": "RUN pip install pip-audit && pip-audit",
     "severity": "medium",
-    "tags": ["python", "security", "dependencies"],
+    "tags": [
+      "dependencies",
+      "fix-dockerfile",
+      "pip-install",
+      "python",
+      "scan-image",
+      "security"
+    ],
     "description": "Regularly audit dependencies for known security vulnerabilities"
   },
   {
@@ -136,7 +227,13 @@
     "recommendation": "Disable automatic docs in production FastAPI applications",
     "example": "# In app code: app = FastAPI(docs_url=None, redoc_url=None)",
     "severity": "low",
-    "tags": ["fastapi", "security", "production"],
+    "tags": [
+      "fastapi",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "production",
+      "security"
+    ],
     "description": "Automatic docs can expose API structure in production"
   },
   {
@@ -146,7 +243,13 @@
     "recommendation": "Use poetry install --no-dev for production builds",
     "example": "COPY pyproject.toml poetry.lock ./\nRUN poetry install --no-dev --no-interaction",
     "severity": "medium",
-    "tags": ["python", "poetry", "production"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "poetry",
+      "production",
+      "python"
+    ],
     "description": "Exclude development dependencies in production containers"
   },
   {
@@ -156,7 +259,13 @@
     "recommendation": "Consider using pandas with appropriate memory settings for data processing",
     "example": "ENV PANDAS_COPY_ON_WRITE=1",
     "severity": "low",
-    "tags": ["python", "pandas", "memory"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "memory",
+      "pandas",
+      "python"
+    ],
     "description": "Pandas memory optimizations can improve container performance"
   },
   {
@@ -166,7 +275,13 @@
     "recommendation": "Configure Python logging to use JSON format for structured logging",
     "example": "ENV PYTHONUNBUFFERED=1\n# Configure JSON logging in application",
     "severity": "medium",
-    "tags": ["python", "logging", "structured"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "logging",
+      "python",
+      "structured"
+    ],
     "description": "Structured logging improves observability in container environments"
   },
   {
@@ -176,7 +291,13 @@
     "recommendation": "Set explicit timezone for consistent datetime handling",
     "example": "ENV TZ=UTC\nRUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime",
     "severity": "low",
-    "tags": ["python", "timezone", "datetime"],
+    "tags": [
+      "datetime",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "python",
+      "timezone"
+    ],
     "description": "Explicit timezone prevents datetime-related bugs"
   },
   {
@@ -186,7 +307,13 @@
     "recommendation": "Configure Celery workers with appropriate concurrency and memory limits",
     "example": "CMD [\"celery\", \"worker\", \"-A\", \"app\", \"--concurrency=4\", \"--max-memory-per-child=200000\"]",
     "severity": "medium",
-    "tags": ["celery", "workers", "performance"],
+    "tags": [
+      "celery",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "workers"
+    ],
     "description": "Proper Celery configuration prevents memory leaks and improves performance"
   },
   {
@@ -196,7 +323,13 @@
     "recommendation": "Pin exact versions in requirements.txt for reproducible builds",
     "example": "# Use pip freeze > requirements.txt or pip-tools",
     "severity": "medium",
-    "tags": ["python", "dependencies", "reproducible"],
+    "tags": [
+      "dependencies",
+      "fix-dockerfile",
+      "python",
+      "reproducible",
+      "scan-image"
+    ],
     "description": "Pinned versions ensure consistent builds across environments"
   },
   {
@@ -206,7 +339,15 @@
     "recommendation": "Optimize FastAPI for async workloads with proper ASGI server configuration",
     "example": "RUN pip install uvicorn[standard] gunicorn\nCMD [\"gunicorn\", \"-w\", \"4\", \"-k\", \"uvicorn.workers.UvicornWorker\", \"--bind\", \"0.0.0.0:8000\", \"main:app\"]",
     "severity": "high",
-    "tags": ["fastapi", "async", "uvicorn", "performance"],
+    "tags": [
+      "async",
+      "fastapi",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "pip-install",
+      "uvicorn"
+    ],
     "description": "Proper ASGI configuration maximizes async FastAPI performance"
   },
   {
@@ -216,7 +357,14 @@
     "recommendation": "Configure aiohttp with proper connector limits and session management",
     "example": "# In app code: set connector limits for production\n# aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=100))\nCMD [\"python\", \"-m\", \"aiohttp.web\", \"-H\", \"0.0.0.0\", \"-P\", \"8080\", \"app:init_app\"]",
     "severity": "medium",
-    "tags": ["aiohttp", "async", "connectors", "performance"],
+    "tags": [
+      "aiohttp",
+      "async",
+      "connectors",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance"
+    ],
     "description": "Proper aiohttp configuration prevents connection pool exhaustion"
   },
   {
@@ -226,7 +374,15 @@
     "recommendation": "Use Poetry with Docker-optimized caching and virtual environment management",
     "example": "ENV POETRY_HOME=\"/opt/poetry\" POETRY_CACHE_DIR=/opt/poetry/cache\nRUN pip install poetry\nCOPY pyproject.toml poetry.lock ./\nRUN poetry config virtualenvs.create false && poetry install --no-dev --no-interaction\nCOPY . .",
     "severity": "high",
-    "tags": ["poetry", "caching", "optimization", "virtualenv"],
+    "tags": [
+      "caching",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "pip-install",
+      "poetry",
+      "virtualenv"
+    ],
     "description": "Poetry configuration optimizes dependency management in containers"
   },
   {
@@ -236,7 +392,16 @@
     "recommendation": "Implement comprehensive Python security scanning with multiple tools",
     "example": "# Install security tools\nRUN pip install pip-audit bandit safety\n# Run security scans\nRUN pip-audit --fix --dry-run\nRUN bandit -r . -x tests/\nRUN safety check --json",
     "severity": "high",
-    "tags": ["security", "pip-audit", "bandit", "safety", "scanning"],
+    "tags": [
+      "bandit",
+      "fix-dockerfile",
+      "pip-audit",
+      "pip-install",
+      "safety",
+      "scan-image",
+      "scanning",
+      "security"
+    ],
     "description": "Multi-tool security scanning provides comprehensive vulnerability detection"
   },
   {
@@ -246,7 +411,15 @@
     "recommendation": "Use uv for faster Python package installation and management",
     "example": "# Install uv\nRUN pip install uv\n# Use uv for faster installs\nCOPY requirements.txt .\nRUN uv pip install --no-cache -r requirements.txt\n# Or with sync\nRUN uv pip sync requirements.txt",
     "severity": "medium",
-    "tags": ["uv", "performance", "package-manager", "rust"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "package-manager",
+      "performance",
+      "pip-install",
+      "rust",
+      "uv"
+    ],
     "description": "uv provides significantly faster Python package installation"
   },
   {
@@ -256,7 +429,16 @@
     "recommendation": "Optimize PyO3/Maturin Rust extensions build in multi-stage containers",
     "example": "FROM rust:alpine AS rust-builder\nRUN apk add --no-cache musl-dev\nCOPY Cargo.toml pyproject.toml ./\nRUN maturin build --release\n\nFROM python:alpine\nCOPY --from=rust-builder /app/target/wheels/*.whl .\nRUN pip install *.whl",
     "severity": "medium",
-    "tags": ["pyo3", "maturin", "rust", "extensions", "performance"],
+    "tags": [
+      "extensions",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "maturin",
+      "performance",
+      "pip-install",
+      "pyo3",
+      "rust"
+    ],
     "description": "Rust extensions provide significant performance improvements for Python"
   },
   {
@@ -266,7 +448,15 @@
     "recommendation": "Integrate mypy type checking in CI/CD pipeline for type safety",
     "example": "RUN pip install mypy\n# Type check during build\nRUN mypy src/ --ignore-missing-imports --strict\n# Or as separate validation step\nRUN python -m mypy --config-file mypy.ini src/",
     "severity": "medium",
-    "tags": ["mypy", "type-checking", "ci", "validation"],
+    "tags": [
+      "ci",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "mypy",
+      "pip-install",
+      "type-checking",
+      "validation"
+    ],
     "description": "mypy type checking catches type errors before runtime"
   },
   {
@@ -276,7 +466,15 @@
     "recommendation": "Use uvloop for better asyncio performance in production",
     "example": "RUN pip install uvloop\n# In application code:\n# import uvloop\n# uvloop.install()\nENV PYTHONPATH=/app",
     "severity": "medium",
-    "tags": ["asyncio", "uvloop", "performance", "event-loop"],
+    "tags": [
+      "asyncio",
+      "event-loop",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "pip-install",
+      "uvloop"
+    ],
     "description": "uvloop provides 2x+ better performance for asyncio applications"
   },
   {
@@ -286,7 +484,16 @@
     "recommendation": "Consider Google Distroless Python images for enhanced security",
     "example": "# Multi-stage with distroless\nFROM python:3.11-slim AS builder\nRUN pip install --user -r requirements.txt\n\nFROM gcr.io/distroless/python3-debian11\nCOPY --from=builder /root/.local /root/.local\nCOPY . .\nCMD [\"main.py\"]",
     "severity": "medium",
-    "tags": ["security", "distroless", "minimal", "attack-surface"],
+    "tags": [
+      "attack-surface",
+      "distroless",
+      "fix-dockerfile",
+      "google",
+      "minimal",
+      "pip-install",
+      "scan-image",
+      "security"
+    ],
     "description": "Distroless images provide minimal attack surface with no shell or package manager"
   },
   {
@@ -296,7 +503,14 @@
     "recommendation": "Configure Python multiprocessing for containerized environments",
     "example": "# Set shared memory size if needed\n# In docker run: --shm-size=2g\nENV PYTHONUNBUFFERED=1\n# Configure multiprocessing start method\nENV MP_START_METHOD=spawn",
     "severity": "medium",
-    "tags": ["multiprocessing", "concurrency", "performance", "configuration"],
+    "tags": [
+      "concurrency",
+      "configuration",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "multiprocessing",
+      "performance"
+    ],
     "description": "Proper multiprocessing configuration prevents issues in containers"
   },
   {
@@ -306,7 +520,14 @@
     "recommendation": "Use Python PGO (Profile Guided Optimization) builds for performance-critical applications",
     "example": "FROM python:3.11-slim\n# For PGO Python builds:\n# FROM python:3.11-slim-bullseye\nENV PYTHONOPTIMIZE=2\nRUN python -O -m py_compile /app/*.py",
     "severity": "low",
-    "tags": ["optimization", "pgo", "performance", "compilation"],
+    "tags": [
+      "compilation",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "performance",
+      "pgo"
+    ],
     "description": "PGO builds can provide 10-20% performance improvements"
   },
   {
@@ -316,7 +537,15 @@
     "recommendation": "Configure Django for async views with proper ASGI deployment",
     "example": "RUN pip install uvicorn gunicorn\n# Use ASGI for async Django\nCMD [\"gunicorn\", \"myproject.asgi:application\", \"-w\", \"4\", \"-k\", \"uvicorn.workers.UvicornWorker\", \"--bind\", \"0.0.0.0:8000\"]",
     "severity": "medium",
-    "tags": ["django", "async", "asgi", "performance"],
+    "tags": [
+      "asgi",
+      "async",
+      "django",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "pip-install"
+    ],
     "description": "ASGI deployment enables async Django views and better performance"
   },
   {
@@ -326,7 +555,15 @@
     "recommendation": "Include memory profiling tools for production debugging",
     "example": "# Install profiling tools\nRUN pip install memory-profiler pympler\n# Set environment for profiling\nENV PYTHONTRACEMALLOC=1\n# Optional: Install tracemalloc utilities",
     "severity": "low",
-    "tags": ["memory", "profiling", "debugging", "monitoring"],
+    "tags": [
+      "debugging",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "memory",
+      "monitoring",
+      "pip-install",
+      "profiling"
+    ],
     "description": "Memory profiling tools help identify memory leaks and optimization opportunities"
   },
   {
@@ -336,7 +573,14 @@
     "recommendation": "Implement continuous dependency vulnerability monitoring",
     "example": "# During build\nRUN pip-audit --requirement requirements.txt --format=json --output=audit-results.json\n# Runtime monitoring\nCOPY audit-results.json /app/\n# Consider tools like snyk, sonatype, or dependabot",
     "severity": "high",
-    "tags": ["security", "dependencies", "monitoring", "vulnerability"],
+    "tags": [
+      "dependencies",
+      "fix-dockerfile",
+      "monitoring",
+      "scan-image",
+      "security",
+      "vulnerability"
+    ],
     "description": "Continuous vulnerability monitoring ensures ongoing security"
   }
 ]

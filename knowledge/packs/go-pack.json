@@ -6,7 +6,16 @@
     "recommendation": "Use multi-stage builds for Go applications to create minimal runtime images",
     "example": "FROM golang:1.21-alpine AS build\nRUN go build -o app .\nFROM alpine:latest\nCOPY --from=build /app/app /usr/local/bin/app",
     "severity": "high",
-    "tags": ["go", "multistage", "optimization", "size"],
+    "tags": [
+      "build-stage",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "multistage",
+      "optimization",
+      "runtime-stage",
+      "size"
+    ],
     "description": "Multi-stage builds can reduce Go image size from ~1GB to ~10MB"
   },
   {
@@ -16,7 +25,15 @@
     "recommendation": "Copy go.mod and go.sum first, then download dependencies for better caching",
     "example": "COPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN go build",
     "severity": "medium",
-    "tags": ["go", "modules", "caching", "optimization"],
+    "tags": [
+      "caching",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "go-mod",
+      "modules",
+      "optimization"
+    ],
     "description": "Separate dependency download improves Docker layer caching"
   },
   {
@@ -26,7 +43,15 @@
     "recommendation": "Build statically linked Go binaries for scratch or distroless base images",
     "example": "RUN CGO_ENABLED=0 GOOS=linux go build -ldflags='-w -s -extldflags \"-static\"' -o app\nFROM scratch\nCOPY --from=build /app/app /app",
     "severity": "medium",
-    "tags": ["go", "static", "scratch", "minimal"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "google",
+      "minimal",
+      "scratch",
+      "static"
+    ],
     "description": "Static linking enables ultra-minimal container images"
   },
   {
@@ -36,7 +61,14 @@
     "recommendation": "Use scratch base image for Go applications with proper certificates and timezone",
     "example": "FROM scratch\nCOPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/\nCOPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo\nCOPY --from=build /app/app /app",
     "severity": "medium",
-    "tags": ["go", "scratch", "certificates", "timezone"],
+    "tags": [
+      "certificates",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "scratch",
+      "timezone"
+    ],
     "description": "Scratch images need certificates and timezone data for HTTPS and time operations"
   },
   {
@@ -46,7 +78,13 @@
     "recommendation": "Use Go build flags to optimize binary size and performance",
     "example": "RUN go build -ldflags='-w -s' -trimpath -o app",
     "severity": "low",
-    "tags": ["go", "build-flags", "optimization"],
+    "tags": [
+      "build-flags",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "optimization"
+    ],
     "description": "Build flags reduce binary size and remove debug information"
   },
   {
@@ -56,7 +94,14 @@
     "recommendation": "Add non-root user even in scratch images for better security",
     "example": "FROM alpine:latest as certs\nRUN adduser -D -s /bin/sh appuser\nFROM scratch\nCOPY --from=certs /etc/passwd /etc/passwd\nUSER appuser",
     "severity": "high",
-    "tags": ["go", "security", "user", "scratch"],
+    "tags": [
+      "fix-dockerfile",
+      "go",
+      "scan-image",
+      "scratch",
+      "security",
+      "user"
+    ],
     "description": "Non-root users improve security even in minimal images"
   },
   {
@@ -66,7 +111,13 @@
     "recommendation": "Add health check endpoint for Go web applications",
     "example": "HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\n  CMD /app --health-check || exit 1",
     "severity": "medium",
-    "tags": ["go", "health", "monitoring"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "health",
+      "monitoring"
+    ],
     "description": "Health checks enable better container orchestration"
   },
   {
@@ -76,7 +127,13 @@
     "recommendation": "Implement graceful shutdown handling in Go applications",
     "example": "# In Go code: use context cancellation and signal handling",
     "severity": "medium",
-    "tags": ["go", "graceful-shutdown", "signals"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "graceful-shutdown",
+      "signals"
+    ],
     "description": "Graceful shutdown prevents data loss and connection issues"
   },
   {
@@ -86,7 +143,14 @@
     "recommendation": "Consider using go mod vendor for reproducible builds in air-gapped environments",
     "example": "RUN go mod vendor\nRUN go build -mod=vendor -o app",
     "severity": "low",
-    "tags": ["go", "vendor", "reproducible"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "go-mod",
+      "reproducible",
+      "vendor"
+    ],
     "description": "Vendoring dependencies ensures reproducible builds"
   },
   {
@@ -96,7 +160,14 @@
     "recommendation": "Consider distroless base images for Go applications requiring libc",
     "example": "FROM gcr.io/distroless/static:nonroot\nCOPY --from=build /app/app /app",
     "severity": "low",
-    "tags": ["go", "distroless", "security"],
+    "tags": [
+      "distroless",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "google",
+      "security"
+    ],
     "description": "Distroless images provide minimal runtime without package manager"
   },
   {
@@ -106,7 +177,13 @@
     "recommendation": "Disable CGO for pure Go applications to enable static linking",
     "example": "RUN CGO_ENABLED=0 go build -o app",
     "severity": "medium",
-    "tags": ["go", "cgo", "static"],
+    "tags": [
+      "cgo",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "static"
+    ],
     "description": "Disabling CGO creates pure Go binaries that don't require libc"
   },
   {
@@ -116,7 +193,13 @@
     "recommendation": "Use Go cross-compilation for building Linux binaries on any platform",
     "example": "RUN GOOS=linux GOARCH=amd64 go build -o app",
     "severity": "low",
-    "tags": ["go", "cross-compile", "platform"],
+    "tags": [
+      "cross-compile",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "platform"
+    ],
     "description": "Cross-compilation enables building for target platform"
   },
   {
@@ -126,7 +209,13 @@
     "recommendation": "Use descriptive binary names and place in standard locations",
     "example": "RUN go build -o /usr/local/bin/myapp\nCMD [\"/usr/local/bin/myapp\"]",
     "severity": "low",
-    "tags": ["go", "naming", "paths"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "naming",
+      "paths"
+    ],
     "description": "Consistent binary naming and paths improve maintainability"
   },
   {
@@ -136,7 +225,13 @@
     "recommendation": "Set Gin to release mode for production deployments",
     "example": "ENV GIN_MODE=release",
     "severity": "medium",
-    "tags": ["go", "gin", "production"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "gin",
+      "go",
+      "production"
+    ],
     "description": "Release mode disables debug logging and improves performance"
   },
   {
@@ -146,7 +241,13 @@
     "recommendation": "Configure Fiber for production with appropriate settings",
     "example": "# In Go code: configure Fiber with production settings",
     "severity": "low",
-    "tags": ["go", "fiber", "production"],
+    "tags": [
+      "fiber",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "production"
+    ],
     "description": "Fiber production configuration improves performance and security"
   },
   {
@@ -156,7 +257,14 @@
     "recommendation": "Add Prometheus metrics endpoint for Go applications observability",
     "example": "EXPOSE 8080 9090\n# Serve metrics on :9090/metrics",
     "severity": "low",
-    "tags": ["go", "prometheus", "metrics", "observability"],
+    "tags": [
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "go",
+      "metrics",
+      "observability",
+      "prometheus"
+    ],
     "description": "Metrics enable better monitoring and observability"
   }
 ]

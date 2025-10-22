@@ -28,6 +28,14 @@ import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledg
 import type { z } from 'zod';
 import yaml from 'js-yaml';
 import { extractErrorMessage } from '@/lib/errors';
+import type { RegoEvaluator } from '@/config/policy-rego';
+import type { Logger } from 'pino';
+import { getToolLogger } from '@/lib/tool-helpers';
+import {
+  validateContentAgainstPolicy,
+  type PolicyViolation,
+  type PolicyValidationResult,
+} from '@/lib/policy-helpers';
 
 const name = 'generate-k8s-manifests';
 const description =
@@ -41,6 +49,22 @@ const MANIFEST_TYPE_TO_TOPIC = {
   aca: TOPICS.KUBERNETES,
   kustomize: TOPICS.KUBERNETES,
 } as const;
+
+/**
+ * Default resource limits for policy validation pseudo-manifests
+ *
+ * These values are used when converting ManifestPlan to YAML for policy validation.
+ * They represent reasonable defaults for a typical microservice application:
+ * - CPU: 500m (0.5 cores) - Sufficient for most API services under moderate load
+ * - Memory: 512Mi - Adequate for typical application runtime and data structures
+ *
+ * These are NOT production recommendations - actual resource limits should be
+ * determined through profiling and load testing. These values are only used
+ * to ensure policy rules that check for resource limit presence can evaluate
+ * the pseudo-manifest structure.
+ */
+const DEFAULT_POLICY_VALIDATION_CPU_LIMIT = '500m';
+const DEFAULT_POLICY_VALIDATION_MEMORY_LIMIT = '512Mi';
 
 /**
  * Parse ACA manifest from YAML or JSON string
@@ -109,6 +133,99 @@ function analyzeAcaManifest(acaManifest: Record<string, unknown>): {
   }
 
   return { containerApps, warnings };
+}
+
+/**
+ * Convert ManifestPlan to pseudo-YAML text for policy validation
+ * This allows policy rules to match against the planned manifest structure
+ */
+function planToManifestText(plan: ManifestPlan, manifestType: string): string {
+  const lines: string[] = [];
+
+  // Extract security and resource management recommendations
+  const securityReqs = plan.recommendations.securityConsiderations || [];
+  const resourceReqs = plan.recommendations.resourceManagement || [];
+
+  if (manifestType === 'kubernetes') {
+    lines.push('apiVersion: apps/v1');
+    lines.push('kind: Deployment');
+    lines.push('metadata:');
+    lines.push(`  name: ${plan.repositoryInfo?.name || 'app'}`);
+    lines.push('spec:');
+    lines.push('  template:');
+    lines.push('    spec:');
+
+    // Check for privileged mode recommendation
+    const hasPrivileged = securityReqs.some((r) =>
+      r.recommendation.toLowerCase().includes('privileged'),
+    );
+    if (hasPrivileged) {
+      lines.push('      containers:');
+      lines.push('      - securityContext:');
+      lines.push('          privileged: true');
+    }
+
+    // Check for host network
+    const hasHostNetwork = securityReqs.some(
+      (r) =>
+        r.recommendation.toLowerCase().includes('hostnetwork') ||
+        r.recommendation.toLowerCase().includes('host network'),
+    );
+    if (hasHostNetwork) {
+      lines.push('      hostNetwork: true');
+    }
+
+    // Check for non-root user
+    const hasNonRootUser = securityReqs.some(
+      (r) =>
+        r.recommendation.toLowerCase().includes('non-root') ||
+        r.recommendation.toLowerCase().includes('runasnonroot'),
+    );
+    if (hasNonRootUser) {
+      lines.push('      securityContext:');
+      lines.push('        runAsNonRoot: true');
+    }
+
+    // Check for resource limits
+    const hasResourceLimits = resourceReqs.some(
+      (r) =>
+        r.recommendation.toLowerCase().includes('resource') &&
+        r.recommendation.toLowerCase().includes('limit'),
+    );
+    if (hasResourceLimits) {
+      lines.push('      containers:');
+      lines.push('      - resources:');
+      lines.push('          limits:');
+      lines.push(`            cpu: ${DEFAULT_POLICY_VALIDATION_CPU_LIMIT}`);
+      lines.push(`            memory: ${DEFAULT_POLICY_VALIDATION_MEMORY_LIMIT}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Validate ManifestPlan against Rego policies
+ * Uses shared validateContentAgainstPolicy utility
+ */
+async function validatePlanAgainstPolicy(
+  plan: ManifestPlan,
+  manifestType: string,
+  policyEvaluator: RegoEvaluator,
+  logger: Logger,
+): Promise<PolicyValidationResult> {
+  // Convert plan to manifest text for policy validation
+  const manifestText = planToManifestText(plan, manifestType);
+
+  logger.debug({ manifestText }, 'Generated manifest text from plan for policy validation');
+
+  // Use shared validation utility
+  return validateContentAgainstPolicy(
+    manifestText,
+    policyEvaluator,
+    logger,
+    'manifest plan',
+  );
 }
 
 // Define category types for better type safety
@@ -337,6 +454,8 @@ async function handleGenerateK8sManifests(
   input: z.infer<typeof generateK8sManifestsSchema>,
   ctx: ToolContext,
 ): Promise<Result<ManifestPlan>> {
+  const logger = getToolLogger(ctx, name);
+
   // If acaManifest is provided, validate it can be parsed
   if (input.acaManifest) {
     try {
@@ -345,12 +464,56 @@ async function handleGenerateK8sManifests(
       return Failure(`Invalid ACA manifest: ${extractErrorMessage(error)}`, {
         message: `Invalid ACA manifest: ${extractErrorMessage(error)}`,
         hint: 'The provided Azure Container Apps manifest could not be parsed',
-        resolution: 'Ensure the acaManifest parameter contains valid YAML or JSON content representing an ACA manifest',
+        resolution:
+          'Ensure the acaManifest parameter contains valid YAML or JSON content representing an ACA manifest',
       });
     }
   }
 
-  return runPattern(input, ctx);
+  // Run the knowledge-based plan generation
+  const result = await runPattern(input, ctx);
+
+  if (!result.ok) return result;
+
+  const plan = result.value;
+
+  // Validate against policy if available
+  if (ctx.policy) {
+    const policyValidation = await validatePlanAgainstPolicy(
+      plan,
+      input.manifestType,
+      ctx.policy,
+      logger,
+    );
+
+    plan.policyValidation = policyValidation;
+
+    // Block if there are violations
+    if (!policyValidation.passed) {
+      const violationMessages = policyValidation.violations
+        .map((v: PolicyViolation) => `  - ${v.ruleId}: ${v.message}`)
+        .join('\n');
+
+      return Failure(
+        `Generated manifest plan violates organizational policies:\n${violationMessages}`,
+        {
+          message: 'Policy violations detected in manifest plan',
+          hint: `${policyValidation.violations.length} blocking policy rule(s) failed`,
+          resolution: 'Adjust recommendations or update policy configuration',
+        },
+      );
+    }
+
+    // Log warnings/suggestions even if plan passes
+    if (policyValidation.warnings.length > 0) {
+      logger.warn(
+        { warnings: policyValidation.warnings.map((w: PolicyViolation) => w.ruleId) },
+        'Policy warnings in manifest plan',
+      );
+    }
+  }
+
+  return result;
 }
 
 import { tool } from '@/types/tool';
@@ -366,8 +529,9 @@ export default tool({
   },
   chainHints: {
     success:
-      'Kubernetes manifests generated successfully. Next: Call prepare-cluster to create a kind cluster to deploy to.',
-    failure: 'Manifest generation failed. Ensure you have a valid image and try again.',
+      'Manifest plan generated successfully and passed policy validation. Next: Call prepare-cluster to create a kind cluster to deploy to.',
+    failure:
+      'Manifest generation failed or plan violates policies. Review manifest requirements and policy violations.',
   },
   handler: handleGenerateK8sManifests,
 });

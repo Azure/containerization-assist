@@ -6,7 +6,14 @@
     "recommendation": "Configure Entity Framework Core with connection pooling for container environments",
     "example": "// In Program.cs\nbuilder.Services.AddDbContextPool<AppDbContext>(options =>\n    options.UseSqlServer(connectionString, sqlOptions =>\n    {\n        sqlOptions.EnableRetryOnFailure(\n            maxRetryCount: 3,\n            maxRetryDelay: TimeSpan.FromSeconds(5),\n            errorNumbersToAdd: null);\n        sqlOptions.CommandTimeout(30);\n    }), poolSize: 128);",
     "severity": "high",
-    "tags": ["ef-core", "connection-pooling", "performance", "scalability"],
+    "tags": [
+      "connection-pooling",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "scalability"
+    ],
     "description": "Connection pooling is essential for high-performance containerized applications"
   },
   {
@@ -16,7 +23,15 @@
     "recommendation": "Handle Entity Framework migrations properly in container deployments",
     "example": "// Migration patterns for containers\nFROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY . .\nRUN dotnet ef migrations bundle --configuration Release --output /app/migrate\n\nFROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY --from=build /app/migrate ./\nCOPY --from=build /app/publish .\n# Run migrations in init container or startup",
     "severity": "high",
-    "tags": ["ef-core", "migrations", "deployment", "database"],
+    "tags": [
+      "database",
+      "deployment",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microsoft",
+      "migrations"
+    ],
     "description": "Database migrations must be handled carefully in container orchestration"
   },
   {
@@ -26,7 +41,14 @@
     "recommendation": "Add Entity Framework health checks for container monitoring",
     "example": "// In Program.cs\nbuilder.Services.AddHealthChecks()\n    .AddDbContextCheck<AppDbContext>(\"database\", failureStatus: HealthStatus.Degraded)\n    .AddSqlServer(connectionString, \"SELECT 1\", \"sql-server\");\n\napp.MapHealthChecks(\"/health/ready\", new HealthCheckOptions\n{\n    Predicate = check => check.Tags.Contains(\"ready\")\n});\napp.MapHealthChecks(\"/health/live\", new HealthCheckOptions\n{\n    Predicate = _ => false\n});",
     "severity": "high",
-    "tags": ["ef-core", "health-checks", "monitoring", "database"],
+    "tags": [
+      "database",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "health-checks",
+      "monitoring"
+    ],
     "description": "Database health checks are critical for container orchestration"
   },
   {
@@ -36,7 +58,14 @@
     "recommendation": "Configure Entity Framework for multi-tenant containerized applications",
     "example": "// Multi-tenant DbContext configuration\nbuilder.Services.AddDbContext<TenantDbContext>((serviceProvider, options) =>\n{\n    var tenantService = serviceProvider.GetRequiredService<ITenantService>();\n    var connectionString = tenantService.GetConnectionString();\n    options.UseSqlServer(connectionString);\n});\n\n// Tenant isolation middleware\napp.UseMiddleware<TenantResolutionMiddleware>();",
     "severity": "medium",
-    "tags": ["ef-core", "multi-tenant", "isolation", "architecture"],
+    "tags": [
+      "architecture",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "isolation",
+      "multi-tenant"
+    ],
     "description": "Multi-tenancy requires careful connection string and context management"
   },
   {
@@ -46,7 +75,14 @@
     "recommendation": "Implement read/write database separation with Entity Framework Core",
     "example": "// Read/Write separation\nbuilder.Services.AddDbContext<WriteDbContext>(options =>\n    options.UseSqlServer(writeConnectionString));\n    \nbuilder.Services.AddDbContext<ReadDbContext>(options =>\n    options.UseSqlServer(readConnectionString)\n           .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));\n\n// Repository pattern\nbuilder.Services.AddScoped<IReadRepository, ReadRepository>();\nbuilder.Services.AddScoped<IWriteRepository, WriteRepository>();",
     "severity": "medium",
-    "tags": ["ef-core", "cqrs", "read-replica", "performance"],
+    "tags": [
+      "cqrs",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "read-replica"
+    ],
     "description": "Read/write separation improves scalability in containerized environments"
   },
   {
@@ -56,7 +92,14 @@
     "recommendation": "Externalize Entity Framework configuration for container flexibility",
     "example": "// Environment-based configuration\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n{\n    var connectionString = builder.Configuration.GetConnectionString(\"DefaultConnection\");\n    var provider = builder.Configuration.GetValue<string>(\"DatabaseProvider\", \"SqlServer\");\n    \n    switch (provider.ToLower())\n    {\n        case \"postgresql\":\n            options.UseNpgsql(connectionString);\n            break;\n        case \"mysql\":\n            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));\n            break;\n        default:\n            options.UseSqlServer(connectionString);\n            break;\n    }\n});",
     "severity": "medium",
-    "tags": ["ef-core", "configuration", "multi-provider", "flexibility"],
+    "tags": [
+      "configuration",
+      "ef-core",
+      "fix-dockerfile",
+      "flexibility",
+      "generate-dockerfile",
+      "multi-provider"
+    ],
     "description": "Database provider flexibility enables deployment across different environments"
   },
   {
@@ -66,7 +109,14 @@
     "recommendation": "Use Entity Framework interceptors for monitoring and logging in containers",
     "example": "// Custom interceptor for monitoring\npublic class PerformanceInterceptor : DbCommandInterceptor\n{\n    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(\n        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,\n        CancellationToken cancellationToken = default)\n    {\n        var stopwatch = Stopwatch.StartNew();\n        eventData.Context.ChangeTracker.Tracked += (s, e) => stopwatch.Stop();\n        return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);\n    }\n}\n\n// Registration\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(connectionString)\n           .AddInterceptors(new PerformanceInterceptor()));",
     "severity": "low",
-    "tags": ["ef-core", "interceptors", "monitoring", "performance"],
+    "tags": [
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "interceptors",
+      "monitoring",
+      "performance"
+    ],
     "description": "Interceptors provide insights into database performance in production containers"
   },
   {
@@ -76,7 +126,14 @@
     "recommendation": "Optimize Entity Framework memory usage for long-running container services",
     "example": "// Memory optimization strategies\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(connectionString)\n           .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking) // For read-only\n           .EnableSensitiveDataLogging(false) // Production\n           .EnableDetailedErrors(false) // Production\n           .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.RowLimitingOperationWithoutOrderByWarning)));\n\n// Explicit context disposal in long-running services\nusing var scope = serviceProvider.CreateScope();\nvar context = scope.ServiceProvider.GetRequiredService<AppDbContext>();",
     "severity": "medium",
-    "tags": ["ef-core", "memory", "optimization", "performance"],
+    "tags": [
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "memory",
+      "optimization",
+      "performance"
+    ],
     "description": "Memory optimization prevents leaks in long-running containerized applications"
   },
   {
@@ -86,7 +143,14 @@
     "recommendation": "Use bulk operations for high-throughput Entity Framework scenarios",
     "example": "// Bulk operations for performance\npublic async Task BulkInsertAsync<T>(IEnumerable<T> entities) where T : class\n{\n    const int batchSize = 1000;\n    var entityList = entities.ToList();\n    \n    for (int i = 0; i < entityList.Count; i += batchSize)\n    {\n        var batch = entityList.Skip(i).Take(batchSize);\n        await _context.Set<T>().AddRangeAsync(batch);\n        await _context.SaveChangesAsync();\n        _context.ChangeTracker.Clear(); // Prevent memory buildup\n    }\n}\n\n// Consider EFCore.BulkExtensions for even better performance\n// await context.BulkInsertAsync(entities);",
     "severity": "medium",
-    "tags": ["ef-core", "bulk-operations", "performance", "throughput"],
+    "tags": [
+      "bulk-operations",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "performance",
+      "throughput"
+    ],
     "description": "Bulk operations are essential for high-throughput containerized applications"
   },
   {
@@ -96,7 +160,14 @@
     "recommendation": "Implement distributed caching for Entity Framework in container clusters",
     "example": "// Distributed caching setup\nbuilder.Services.AddStackExchangeRedisCache(options =>\n{\n    options.Configuration = builder.Configuration.GetConnectionString(\"Redis\");\n    options.InstanceName = \"MyApp\";\n});\n\n// EF Core caching (requires EFCoreSecondLevelCacheInterceptor)\nbuilder.Services.AddEFSecondLevelCache(options =>\n    options.UseRedisCache(builder.Configuration.GetConnectionString(\"Redis\"))\n           .ConfigureLogging(true));\n\nbuilder.Services.AddDbContext<AppDbContext>(options =>\n    options.UseSqlServer(connectionString)\n           .AddInterceptors(serviceProvider.GetRequiredService<SecondLevelCacheInterceptor>()));",
     "severity": "medium",
-    "tags": ["ef-core", "caching", "redis", "distributed"],
+    "tags": [
+      "caching",
+      "distributed",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "redis"
+    ],
     "description": "Distributed caching improves performance across multiple container instances"
   },
   {
@@ -106,7 +177,14 @@
     "recommendation": "Configure Entity Framework for database sharding in microservice containers",
     "example": "// Sharding strategy\npublic class ShardedDbContextFactory : IDbContextFactory<ShardedDbContext>\n{\n    private readonly IConfiguration _configuration;\n    private readonly IShardResolver _shardResolver;\n    \n    public ShardedDbContext CreateDbContext(string shardKey)\n    {\n        var connectionString = _shardResolver.GetConnectionString(shardKey);\n        var optionsBuilder = new DbContextOptionsBuilder<ShardedDbContext>();\n        optionsBuilder.UseSqlServer(connectionString);\n        return new ShardedDbContext(optionsBuilder.Options);\n    }\n}\n\n// Registration\nbuilder.Services.AddSingleton<IDbContextFactory<ShardedDbContext>, ShardedDbContextFactory>();",
     "severity": "low",
-    "tags": ["ef-core", "sharding", "microservices", "scalability"],
+    "tags": [
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "microservices",
+      "scalability",
+      "sharding"
+    ],
     "description": "Database sharding enables horizontal scaling in containerized microservices"
   },
   {
@@ -116,7 +194,14 @@
     "recommendation": "Implement audit logging for Entity Framework in containerized applications",
     "example": "// Audit logging implementation\npublic class AuditableDbContext : DbContext\n{\n    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)\n    {\n        var auditEntries = new List<AuditEntry>();\n        \n        foreach (var entry in ChangeTracker.Entries())\n        {\n            if (entry.Entity is IAuditable auditable && entry.State != EntityState.Unchanged)\n            {\n                auditable.ModifiedAt = DateTime.UtcNow;\n                auditable.ModifiedBy = _currentUserService.UserId;\n                \n                auditEntries.Add(new AuditEntry\n                {\n                    EntityType = entry.Entity.GetType().Name,\n                    Action = entry.State.ToString(),\n                    Timestamp = DateTime.UtcNow,\n                    Changes = GetChanges(entry)\n                });\n            }\n        }\n        \n        var result = await base.SaveChangesAsync(cancellationToken);\n        await LogAuditAsync(auditEntries);\n        return result;\n    }\n}",
     "severity": "medium",
-    "tags": ["ef-core", "audit", "logging", "compliance"],
+    "tags": [
+      "audit",
+      "compliance",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "logging"
+    ],
     "description": "Audit logging provides traceability and compliance in containerized applications"
   },
   {
@@ -126,7 +211,14 @@
     "recommendation": "Handle distributed transactions carefully in Entity Framework containers",
     "example": "// Distributed transaction handling\npublic class TransactionalService\n{\n    private readonly AppDbContext _context;\n    private readonly IMessageBus _messageBus;\n    \n    public async Task ProcessWithSagaAsync(Order order)\n    {\n        using var transaction = await _context.Database.BeginTransactionAsync();\n        try\n        {\n            // Update local database\n            _context.Orders.Add(order);\n            await _context.SaveChangesAsync();\n            \n            // Publish event for saga orchestration\n            await _messageBus.PublishAsync(new OrderCreatedEvent(order.Id));\n            \n            await transaction.CommitAsync();\n        }\n        catch\n        {\n            await transaction.RollbackAsync();\n            throw;\n        }\n    }\n}",
     "severity": "medium",
-    "tags": ["ef-core", "transactions", "distributed", "saga"],
+    "tags": [
+      "distributed",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "saga",
+      "transactions"
+    ],
     "description": "Distributed transactions require careful handling in microservice containers"
   },
   {
@@ -136,7 +228,14 @@
     "recommendation": "Configure Entity Framework Core temporal tables for audit and history",
     "example": "// Temporal table configuration\npublic class AppDbContext : DbContext\n{\n    protected override void OnModelCreating(ModelBuilder modelBuilder)\n    {\n        modelBuilder.Entity<Product>(entity =>\n        {\n            entity.ToTable(\"Products\", tb => tb.IsTemporal(ttb =>\n            {\n                ttb.HasPeriodStart(\"ValidFrom\");\n                ttb.HasPeriodEnd(\"ValidTo\");\n                ttb.UseHistoryTable(\"ProductHistory\");\n            }));\n        });\n    }\n}\n\n// Querying temporal data\nvar productHistory = await context.Products\n    .TemporalAll()\n    .Where(p => p.Id == productId)\n    .OrderBy(p => EF.Property<DateTime>(p, \"ValidFrom\"))\n    .ToListAsync();",
     "severity": "low",
-    "tags": ["ef-core", "temporal-tables", "audit", "history"],
+    "tags": [
+      "audit",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "history",
+      "temporal-tables"
+    ],
     "description": "Temporal tables provide built-in audit trails for containerized applications"
   },
   {
@@ -146,7 +245,14 @@
     "recommendation": "Configure Entity Framework Core for Azure Cosmos DB in containers",
     "example": "// Cosmos DB configuration\nbuilder.Services.AddDbContext<CosmosDbContext>(options =>\n    options.UseCosmos(\n        accountEndpoint: builder.Configuration[\"CosmosDb:AccountEndpoint\"],\n        accountKey: builder.Configuration[\"CosmosDb:AccountKey\"],\n        databaseName: builder.Configuration[\"CosmosDb:DatabaseName\"])\n    .EnableSensitiveDataLogging(builder.Environment.IsDevelopment()));\n\n// Container configuration\nprotected override void OnModelCreating(ModelBuilder modelBuilder)\n{\n    modelBuilder.Entity<Product>()\n        .ToContainer(\"Products\")\n        .HasPartitionKey(p => p.Category)\n        .HasKey(p => p.Id);\n}",
     "severity": "medium",
-    "tags": ["ef-core", "cosmos-db", "nosql", "azure"],
+    "tags": [
+      "azure",
+      "cosmos-db",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "nosql"
+    ],
     "description": "Cosmos DB integration enables globally distributed containerized applications"
   },
   {
@@ -156,7 +262,14 @@
     "recommendation": "Use Entity Framework value converters for complex type mapping in containers",
     "example": "// Value converter for JSON serialization\npublic class JsonValueConverter<T> : ValueConverter<T, string>\n{\n    public JsonValueConverter() : base(\n        value => JsonSerializer.Serialize(value, (JsonSerializerOptions)null),\n        json => JsonSerializer.Deserialize<T>(json, (JsonSerializerOptions)null))\n    {\n    }\n}\n\n// Configuration\nprotected override void OnModelCreating(ModelBuilder modelBuilder)\n{\n    modelBuilder.Entity<Order>()\n        .Property(e => e.Metadata)\n        .HasConversion(new JsonValueConverter<Dictionary<string, object>>());\n        \n    modelBuilder.Entity<User>()\n        .Property(e => e.Preferences)\n        .HasConversion(\n            preferences => JsonSerializer.Serialize(preferences),\n            json => JsonSerializer.Deserialize<UserPreferences>(json));\n}",
     "severity": "low",
-    "tags": ["ef-core", "value-converters", "json", "serialization"],
+    "tags": [
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "json",
+      "serialization",
+      "value-converters"
+    ],
     "description": "Value converters enable complex type storage in relational databases"
   },
   {
@@ -166,7 +279,14 @@
     "recommendation": "Use global query filters for security and multi-tenancy in containers",
     "example": "// Global query filters\nprotected override void OnModelCreating(ModelBuilder modelBuilder)\n{\n    // Soft delete filter\n    modelBuilder.Entity<BaseEntity>()\n        .HasQueryFilter(e => !e.IsDeleted);\n    \n    // Multi-tenant filter\n    modelBuilder.Entity<TenantEntity>()\n        .HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);\n    \n    // Security filter\n    modelBuilder.Entity<SecureEntity>()\n        .HasQueryFilter(e => e.UserId == _currentUserService.UserId || _currentUserService.IsAdmin);\n}\n\n// Bypassing filters when needed\nvar allEntities = await context.MyEntities\n    .IgnoreQueryFilters()\n    .ToListAsync();",
     "severity": "medium",
-    "tags": ["ef-core", "query-filters", "security", "multi-tenant"],
+    "tags": [
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "multi-tenant",
+      "query-filters",
+      "security"
+    ],
     "description": "Global query filters provide automatic security and data isolation"
   },
   {
@@ -176,7 +296,14 @@
     "recommendation": "Use owned entities for complex value objects in containerized applications",
     "example": "// Owned entity configuration\nprotected override void OnModelCreating(ModelBuilder modelBuilder)\n{\n    modelBuilder.Entity<Customer>()\n        .OwnsOne(c => c.Address, address =>\n        {\n            address.Property(a => a.Street).HasColumnName(\"Street\");\n            address.Property(a => a.City).HasColumnName(\"City\");\n            address.Property(a => a.Country).HasColumnName(\"Country\");\n        });\n    \n    modelBuilder.Entity<Order>()\n        .OwnsMany(o => o.LineItems, lineItem =>\n        {\n            lineItem.WithOwner().HasForeignKey(\"OrderId\");\n            lineItem.Property(li => li.ProductId);\n            lineItem.Property(li => li.Quantity);\n            lineItem.Property(li => li.Price).HasColumnType(\"decimal(18,2)\");\n        });\n}\n\n// Usage\npublic class Customer\n{\n    public int Id { get; set; }\n    public string Name { get; set; }\n    public Address Address { get; set; } // Owned entity\n}",
     "severity": "low",
-    "tags": ["ef-core", "owned-entities", "value-objects", "ddd"],
+    "tags": [
+      "ddd",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "owned-entities",
+      "value-objects"
+    ],
     "description": "Owned entities support domain-driven design patterns in containerized applications"
   },
   {
@@ -186,7 +313,14 @@
     "recommendation": "Implement database seeding strategies for containerized Entity Framework applications",
     "example": "// Database seeding in containers\npublic static class DatabaseSeeder\n{\n    public static async Task SeedAsync(AppDbContext context, ILogger logger)\n    {\n        try\n        {\n            if (!await context.Database.CanConnectAsync())\n            {\n                logger.LogError(\"Cannot connect to database\");\n                return;\n            }\n            \n            // Apply pending migrations\n            if ((await context.Database.GetPendingMigrationsAsync()).Any())\n            {\n                logger.LogInformation(\"Applying pending migrations\");\n                await context.Database.MigrateAsync();\n            }\n            \n            // Seed data if needed\n            if (!await context.Users.AnyAsync())\n            {\n                logger.LogInformation(\"Seeding initial data\");\n                await SeedInitialDataAsync(context);\n            }\n        }\n        catch (Exception ex)\n        {\n            logger.LogError(ex, \"Database seeding failed\");\n            throw;\n        }\n    }\n}\n\n// In Program.cs\nusing var scope = app.Services.CreateScope();\nvar context = scope.ServiceProvider.GetRequiredService<AppDbContext>();\nvar logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();\nawait DatabaseSeeder.SeedAsync(context, logger);",
     "severity": "medium",
-    "tags": ["ef-core", "seeding", "migrations", "initialization"],
+    "tags": [
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "initialization",
+      "migrations",
+      "seeding"
+    ],
     "description": "Proper database seeding ensures consistent state across container deployments"
   },
   {
@@ -196,7 +330,14 @@
     "recommendation": "Use compiled queries for high-performance Entity Framework scenarios",
     "example": "// Compiled queries for performance\npublic static class CompiledQueries\n{\n    public static readonly Func<AppDbContext, int, Task<User>> GetUserById =\n        EF.CompileAsyncQuery((AppDbContext context, int id) =>\n            context.Users.FirstOrDefault(u => u.Id == id));\n    \n    public static readonly Func<AppDbContext, string, IAsyncEnumerable<Product>> GetProductsByCategory =\n        EF.CompileAsyncQuery((AppDbContext context, string category) =>\n            context.Products.Where(p => p.Category == category));\n    \n    public static readonly Func<AppDbContext, DateTime, DateTime, Task<int>> GetOrderCountInRange =\n        EF.CompileAsyncQuery((AppDbContext context, DateTime start, DateTime end) =>\n            context.Orders.Count(o => o.CreatedAt >= start && o.CreatedAt <= end));\n}\n\n// Usage\nvar user = await CompiledQueries.GetUserById(context, userId);\nvar products = CompiledQueries.GetProductsByCategory(context, \"Electronics\");",
     "severity": "low",
-    "tags": ["ef-core", "compiled-queries", "performance", "optimization"],
+    "tags": [
+      "compiled-queries",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "performance"
+    ],
     "description": "Compiled queries provide maximum performance for frequently executed queries"
   },
   {
@@ -206,7 +347,14 @@
     "recommendation": "Optimize Entity Framework change tracking for container performance",
     "example": "// Change tracking optimization\npublic class OptimizedDbContext : DbContext\n{\n    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)\n    {\n        // Disable automatic change detection for bulk operations\n        ChangeTracker.AutoDetectChangesEnabled = false;\n        ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;\n    }\n    \n    public async Task BulkUpdateAsync<T>(IEnumerable<T> entities) where T : class\n    {\n        try\n        {\n            ChangeTracker.AutoDetectChangesEnabled = false;\n            \n            foreach (var entity in entities)\n            {\n                Entry(entity).State = EntityState.Modified;\n            }\n            \n            await SaveChangesAsync();\n        }\n        finally\n        {\n            ChangeTracker.AutoDetectChangesEnabled = true;\n        }\n    }\n}\n\n// For read-only scenarios\nvar products = await context.Products\n    .AsNoTracking()\n    .Where(p => p.IsActive)\n    .ToListAsync();",
     "severity": "medium",
-    "tags": ["ef-core", "change-tracking", "performance", "optimization"],
+    "tags": [
+      "change-tracking",
+      "ef-core",
+      "fix-dockerfile",
+      "generate-dockerfile",
+      "optimization",
+      "performance"
+    ],
     "description": "Change tracking optimization reduces memory usage and improves performance"
   }
 ]

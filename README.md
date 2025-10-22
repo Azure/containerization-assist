@@ -214,7 +214,7 @@ The following environment variables control server behavior:
 | `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
 | `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
-| `CONTAINERIZATION_ASSIST_POLICY_PATH` | Path to policy YAML file (overridden by --config flag) | Auto-discover all policies/ | No |
+| `CONTAINERIZATION_ASSIST_POLICY_PATH` | Path to your custom Rego policy file (overridden by --config flag) | Not set (policies disabled) | No |
 
 **Progress Notifications:**
 Long-running operations (build, deploy, scan-image) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
