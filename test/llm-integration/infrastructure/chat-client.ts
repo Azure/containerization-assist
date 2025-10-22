@@ -6,7 +6,7 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { generateText, tool, Experimental_Agent as Agent, stepCountIs } from 'ai';
-import { createAzure } from '@ai-sdk/azure';
+import { AzureOpenAIProvider, createAzure } from '@ai-sdk/azure';
 import { z } from 'zod';
 import type {
   LLMClient,
@@ -20,7 +20,7 @@ import type {
 
 export class ChatClient implements LLMClient {
   readonly model: string;
-  private readonly provider: any;
+  private readonly provider: AzureOpenAIProvider;
 
   constructor() {
     // Get Azure configuration from environment variables, validated to fail fast

@@ -167,7 +167,7 @@ export class MCPTestHarness {
       // Debug: Log what the tool expects vs what we're sending
       console.log(`🔍 DEBUG: Validating arguments for ${toolCall.name}`);
       try {
-        const parsed = tool.parse(toolCall.arguments);
+        const parsed = tool.zodSchema.parse(toolCall.arguments);
         console.log(`✅ Arguments are valid:`, JSON.stringify(parsed, null, 2));
       } catch (error) {
         console.log(`❌ Argument validation failed:`, error instanceof Error ? error.message : String(error));

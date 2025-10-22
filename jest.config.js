@@ -186,7 +186,7 @@ export default {
     '/node_modules/',
     '/dist/',
     'test/unit/lib/kubernetes.test.ts',
-    // ES module issues resolved - integration tests enabled
+    'test/llm-integration/**/*.test.ts', // Exclude LLM integration tests from default runs
   ],
 
   // Timeout handling for different test types
