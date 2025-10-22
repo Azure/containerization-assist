@@ -25,12 +25,19 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { opsToolSchema } from './schema';
 import type { z } from 'zod';
+import { formatDuration, formatTimestamp } from '@/lib/summary-helpers';
 
 interface PingConfig {
   message?: string;
 }
 
 interface PingResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the ping result.
+   * @example "✅ Server is responsive. Ping successful at 2025-01-15T10:30:00Z."
+   */
+  summary?: string;
   success: boolean;
   message: string;
   timestamp: string;
@@ -58,10 +65,14 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
 
     logger.info({ message }, 'Processing ping request');
 
+    const timestamp = new Date().toISOString();
+    const summary = `✅ Server is responsive. Ping successful at ${formatTimestamp(timestamp)}.`;
+
     const result: PingResult = {
+      summary,
       success: true,
       message: `pong: ${message}`,
-      timestamp: new Date().toISOString(),
+      timestamp,
       server: {
         name: 'containerization-assist-mcp',
         version: '2.0.0',
@@ -92,6 +103,12 @@ interface ServerStatusConfig {
 }
 
 interface ServerStatusResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the server status.
+   * @example "✅ Server healthy. Running for 2h 15m. Memory: 45% used, CPU: 4 cores."
+   */
+  summary?: string;
   success: boolean;
   version: string;
   uptime: number;
@@ -145,7 +162,12 @@ export async function serverStatus(
 
     const migratedToolCount = 12;
 
+    // Generate summary
+    const uptimeStr = formatDuration(uptime);
+    const summary = `✅ Server healthy. Running for ${uptimeStr}. Memory: ${memPercentage}% used, CPU: ${cpus.length} cores.`;
+
     const status: ServerStatusResult = {
+      summary,
       success: true,
       version,
       uptime,

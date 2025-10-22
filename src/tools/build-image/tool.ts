@@ -23,8 +23,15 @@ import { readDockerfile } from '@/lib/file-utils';
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
 import { type BuildImageParams, buildImageSchema } from './schema';
+import { formatSize, formatDuration } from '@/lib/summary-helpers';
 
 export interface BuildImageResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the build outcome, image details, and next steps.
+   * @example "✅ Built image successfully. Image: myapp:latest (245MB). Build completed in 45s."
+   */
+  summary?: string;
   /** Whether the build completed successfully */
   success: boolean;
   /** Generated Docker image ID (SHA256 hash) */
@@ -207,7 +214,18 @@ async function handleBuildImage(
     // Prepare the result using strongly typed values from the Docker client response.
     // All result fields are sourced directly from the Docker client, ensuring type safety and consistency.
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
+
+    // Generate summary
+    const imageTag = finalTags[0] || buildResult.value.imageId;
+    const sizeText = buildResult.value.size ? ` (${formatSize(buildResult.value.size)})` : '';
+    const timeText = buildResult.value.buildTime
+      ? ` Build completed in ${formatDuration(Math.round(buildResult.value.buildTime / 1000))}.`
+      : '';
+
+    const summary = `✅ Built image successfully. Image: ${imageTag}${sizeText}.${timeText}`;
+
     const result: BuildImageResult = {
+      summary,
       success: true,
       imageId: buildResult.value.imageId,
       tags: finalTags,

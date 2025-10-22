@@ -7,6 +7,7 @@ import { tool } from '@/types/tool';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { validatePathOrFail } from '@/lib/validation-helpers';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
+import { pluralize } from '@/lib/summary-helpers';
 import {
   parsePackageJson,
   parseGradle,
@@ -237,7 +238,16 @@ async function handleAnalyzeRepo(
 
     logger.info({ moduleCount: modules.length, isMonorepo }, 'Repository analysis complete');
 
+    // Generate summary
+    const modulesText =
+      modules.length === 1
+        ? `${modules[0]?.language || 'unknown'} project`
+        : `${pluralize(modules.length, 'module')} (${modules.map((m) => m.language).join(', ')})`;
+
+    const summary = `✅ Analyzed repository at ${repoPath}. Detected ${modulesText}.${isMonorepo ? ' Monorepo structure identified.' : ''} Ready for Dockerfile generation.`;
+
     return Success({
+      summary,
       modules,
       isMonorepo,
       analyzedPath: repoPath,

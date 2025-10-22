@@ -18,6 +18,12 @@ import type { z } from 'zod';
 import { createErrorGuidance } from '@/lib/errors';
 
 export interface PushImageResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the push result.
+   * @example "✅ Pushed image to registry. Image: docker.io/myapp:v1.0.0. Digest: sha256:abc123..."
+   */
+  summary?: string;
   success: true;
   registry: string;
   digest: string;
@@ -153,10 +159,16 @@ async function handlePushImage(
       'Image pushed successfully',
     );
 
+    // Generate summary
+    const registryName = input.registry ?? 'docker.io';
+    const digestShort = pushResult.value.digest.substring(0, 19); // sha256:abc123...
+    const summary = `✅ Pushed image to registry. Image: ${registryName}/${pushedTag}. Digest: ${digestShort}...`;
+
     // Return success response
     const result: PushImageResult = {
+      summary,
       success: true,
-      registry: input.registry ?? 'docker.io',
+      registry: registryName,
       digest: pushResult.value.digest,
       pushedTag,
     };

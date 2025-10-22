@@ -20,6 +20,18 @@ import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
 import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
+import type { ScanImageResult } from '@/tools/scan-image/tool';
+import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
+import type { DeployApplicationResult } from '@/tools/deploy/tool';
+import type { BuildImageResult } from '@/tools/build-image/tool';
+import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import {
+  formatScanImageNarrative,
+  formatDockerfilePlanNarrative,
+  formatDeployNarrative,
+  formatBuildImageNarrative,
+  formatAnalyzeRepoNarrative,
+} from '@/mcp/formatters/natural-language-formatters';
 
 /**
  * Constants
@@ -71,10 +83,19 @@ export interface MCPServer {
   getTools(): Array<{ name: string; description: string }>;
 }
 
+/**
+ * Output format options for tool results
+ *
+ * @property JSON - Full structured JSON output (for APIs and programmatic access)
+ * @property TEXT - Concise summary text (for logs and quick display)
+ * @property MARKDOWN - Summary with collapsible JSON details (for documentation)
+ * @property NATURAL_LANGUAGE - Rich narrative with sections (for user interfaces)
+ */
 export const OUTPUTFORMAT = {
   MARKDOWN: 'markdown',
   JSON: 'json',
   TEXT: 'text',
+  NATURAL_LANGUAGE: 'natural-language',
 } as const;
 export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
 
@@ -390,24 +411,137 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
 
 /**
  * Format tool output based on requested format
+ *
+ * @param output - The tool result to format (typically includes a summary field)
+ * @param format - Output format (JSON, TEXT, MARKDOWN, or NATURAL_LANGUAGE)
+ * @returns Formatted string representation of the output
+ *
+ * @description
+ * Transforms tool results into user-friendly formats:
+ * - JSON: Full structured data (default, for APIs)
+ * - TEXT: Summary field only (for logs/console)
+ * - MARKDOWN: Summary + collapsible JSON (for documentation)
+ * - NATURAL_LANGUAGE: Rich narrative (for user interfaces)
+ *
+ * All tool results include a `summary` field for human-readable display.
+ * The NATURAL_LANGUAGE format uses type detection to provide tool-specific
+ * rich narratives with sections, formatting, and next steps.
  */
 export function formatOutput(output: unknown, format: OutputFormat): string {
   switch (format) {
     case OUTPUTFORMAT.JSON:
       return JSON.stringify(output, null, 2);
 
+    case OUTPUTFORMAT.NATURAL_LANGUAGE:
+      // Rich narrative formatting - delegates to tool-specific formatters
+      return formatAsNaturalLanguage(output);
+
     case OUTPUTFORMAT.MARKDOWN:
-      // Use simple code block for object output
-      if (typeof output === 'object' && output !== null) {
-        return `\`\`\`json\n${JSON.stringify(output, null, 2)}\n\`\`\``;
+      // Check if output has a summary field
+      if (typeof output === 'object' && output !== null && 'summary' in output) {
+        const { summary, ...rest } = output as { summary: string; [key: string]: unknown };
+
+        // Display summary prominently, with structured data collapsed
+        return `${summary}\n\n<details>\n<summary>View detailed output</summary>\n\n\`\`\`json\n${JSON.stringify(rest, null, 2)}\n\`\`\`\n</details>`;
       }
-      return String(output);
+
+      // Fallback to JSON code block
+      return `\`\`\`json\n${JSON.stringify(output, null, 2)}\n\`\`\``;
 
     case OUTPUTFORMAT.TEXT:
-    default:
+      // Prioritize summary in plain text mode
+      if (typeof output === 'object' && output !== null && 'summary' in output) {
+        const { summary } = output as { summary: string };
+        return summary;
+      }
+
+      // Fallback to JSON
       if (typeof output === 'object' && output !== null) {
         return JSON.stringify(output, null, 2);
       }
       return String(output);
+
+    default:
+      return JSON.stringify(output, null, 2);
   }
+}
+
+/**
+ * Format output as natural language narrative
+ *
+ * @param output - Tool result to format as narrative
+ * @returns Rich narrative with formatting, or summary/JSON fallback
+ *
+ * @description
+ * Delegates to tool-specific formatters for rich narratives with:
+ * - Section headers and formatting
+ * - Bullet points and structured lists
+ * - Context-aware next steps
+ * - Proper handling of optional fields
+ *
+ * Supported tool types with dedicated formatters:
+ * - scan-image: Security scan results with severity breakdown
+ * - generate-dockerfile: Planning with base images and recommendations
+ * - deploy: Deployment status with endpoints and conditions
+ * - build-image: Build results with metrics
+ * - analyze-repo: Repository analysis with module detection
+ *
+ * Falls back to summary field or JSON for other tool types.
+ */
+function formatAsNaturalLanguage(output: unknown): string {
+  if (!output || typeof output !== 'object') {
+    return String(output);
+  }
+
+  // Type detection and delegation
+  // Each tool result type gets its own formatter
+  if (isScanImageResult(output)) {
+    return formatScanImageNarrative(output);
+  }
+  if (isDockerfilePlan(output)) {
+    return formatDockerfilePlanNarrative(output);
+  }
+  if (isDeployResult(output)) {
+    return formatDeployNarrative(output);
+  }
+  if (isBuildImageResult(output)) {
+    return formatBuildImageNarrative(output);
+  }
+  if (isAnalyzeRepoResult(output)) {
+    return formatAnalyzeRepoNarrative(output);
+  }
+  // Additional tool result types can be added as needed
+
+  // Fallback: use summary if available, otherwise JSON
+  if ('summary' in output) {
+    const { summary } = output as { summary: string };
+    return summary;
+  }
+
+  return JSON.stringify(output, null, 2);
+}
+
+/**
+ * Type guards for result types
+ * These enable proper type detection for natural language formatting
+ */
+
+function isScanImageResult(output: object): output is ScanImageResult {
+  return 'vulnerabilities' in output && 'scanTime' in output && 'passed' in output;
+}
+
+function isDockerfilePlan(output: object): output is DockerfilePlan {
+  return 'recommendations' in output && 'repositoryInfo' in output;
+}
+
+function isDeployResult(output: object): output is DeployApplicationResult {
+  return 'deploymentName' in output && 'endpoints' in output && 'namespace' in output;
+}
+
+function isBuildImageResult(output: object): output is BuildImageResult {
+  return 'imageId' in output && 'buildTime' in output;
+}
+
+function isAnalyzeRepoResult(output: object): output is RepositoryAnalysis {
+  return 'modules' in output && 'isMonorepo' in output;
 }

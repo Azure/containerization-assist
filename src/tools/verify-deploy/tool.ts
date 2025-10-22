@@ -31,8 +31,15 @@ import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernete
 import { DEFAULT_TIMEOUTS } from '@/config/constants';
 import { Success, Failure, type Result } from '@/types';
 import { verifyDeploySchema, type VerifyDeployParams } from './schema';
+import { buildStatusSummary } from '@/lib/summary-helpers';
 
 export interface VerifyDeploymentResult extends Record<string, unknown> {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the deployment verification outcome.
+   * @example "✅ Deployment myapp is healthy. 3/3 pods ready. All health checks passing."
+   */
+  summary?: string;
   success: boolean;
   namespace: string;
   deploymentName: string;
@@ -224,8 +231,16 @@ async function handleVerifyDeployment(
     // Determine success status
     const isSuccessful = overallStatus === 'healthy';
 
+    // Generate summary
+    const summary = buildStatusSummary(
+      isSuccessful,
+      `Deployment ${deploymentName} is healthy. ${health.readyReplicas}/${health.totalReplicas} pods ready. All health checks passing.`,
+      `Deployment ${deploymentName} has issues. ${health.readyReplicas}/${health.totalReplicas} pods ready. Check pod logs for details.`,
+    );
+
     // Prepare the result
     const result: VerifyDeploymentResult = {
+      summary,
       success: isSuccessful,
       namespace,
       deploymentName,
