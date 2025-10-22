@@ -127,6 +127,125 @@ describe('validation helpers', () => {
       });
     });
 
+    describe('readable validation', () => {
+      it('should validate that a path is readable', async () => {
+        const result = await validatePath(tempFile, {
+          readable: true,
+        });
+        expect(result.ok).toBe(true);
+      });
+
+      it('should fail when path is not readable', async () => {
+        // Make file non-readable (Unix-like systems only)
+        if (process.platform !== 'win32') {
+          await fs.chmod(tempFile, 0o000);
+          const result = await validatePath(tempFile, {
+            readable: true,
+          });
+          expect(result.ok).toBe(false);
+          if (!result.ok) {
+            expect(result.error).toContain('not readable');
+            expect(result.guidance?.hint).toContain('cannot be read');
+            expect(result.guidance?.resolution).toContain('read access');
+          }
+          // Restore permissions for cleanup
+          await fs.chmod(tempFile, 0o644);
+        }
+      });
+    });
+
+    describe('writable validation', () => {
+      it('should validate that an existing path is writable', async () => {
+        const result = await validatePath(tempFile, {
+          writable: true,
+        });
+        expect(result.ok).toBe(true);
+      });
+
+      it('should validate that a non-existent path can be created (parent writable)', async () => {
+        const newFile = path.join(tempDir, 'new-file.txt');
+        const result = await validatePath(newFile, {
+          writable: true,
+        });
+        expect(result.ok).toBe(true);
+      });
+
+      it('should fail when path is not writable', async () => {
+        // Make file non-writable (Unix-like systems only)
+        if (process.platform !== 'win32') {
+          await fs.chmod(tempFile, 0o444);
+          const result = await validatePath(tempFile, {
+            writable: true,
+          });
+          expect(result.ok).toBe(false);
+          if (!result.ok) {
+            expect(result.error).toContain('not writable');
+            expect(result.guidance?.hint).toContain('cannot be written');
+            expect(result.guidance?.resolution).toContain('write access');
+          }
+          // Restore permissions for cleanup
+          await fs.chmod(tempFile, 0o644);
+        }
+      });
+
+      it('should fail when parent directory is not writable for non-existent path', async () => {
+        // Make directory non-writable (Unix-like systems only)
+        if (process.platform !== 'win32') {
+          await fs.chmod(tempDir, 0o555);
+          const newFile = path.join(tempDir, 'new-file.txt');
+          const result = await validatePath(newFile, {
+            writable: true,
+          });
+          expect(result.ok).toBe(false);
+          if (!result.ok) {
+            expect(result.error).toContain('not writable');
+            expect(result.guidance?.hint).toContain('not writable');
+          }
+          // Restore permissions for cleanup
+          await fs.chmod(tempDir, 0o755);
+        }
+      });
+    });
+
+    describe('combined validation options', () => {
+      it('should validate readable and writable together', async () => {
+        const result = await validatePath(tempFile, {
+          readable: true,
+          writable: true,
+        });
+        expect(result.ok).toBe(true);
+      });
+
+      it('should validate existence, type, and permissions together', async () => {
+        const result = await validatePath(tempFile, {
+          mustExist: true,
+          mustBeFile: true,
+          readable: true,
+          writable: true,
+        });
+        expect(result.ok).toBe(true);
+      });
+
+      it('should fail validation when any option fails', async () => {
+        // Make file non-writable (Unix-like systems only)
+        if (process.platform !== 'win32') {
+          await fs.chmod(tempFile, 0o444);
+          const result = await validatePath(tempFile, {
+            mustExist: true,
+            mustBeFile: true,
+            readable: true,
+            writable: true,
+          });
+          expect(result.ok).toBe(false);
+          if (!result.ok) {
+            expect(result.error).toContain('not writable');
+          }
+          // Restore permissions for cleanup
+          await fs.chmod(tempFile, 0o644);
+        }
+      });
+    });
+
     describe('error guidance', () => {
       it('should provide helpful guidance for nonexistent paths', async () => {
         const result = await validatePath('/nonexistent/path', { mustExist: true });

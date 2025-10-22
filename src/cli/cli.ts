@@ -9,11 +9,10 @@ import { createApp } from '@/app';
 import { config, logConfigSummaryIfDev } from '@/config/index';
 import { createLogger } from '@/lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { checkDockerHealth, checkKubernetesHealth } from '@/infra/health/checks';
 import { validateDockerSocket } from '@/infra/docker/socket-validation';
 import { createInspectToolsCommand } from './commands/inspect-tools';
 import { provideContextualGuidance } from './guidance';
@@ -165,27 +164,22 @@ async function main(): Promise<void> {
       const policyConfig = resolvePolicyConfig(options);
       console.error(`  • Policy Path: ${policyConfig.policyPath ?? 'auto-discover'}`);
 
-      // Test Docker connection
-      {
-        console.error('\n🐳 Testing Docker connection...');
-        try {
-          execSync('docker version', { stdio: 'pipe' });
-          console.error('  ✅ Docker connection successful');
-        } catch (error) {
-          const errorMsg = extractErrorMessage(error);
-          console.error(`  ⚠️  Docker connection failed - ensure Docker is running: ${errorMsg}`);
-        }
-      }
+      // Test Docker and Kubernetes connections
+      console.error('\n🔍 Checking dependencies...');
+      const dockerStatus = await checkDockerHealth(getLogger());
+      const k8sStatus = await checkKubernetesHealth(getLogger());
 
-      // Test Kubernetes connection
-      console.error('\n☸️  Testing Kubernetes connection...');
-      try {
-        execSync('kubectl version --client=true', { stdio: 'pipe' });
-        console.error('  ✅ Kubernetes client available');
-      } catch (error) {
-        const errorMsg = extractErrorMessage(error);
-        console.error(`  ⚠️  Kubernetes client not found - kubectl not in PATH: ${errorMsg}`);
-      }
+      console.error(
+        dockerStatus.available
+          ? `  ✅ Docker: ${dockerStatus.version}`
+          : `  ⚠️  Docker: ${dockerStatus.error}`,
+      );
+
+      console.error(
+        k8sStatus.available
+          ? `  ✅ Kubernetes: ${k8sStatus.version || 'connected'}`
+          : `  ⚠️  Kubernetes: ${k8sStatus.error}`,
+      );
 
       getLogger().info('Configuration validation completed');
       console.error('\n✅ Configuration validation complete!');
@@ -290,7 +284,7 @@ async function main(): Promise<void> {
 
     logStartupSuccess(transportConfig, getLogger(), !!process.env.MCP_QUIET);
 
-    // Install unified shutdown handlers
+    // Install shutdown handlers
     installShutdownHandlers(app, getLogger(), !!process.env.MCP_QUIET);
   } catch (error) {
     logStartupFailure(error as Error, getLogger(), !!process.env.MCP_QUIET);
@@ -303,7 +297,7 @@ async function main(): Promise<void> {
   }
 }
 
-// Uncaught exception and rejection handlers are installed by the unified shutdown handlers
+// Uncaught exception and rejection handlers are installed by the shutdown handlers
 
 // Run the CLI
 void main();

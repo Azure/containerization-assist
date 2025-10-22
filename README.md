@@ -164,8 +164,7 @@ The server provides 13 MCP tools organized by functionality:
 | Tool | Description |
 |------|-------------|
 | `generate-dockerfile` | Gather insights from knowledge base and return requirements for Dockerfile creation |
-| `validate-dockerfile` | Validate Dockerfile base images against allowlist/denylist patterns |
-| `fix-dockerfile` | Analyze Dockerfile for issues and return knowledge-based fix recommendations |
+| `fix-dockerfile` | Analyze Dockerfile for issues including organizational policy validation and return knowledge-based fix recommendations |
 
 ### Image Operations
 | Tool | Description |
@@ -214,10 +213,8 @@ The following environment variables control server behavior:
 | `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
 | `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
-| `CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
-| `CONTAINERIZATION_ASSIST_IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
 | `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
-| `CONTAINERIZATION_ASSIST_POLICY_PATH` | Path to policy YAML file (overridden by --config flag) | Auto-discover all policies/ | No |
+| `CONTAINERIZATION_ASSIST_POLICY_PATH` | Path to your custom Rego policy file (overridden by --config flag) | Not set (policies disabled) | No |
 
 **Progress Notifications:**
 Long-running operations (build, deploy, scan-image) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
@@ -256,7 +253,7 @@ The logging directory is validated at startup to ensure it's writable.
 
 ### Policy System
 
-The policy system enables enforcement of security, quality, and compliance rules across your containerization workflow.
+The policy system enables enforcement of security, quality, and compliance rules through YAML-based policies. Policies use a rule-based system with regex and function matchers to validate Dockerfiles and container configurations.
 
 **Default Behavior (No Configuration Needed):**
 By default, **all policies** in the `policies/` directory are automatically discovered and merged:
@@ -266,30 +263,125 @@ By default, **all policies** in the `policies/` directory are automatically disc
 
 This provides comprehensive coverage out-of-the-box.
 
-**Use a Specific Policy File:**
-```bash
-# Use only the security baseline policy file (disables auto-merging)
-npx -y containerization-assist-mcp start --config ./policies/security-baseline.yaml
+**Policy File Format:**
 
-# Or specify in VS Code MCP configuration
-{
-  "servers": {
-    "containerization-assist": {
-      "command": "npx",
-      "args": ["-y", "containerization-assist-mcp", "start", "--config", "./policies/security-baseline.yaml"]
-    }
-  }
-}
+```yaml
+version: '2.0'
+metadata:
+  name: Production Security Policy
+  description: Security and quality rules for production
+  category: security
+
+defaults:
+  enforcement: strict  # Options: strict, advisory, lenient
+  security:
+    nonRootUser: true
+    scanners:
+      required: true
+      tools: ['trivy']
+  registries:
+    allowed:
+      - docker.io
+      - gcr.io
+      - mcr.microsoft.com
+    blocked:
+      - '*localhost*'
+
+rules:
+  - id: block-latest-tag
+    category: quality
+    priority: 80
+    description: Prevent :latest for reproducibility
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+[^:]+:latest'
+        flags: im
+    actions:
+      block: true
+      message: 'Using :latest tag is not allowed. Specify explicit version tags.'
+
+  - id: block-root-user
+    category: security
+    priority: 95
+    description: Enforce non-root user
+    conditions:
+      - kind: regex
+        pattern: '^USER\s+(root|0)\s*$'
+        flags: m
+    actions:
+      block: true
+      message: 'Running as root user is not allowed.'
 ```
 
-**Environment-Specific Configuration:**
-```bash
-# Use development mode (less strict policy enforcement)
-npx -y containerization-assist-mcp start --dev
+**Rule Components:**
 
-# Production mode is the default
-npx -y containerization-assist-mcp start
+**Conditions:**
+- `kind: regex` - Match patterns in Dockerfile content
+  - `pattern`: Regular expression to match
+  - `flags`: Regex flags (i=case-insensitive, m=multiline)
+  - `count_threshold`: Minimum matches required (optional)
+- `kind: function` - Built-in function matchers
+  - `hasPattern` - Check if pattern exists in content
+  - `fileExists` - Check if file exists in context
+  - `largerThan` - Check if content/file exceeds size threshold
+  - `hasVulnerabilities` - Check vulnerability scan results
+
+**Actions:**
+- `block: true` - Prevents build/deployment, operation fails
+- `warn: true` - Logs warning, operation continues
+- `suggest: true` - Provides recommendation, informational only
+- `message`: User-facing explanation of the rule violation
+
+**Priority Levels:**
+- **90-100**: Security rules (highest priority)
+- **70-89**: Quality rules
+- **50-69**: Performance rules
+- **30-49**: Compliance rules
+
+**Enforcement Modes:**
+- **strict**: All rules enforced, violations block operations
+- **advisory**: Rules evaluated, violations logged but not blocking
+- **lenient**: Minimal enforcement, warnings only
+
+**Example Policies:**
+
+The repository includes three production-ready policies:
+- `policies/base-images.yaml` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions)
+- `policies/security-baseline.yaml` - Essential security rules (root user prevention, secrets detection, privileged containers)
+- `policies/container-best-practices.yaml` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
+
+For detailed examples and guidance, see [Policy Configuration Guide](docs/guides/policy-configuration.md).
+
+**Using Policies:**
+
+```bash
+# Validate Dockerfile with built-in validation + organizational policies
+npx containerization-assist fix-dockerfile --path ./Dockerfile
+
+# Use specific policy file for organizational validation
+npx containerization-assist fix-dockerfile \
+  --path ./Dockerfile \
+  --policy-path ./policies/production.yaml
+
+# The fix-dockerfile tool will automatically detect and load policies from the policies/ directory
+# It combines:
+# - Built-in best practices validation (security, performance, compliance)
+# - Custom organizational policy validation (if policies are provided)
 ```
+
+**Creating Custom Policies:**
+
+See existing policies in `policies/` for examples.
+
+**Policy Discovery and Merging:**
+
+The server automatically discovers and loads all `.yaml` files in the `policies/` directory:
+- **Automatic Discovery**: All policies in `policies/` are loaded and merged automatically
+- **Rule Merging**: Rules with the same ID are overridden by later policies (alphabetically sorted)
+- **Default Merging**: Later policies override earlier policies' default settings
+- **Priority Sorting**: All rules are sorted by priority (highest first) after merging
+
+This allows you to organize policies by concern (security, quality, performance) in separate files while maintaining a unified policy enforcement system.
 
 ### MCP Inspector (Testing)
 

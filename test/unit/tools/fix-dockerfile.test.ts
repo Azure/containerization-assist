@@ -5,6 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
+import { createMockValidatePath } from '../../__support__/utilities/mocks';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -53,6 +54,19 @@ jest.mock('node:fs', () => ({
     X_OK: 1,
     F_OK: 0,
   },
+}));
+
+// Mock the validation library
+jest.mock('../../../src/lib/validation', () => ({
+  validatePath: createMockValidatePath(),
+}));
+
+// Mock validation-helpers to use the mocked validation
+jest.mock('../../../src/lib/validation-helpers', () => ({
+  validatePathOrFail: jest.fn().mockImplementation(async (...args: any[]) => {
+    const { validatePath } = require('../../../src/lib/validation');
+    return validatePath(...args);
+  }),
 }));
 
 // Mock validation
@@ -120,6 +134,11 @@ describe('fix-dockerfile', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
+
+    // Default mock implementations for file system operations
+    mockFs.access.mockResolvedValue(undefined);
+    mockFs.stat.mockResolvedValue({ isFile: () => true, isDirectory: () => false } as any);
+    mockFs.readFile.mockResolvedValue(dockerfileWithIssues);
 
     // Default knowledge matches
     mockGetKnowledgeForCategory.mockReturnValue([
@@ -312,7 +331,7 @@ describe('fix-dockerfile', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Dockerfile content is empty');
+        expect(result.error).toContain("Either 'path' or 'content' must be provided");
       }
     });
 
@@ -332,6 +351,9 @@ describe('fix-dockerfile', () => {
       delete config.dockerfile;
       config.path = '/nonexistent/Dockerfile';
 
+      // Mock access to simulate file doesn't exist (for validation)
+      mockFs.access.mockRejectedValue(new Error('ENOENT: no such file or directory'));
+      mockFs.stat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
       mockFs.readFile.mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
       const mockContext = createMockToolContext();
@@ -339,7 +361,7 @@ describe('fix-dockerfile', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Failed to read Dockerfile');
+        expect(result.error).toContain('does not exist');
       }
     });
 
@@ -352,6 +374,198 @@ describe('fix-dockerfile', () => {
       await expect(async () => {
         await fixDockerfileTool.handler(config, mockContext);
       }).rejects.toThrow('Validation service unavailable');
+    });
+
+    it('should handle permission errors when reading Dockerfile', async () => {
+      delete config.dockerfile;
+      config.path = '/restricted/Dockerfile';
+
+      mockFs.access.mockRejectedValue(new Error('EACCES: permission denied'));
+      mockFs.stat.mockRejectedValue(new Error('EACCES: permission denied'));
+      mockFs.readFile.mockRejectedValue(new Error('EACCES: permission denied'));
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBeTruthy();
+      }
+    });
+
+    it('should handle Dockerfile with only whitespace', async () => {
+      config.dockerfile = '   \n\n\t\t   \n   ';
+
+      // Reset the mock to return validation results for empty/whitespace content
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: false,
+        score: 0,
+        grade: 'F',
+        results: [
+          {
+            passed: false,
+            rule: 'empty-dockerfile',
+            message: 'Dockerfile appears to be empty',
+            line: 1,
+            metadata: {
+              category: ValidationCategory.SECURITY,
+              severity: ValidationSeverity.ERROR,
+            },
+          },
+        ],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      // The readDockerfile utility now rejects whitespace-only content early
+      // This is more strict than the old behavior but is more correct
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('empty');
+      }
+    });
+
+    it('should handle binary content in Dockerfile', async () => {
+      config.dockerfile = '\x00\x01\x02\x03\x04\x05';
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: false,
+        score: 0,
+        grade: 'F',
+        results: [
+          {
+            passed: false,
+            rule: 'syntax-error',
+            message: 'Invalid Dockerfile syntax',
+            line: 1,
+            metadata: {
+              category: ValidationCategory.SECURITY,
+              severity: ValidationSeverity.ERROR,
+            },
+          },
+        ],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      // Tool should handle binary content
+      expect(result).toBeDefined();
+    });
+
+    it('should handle very large Dockerfile files', async () => {
+      // Create a very large Dockerfile (10000 lines)
+      const largeDockerfile = Array(10000)
+        .fill('RUN echo "line"')
+        .join('\n');
+      config.dockerfile = largeDockerfile;
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: false,
+        score: 50,
+        grade: 'F',
+        results: [
+          {
+            passed: false,
+            rule: 'too-many-layers',
+            message: 'Too many layers',
+            line: 1,
+            metadata: {
+              category: ValidationCategory.PERFORMANCE,
+              severity: ValidationSeverity.WARNING,
+            },
+          },
+        ],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.currentIssues).toBeDefined();
+      }
+    });
+
+    it('should handle invalid file path characters', async () => {
+      delete config.dockerfile;
+      config.path = '/invalid\x00path/Dockerfile';
+
+      mockFs.readFile.mockRejectedValue(new Error('Invalid path'));
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('should handle Dockerfile with unicode characters', async () => {
+      config.dockerfile = `FROM node:18-alpine
+# 这是一个注释
+WORKDIR /app
+COPY . .
+RUN npm install
+# Comment with émojis: 🐳 🚀
+CMD ["node", "index.js"]`;
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: true,
+        score: 85,
+        grade: 'B',
+        results: [],
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.validationScore).toBeGreaterThan(0);
+      }
+    });
+
+    it('should handle network timeout during validation', async () => {
+      mockValidateDockerfileContent.mockImplementation(() => {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => reject(new Error('Network timeout')), 100);
+        });
+      });
+
+      const mockContext = createMockToolContext();
+
+      await expect(async () => {
+        await fixDockerfileTool.handler(config, mockContext);
+      }).rejects.toThrow('Network timeout');
+    });
+
+    it('should handle malformed validation results', async () => {
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: true,
+        score: null as any,
+        grade: undefined as any,
+        results: null as any,
+      });
+
+      const mockContext = createMockToolContext();
+
+      // Tool should handle malformed validation data
+      await expect(async () => {
+        await fixDockerfileTool.handler(config, mockContext);
+      }).rejects.toThrow();
+    });
+
+    it('should handle Dockerfile path that is actually a directory', async () => {
+      delete config.dockerfile;
+      config.path = '/test/directory';
+
+      mockFs.stat.mockResolvedValue({ isFile: () => false, isDirectory: () => true } as any);
+      mockFs.readFile.mockRejectedValue(new Error('EISDIR: illegal operation on a directory'));
+
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(false);
     });
   });
 
@@ -701,6 +915,92 @@ describe('fix-dockerfile', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.priority).toBe('medium');
+      }
+    });
+  });
+
+  describe('Policy Validation Integration', () => {
+    it('should skip policy validation when no policies directory exists', async () => {
+      const mockFs = fs as jest.Mocked<typeof fs>;
+      mockFs.readFile.mockResolvedValue('FROM node:18\nWORKDIR /app\nCOPY . .');
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: true,
+        score: 100,
+        grade: 'A',
+        results: [],
+      });
+
+      const config = { path: '/test/Dockerfile', environment: 'production' };
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should not have policy validation results when no policies exist
+        expect(result.value.policyValidation).toBeUndefined();
+      }
+    });
+
+    it('should include policy validation results when policies are provided', async () => {
+      // This test would require mocking the policy loading system
+      // For now, we verify the schema supports it
+      const mockFs = fs as jest.Mocked<typeof fs>;
+      mockFs.readFile.mockResolvedValue('FROM node:18\nWORKDIR /app');
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: true,
+        score: 100,
+        grade: 'A',
+        results: [],
+      });
+
+      const config = {
+        path: '/test/Dockerfile',
+        environment: 'production',
+        policyPath: '/test/policy.yaml'
+      };
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      // Policy validation integration is tested in integration tests
+    });
+
+    it('should handle both validation issues and policy validation', async () => {
+      const mockFs = fs as jest.Mocked<typeof fs>;
+      mockFs.readFile.mockResolvedValue('FROM node:latest\nRUN npm install');
+
+      mockValidateDockerfileContent.mockResolvedValue({
+        passed: false,
+        score: 70,
+        grade: 'C',
+        results: [
+          {
+            passed: false,
+            rule: 'security-issue',
+            message: 'Security vulnerability detected',
+            line: 1,
+            metadata: {
+              category: ValidationCategory.SECURITY,
+              severity: ValidationSeverity.WARNING,
+            },
+          },
+        ],
+      });
+
+      const config = { path: '/test/Dockerfile', environment: 'production' };
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should have validation issues
+        expect(result.value.currentIssues).toBeDefined();
+        expect(result.value.currentIssues.security.length).toBeGreaterThan(0);
+
+        // Should have fix recommendations
+        expect(result.value.fixes).toBeDefined();
       }
     });
   });

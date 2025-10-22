@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { environment } from '../shared/schemas';
+import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
 export const generateK8sManifestsSchema = z
   .object({
@@ -127,16 +128,29 @@ export interface RepositoryInfo {
   name: string | undefined;
   modulePath: string | undefined;
   dockerfilePath?: string | undefined;
-  language?: 'java' | 'dotnet' | 'javascript' | 'typescript' | 'python' | 'rust' | 'go' | 'other' | undefined;
+  language?:
+    | 'java'
+    | 'dotnet'
+    | 'javascript'
+    | 'typescript'
+    | 'python'
+    | 'rust'
+    | 'go'
+    | 'other'
+    | undefined;
   languageVersion?: string | undefined;
-  frameworks?: Array<{
-    name: string;
-    version?: string;
-  }> | undefined;
-  buildSystem?: {
-    type?: string;
-    configFile?: string;
-  } | undefined;
+  frameworks?:
+    | Array<{
+        name: string;
+        version?: string;
+      }>
+    | undefined;
+  buildSystem?:
+    | {
+        type?: string;
+        configFile?: string;
+      }
+    | undefined;
   dependencies?: string[] | undefined;
   ports?: number[] | undefined;
   entryPoint?: string | undefined;
@@ -164,4 +178,5 @@ export interface ManifestPlan {
   knowledgeMatches: ManifestRequirement[];
   confidence: number;
   summary: string;
+  policyValidation?: PolicyValidationResult;
 }

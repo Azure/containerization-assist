@@ -1,5 +1,5 @@
 /**
- * Unified Test Setup - Containerization Assist MCP Server
+ * Test Setup - Containerization Assist MCP Server
  * ESM-compatible test configuration and mocks
  */
 

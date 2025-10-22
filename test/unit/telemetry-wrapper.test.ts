@@ -1,6 +1,6 @@
 /**
  * Unit Tests: Telemetry Wrapper Pattern
- * Tests the new MCPTool interface properties that enable external telemetry wrapping
+ * Tests the new Tool interface properties that enable external telemetry wrapping
  * by the App Mod team and other consumers.
  */
 

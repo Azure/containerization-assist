@@ -3,7 +3,6 @@
     "entry": [
         "src/index.ts",
         "src/mcp/mcp-server.ts",
-        "src/cli/cli.ts",
         "docs/examples/**/*.{ts,js}",
         "test/**/*.test.ts",
         "scripts/**/*.ts"
@@ -24,11 +23,13 @@
         "type": true
     },
     "ignoreDependencies": [
-        "tsc-alias",
         "husky",
         "@kubernetes-models/apimachinery",
         "dockerfilelint",
         "kubernetes-models"
+    ],
+    "ignoreBinaries": [
+        "opa"
     ],
     "includeEntryExports": false
 }

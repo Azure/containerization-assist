@@ -26,7 +26,7 @@ const ALL_TOOLS = [
   'push-image',
   'scan-image',
   'tag-image',
-  'validate-dockerfile',
+  'fix-dockerfile',
   'verify-deploy',
 ] as const;
 

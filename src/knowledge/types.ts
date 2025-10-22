@@ -10,6 +10,7 @@
 export const CATEGORY = {
   API: 'api',
   ARCHITECTURE: 'architecture',
+  BUILD: 'build',
   CACHING: 'caching',
   CONFIGURATION: 'configuration',
   DOCKERFILE: 'dockerfile',
@@ -43,7 +44,7 @@ export interface KnowledgeEntry {
   example?: string;
 
   /** Severity level */
-  severity?: 'high' | 'medium' | 'low';
+  severity?: 'required' | 'high' | 'medium' | 'low';
 
   /** Tags for additional filtering */
   tags?: string[];
@@ -62,6 +63,9 @@ export interface KnowledgeQuery {
   /** Programming language context */
   language?: string;
 
+  /** Programming language version (e.g., "17", "25", "3.11") */
+  languageVersion?: string;
+
   /** Framework context */
   framework?: string;
 
@@ -70,6 +74,9 @@ export interface KnowledgeQuery {
 
   /** Specific tags to filter by */
   tags?: string[];
+
+  /** Tool context (e.g., 'fix-dockerfile', 'scan-image') */
+  tool?: string;
 
   /** Maximum number of results */
   limit?: number;
@@ -86,18 +93,8 @@ export interface KnowledgeMatch {
   reasons: string[];
 }
 
-export interface LoadedEntry extends KnowledgeEntry {
-  /** Precompiled regex patterns for performance */
-  compiledCache?: {
-    pattern: RegExp | null;
-    lastCompiled: number;
-    compilationError?: string;
-  };
-}
-
-export interface CompilationStats {
-  totalEntries: number;
-  compiledSuccessfully: number;
-  compilationErrors: number;
-  avgCompilationTime: number;
-}
+/**
+ * LoadedEntry is just an alias for KnowledgeEntry.
+ * Regex patterns are compiled on-demand for simplicity.
+ */
+export type LoadedEntry = KnowledgeEntry;

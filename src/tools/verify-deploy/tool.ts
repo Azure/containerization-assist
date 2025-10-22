@@ -23,12 +23,12 @@
  * ```
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { setupToolContext } from '@/lib/tool-context-helpers';
+import { extractErrorMessage } from '@/lib/errors';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
 
-import { DEFAULT_TIMEOUTS } from '@/config/defaults';
+import { DEFAULT_TIMEOUTS } from '@/config/constants';
 import { Success, Failure, type Result } from '@/types';
 import { verifyDeploySchema, type VerifyDeployParams } from './schema';
 
@@ -155,10 +155,13 @@ async function handleVerifyDeployment(
   context: ToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
   if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+    return Failure('Invalid parameters provided', {
+      message: 'Parameters must be a valid object',
+      hint: 'Tool received invalid or missing parameters',
+      resolution: 'Ensure parameters are provided as a JSON object',
+    });
   }
-  const logger = getToolLogger(context, 'verify-deploy');
-  const timer = createToolTimer(logger, 'verify-deploy');
+  const { logger, timer } = setupToolContext(context, 'verify-deploy');
 
   const {
     deploymentName: configDeploymentName,
@@ -166,7 +169,7 @@ async function handleVerifyDeployment(
     checks = ['pods', 'services', 'health'],
   } = params;
 
-  const timeout = 60;
+  const timeout = Math.floor(DEFAULT_TIMEOUTS.verification / 1000); // Convert ms to seconds
 
   try {
     logger.info({ checks }, 'Starting Kubernetes deployment verification');
@@ -174,7 +177,11 @@ async function handleVerifyDeployment(
     const k8sClient = createKubernetesClient(logger);
 
     if (!configDeploymentName) {
-      return Failure('Deployment name is required. Provide deploymentName parameter.');
+      return Failure('Deployment name is required. Provide deploymentName parameter.', {
+        message: 'Missing required parameter: deploymentName',
+        hint: 'Deployment name must be specified to verify the deployment',
+        resolution: 'Add deploymentName parameter with the name of the deployment to verify',
+      });
     }
 
     const namespace = configNamespace ?? 'default';
@@ -266,7 +273,11 @@ async function handleVerifyDeployment(
   } catch (error) {
     timer.error(error);
 
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred during deployment verification',
+      resolution: 'Check the error message for details. Verify the deployment exists, cluster is accessible, and you have proper permissions',
+    });
   }
 }
 

@@ -6,9 +6,21 @@ import type { ToolMetadata } from './tool-metadata';
 import { extractSchemaShape } from '@/lib/zod-utils';
 
 /**
- * Unified tool interface for all MCP tools with external telemetry support
+ * Chain hints for tool workflow guidance
  */
-export interface MCPTool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
+export interface ChainHints {
+  /** Guidance message shown after successful execution */
+  success: string;
+  /** Guidance message shown after failed execution */
+  failure: string;
+}
+
+/**
+ * Tool interface for all MCP tools with external telemetry support
+ *
+ * @see {@link ../../docs/adr/002-tool-interface.md ADR-002: Unified Tool Interface}
+ */
+export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
   /** Unique tool identifier */
   name: string;
 
@@ -30,6 +42,9 @@ export interface MCPTool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unk
   /** Tool metadata for AI enhancement tracking (required) */
   metadata: ToolMetadata;
 
+  /** Optional workflow guidance hints for tool chaining */
+  chainHints?: ChainHints;
+
   /** Parse and validate untyped arguments to strongly-typed input (matches Zod API) */
   parse: (args: unknown) => z.infer<TSchema>;
 
@@ -49,7 +64,8 @@ export function tool<TSchema extends z.ZodTypeAny, TOut>(config: {
   handler: (input: z.infer<TSchema>, context: ToolContext) => Promise<Result<TOut>>;
   category?: ToolCategory;
   version?: string;
-}): MCPTool<TSchema, TOut> {
+  chainHints?: ChainHints;
+}): Tool<TSchema, TOut> {
   return {
     ...config,
     inputSchema: extractSchemaShape(config.schema),

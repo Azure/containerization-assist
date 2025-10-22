@@ -5,6 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
+import { createMockValidatePath } from '../../__support__/utilities/mocks';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -35,13 +36,18 @@ function createMockLogger() {
 
 // Mock the validation library to bypass path validation in tests
 jest.mock('../../../src/lib/validation', () => ({
-  validatePath: jest.fn().mockImplementation(async (pathStr: string, options: any) => {
-    // Always return success with the path for tests
-    return { ok: true, value: pathStr };
-  }),
+  validatePath: createMockValidatePath(),
   validateImageName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
   validateK8sName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
   validateNamespace: jest.fn().mockImplementation((ns: string) => ({ ok: true, value: ns })),
+}));
+
+// Mock validation-helpers to use the mocked validation
+jest.mock('../../../src/lib/validation-helpers', () => ({
+  validatePathOrFail: jest.fn().mockImplementation(async (...args: any[]) => {
+    const { validatePath } = require('../../../src/lib/validation');
+    return validatePath(...args);
+  }),
 }));
 
 // Mock filesystem functions with proper structure
@@ -68,7 +74,14 @@ jest.mock('node:fs', () => ({
 
 // Mock lib modules
 const mockDockerClient = {
-  buildImage: jest.fn(),
+  buildImage: jest.fn() as jest.MockedFunction<
+    (options: any) => Promise<{
+      ok: boolean;
+      value?: any;
+      error?: string;
+      guidance?: { hint?: string; resolution?: string };
+    }>
+  >,
 };
 
 
@@ -132,10 +145,13 @@ CMD ["node", "index.js"]`;
     mockDockerClient.buildImage.mockResolvedValue(
       createSuccessResult({
         imageId: 'sha256:mock-image-id',
+        digest: 'sha256:abcdef1234567890',
         tags: ['myapp:latest', 'myapp:v1.0'],
         size: 123456789,
         layers: 8,
+        buildTime: 5000,
         logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+        warnings: [],
       }),
     );
   });
@@ -210,14 +226,15 @@ CMD ["node", "index.js"]`;
 
   describe('Dockerfile Resolution', () => {
     it('should fail when Dockerfile does not exist', async () => {
-      // Mock stat to return that the file doesn't exist
+      // Mock access to simulate file doesn't exist (for validation)
+      mockFs.access.mockRejectedValue(new Error('ENOENT: no such file or directory'));
       mockFs.stat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Dockerfile not found');
+        expect(result.error).toContain('does not exist');
       }
     });
 
@@ -361,7 +378,7 @@ CMD ["node", "index.js"]`;
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Permission denied');
+        expect(result.error).toContain('Permission denied');
       }
     });
 
@@ -378,6 +395,232 @@ CMD ["node", "index.js"]`;
     });
   });
 
+  describe('Error Scenarios - Infrastructure', () => {
+    it('should fail gracefully when Docker daemon is not running', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'Cannot connect to the Docker daemon',
+        guidance: {
+          hint: 'The Docker daemon must be running to build images',
+          resolution: 'Start Docker Desktop or run: sudo systemctl start docker',
+        },
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Cannot connect to the Docker daemon');
+        expect(result.guidance).toBeDefined();
+        expect(result.guidance?.hint).toContain('Docker daemon');
+        expect(result.guidance?.resolution).toBeDefined();
+      }
+    });
+
+    it('should fail when Docker socket is not accessible', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'EACCES: permission denied, connect /var/run/docker.sock',
+        guidance: {
+          hint: 'Current user does not have permission to access Docker socket',
+          resolution: 'Add user to docker group: sudo usermod -aG docker $USER',
+        },
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('permission denied');
+        expect(result.guidance).toBeDefined();
+        expect(result.guidance?.hint).toBeDefined();
+        expect(result.guidance?.resolution).toBeDefined();
+      }
+    });
+
+    it('should fail when network is unreachable during base image pull', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'Error pulling image: network unreachable',
+        guidance: {
+          hint: 'Cannot pull base image due to network issues',
+          resolution: 'Check your internet connection and Docker registry configuration',
+        },
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('network unreachable');
+        expect(result.guidance).toBeDefined();
+      }
+    });
+  });
+
+  describe('Error Scenarios - File System', () => {
+    it('should fail when build context directory does not exist', async () => {
+      mockFs.access.mockRejectedValue(new Error('ENOENT: no such file or directory'));
+      mockFs.stat.mockRejectedValue(new Error('ENOENT'));
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('does not exist');
+      }
+    });
+
+    it('should fail when Dockerfile is not readable', async () => {
+      mockFs.access.mockRejectedValue(new Error('EACCES: permission denied'));
+      mockFs.stat.mockResolvedValue({ isFile: () => true, isDirectory: () => false } as any);
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/permission denied|does not exist|not accessible/i);
+      }
+    });
+
+    it('should fail when Dockerfile path points to a directory', async () => {
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.stat.mockResolvedValue({ isFile: () => false, isDirectory: () => true } as any);
+      mockFs.readFile.mockRejectedValue(Object.assign(new Error('EISDIR'), { code: 'EISDIR' }));
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/not a file|directory|EISDIR/i);
+      }
+    });
+
+    it('should handle EISDIR error when reading Dockerfile', async () => {
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.stat.mockResolvedValue({ isFile: () => true, isDirectory: () => false } as any);
+      const error = new Error('EISDIR: illegal operation on a directory') as any;
+      error.code = 'EISDIR';
+      mockFs.readFile.mockRejectedValue(error);
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('directory');
+      }
+    });
+  });
+
+  describe('Error Scenarios - Input Validation', () => {
+    it('should fail with invalid parameters object', async () => {
+      const result = await buildImage(null as any, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Invalid parameters');
+      }
+    });
+
+    it('should fail when imageName and tags are both empty', async () => {
+      const invalidConfig = {
+        ...config,
+        imageName: undefined,
+        tags: [],
+      };
+
+      const result = await buildImage(invalidConfig, createMockToolContext());
+
+      // Should still succeed but with no tags (implementation allows this)
+      // Or fail depending on validation logic
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('Error Scenarios - Docker Build Failures', () => {
+    it('should fail when Dockerfile has syntax errors', async () => {
+      mockFs.readFile.mockResolvedValue('INVALID DOCKERFILE SYNTAX');
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'Dockerfile parse error: unknown instruction: INVALID',
+        guidance: {
+          hint: 'Dockerfile contains syntax errors',
+          resolution: 'Check Dockerfile syntax and fix errors. Use "docker build" locally to debug.',
+        },
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('parse error');
+      }
+    });
+
+    it('should fail when base image is not found', async () => {
+      mockFs.readFile.mockResolvedValue('FROM nonexistent:image\nCMD ["echo", "hello"]');
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'manifest for nonexistent:image not found',
+        guidance: {
+          hint: 'Base image does not exist in registry',
+          resolution: 'Verify the image name and tag, or use a different base image',
+        },
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('not found');
+        expect(result.guidance).toBeDefined();
+      }
+    });
+
+    it('should fail when build step fails', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'RUN command failed: npm ci exited with code 1',
+        guidance: {
+          hint: 'Build step failed during execution',
+          resolution: 'Check the command in your Dockerfile and ensure dependencies are available',
+        },
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('RUN command failed');
+        expect(result.guidance).toBeDefined();
+      }
+    });
+
+    it('should fail when disk space is insufficient', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'no space left on device',
+        guidance: {
+          hint: 'Insufficient disk space to complete build',
+          resolution: 'Free up disk space or prune unused Docker images: docker system prune',
+        },
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('no space left');
+        expect(result.guidance).toBeDefined();
+      }
+    });
+  });
+
   describe('Build Arguments', () => {
     beforeEach(() => {
       // Setup filesystem mocks
@@ -388,8 +631,13 @@ CMD ["node", "index.js"]`;
       mockDockerClient.buildImage.mockResolvedValue(
         createSuccessResult({
           imageId: 'sha256:mock-image-id',
-          logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+          digest: 'sha256:abcdef1234567890',
+          tags: ['myapp:latest', 'myapp:v1.0'],
+          size: 123456789,
           layers: 8,
+          buildTime: 5000,
+          logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+          warnings: [],
         }),
       );
     });

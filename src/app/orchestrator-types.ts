@@ -1,9 +1,10 @@
 /**
- * Simplified Orchestrator Types
- * Minimal types for tool orchestration without unnecessary complexity
+ * Orchestrator Types
+ * Types for tool orchestration
  */
 
 import type { Result } from '@/types/index';
+import type { ChainHintsRegistry } from './chain-hints';
 
 /**
  * Request to execute a tool
@@ -28,7 +29,7 @@ export interface ExecuteMetadata {
 }
 
 /**
- * Simplified orchestrator interface
+ * Orchestrator interface
  */
 export interface ToolOrchestrator {
   execute(request: ExecuteRequest): Promise<Result<unknown>>;
@@ -43,4 +44,7 @@ type ChainHintsMode = 'enabled' | 'disabled';
 export interface OrchestratorConfig {
   policyPath?: string;
   chainHintsMode: ChainHintsMode;
+  chainHints?: ChainHintsRegistry;
+  /** Reverse mapping from alias to original tool name (alias -> original) */
+  aliasToOriginalMap?: Record<string, string>;
 }

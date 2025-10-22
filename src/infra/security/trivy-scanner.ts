@@ -11,9 +11,10 @@ import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Logger } from 'pino';
 
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { Result, Success, Failure } from '@/types';
 import type { BasicScanResult } from './scanner';
+import { DEFAULT_TIMEOUTS, LIMITS } from '@/config/constants';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -163,7 +164,7 @@ function validateImageId(imageId: string): boolean {
  */
 async function getTrivyVersion(logger: Logger): Promise<string | undefined> {
   try {
-    const { stdout } = await execAsync('trivy --version', { timeout: 15000 });
+    const { stdout } = await execAsync('trivy --version', { timeout: DEFAULT_TIMEOUTS.trivyVersionCheck });
     // Trivy version output format: "Version: X.Y.Z"
     const match = stdout.match(/Version:\s*([^\s\n]+)/);
     if (!match) {
@@ -243,7 +244,7 @@ export async function scanImageWithTrivy(
     logger.debug({ args }, 'Executing Trivy command');
 
     const { stdout, stderr } = await execFileAsync('trivy', args, {
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large scan results
+      maxBuffer: LIMITS.MAX_SCAN_BUFFER, // 10MB buffer for large scan results
     });
 
     // Log any warnings from stderr

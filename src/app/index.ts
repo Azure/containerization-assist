@@ -8,14 +8,13 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { createLogger } from '@/lib/logger';
 import { type Tool, type ToolName, ALL_TOOLS } from '@/tools';
-import { createToolContext } from '@/mcp/context';
 import {
   createMCPServer,
   OUTPUTFORMAT,
   registerToolsWithServer,
   type MCPServer,
 } from '@/mcp/mcp-server';
-import { createOrchestrator, createHostlessToolContext } from './orchestrator';
+import { createOrchestrator } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
 import type { Result } from '@/types';
 import type {
@@ -26,28 +25,35 @@ import type {
   ExecutionMetadata,
 } from '@/types/runtime';
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
-import Docker from 'dockerode';
-import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
-import { createKubernetesClient } from '@/infra/kubernetes/client';
-
-/**
- * Timeout for Docker connection checks in milliseconds
- */
-const DOCKER_CONNECTION_TIMEOUT_MS = 3000;
+import { checkDockerHealth, checkKubernetesHealth } from '@/infra/health/checks';
+import { DEFAULT_CHAIN_HINTS } from './chain-hints';
 
 /**
  * Apply tool aliases to create renamed versions of tools
+ * Returns both the aliased tools and a reverse mapping (alias -> original)
  */
-function applyToolAliases(tools: readonly Tool[], aliases?: Record<string, string>): Tool[] {
-  if (!aliases) return [...tools];
+function applyToolAliases(
+  tools: readonly Tool[],
+  aliases?: Record<string, string>,
+): { aliasedTools: Tool[]; aliasToOriginalMap: Record<string, string> } {
+  if (!aliases) {
+    return { aliasedTools: [...tools], aliasToOriginalMap: {} };
+  }
 
-  return tools.map((tool) => {
+  const aliasToOriginalMap: Record<string, string> = {};
+
+  const aliasedTools = tools.map((tool) => {
     const alias = aliases[tool.name];
     if (!alias) return tool;
+
+    // Store reverse mapping (alias -> original)
+    aliasToOriginalMap[alias] = tool.name;
 
     // Create a new tool object with the alias name
     return { ...tool, name: alias };
   });
+
+  return { aliasedTools, aliasToOriginalMap };
 }
 
 /**
@@ -67,7 +73,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   createToolLoggerFile(logger);
 
   const tools = config.tools || ALL_TOOLS;
-  const aliasedTools = applyToolAliases(tools, config.toolAliases);
+  const { aliasedTools, aliasToOriginalMap } = applyToolAliases(tools, config.toolAliases);
 
   // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema
   const registryTools: Tool[] = aliasedTools.map((tool) => tool as unknown as Tool);
@@ -79,7 +85,11 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
 
   const chainHintsMode = config.chainHintsMode || 'enabled';
   const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
-  const orchestratorConfig: OrchestratorConfig = { chainHintsMode };
+  const orchestratorConfig: OrchestratorConfig = {
+    chainHintsMode,
+    chainHints: DEFAULT_CHAIN_HINTS,
+    aliasToOriginalMap,
+  };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
 
   const toolList = Array.from(toolsMap.values());
@@ -94,21 +104,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       registry: toolsMap,
       logger,
       config: orchestratorConfig,
-      contextFactory: ({ request, logger: toolLogger }) => {
-        const metadata = request.metadata;
-        const server = activeServer;
-        if (server) {
-          const contextOptions = {
-            ...(metadata?.signal && { signal: metadata.signal }),
-            ...(metadata?.progress !== undefined && { progress: metadata.progress }),
-          };
-          return createToolContext(toolLogger, contextOptions);
-        }
-
-        return createHostlessToolContext(toolLogger, {
-          ...(metadata && { metadata }),
-        });
-      },
+      ...(activeServer && { server: activeServer }),
     });
   }
 
@@ -212,67 +208,11 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     healthCheck: async () => {
       const toolCount = toolsMap.size;
 
-      // Check Docker connectivity
-      const dockerStatus: {
-        available: boolean;
-        version?: string;
-        error?: string;
-      } = await (async () => {
-        try {
-          const socketPath = autoDetectDockerSocket();
-          const docker = new Docker({ socketPath });
-
-          const versionInfo = await Promise.race([
-            docker.version(),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new Error('Docker connection timeout')),
-                DOCKER_CONNECTION_TIMEOUT_MS,
-              ),
-            ),
-          ]);
-
-          return {
-            available: true,
-            version: versionInfo.Version,
-          };
-        } catch (error) {
-          return {
-            available: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      })();
-
-      // Check Kubernetes connectivity
-      const k8sStatus: {
-        available: boolean;
-        version?: string;
-        error?: string;
-      } = await (async () => {
-        try {
-          const k8sClient = createKubernetesClient(logger);
-
-          const connected = await k8sClient.ping();
-
-          if (connected) {
-            return {
-              available: true,
-              version: 'connected',
-            };
-          } else {
-            return {
-              available: false,
-              error: 'Unable to connect to cluster',
-            };
-          }
-        } catch (error) {
-          return {
-            available: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      })();
+      // Check Docker and Kubernetes connectivity in parallel
+      const [dockerStatus, k8sStatus] = await Promise.all([
+        checkDockerHealth(logger),
+        checkKubernetesHealth(logger),
+      ]);
 
       const hasIssues = !dockerStatus.available || !k8sStatus.available;
       const status: 'healthy' | 'unhealthy' = hasIssues ? 'unhealthy' : 'healthy';

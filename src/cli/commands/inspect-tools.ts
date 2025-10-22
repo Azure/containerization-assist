@@ -7,11 +7,7 @@
 
 import { Command } from 'commander';
 import { ALL_TOOLS, type Tool } from '@/tools';
-import {
-  validateAllToolMetadata,
-  type ValidatableTool,
-  type EnhancementCapability,
-} from '@/types/tool-metadata';
+import { validateAllToolMetadata, type ValidatableTool } from '@/types/tool-metadata';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { handleResultError, handleGenericError } from '../error-formatting';
@@ -22,8 +18,6 @@ import { Result, Success, Failure } from '@/types';
 export interface ToolDiscoveryOptions {
   /** Include only knowledge-enhanced tools */
   knowledgeEnhancedOnly?: boolean;
-  /** Filter by enhancement capabilities */
-  hasCapability?: string;
   /** Include detailed metadata in results */
   includeDetails?: boolean;
 }
@@ -41,13 +35,6 @@ async function discoverToolCapabilities(
     for (const tool of ALL_TOOLS) {
       // Apply filters
       if (options.knowledgeEnhancedOnly && !tool.metadata.knowledgeEnhanced) continue;
-      if (
-        options.hasCapability &&
-        !tool.metadata.enhancementCapabilities?.includes(
-          options.hasCapability as EnhancementCapability,
-        )
-      )
-        continue;
 
       filteredTools.push(tool);
     }
@@ -65,7 +52,6 @@ async function getToolStatistics(): Promise<
   Result<{
     total: number;
     knowledgeEnhanced: number;
-    enhancementCapabilities: Record<string, number>;
     categories: Record<string, number>;
   }>
 > {
@@ -76,19 +62,8 @@ async function getToolStatistics(): Promise<
   const stats = {
     total: tools.length,
     knowledgeEnhanced: tools.filter((t) => t.metadata.knowledgeEnhanced).length,
-    enhancementCapabilities: {} as Record<string, number>,
     categories: {} as Record<string, number>,
   };
-
-  // Count enhancement capabilities
-  for (const tool of tools) {
-    if (tool.metadata.enhancementCapabilities) {
-      for (const capability of tool.metadata.enhancementCapabilities) {
-        stats.enhancementCapabilities[capability] =
-          (stats.enhancementCapabilities[capability] || 0) + 1;
-      }
-    }
-  }
 
   // Count categories
   for (const tool of tools) {
@@ -131,16 +106,6 @@ async function validateToolMetadata(): Promise<
 }
 
 /**
- * Helper function to determine if enhancement capabilities include validation
- */
-function hasValidationSupport(capabilities: string[]): boolean {
-  const validationKeywords = ['validation', 'repair', 'fix', 'security', 'optimization'];
-  return capabilities.some((cap) =>
-    validationKeywords.some((keyword) => cap.toLowerCase().includes(keyword)),
-  );
-}
-
-/**
  * Generate comprehensive tool capabilities report
  */
 async function generateToolCapabilitiesReport(): Promise<Result<string>> {
@@ -167,26 +132,18 @@ Generated: ${new Date().toISOString()}
 - **Total Tools**: ${stats.total}
 - **Knowledge-Enhanced Tools**: ${stats.knowledgeEnhanced} (${Math.round((stats.knowledgeEnhanced / stats.total) * 100)}%)
 
-### Enhancement Capabilities
+### Categories
 `;
-  for (const [capability, count] of Object.entries(stats.enhancementCapabilities)) {
-    report += `- **${capability}**: ${count} tools\n`;
-  }
-
-  report += `\n### Categories\n`;
   for (const [category, count] of Object.entries(stats.categories)) {
     report += `- **${category}**: ${count} tools\n`;
   }
 
   report += `\n## Tool Details\n\n`;
   for (const tool of capabilities) {
-    const validationSupport = hasValidationSupport(tool.metadata.enhancementCapabilities ?? []);
     report += `### ${tool.name}
 - **Description**: ${tool.description}
 - **Category**: ${tool.category || 'uncategorized'}
 - **Knowledge-Enhanced**: ${tool.metadata.knowledgeEnhanced ? '✅' : '❌'}
-- **Enhancement Capabilities**: ${tool.metadata.enhancementCapabilities?.join(', ') || 'None'}
-- **Validation Support**: ${validationSupport ? '✅' : '❌'}
 
 `;
   }
@@ -215,16 +172,14 @@ export function createInspectToolsCommand(): Command {
   // List all tools with capabilities
   cmd
     .command('list')
-    .description('List all tools with their AI enhancement capabilities')
+    .description('List all tools with their AI enhancement status')
     .option('--knowledge-enhanced', 'Show only knowledge-enhanced tools')
-    .option('--capability <name>', 'Filter by enhancement capability')
     .option('--format <format>', 'Output format (table, json, csv)', 'table')
     .option('--detailed', 'Include detailed metadata')
     .action(async (options) => {
       try {
         const discoveryOptions: ToolDiscoveryOptions = {
           knowledgeEnhancedOnly: options.knowledgeEnhanced,
-          hasCapability: options.capability,
           includeDetails: options.detailed,
         };
 
@@ -266,11 +221,6 @@ export function createInspectToolsCommand(): Command {
           console.info(
             `Knowledge-Enhanced: ${stats.knowledgeEnhanced} (${Math.round((stats.knowledgeEnhanced / stats.total) * 100)}%)`,
           );
-
-          console.info('\n⚡ Enhancement Capabilities:');
-          for (const [capability, count] of Object.entries(stats.enhancementCapabilities)) {
-            console.info(`  ${capability}: ${count} tools`);
-          }
 
           console.info('\n📁 Categories:');
           for (const [category, count] of Object.entries(stats.categories)) {
@@ -375,31 +325,6 @@ export function createInspectToolsCommand(): Command {
             options.output || path.join(process.cwd(), 'tool-capabilities-report.md');
           writeFileSync(outputPath, report, 'utf-8');
           console.info(`📄 Report generated: ${outputPath}`);
-        }
-      } catch (error) {
-        handleGenericError('Error during operation', error);
-      }
-    });
-
-  // Capability command
-  cmd
-    .command('capability <capability>')
-    .description('List tools with specific enhancement capability')
-    .action(async (capability) => {
-      try {
-        const result = await discoverToolCapabilities({ hasCapability: capability });
-        if (!result.ok) {
-          handleResultError(result, 'Failed to get tools with capability');
-        }
-
-        const tools = result.value.map((tool) => tool.name);
-
-        if (tools.length === 0) {
-          console.info(`No tools found with capability: ${capability}`);
-        } else {
-          console.info(`🎯 Tools with capability "${capability}":\n`);
-          tools.forEach((tool) => console.info(`  • ${tool}`));
-          console.info(`\nTotal: ${tools.length} tools`);
         }
       } catch (error) {
         handleGenericError('Error during operation', error);

@@ -18,7 +18,7 @@ describe('Main Configuration', () => {
       expect(config.server).toBeDefined();
       expect(config.workspace).toBeDefined();
       expect(config.docker).toBeDefined();
-      expect(config.mutex).toBeDefined();
+      expect(config.toolLogging).toBeDefined();
     });
 
     it('should use environment variables when provided', () => {
@@ -52,45 +52,26 @@ describe('Main Configuration', () => {
 
     it('should parse integer environment variables correctly', () => {
       process.env.MAX_FILE_SIZE = '20971520'; // 20MB
-      process.env.MUTEX_DEFAULT_TIMEOUT = '45000';
+      process.env.DOCKER_TIMEOUT = '90000';
 
       jest.resetModules();
       const { config: testConfig } = require('../../../src/config/index');
 
       expect(testConfig.workspace.maxFileSize).toBe(20971520);
-      expect(testConfig.mutex.defaultTimeout).toBe(45000);
+      expect(testConfig.docker.timeout).toBe(90000);
     });
 
-    it('should handle boolean environment variables', () => {
-      process.env.MUTEX_MONITORING = 'true';
+    it('should have toolLogging configuration', () => {
+      expect(config.toolLogging.dirPath).toBeDefined();
+      expect(config.toolLogging.enabled).toBeDefined();
 
-      jest.resetModules();
-      const { config: testConfig } = require('../../../src/config/index');
-
-      expect(testConfig.mutex.monitoringEnabled).toBe(true);
-
-      process.env.MUTEX_MONITORING = 'false';
-
-      jest.resetModules();
-      const { config: testConfig2 } = require('../../../src/config/index');
-
-      expect(testConfig2.mutex.monitoringEnabled).toBe(false);
-    });
-
-    it('should have mutex configuration', () => {
-      expect(config.mutex.defaultTimeout).toBeDefined();
-      expect(config.mutex.dockerBuildTimeout).toBeDefined();
-      expect(config.mutex.monitoringEnabled).toBeDefined();
-
-      expect(typeof config.mutex.defaultTimeout).toBe('number');
-      expect(typeof config.mutex.dockerBuildTimeout).toBe('number');
-      expect(typeof config.mutex.monitoringEnabled).toBe('boolean');
+      expect(typeof config.toolLogging.dirPath).toBe('string');
+      expect(typeof config.toolLogging.enabled).toBe('boolean');
     });
 
     it('should be immutable (readonly)', () => {
       // This test verifies the 'as const' assertion works
       expect(() => {
-        // @ts-expect-error - This should fail at compile time due to readonly
         (config as any).server.logLevel = 'test';
       }).not.toThrow(); // Runtime doesn't prevent this, but TypeScript should
     });
@@ -181,19 +162,12 @@ describe('Main Configuration', () => {
 
       expect(config.workspace.maxFileSize).toBeGreaterThan(0);
 
-      expect(config.mutex.defaultTimeout).toBeGreaterThan(0);
-      expect(config.mutex.dockerBuildTimeout).toBeGreaterThan(0);
+      expect(config.docker.timeout).toBeGreaterThan(0);
     });
 
     it('should have valid file paths', () => {
       expect(config.docker.socketPath).toContain('/');
       expect(config.workspace.workspaceDir).toBeTruthy();
-    });
-
-    it('should have all required mutex settings', () => {
-      expect(config.mutex.defaultTimeout).toBeDefined();
-      expect(config.mutex.dockerBuildTimeout).toBeDefined();
-      expect(config.mutex.monitoringEnabled).toBeDefined();
     });
   });
 });

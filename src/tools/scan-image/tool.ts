@@ -5,7 +5,7 @@
  * Uses standardized helpers for consistency
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import type { ToolContext } from '@/mcp/context';
 
 import { createSecurityScanner } from '@/infra/security/scanner';
@@ -67,10 +67,13 @@ async function handleScanImage(
   context: ToolContext,
 ): Promise<Result<ScanImageResult>> {
   if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+    return Failure('Invalid parameters provided', {
+      message: 'Parameters must be a valid object',
+      hint: 'Tool received invalid or missing parameters',
+      resolution: 'Ensure parameters are provided as a JSON object',
+    });
   }
-  const logger = getToolLogger(context, 'scan-image');
-  const timer = createToolTimer(logger, 'scan-image');
+  const { logger, timer } = setupToolContext(context, 'scan-image');
 
   const { scanner = 'trivy', severity } = params;
 
@@ -90,7 +93,11 @@ async function handleScanImage(
     const imageId = params.imageId;
 
     if (!imageId) {
-      return Failure('No image specified. Provide imageId parameter.');
+      return Failure('No image specified. Provide imageId parameter.', {
+        message: 'Missing required parameter: imageId',
+        hint: 'Image ID or name must be specified to scan',
+        resolution: 'Add imageId parameter with the Docker image ID or name to scan',
+      });
     }
     logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
 
@@ -98,7 +105,10 @@ async function handleScanImage(
     const scanResultWrapper = await securityScanner.scanImage(imageId);
 
     if (!scanResultWrapper.ok) {
-      return Failure(`Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`);
+      return Failure(
+        `Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`,
+        scanResultWrapper.guidance,
+      );
     }
 
     const scanResult = scanResultWrapper.value;
@@ -231,7 +241,11 @@ async function handleScanImage(
     logger.error({ error }, 'Image scan failed');
 
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return Failure(errorMessage);
+    return Failure(errorMessage, {
+      message: errorMessage,
+      hint: 'An unexpected error occurred during the security scan',
+      resolution: 'Verify that the scanner (Trivy) is installed and accessible, the image exists, and you have proper permissions',
+    });
   }
 }
 
@@ -251,6 +265,12 @@ export default tool({
   schema: scanImageSchema,
   metadata: {
     knowledgeEnhanced: true,
+  },
+  chainHints: {
+    success:
+      'Security scan passed! Proceed with push-image to push to a registry, or continue with deployment preparation.',
+    failure:
+      'Security scan found vulnerabilities. Use fix-dockerfile to address security issues in your base images and dependencies.',
   },
   handler: handleScanImage,
 });

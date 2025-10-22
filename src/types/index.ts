@@ -21,3 +21,14 @@ export * from './topics';
  */
 export type { ToolContext } from '../mcp/context';
 
+/**
+ * Policy validation types
+ *
+ * @remarks
+ * These types are used for organizational policy validation across tools:
+ * - `PolicyViolation`: Individual policy violation
+ * - `PolicyValidationResult`: Complete validation result with violations, warnings, and suggestions
+ *
+ * @public
+ */
+export type { PolicyViolation, PolicyValidationResult } from '@/lib/policy-helpers';

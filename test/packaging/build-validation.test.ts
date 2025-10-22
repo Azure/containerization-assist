@@ -84,7 +84,7 @@ describe('Build Validation', () => {
         'push-image',
         'scan-image',
         'tag-image',
-        'validate-dockerfile',
+        'fix-dockerfile',
         'verify-deploy',
       ];
 

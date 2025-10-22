@@ -47,6 +47,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -60,6 +61,7 @@ export default {
         '/dist/',
         'test/unit/lib/kubernetes.test.ts',
       ],
+      maxWorkers: 1, // Run unit tests serially to prevent worker shutdown issues
     },
     {
       displayName: 'integration',
@@ -68,6 +70,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -79,11 +82,9 @@ export default {
       testPathIgnorePatterns: [
         '/node_modules/',
         '/dist/',
-        'test/integration/kubernetes-fast-fail.test.ts',
-        'test/integration/error-guidance-propagation.test.ts',
-        'test/integration/single-app-flow.test.ts',
-        'test/integration/orchestrator-routing.test.ts', // ES module loading issues with @kubernetes/client-node
+        // ES module issues resolved - all integration tests enabled
       ],
+      workerIdleMemoryLimit: '512MB', // Force worker restart after integration tests
     },
     {
       displayName: 'e2e',
@@ -92,6 +93,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -130,6 +132,7 @@ export default {
 
   // Performance optimizations
   maxWorkers: '50%', // Use half of available CPU cores
+  workerIdleMemoryLimit: '512MB', // Force worker restart to prevent memory leaks
   cache: true,
   cacheDirectory: '<rootDir>/node_modules/.cache/jest',
 
@@ -145,28 +148,34 @@ export default {
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   coverageThreshold: {
     global: {
-      branches: 7,
-      functions: 18,
-      lines: 8,
-      statements: 9,
+      branches: 48,
+      functions: 60,
+      lines: 58,
+      statements: 58,
     },
-    './src/mcp/': {
-      branches: 14,
-      functions: 22,
-      lines: 20,
-      statements: 19,
+    './src/app/': {
+      branches: 55,
+      functions: 80,
+      lines: 74,
+      statements: 74,
+    },
+    './src/infra/': {
+      branches: 50,
+      functions: 60,
+      lines: 55,
+      statements: 55,
     },
     './src/tools/': {
-      branches: 29,
-      functions: 33,
-      lines: 53,
-      statements: 51,
+      branches: 50,
+      functions: 64,
+      lines: 65,
+      statements: 65,
     },
     './src/lib/': {
-      branches: 22,
-      functions: 40,
-      lines: 39,
-      statements: 39,
+      branches: 50,
+      functions: 50,
+      lines: 60,
+      statements: 60,
     },
   },
 
@@ -177,10 +186,7 @@ export default {
     '/node_modules/',
     '/dist/',
     'test/unit/lib/kubernetes.test.ts',
-    'test/integration/kubernetes-fast-fail.test.ts', // ES module loading issues with @kubernetes/client-node
-    'test/integration/error-guidance-propagation.test.ts', // Imports kubernetes client
-    'test/integration/single-app-flow.test.ts', // Imports kubernetes client
-    'test/integration/multi-module-flow.test.ts', // Imports kubernetes client
+    // ES module issues resolved - integration tests enabled
   ],
 
   // Timeout handling for different test types

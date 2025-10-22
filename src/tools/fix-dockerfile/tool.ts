@@ -8,9 +8,10 @@
  * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
  */
 
-import { Failure, type Result, Success, TOPICS } from '@/types';
+import { type Result, Success, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { getToolLogger } from '@/lib/tool-helpers';
+import { LIMITS } from '@/config/constants';
 import {
   fixDockerfileSchema,
   type DockerfileFixPlan,
@@ -23,8 +24,8 @@ import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledg
 import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import { ValidationCategory, ValidationSeverity } from '@/validation/core-types';
 import type { z } from 'zod';
-import { promises as fs } from 'node:fs';
-import nodePath from 'node:path';
+import { readDockerfile } from '@/lib/file-utils';
+import { validateContentAgainstPolicy, type PolicyValidationResult } from '@/lib/policy-helpers';
 
 const name = 'fix-dockerfile';
 const description = 'Analyze Dockerfile for issues and return knowledge-based fix recommendations';
@@ -103,8 +104,8 @@ const runPattern = createKnowledgeTool<
   query: {
     topic: TOPICS.FIX_DOCKERFILE,
     category: CATEGORY.DOCKERFILE,
-    maxChars: 5000,
-    maxSnippets: 25,
+    maxChars: LIMITS.MAX_PROMPT_CHARS,
+    maxSnippets: LIMITS.MAX_PROMPT_SNIPPETS,
     extractFilters: (input) => {
       const issues = input._validationResults || [];
       const hasSecurityIssues = issues.some((i) => i.category === 'security');
@@ -305,24 +306,18 @@ async function handleFixDockerfile(
   ctx: ToolContext,
 ): Promise<Result<DockerfileFixPlan>> {
   const logger = getToolLogger(ctx, 'fix-dockerfile');
-  let content = input.dockerfile || '';
 
-  if (input.path) {
-    const dockerfilePath = nodePath.isAbsolute(input.path)
-      ? input.path
-      : nodePath.resolve(process.cwd(), input.path);
-    try {
-      content = await fs.readFile(dockerfilePath, 'utf-8');
-    } catch (error) {
-      return Failure(
-        `Failed to read Dockerfile at ${dockerfilePath}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+  // Use shared utility to read Dockerfile
+  const contentResult = await readDockerfile({
+    ...(input.path !== undefined && { path: input.path }),
+    ...(input.dockerfile !== undefined && { content: input.dockerfile }),
+  });
+
+  if (!contentResult.ok) {
+    return contentResult;
   }
 
-  if (!content) {
-    return Failure('Dockerfile content is empty. Provide valid Dockerfile content or path.');
-  }
+  const content = contentResult.value;
 
   logger.info({ preview: content.substring(0, 100) }, 'Validating Dockerfile for issues');
 
@@ -352,6 +347,28 @@ async function handleFixDockerfile(
     'Dockerfile validation completed',
   );
 
+  // Perform policy validation if policy evaluator is provided
+  let policyValidation: PolicyValidationResult | undefined;
+  if (ctx.policy) {
+    logger.info('Evaluating Dockerfile against organizational policy');
+    policyValidation = await validateContentAgainstPolicy(
+      content,
+      ctx.policy,
+      logger,
+      'Dockerfile',
+    );
+
+    logger.info(
+      {
+        passed: policyValidation.passed,
+        violations: policyValidation.violations.length,
+        warnings: policyValidation.warnings.length,
+        suggestions: policyValidation.suggestions.length,
+      },
+      'Policy validation completed',
+    );
+  }
+
   if (validationIssues.length === 0) {
     return Success({
       currentIssues: {
@@ -364,6 +381,7 @@ async function handleFixDockerfile(
         performance: [],
         bestPractices: [],
       },
+      ...(policyValidation && { policyValidation }),
       validationScore: validationReport.score,
       validationGrade: validationReport.grade,
       priority: 'low',
@@ -387,7 +405,18 @@ Dockerfile Fix Planning Summary:
     _dockerfileContent: content,
   };
 
-  return runPattern(extendedInput, ctx);
+  const result = await runPattern(extendedInput, ctx);
+
+  // Add policy validation to the result
+  if (result.ok) {
+    const plan: DockerfileFixPlan = {
+      ...result.value,
+      ...(policyValidation && { policyValidation }),
+    };
+    return Success(plan);
+  }
+
+  return result;
 }
 
 import { tool } from '@/types/tool';
@@ -400,6 +429,12 @@ export default tool({
   schema: fixDockerfileSchema,
   metadata: {
     knowledgeEnhanced: true,
+  },
+  chainHints: {
+    success:
+      'Dockerfile validation and analysis complete (includes built-in best practices + organizational policy validation if configured). Next: Apply recommended fixes, then call build-image to test the Dockerfile.',
+    failure:
+      'Dockerfile validation failed. Review validation errors, policy violations (if any), and apply recommended fixes.',
   },
   handler: handleFixDockerfile,
 });

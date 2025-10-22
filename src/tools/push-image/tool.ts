@@ -9,13 +9,13 @@
 
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
 import { getToolLogger } from '@/lib/tool-helpers';
-import { validateImageName } from '@/lib/validation';
+import { parseImageName } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
 import { pushImageSchema } from './schema';
 import type { z } from 'zod';
-import { createErrorGuidance } from '@/lib/error-utils';
+import { createErrorGuidance } from '@/lib/errors';
 
 export interface PushImageResult {
   success: true;
@@ -47,10 +47,10 @@ async function handlePushImage(
       );
     }
 
-    // Validate image name format
-    const imageValidation = validateImageName(input.imageId);
-    if (!imageValidation.ok) {
-      return imageValidation;
+    // Parse and validate image name
+    const parsedImage = parseImageName(input.imageId);
+    if (!parsedImage.ok) {
+      return parsedImage;
     }
 
     // Use docker from context if provided (for testing), otherwise create new client
@@ -59,26 +59,24 @@ async function handlePushImage(
       (ctx && 'docker' in ctx && ((ctx as Record<string, unknown>).docker as DockerClient)) ||
       createDockerClient(logger);
 
-    // Parse repository and tag from imageId
-    let repository: string;
-    let tag: string;
+    // Extract repository and tag from parsed image
+    // Preserve original registry if present, then apply override if provided
+    let repository = parsedImage.value.registry
+      ? `${parsedImage.value.registry}/${parsedImage.value.repository}`
+      : parsedImage.value.repository;
+    const tag = parsedImage.value.tag;
 
-    const colonIndex = input.imageId.lastIndexOf(':');
-    if (colonIndex === -1 || colonIndex < input.imageId.lastIndexOf('/')) {
-      // No tag specified, use 'latest'
-      repository = input.imageId;
-      tag = 'latest';
-    } else {
-      repository = input.imageId.substring(0, colonIndex);
-      tag = input.imageId.substring(colonIndex + 1);
-    }
-
-    // Apply registry prefix if provided
+    // Override registry if explicitly provided
     if (input.registry) {
       const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      if (!repository.startsWith(registryHost)) {
-        repository = `${registryHost}/${repository}`;
+      const expectedPrefix = `${registryHost}/`;
+
+      // Check if repository already starts with the registry override (avoid double-prefixing)
+      if (!repository.startsWith(expectedPrefix)) {
+        // Repository doesn't start with the override, so replace/add the registry
+        repository = `${registryHost}/${parsedImage.value.repository}`;
       }
+      // else: repository already has the correct registry prefix, keep as-is
     }
 
     // Build auth config if credentials are provided
@@ -166,7 +164,11 @@ async function handlePushImage(
     return Success(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error occurred';
-    return Failure(`Push image failed: ${message}`);
+    return Failure(`Push image failed: ${message}`, {
+      message: `Push image failed: ${message}`,
+      hint: 'An unexpected error occurred while pushing the image to the registry',
+      resolution: 'Check the error message for details. Common issues include network connectivity, registry authentication, or insufficient permissions',
+    });
   }
 }
 
@@ -181,6 +183,11 @@ export default tool({
   schema: pushImageSchema,
   metadata: {
     knowledgeEnhanced: false,
+  },
+  chainHints: {
+    success: 'Image pushed successfully. Review AI optimization insights for push improvements.',
+    failure:
+      'Image push failed. Check registry credentials, network connectivity, and image tag format.',
   },
   handler: handlePushImage,
 });

@@ -19,16 +19,6 @@ jest.mock('@kubernetes/client-node', () => ({
   CustomObjectsApi: jest.fn()
 }));
 
-// Mock config
-jest.mock('../../../../src/config', () => ({
-  config: {
-    mutex: {
-      defaultTimeout: 30000,
-      monitoringEnabled: true
-    }
-  }
-}));
-
 // Mock js-yaml
 jest.mock('js-yaml', () => ({
   loadAll: (content: string) => {
@@ -229,7 +219,9 @@ describe('IdempotentApply', () => {
 
       // First create fails with 409 (already exists)
       mockAppsApi.createNamespacedDeployment.mockRejectedValue({
-        statusCode: 409,
+        response: {
+          statusCode: 409
+        },
         message: 'deployments.apps "existing-app" already exists'
       });
 
@@ -272,7 +264,7 @@ describe('IdempotentApply', () => {
           return { body: service };
         } else {
           // Subsequent calls fail with 409
-          throw { statusCode: 409, message: 'already exists' };
+          throw { response: { statusCode: 409 }, message: 'already exists' };
         }
       });
 
@@ -309,14 +301,16 @@ describe('IdempotentApply', () => {
       };
 
       mockAppsApi.createNamespacedDeployment.mockRejectedValue({
-        statusCode: 400,
-        message: 'Invalid deployment spec'
+        response: {
+          statusCode: 400
+        },
+        message: 'validation failed: invalid deployment spec'
       });
 
       const result = await applyResource(deployment);
 
       expect(result.ok).toBe(false);
-      expect(result.error).toContain('Invalid deployment spec');
+      expect(result.error).toContain('validation');
     });
 
     test('should handle network errors', async () => {
@@ -330,14 +324,17 @@ describe('IdempotentApply', () => {
         spec: {}
       };
 
-      mockCoreApi.createNamespacedService.mockRejectedValue(
-        new Error('ECONNREFUSED')
-      );
+      mockCoreApi.createNamespacedService.mockRejectedValue({
+        response: {
+          statusCode: 503
+        },
+        message: 'connect ECONNREFUSED'
+      });
 
       const result = await applyResource(service);
 
       expect(result.ok).toBe(false);
-      expect(result.error).toContain('ECONNREFUSED');
+      expect(result.error).toContain('Cannot connect to Kubernetes cluster');
     });
   });
 

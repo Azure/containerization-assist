@@ -1,6 +1,6 @@
 {
   "name": "containerization-assist-mcp",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -47,7 +47,7 @@
   "files": [
     "dist/**/*",
     "dist-cjs/**/*",
-    "policies/**/*.yaml",
+    "policies/**/*.rego",
     "knowledge/**/*.json",
     "README.md",
     "LICENSE",
@@ -63,7 +63,7 @@
     "dev": "tsx watch src/cli/cli.ts",
     "start": "node dist/src/cli/cli.js",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
-    "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit",
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --runInBand",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
@@ -78,7 +78,9 @@
     "postpack": "node scripts/restore-package.cjs",
     "prepublishOnly": "npm run validate && npm run build",
     "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
-    "smoke:journey": "tsx scripts/smoke-journey.ts"
+    "smoke:journey": "tsx scripts/smoke-journey.ts",
+    "test:policies": "opa test policies/",
+    "tag-migration": "tsx scripts/tag-migration.ts"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
@@ -88,12 +90,12 @@
     "@types/xml2js": "^0.4.14",
     "commander": "^14.0.1",
     "docker-file-parser": "^1.0.7",
-    "dockerfile-ast": "^0.7.1",
     "dockerfilelint": "^1.8.0",
     "dockerode": "^4.0.9",
     "js-yaml": "^4.1.0",
     "kubernetes-models": "^4.5.1",
     "pino": "^9.12.0",
+    "tmp": "^0.2.5",
     "validate-dockerfile": "^1.8.1",
     "xml2js": "^0.6.2",
     "yaml": "^2.8.1",
@@ -117,7 +119,6 @@
     "jest": "^30.2.0",
     "lint-staged": "^16.2.3",
     "prettier": "^3.6.2",
-    "tmp": "^0.2.5",
     "ts-jest": "^29.4.4",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",

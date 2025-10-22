@@ -149,14 +149,17 @@ export class DockerTestCleaner {
     } catch (error) {
       this.logger.debug(`Container cleanup failed: ${error}`);
     }
-  }  /**
+  }
+
+  /**
    * Execute cleanup with timeout and proper error handling
    */
   async cleanup(): Promise<void> {
     const cleanupPromise = this.performCleanup();
-    const timeoutPromise = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('Cleanup timeout')), this.config.cleanupTimeoutMs)
-    );
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Cleanup timeout')), this.config.cleanupTimeoutMs);
+      timeout.unref();
+    });
 
     try {
       await Promise.race([cleanupPromise, timeoutPromise]);
@@ -173,7 +176,7 @@ export class DockerTestCleaner {
   }
 
   /**
-   * Perform the actual cleanup operations - SIMPLIFIED
+   * Perform the actual cleanup operations
    */
   private async performCleanup(): Promise<void> {
     // Clean tracked containers first (they might reference images)
@@ -247,7 +250,7 @@ export class DockerTestCleaner {
   }
 
   /**
-   * Verify cleanup success (if enabled) - SIMPLIFIED
+   * Verify cleanup success (if enabled)
    */
   private async verifyCleanupSuccess(): Promise<void> {
     try {

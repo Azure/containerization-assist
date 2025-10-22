@@ -9,6 +9,7 @@ import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractK8sErrorGuidance } from './errors';
 import { discoverAndValidateKubeconfig } from './kubeconfig-discovery';
+import { applyResource as applyK8sResource } from './resource-operations';
 
 export interface DeploymentResult {
   ready: boolean;
@@ -107,10 +108,7 @@ export const createKubernetesClient = (
   const k8sApi = kc.makeApiClient(k8s.AppsV1Api);
   const coreApi = kc.makeApiClient(k8s.CoreV1Api);
   const networkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
-  const batchApi = kc.makeApiClient(k8s.BatchV1Api);
-  const rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
   const authApi = kc.makeApiClient(k8s.AuthorizationV1Api);
-  const objectApi = k8s.KubernetesObjectApi.makeApiClient(kc);
 
   // Define helper functions that can be reused internally
   const checkNamespaceExists = async (namespace: string): Promise<boolean> => {
@@ -163,146 +161,43 @@ export const createKubernetesClient = (
     }
   };
 
-  // Resource mapping for type-safe resource creation
-  // Use unknown to allow any K8s API client, with type assertions at call sites
-  type ResourceCreateConfig = {
-    api: unknown;
-    method: string;
-    namespaced: boolean;
-  };
-
-  const resourceCreateMap: Record<string, ResourceCreateConfig> = {
-    Namespace: { api: coreApi, method: 'createNamespace', namespaced: false },
-    Deployment: { api: k8sApi, method: 'createNamespacedDeployment', namespaced: true },
-    Service: { api: coreApi, method: 'createNamespacedService', namespaced: true },
-    ConfigMap: { api: coreApi, method: 'createNamespacedConfigMap', namespaced: true },
-    Secret: { api: coreApi, method: 'createNamespacedSecret', namespaced: true },
-    ServiceAccount: { api: coreApi, method: 'createNamespacedServiceAccount', namespaced: true },
-    Ingress: { api: networkingApi, method: 'createNamespacedIngress', namespaced: true },
-    StatefulSet: { api: k8sApi, method: 'createNamespacedStatefulSet', namespaced: true },
-    DaemonSet: { api: k8sApi, method: 'createNamespacedDaemonSet', namespaced: true },
-    Job: { api: batchApi, method: 'createNamespacedJob', namespaced: true },
-    CronJob: { api: batchApi, method: 'createNamespacedCronJob', namespaced: true },
-    Role: { api: rbacApi, method: 'createNamespacedRole', namespaced: true },
-    RoleBinding: { api: rbacApi, method: 'createNamespacedRoleBinding', namespaced: true },
-    ClusterRole: { api: rbacApi, method: 'createClusterRole', namespaced: false },
-    ClusterRoleBinding: { api: rbacApi, method: 'createClusterRoleBinding', namespaced: false },
-    PersistentVolumeClaim: {
-      api: coreApi,
-      method: 'createNamespacedPersistentVolumeClaim',
-      namespaced: true,
-    },
-    PersistentVolume: { api: coreApi, method: 'createPersistentVolume', namespaced: false },
-  };
-
-  /**
-   * Helper function to create Kubernetes resources using the resource mapping
-   */
-  const createResource = async (manifest: K8sManifest, namespace: string): Promise<void> => {
-    const kind = manifest.kind;
-    const config = resourceCreateMap[kind];
-
-    if (!config) {
-      // For unsupported resource types, use the generic KubernetesObjectApi
-      await objectApi.create(manifest as k8s.KubernetesObject);
-      return;
-    }
-
-    // Prepare the API call parameters
-    // Type assertion: api is a K8s API client with callable methods
-    const api = config.api as Record<string, (args: unknown) => Promise<unknown>>;
-    const method = api[config.method];
-
-    if (!method) {
-      throw new Error(`Method ${config.method} not found on API client`);
-    }
-
-    if (config.namespaced) {
-      await method({
-        namespace: manifest.metadata.namespace || namespace,
-        body: manifest,
-      });
-    } else {
-      await method({
-        body: manifest,
-      });
-    }
-  };
-
   return {
     /**
      * Apply Kubernetes manifest (supports all resource types)
      * Creates a new resource. If the resource already exists (409 error), the operation succeeds idempotently.
      *
-     * Note: This is a simple create-or-ignore implementation. For true server-side apply with updates,
-     * consider using the idempotent-apply module which supports patch operations.
+     * Uses the consolidated resource-operations module for idempotent apply.
      *
      * @param manifest - Kubernetes resource manifest to apply
      * @param namespace - Default namespace for namespaced resources (default: 'default')
      * @returns Success if resource was created or already exists, Failure otherwise
      */
     async applyManifest(manifest: K8sManifest, namespace = 'default'): Promise<Result<void>> {
-      try {
-        logger.debug({ manifest: manifest.kind, namespace }, 'Applying Kubernetes manifest');
+      // Set namespace in metadata if not already set and not a cluster-scoped resource
+      const isClusterScoped = ['Namespace', 'ClusterRole', 'ClusterRoleBinding'].includes(
+        manifest.kind || '',
+      );
 
-        // Validate manifest has metadata and a non-empty name
-        if (!manifest.metadata?.name || manifest.metadata.name.trim() === '') {
-          const errorMessage =
-            'Manifest is missing required metadata.name. Please supply a valid name.';
-          logger.error(
-            { manifest: manifest.kind, namespace, metadata: manifest.metadata },
-            errorMessage,
-          );
-          return Failure(errorMessage);
-        }
+      // Create a working copy to avoid mutating the input manifest
+      const workingManifest =
+        !isClusterScoped && !manifest.metadata.namespace
+          ? {
+              ...manifest,
+              metadata: {
+                ...manifest.metadata,
+                namespace,
+              },
+            }
+          : manifest;
 
-        // Set namespace in metadata if not already set and not a cluster-scoped resource
-        const isClusterScoped = ['Namespace', 'ClusterRole', 'ClusterRoleBinding'].includes(
-          manifest.kind || '',
-        );
-        if (!isClusterScoped && !manifest.metadata.namespace) {
-          manifest.metadata.namespace = namespace;
-        }
+      // Use the consolidated resource operations module
+      const result = await applyK8sResource(kc, workingManifest, logger);
 
-        // Create the resource using the helper function
-        await createResource(manifest, namespace);
-
-        logger.info(
-          { kind: manifest.kind, name: manifest.metadata?.name },
-          'Manifest applied successfully',
-        );
-        return Success(undefined);
-      } catch (error) {
-        // Handle 409 Conflict (AlreadyExists) as success to maintain idempotency
-        if (error && typeof error === 'object' && 'response' in error) {
-          const response = (error as { response?: { statusCode?: number } }).response;
-          if (response?.statusCode === 409) {
-            logger.debug(
-              { kind: manifest.kind, name: manifest.metadata?.name },
-              'Resource already exists (idempotent operation)',
-            );
-            return Success(undefined);
-          }
-        }
-
-        const guidance = extractK8sErrorGuidance(error, 'apply manifest');
-        const errorMessage = `Failed to apply manifest: ${guidance.message}`;
-
-        logger.error(
-          {
-            error: errorMessage,
-            hint: guidance.hint,
-            resolution: guidance.resolution,
-            details: guidance.details,
-            kind: manifest.kind,
-            name: manifest.metadata?.name,
-            namespace: manifest.metadata?.namespace || namespace,
-          },
-          'Manifest apply failed',
-        );
-
-        return Failure(errorMessage, guidance);
+      if (!result.ok) {
+        return Failure(result.error, result.guidance);
       }
+
+      return Success(undefined);
     },
 
     /**
@@ -324,15 +219,40 @@ export const createKubernetesClient = (
      * @returns true if cluster is reachable, false otherwise
      */
     async ping(): Promise<boolean> {
+      let timeoutId: NodeJS.Timeout | undefined;
+
+      // Helper function to cleanup timeout
+      const cleanupTimeout = (): void => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+
       try {
         // Use a shorter timeout for ping operations
         const pingTimeout = timeout || 5000;
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timeout')), pingTimeout),
-        );
 
-        await Promise.race([coreApi.listNamespace(), timeoutPromise]);
-        return true;
+        // Create timeout promise with proper cleanup
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Connection timeout'));
+          }, pingTimeout);
+        });
+
+        try {
+          await Promise.race([
+            coreApi.listNamespace().then((result) => {
+              // Clear timeout on success to prevent unhandled rejection
+              cleanupTimeout();
+              return result;
+            }),
+            timeoutPromise,
+          ]);
+          return true;
+        } finally {
+          // Always clear the timeout to prevent hanging timers
+          cleanupTimeout();
+        }
       } catch (error) {
         const guidance = extractK8sErrorGuidance(error, 'ping cluster');
         logger.debug(

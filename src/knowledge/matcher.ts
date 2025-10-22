@@ -12,8 +12,12 @@ const SCORING = {
   PATTERN: 30,
   TAG: 10,
   LANGUAGE: 15,
+  LANGUAGE_VERSION_EXACT: 20, // Exact version match
+  LANGUAGE_VERSION_COMPATIBLE: 10, // Compatible version (within major version)
   FRAMEWORK: 10,
   ENVIRONMENT: 8,
+  TOOL: 25, // High weight for tool-specific matches
+  VENDOR: 12, // Medium weight for vendor matches
   SEVERITY: {
     required: 50,
     high: 15,
@@ -22,15 +26,22 @@ const SCORING = {
   },
 } as const;
 
+const SEVERITY_TIERS: Record<string, number> = {
+  required: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+} as const;
+
 // Language keyword mappings for context matching
 const LANGUAGE_KEYWORDS: Record<string, string[]> = {
   javascript: ['node', 'nodejs', 'npm', 'js', 'javascript'],
   typescript: ['node', 'nodejs', 'npm', 'ts', 'typescript'],
-  python: ['python', 'pip', 'django', 'flask', 'fastapi'],
-  java: ['java', 'openjdk', 'maven', 'gradle', 'spring'],
+  python: ['python', 'pip', 'django', 'flask', 'fastapi', 'gunicorn'],
+  java: ['java', 'openjdk', 'maven', 'gradle', 'spring', 'quarkus', 'micronaut'],
   go: ['golang', 'go'],
-  'c#': ['dotnet', 'aspnet', 'csharp'],
-  php: ['php', 'composer'],
+  'c#': ['dotnet', 'aspnet', 'csharp', 'blazor'],
+  php: ['php', 'composer', 'laravel'],
   ruby: ['ruby', 'rails', 'gem'],
   rust: ['rust', 'cargo'],
 } as const;
@@ -63,6 +74,47 @@ const ENVIRONMENT_KEYWORDS: Record<string, string[]> = {
   staging: ['staging', 'stage'],
 } as const;
 
+const TAG_ALIASES: Record<string, string> = {
+  // Languages
+  nodejs: 'node',
+  javascript: 'node',
+  js: 'node',
+  typescript: 'node',
+  ts: 'node',
+  golang: 'go',
+  py: 'python',
+  csharp: 'dotnet',
+
+  // Image types
+  minimal: 'distroless',
+
+  // Vendor
+  mcr: 'microsoft',
+  msft: 'microsoft',
+  mariner: 'microsoft',
+  gcp: 'google',
+  gcr: 'google',
+  eks: 'aws',
+  ecr: 'aws',
+  aks: 'azure',
+  acr: 'azure',
+
+  // Build tools
+  mvn: 'maven',
+  gradlew: 'gradle',
+  cargo: 'rust',
+} as const;
+
+/**
+ * Normalize a tag to its canonical form
+ * @param tag - Tag to normalize
+ * @returns Canonical tag name (lowercase)
+ */
+const normalizeTag = (tag: string): string => {
+  const lower = tag.toLowerCase();
+  return TAG_ALIASES[lower] || lower;
+};
+
 /**
  * Get keywords associated with a programming language
  */
@@ -85,7 +137,7 @@ const getEnvironmentKeywords = (environment: string): string[] => {
 };
 
 /**
- * Evaluate pattern match using precompiled regex
+ * Evaluate pattern match by compiling regex on-demand
  */
 const evaluatePatternMatch = (
   entry: LoadedEntry,
@@ -93,22 +145,20 @@ const evaluatePatternMatch = (
 ): { score: number; reasons: string[] } => {
   if (!query.text || !entry.pattern) return { score: 0, reasons: [] };
 
-  // Use precompiled pattern if available
-  if (entry.compiledCache?.pattern) {
-    // Reset regex lastIndex for stateful regex
-    entry.compiledCache.pattern.lastIndex = 0;
-
-    if (entry.compiledCache.pattern.test(query.text)) {
+  try {
+    // Compile regex on-demand (regex compilation is fast)
+    const regex = new RegExp(entry.pattern, 'gmi');
+    if (regex.test(query.text)) {
       return {
         score: SCORING.PATTERN,
-        reasons: ['Pattern match (precompiled)'],
+        reasons: ['Pattern match'],
       };
     }
-  } else if (entry.compiledCache?.compilationError) {
-    // Pattern failed to compile during load, skip
+  } catch (error) {
+    // Skip entries with invalid patterns
     logger.debug(
-      { entryId: entry.id, error: entry.compiledCache.compilationError },
-      'Skipping entry with compilation error',
+      { entryId: entry.id, pattern: entry.pattern, error },
+      'Skipping entry with invalid pattern',
     );
   }
 
@@ -124,7 +174,10 @@ const evaluateTagMatch = (
 ): { score: number; reasons: string[] } => {
   if (!query.tags || !entry.tags) return { score: 0, reasons: [] };
 
-  const matchedTags = query.tags.filter((tag) => entry.tags?.includes(tag));
+  const normalizedQueryTags = query.tags.map(normalizeTag);
+  const normalizedEntryTags = entry.tags.map(normalizeTag);
+
+  const matchedTags = normalizedQueryTags.filter((tag) => normalizedEntryTags.includes(tag));
   if (matchedTags.length > 0) {
     return {
       score: matchedTags.length * SCORING.TAG,
@@ -133,6 +186,39 @@ const evaluateTagMatch = (
   }
 
   return { score: 0, reasons: [] };
+};
+
+/**
+ * Extract version number from text (e.g., "openjdk:17" -> "17", "jdk:21-mariner" -> "21")
+ */
+const extractVersionFromText = (text: string): string | null => {
+  // Match version patterns like :17, :21, :3.11, openjdk-17, java17, etc.
+  const versionPatterns = [
+    /:(\d+(?:\.\d+)?)/i, // :17, :21, :3.11
+    /openjdk[:-]?(\d+)/i, // openjdk-17, openjdk:17
+    /jdk[:-]?(\d+)/i, // jdk-21, jdk:21
+    /java[:-]?(\d+)/i, // java-17, java:17
+    /python[:-]?(\d+(?:\.\d+)?)/i, // python-3.11, python:3.11
+    /node[:-]?(\d+)/i, // node-20, node:20
+  ];
+
+  for (const pattern of versionPatterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Check if two version strings are compatible (same major version)
+ */
+const areVersionsCompatible = (version1: string, version2: string): boolean => {
+  const major1 = version1.split('.')[0];
+  const major2 = version2.split('.')[0];
+  return major1 === major2;
 };
 
 /**
@@ -145,35 +231,53 @@ const evaluateLanguageMatch = (
   if (!query.language) return { score: 0, reasons: [] };
 
   const languageKeywords = getLanguageKeywords(query.language);
+  let score = 0;
+  const reasons: string[] = [];
 
   // Fast path: Check tags first (most common match)
   if (entry.tags) {
     const tagMatch = languageKeywords.some((keyword) => entry.tags?.includes(keyword));
     if (tagMatch) {
-      return {
-        score: SCORING.LANGUAGE,
-        reasons: [`Language: ${query.language} (tag match)`],
-      };
+      score += SCORING.LANGUAGE;
+      reasons.push(`Language: ${query.language} (tag match)`);
     }
   }
 
   // Slower path: Check text content only if no tag match
-  const textMatch = languageKeywords.some((keyword) => {
-    const lowerKeyword = keyword.toLowerCase();
-    return (
-      entry.recommendation.toLowerCase().includes(lowerKeyword) ||
-      entry.pattern.toLowerCase().includes(lowerKeyword)
-    );
-  });
+  if (score === 0) {
+    const textMatch = languageKeywords.some((keyword) => {
+      const lowerKeyword = keyword.toLowerCase();
+      return (
+        entry.recommendation.toLowerCase().includes(lowerKeyword) ||
+        entry.pattern.toLowerCase().includes(lowerKeyword)
+      );
+    });
 
-  if (textMatch) {
-    return {
-      score: SCORING.LANGUAGE,
-      reasons: [`Language: ${query.language} (text match)`],
-    };
+    if (textMatch) {
+      score += SCORING.LANGUAGE;
+      reasons.push(`Language: ${query.language} (text match)`);
+    }
   }
 
-  return { score: 0, reasons: [] };
+  // Language version matching
+  if (query.languageVersion && score > 0) {
+    const recommendationVersion = extractVersionFromText(entry.recommendation);
+    const exampleVersion = entry.example ? extractVersionFromText(entry.example) : null;
+
+    const matchedVersion = recommendationVersion || exampleVersion;
+
+    if (matchedVersion) {
+      if (matchedVersion === query.languageVersion) {
+        score += SCORING.LANGUAGE_VERSION_EXACT;
+        reasons.push(`Version: ${query.languageVersion} (exact match)`);
+      } else if (areVersionsCompatible(matchedVersion, query.languageVersion)) {
+        score += SCORING.LANGUAGE_VERSION_COMPATIBLE;
+        reasons.push(`Version: ${matchedVersion} (compatible with ${query.languageVersion})`);
+      }
+    }
+  }
+
+  return score > 0 ? { score, reasons } : { score: 0, reasons: [] };
 };
 
 /**
@@ -227,11 +331,133 @@ const evaluateEnvironmentMatch = (
 };
 
 /**
+ * Evaluate tool context match scoring
+ */
+const evaluateToolMatch = (
+  entry: LoadedEntry,
+  query: KnowledgeQuery,
+): { score: number; reasons: string[] } => {
+  if (!query.tool || !entry.tags) return { score: 0, reasons: [] };
+
+  const normalizedTool = normalizeTag(query.tool);
+  const normalizedEntryTags = entry.tags.map(normalizeTag);
+
+  if (normalizedEntryTags.includes(normalizedTool)) {
+    return {
+      score: SCORING.TOOL,
+      reasons: [`Tool: ${query.tool}`],
+    };
+  }
+
+  return { score: 0, reasons: [] };
+};
+
+/**
  * Evaluate severity scoring boost
  */
 const evaluateSeverity = (entry: LoadedEntry): number => {
   if (!entry.severity) return 0;
   return SCORING.SEVERITY[entry.severity] || SCORING.SEVERITY.medium;
+};
+
+/**
+ * Language, framework, and technology tags that identify context-specific entries.
+ * If an entry has any of these tags, it should only match queries for that context.
+ * This prevents irrelevant recommendations (e.g., Flask for Java, PostgreSQL for non-DB apps)
+ */
+const LANGUAGE_TAGS = [
+  // Languages
+  'java',
+  'python',
+  'node',
+  'nodejs',
+  'javascript',
+  'typescript',
+  'go',
+  'golang',
+  'dotnet',
+  'csharp',
+  'php',
+  'ruby',
+  'rust',
+  // Language-specific frameworks
+  'spring',
+  'quarkus',
+  'micronaut',
+  'django',
+  'flask',
+  'fastapi',
+  'gunicorn',
+  'express',
+  'react',
+  'vue',
+  'angular',
+  'aspnet',
+  'blazor',
+  'laravel',
+  'rails',
+  // Database technologies (only match if explicitly requested)
+  'postgres',
+  'postgresql',
+  'mongodb',
+  'mongo',
+  'mysql',
+  'mariadb',
+  'redis',
+  'elasticsearch',
+  'cassandra',
+  'dynamodb',
+  'sqlserver',
+  'vitess',
+  'cockroachdb',
+  'migrations',
+  'schema',
+  // .NET specific
+  'dotnet-framework',
+  'entity-framework',
+  'ef-core',
+  'worker-service',
+  // Database server infrastructure (not client libraries)
+  'database-server',
+] as const;
+
+/**
+ * Check if an entry is tagged with a specific context (language/framework/tech) that conflicts with the query
+ */
+const hasConflictingLanguageTag = (
+  entry: LoadedEntry,
+  queryLanguage: string,
+  queryTags?: string[],
+): boolean => {
+  if (!entry.tags || entry.tags.length === 0) {
+    return false; // Entries without tags are considered generic
+  }
+
+  const normalizedQueryLanguage = normalizeTag(queryLanguage);
+  const queryLanguageKeywords = getLanguageKeywords(queryLanguage);
+
+  // Normalize all query tags for comparison
+  const normalizedQueryTags = queryTags ? queryTags.map(normalizeTag) : [];
+
+  // Check if entry has any context-specific tags
+  const entryContextTags = entry.tags
+    .map(normalizeTag)
+    .filter((tag) => LANGUAGE_TAGS.includes(tag as (typeof LANGUAGE_TAGS)[number]));
+
+  if (entryContextTags.length === 0) {
+    return false; // Entry has no context tags, it's generic
+  }
+
+  // Check if any of the entry's context tags match the query language/framework/dependencies
+  const hasMatchingContext = entryContextTags.some(
+    (tag) =>
+      tag === normalizedQueryLanguage ||
+      queryLanguageKeywords.includes(tag) ||
+      normalizedQueryTags.includes(tag),
+  );
+
+  // If entry has context tags but none match the query, it's a conflict
+  return !hasMatchingContext;
 };
 
 /**
@@ -241,6 +467,12 @@ const evaluateSeverity = (entry: LoadedEntry): number => {
 const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): KnowledgeMatch | null => {
   // Early exit for category mismatch
   if (query.category && entry.category !== query.category) {
+    return null;
+  }
+
+  // Early exit for language conflict
+  // If query specifies a language and entry has conflicting language tags, exclude it
+  if (query.language && hasConflictingLanguageTag(entry, query.language, query.tags)) {
     return null;
   }
 
@@ -257,6 +489,7 @@ const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): KnowledgeMatc
     evaluateLanguageMatch(entry, query),
     evaluateFrameworkMatch(entry, query),
     evaluateEnvironmentMatch(entry, query),
+    evaluateToolMatch(entry, query),
   ];
 
   // Accumulate scores and reasons
@@ -275,7 +508,15 @@ const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): KnowledgeMatc
 };
 
 /**
- * Find matching knowledge entries for a query using functional composition
+ * Get severity tier for sorting priority.
+ */
+const getSeverityTier = (entry: LoadedEntry): number => {
+  if (!entry.severity) return 0;
+  return SEVERITY_TIERS[entry.severity] ?? 0;
+};
+
+/**
+ * Find matching knowledge entries for a query using functional composition.
  */
 export const findKnowledgeMatches = (
   entries: LoadedEntry[],
@@ -284,7 +525,12 @@ export const findKnowledgeMatches = (
   const matches = entries
     .map((entry) => evaluateEntry(entry, query))
     .filter((match): match is KnowledgeMatch => match !== null && match.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      const tierDiff = getSeverityTier(b.entry) - getSeverityTier(a.entry);
+      if (tierDiff !== 0) return tierDiff;
+
+      return b.score - a.score;
+    });
 
   const limit = query.limit || 5;
   return matches.slice(0, limit);
@@ -297,6 +543,7 @@ export interface KnowledgeSnippetOptions {
   environment: string;
   tool: string;
   language?: string;
+  languageVersion?: string;
   framework?: string;
   category?: KnowledgeCategory;
   maxChars?: number;
@@ -327,11 +574,17 @@ export async function getKnowledgeSnippets(
     if (options.language) queryTags.push(options.language);
     if (options.framework) queryTags.push(options.framework);
     if (options.environment) queryTags.push(options.environment);
+    if (options.detectedDependencies) {
+      // Add detected dependencies as tags for better context matching
+      queryTags.push(...options.detectedDependencies);
+    }
 
     const query: KnowledgeQuery = {
       text: queryTextParts.join(' '),
       environment: options.environment,
+      tool: options.tool,
       ...(options.language && { language: options.language }),
+      ...(options.languageVersion && { languageVersion: options.languageVersion }),
       ...(options.framework && { framework: options.framework }),
       ...(options.category && { category: options.category }),
       tags: queryTags,
@@ -349,6 +602,7 @@ export async function getKnowledgeSnippets(
       ...(match.entry.tags && { tags: match.entry.tags }),
       category: match.entry.category,
       source: match.entry.id,
+      ...(match.entry.severity && { severity: match.entry.severity }),
     }));
 
     // Apply character budget if specified
@@ -364,6 +618,16 @@ export async function getKnowledgeSnippets(
 }
 
 /**
+ * Extract FROM lines from Dockerfile examples
+ */
+function extractFromLines(example: string): string[] {
+  const lines = example.split('\n');
+  return lines
+    .filter((line) => line.trim().toUpperCase().startsWith('FROM '))
+    .map((line) => line.trim());
+}
+
+/**
  * Formats a knowledge entry as a concise snippet.
  *
  * @param entry - Knowledge entry to format
@@ -375,9 +639,18 @@ function formatEntryAsSnippet(entry: LoadedEntry): string {
   // Add recommendation (primary content)
   parts.push(entry.recommendation);
 
-  // Add example if present and concise
-  if (entry.example && entry.example.length <= 200) {
-    parts.push(`Example: ${entry.example}`);
+  // Add example if present
+  if (entry.example) {
+    if (entry.example.length <= 200) {
+      // Short examples: include as-is
+      parts.push(`Example: ${entry.example}`);
+    } else {
+      // Long examples: extract FROM lines for base image identification
+      const fromLines = extractFromLines(entry.example);
+      if (fromLines.length > 0) {
+        parts.push(`Example: ${fromLines.join(' ')}`);
+      }
+    }
   }
 
   return parts.join(' ');
@@ -392,17 +665,30 @@ function formatEntryAsSnippet(entry: LoadedEntry): string {
  */
 function applyCharacterBudget(snippets: KnowledgeSnippet[], maxChars: number): KnowledgeSnippet[] {
   const selected: KnowledgeSnippet[] = [];
+  const selectedIds = new Set<string>();
   let currentChars = 0;
 
-  // Snippets are already sorted by weight/score
+  const requiredSnippets = snippets.filter((s) => s.severity === 'required');
+
+  for (const snippet of requiredSnippets) {
+    selected.push(snippet);
+    selectedIds.add(snippet.id);
+    currentChars += snippet.text.length;
+  }
+
   for (const snippet of snippets) {
+    if (selectedIds.has(snippet.id)) {
+      continue;
+    }
+
     const snippetLength = snippet.text.length;
 
     if (currentChars + snippetLength <= maxChars) {
       selected.push(snippet);
+      selectedIds.add(snippet.id);
       currentChars += snippetLength;
-    } else if (currentChars === 0 && snippetLength > maxChars) {
-      // If first snippet exceeds budget, truncate it
+    } else if (selected.length === requiredSnippets.length && snippetLength > maxChars) {
+      // If first non-required snippet exceeds budget, truncate it
       selected.push({
         ...snippet,
         text: `${snippet.text.substring(0, maxChars - 3)}...`,

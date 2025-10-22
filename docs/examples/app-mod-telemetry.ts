@@ -2,7 +2,7 @@
  * Example: App Mod Telemetry Integration
  *
  * This example demonstrates how the App Mod team can wrap Container Assist tools
- * with their telemetry layer using the new MCPTool interface.
+ * with their telemetry layer using the new Tool interface.
  *
  * The new interface exposes:
  * - `name`: Tool identifier
@@ -22,7 +22,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { buildImageTool, deployTool, ALL_TOOLS } from 'containerization-assist-mcp';
-import type { MCPTool } from 'containerization-assist-mcp';
+import type { Tool } from 'containerization-assist-mcp';
 import type { ToolContext } from 'containerization-assist-mcp';
 
 /**
@@ -152,7 +152,7 @@ function formatMCPResponse(result: { ok: boolean; value?: unknown; error?: strin
  */
 function registerToolWithTelemetry(
   server: McpServer,
-  tool: MCPTool,
+  tool: Tool,
   context: ToolContext,
 ) {
   // Register tool with MCP server using exposed properties
@@ -308,7 +308,7 @@ async function demonstratePattern() {
  */
 function createAdvancedTelemetryWrapper(
   server: McpServer,
-  tool: MCPTool,
+  tool: Tool,
   context: ToolContext,
 ) {
   server.tool(tool.name, tool.description, tool.inputSchema, async (args) => {

@@ -220,446 +220,439 @@ export async function getImageMetadata(
   };
 }
 
+// ===== REGISTRY HELPER FUNCTIONS =====
+
 /**
- * Docker Registry Client for private registry operations
- *
- * Provides authentication, health checks, and image validation
- * for Docker registries including Docker Hub and private registries
+ * Normalize registry URL to standard format
  */
-export class DockerRegistry {
-  private docker: Docker;
-  private logger: Logger;
-  private authConfig?: { username: string; password: string; serveraddress: string };
+function normalizeRegistryUrl(url: string): string {
+  // Remove protocol if present
+  let normalized = url.replace(/^https?:\/\//, '');
 
-  constructor(docker: Docker, logger: Logger) {
-    this.docker = docker;
-    this.logger = logger;
+  // Remove trailing slash
+  normalized = normalized.replace(/\/$/, '');
+
+  // Default to docker.io if no registry specified
+  if (!normalized || normalized === 'docker.io') {
+    return 'https://index.docker.io/v1/';
   }
 
-  /**
-   * Authenticate with a Docker registry
-   *
-   * Validates credentials with the registry and stores them for subsequent operations.
-   * Supports both username/password and token-based authentication.
-   *
-   * @param config - Registry configuration with credentials
-   * @returns Result indicating success or failure with guidance
-   */
-  async authenticate(config: RegistryConfig): Promise<Result<void>> {
-    try {
-      const serverAddress = this.normalizeRegistryUrl(config.url);
+  return normalized;
+}
 
-      // Build auth config for dockerode
-      if (config.username && config.password) {
-        this.authConfig = {
-          username: config.username,
-          password: config.password,
-          serveraddress: serverAddress,
-        };
-      } else if (config.token) {
-        // For token-based auth, use token as password with empty username
-        this.authConfig = {
-          username: '',
-          password: config.token,
-          serveraddress: serverAddress,
-        };
-      } else {
-        return Failure('Authentication requires either username/password or token', {
-          message: 'Missing credentials',
-          hint: 'Provide either username and password, or an authentication token',
-          resolution: 'Add credentials to the registry configuration',
+/**
+ * Get registry API URL for health checks
+ */
+function getRegistryApiUrl(registryUrl: string): string {
+  // Safely check for Docker Hub by parsing the hostname
+  const normalizedUrl = registryUrl.startsWith('http') ? registryUrl : `https://${registryUrl}`;
+
+  try {
+    const url = new URL(normalizedUrl);
+    const hostname = url.hostname.toLowerCase();
+
+    // For Docker Hub - check exact hostname match
+    if (
+      hostname === 'docker.io' ||
+      hostname === 'index.docker.io' ||
+      hostname === 'registry-1.docker.io'
+    ) {
+      return 'https://registry-1.docker.io/v2/';
+    }
+  } catch {
+    // If URL parsing fails, fall through to generic handling
+  }
+
+  // For other registries, append /v2/ if not present
+  const baseUrl = registryUrl.startsWith('http') ? registryUrl : `https://${registryUrl}`;
+  return baseUrl.endsWith('/v2/') ? baseUrl : `${baseUrl}/v2/`;
+}
+
+/**
+ * Parse image name into repository and reference (tag or digest)
+ */
+function parseImageName(imageName: string): { repository: string; reference: string } {
+  // Check for digest reference (contains @sha256:)
+  if (imageName.includes('@')) {
+    const parts = imageName.split('@');
+    const repository = parts[0] || imageName;
+    const digest = parts[1] || '';
+    return { repository, reference: digest };
+  }
+
+  // Check for tag reference (contains :)
+  const lastColonIndex = imageName.lastIndexOf(':');
+  if (lastColonIndex > imageName.lastIndexOf('/')) {
+    // Colon is for tag, not port
+    const repository = imageName.substring(0, lastColonIndex);
+    const tag = imageName.substring(lastColonIndex + 1);
+    return { repository, reference: tag };
+  }
+
+  // No tag or digest specified, assume latest
+  return { repository: imageName, reference: 'latest' };
+}
+
+/**
+ * List tags from Docker Hub public API
+ */
+async function listDockerHubTags(repository: string, logger: Logger): Promise<Result<string[]>> {
+  try {
+    // Parse repository to handle official images vs user/org images
+    const parts = repository.split('/');
+    const isOfficial = parts.length === 1;
+    const namespace = isOfficial ? 'library' : parts[0];
+    const repo = isOfficial ? repository : parts[1];
+
+    // Docker Hub API endpoint for tags
+    const url = `https://hub.docker.com/v2/repositories/${namespace}/${repo}/tags?page_size=100`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DOCKER_HUB_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return Failure(`Docker Hub returned status ${response.status}`, {
+          message: 'Failed to fetch tags from Docker Hub',
+          hint: `HTTP ${response.status} error`,
+          resolution: 'Verify the repository name and try again',
+          details: { repository, status: response.status },
         });
       }
 
-      // Verify authentication by calling Docker auth endpoint
-      try {
-        await this.docker.checkAuth(this.authConfig);
-        this.logger.info({ registry: serverAddress }, 'Registry authentication successful');
-        return Success(undefined);
-      } catch (error) {
-        // Clear stored auth config on failure
-        delete this.authConfig;
+      const data = (await response.json()) as { results: Array<{ name: string }> };
+      const tags = data.results.map((tag) => tag.name);
 
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return Failure(`Authentication failed: ${errorMessage}`, {
-          message: 'Registry authentication failed',
-          hint: 'Invalid credentials or registry is unavailable',
-          resolution:
-            'Verify your username/password or token, and ensure the registry is accessible',
-          details: { registry: serverAddress, error: errorMessage },
-        });
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return Failure(`Authentication error: ${errorMessage}`, {
-        message: 'Failed to authenticate with registry',
-        hint: 'An unexpected error occurred during authentication',
-        resolution: 'Check registry URL format and network connectivity',
-        details: { error: errorMessage },
-      });
+      logger.debug({ repository, tagCount: tags.length }, 'Listed Docker Hub tags');
+      return Success(tags);
+    } finally {
+      clearTimeout(timeoutId);
     }
-  }
-
-  /**
-   * Check if a registry is accessible
-   *
-   * Performs a health check by attempting to connect to the registry's API.
-   * For Docker Hub, pings the v2 API endpoint. For private registries,
-   * checks the /v2/ endpoint which should return 200 or 401.
-   *
-   * @param registryUrl - Registry URL to check
-   * @returns Result with boolean indicating if registry is accessible
-   */
-  async healthCheck(registryUrl: string): Promise<Result<boolean>> {
-    try {
-      const normalizedUrl = this.normalizeRegistryUrl(registryUrl);
-      const apiUrl = this.getRegistryApiUrl(normalizedUrl);
-
-      this.logger.debug({ registryUrl: apiUrl }, 'Performing registry health check');
-
-      // Create AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REGISTRY_REQUEST_TIMEOUT_MS);
-
-      try {
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        // Docker Registry v2 API returns 200 for authenticated requests
-        // or 401 for unauthenticated but accessible registries
-        const isHealthy = response.status === 200 || response.status === 401;
-
-        this.logger.debug(
-          { registryUrl: apiUrl, status: response.status, healthy: isHealthy },
-          'Registry health check complete',
-        );
-
-        return Success(isHealthy);
-      } catch (error) {
-        clearTimeout(timeoutId);
-
-        if (error instanceof Error && error.name === 'AbortError') {
-          this.logger.warn({ registryUrl: apiUrl }, 'Registry health check timed out');
-          return Success(false);
-        }
-
-        this.logger.debug({ registryUrl: apiUrl, error }, 'Registry health check failed');
-        return Success(false);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return Failure(`Health check error: ${errorMessage}`, {
-        message: 'Failed to perform registry health check',
-        hint: 'Unable to connect to registry',
-        resolution: 'Verify the registry URL and network connectivity',
-        details: { error: errorMessage },
-      });
-    }
-  }
-
-  /**
-   * Check if an image exists locally in the Docker daemon
-   *
-   * Checks if a specific image exists in the local Docker daemon cache.
-   * This does not query remote registries - it only checks locally pulled images.
-   * Use `docker pull` first if you need to verify remote image availability.
-   *
-   * @param imageName - Full image name (repository:tag or repository@digest)
-   * @returns Result with boolean indicating if image exists locally
-   */
-  async imageExists(imageName: string): Promise<Result<boolean>> {
-    try {
-      // Parse image name into components
-      const { repository, reference } = this.parseImageName(imageName);
-
-      this.logger.debug({ repository, reference }, 'Checking if image exists locally');
-
-      try {
-        // Use Docker API to inspect the image locally
-        // This only checks the local Docker daemon, not remote registries
-        const image = this.docker.getImage(imageName);
-        await image.inspect();
-
-        this.logger.debug({ imageName }, 'Image exists');
-        return Success(true);
-      } catch (error) {
-        // If image doesn't exist locally, Docker will throw a 404 error
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        if (errorMessage.includes('404') || errorMessage.includes('no such image')) {
-          this.logger.debug({ imageName }, 'Image does not exist');
-          return Success(false);
-        }
-
-        // For other errors, return failure with guidance
-        return Failure(`Failed to check image existence: ${errorMessage}`, {
-          message: 'Unable to verify image existence',
-          hint: 'Error occurred while checking registry',
-          resolution: 'Ensure Docker daemon is running and registry is accessible',
-          details: { imageName, error: errorMessage },
-        });
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return Failure(`Image existence check error: ${errorMessage}`, {
-        message: 'Failed to check if image exists',
-        hint: 'Invalid image name format or registry error',
-        resolution: 'Verify the image name format (repository:tag)',
-        details: { error: errorMessage },
-      });
-    }
-  }
-
-  /**
-   * List available tags for a repository
-   *
-   * Retrieves all tags for a given repository from the registry.
-   * For Docker Hub, uses the public API. For private registries,
-   * requires authentication.
-   *
-   * @param repository - Repository name (e.g., 'library/node' or 'myorg/myapp')
-   * @returns Result with array of tag names
-   */
-  async listTags(repository: string): Promise<Result<string[]>> {
-    try {
-      this.logger.debug({ repository }, 'Listing repository tags');
-
-      // For Docker Hub, use the public API
-      // Check only the first path segment for a hostname pattern (dot or colon)
-      const firstSegment = repository.split('/')[0] ?? '';
-      if (!/[.:]/.test(firstSegment)) {
-        return this.listDockerHubTags(repository);
-      }
-
-      // For private registries, use Docker Registry API v2
-      return this.listPrivateRegistryTags(repository);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return Failure(`Failed to list tags: ${errorMessage}`, {
-        message: 'Unable to retrieve repository tags',
-        hint: 'Registry API error or authentication required',
-        resolution: 'Verify repository name and ensure you have access permissions',
-        details: { repository, error: errorMessage },
-      });
-    }
-  }
-
-  /**
-   * Get stored authentication config for registry operations
-   * @internal
-   */
-  getAuthConfig(): { username: string; password: string; serveraddress: string } | undefined {
-    return this.authConfig;
-  }
-
-  // ===== PRIVATE HELPER METHODS =====
-
-  /**
-   * Normalize registry URL to standard format
-   */
-  private normalizeRegistryUrl(url: string): string {
-    // Remove protocol if present
-    let normalized = url.replace(/^https?:\/\//, '');
-
-    // Remove trailing slash
-    normalized = normalized.replace(/\/$/, '');
-
-    // Default to docker.io if no registry specified
-    if (!normalized || normalized === 'docker.io') {
-      return 'https://index.docker.io/v1/';
-    }
-
-    return normalized;
-  }
-
-  /**
-   * Get registry API URL for health checks
-   */
-  private getRegistryApiUrl(registryUrl: string): string {
-    // Safely check for Docker Hub by parsing the hostname
-    const normalizedUrl = registryUrl.startsWith('http') ? registryUrl : `https://${registryUrl}`;
-
-    try {
-      const url = new URL(normalizedUrl);
-      const hostname = url.hostname.toLowerCase();
-
-      // For Docker Hub - check exact hostname match
-      if (
-        hostname === 'docker.io' ||
-        hostname === 'index.docker.io' ||
-        hostname === 'registry-1.docker.io'
-      ) {
-        return 'https://registry-1.docker.io/v2/';
-      }
-    } catch {
-      // If URL parsing fails, fall through to generic handling
-    }
-
-    // For other registries, append /v2/ if not present
-    const baseUrl = registryUrl.startsWith('http') ? registryUrl : `https://${registryUrl}`;
-    return baseUrl.endsWith('/v2/') ? baseUrl : `${baseUrl}/v2/`;
-  }
-
-  /**
-   * Parse image name into repository and reference (tag or digest)
-   */
-  private parseImageName(imageName: string): { repository: string; reference: string } {
-    // Check for digest reference (contains @sha256:)
-    if (imageName.includes('@')) {
-      const parts = imageName.split('@');
-      const repository = parts[0] || imageName;
-      const digest = parts[1] || '';
-      return { repository, reference: digest };
-    }
-
-    // Check for tag reference (contains :)
-    const lastColonIndex = imageName.lastIndexOf(':');
-    if (lastColonIndex > imageName.lastIndexOf('/')) {
-      // Colon is for tag, not port
-      const repository = imageName.substring(0, lastColonIndex);
-      const tag = imageName.substring(lastColonIndex + 1);
-      return { repository, reference: tag };
-    }
-
-    // No tag or digest specified, assume latest
-    return { repository: imageName, reference: 'latest' };
-  }
-
-  /**
-   * List tags from Docker Hub public API
-   */
-  private async listDockerHubTags(repository: string): Promise<Result<string[]>> {
-    try {
-      // Parse repository to handle official images vs user/org images
-      const parts = repository.split('/');
-      const isOfficial = parts.length === 1;
-      const namespace = isOfficial ? 'library' : parts[0];
-      const repo = isOfficial ? repository : parts[1];
-
-      // Docker Hub API endpoint for tags
-      const url = `https://hub.docker.com/v2/repositories/${namespace}/${repo}/tags?page_size=100`;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), DOCKER_HUB_REQUEST_TIMEOUT_MS);
-
-      try {
-        const response = await fetch(url, {
-          headers: { Accept: 'application/json' },
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          return Failure(`Docker Hub returned status ${response.status}`, {
-            message: 'Failed to fetch tags from Docker Hub',
-            hint: `HTTP ${response.status} error`,
-            resolution: 'Verify the repository name and try again',
-            details: { repository, status: response.status },
-          });
-        }
-
-        const data = (await response.json()) as { results: Array<{ name: string }> };
-        const tags = data.results.map((tag) => tag.name);
-
-        this.logger.debug({ repository, tagCount: tags.length }, 'Listed Docker Hub tags');
-        return Success(tags);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return Failure(`Failed to list Docker Hub tags: ${errorMessage}`, {
-        message: 'Error fetching tags from Docker Hub',
-        hint: 'Network error or repository not found',
-        resolution: 'Check repository name and network connectivity',
-        details: { repository, error: errorMessage },
-      });
-    }
-  }
-
-  /**
-   * List tags from private registry using Docker Registry API v2
-   */
-  private async listPrivateRegistryTags(repository: string): Promise<Result<string[]>> {
-    try {
-      // Extract registry and repository path
-      const parts = repository.split('/');
-      const registry = parts[0];
-      const repoPath = parts.slice(1).join('/');
-
-      const url = `https://${registry}/v2/${repoPath}/tags/list`;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REGISTRY_REQUEST_TIMEOUT_MS);
-
-      try {
-        const headers: Record<string, string> = { Accept: 'application/json' };
-
-        // Add authentication if available
-        if (this.authConfig) {
-          const authString = Buffer.from(
-            `${this.authConfig.username}:${this.authConfig.password}`,
-          ).toString('base64');
-          headers['Authorization'] = `Basic ${authString}`;
-        }
-
-        const response = await fetch(url, {
-          headers,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            return Failure('Authentication required', {
-              message: 'Registry requires authentication',
-              hint: 'Unauthorized access to private registry',
-              resolution: 'Call authenticate() with valid credentials before listing tags',
-              details: { repository },
-            });
-          }
-
-          return Failure(`Registry returned status ${response.status}`, {
-            message: 'Failed to fetch tags from registry',
-            hint: `HTTP ${response.status} error`,
-            resolution: 'Verify the repository name and registry access',
-            details: { repository, status: response.status },
-          });
-        }
-
-        const data = (await response.json()) as { tags: string[] };
-        const tags = data.tags || [];
-
-        this.logger.debug({ repository, tagCount: tags.length }, 'Listed private registry tags');
-        return Success(tags);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return Failure(`Failed to list private registry tags: ${errorMessage}`, {
-        message: 'Error fetching tags from private registry',
-        hint: 'Network error or invalid registry URL',
-        resolution: 'Check registry URL and network connectivity',
-        details: { repository, error: errorMessage },
-      });
-    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Failure(`Failed to list Docker Hub tags: ${errorMessage}`, {
+      message: 'Error fetching tags from Docker Hub',
+      hint: 'Network error or repository not found',
+      resolution: 'Check repository name and network connectivity',
+      details: { repository, error: errorMessage },
+    });
   }
 }
 
 /**
- * Create a Docker Registry client
- *
- * @param docker - Dockerode instance
- * @param logger - Logger instance
- * @returns DockerRegistry client instance
+ * List tags from private registry using Docker Registry API v2
  */
-export function createDockerRegistry(docker: Docker, logger: Logger): DockerRegistry {
-  return new DockerRegistry(docker, logger);
+async function listPrivateRegistryTags(
+  repository: string,
+  logger: Logger,
+  authConfig?: { username: string; password: string; serveraddress: string },
+): Promise<Result<string[]>> {
+  try {
+    // Extract registry and repository path
+    const parts = repository.split('/');
+    const registry = parts[0];
+    const repoPath = parts.slice(1).join('/');
+
+    const url = `https://${registry}/v2/${repoPath}/tags/list`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REGISTRY_REQUEST_TIMEOUT_MS);
+
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json' };
+
+      // Add authentication if available
+      if (authConfig) {
+        const authString = Buffer.from(`${authConfig.username}:${authConfig.password}`).toString(
+          'base64',
+        );
+        headers['Authorization'] = `Basic ${authString}`;
+      }
+
+      const response = await fetch(url, {
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return Failure('Authentication required', {
+            message: 'Registry requires authentication',
+            hint: 'Unauthorized access to private registry',
+            resolution: 'Call authenticate() with valid credentials before listing tags',
+            details: { repository },
+          });
+        }
+
+        return Failure(`Registry returned status ${response.status}`, {
+          message: 'Failed to fetch tags from registry',
+          hint: `HTTP ${response.status} error`,
+          resolution: 'Verify the repository name and registry access',
+          details: { repository, status: response.status },
+        });
+      }
+
+      const data = (await response.json()) as { tags: string[] };
+      const tags = data.tags || [];
+
+      logger.debug({ repository, tagCount: tags.length }, 'Listed private registry tags');
+      return Success(tags);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Failure(`Failed to list private registry tags: ${errorMessage}`, {
+      message: 'Error fetching tags from private registry',
+      hint: 'Network error or invalid registry URL',
+      resolution: 'Check registry URL and network connectivity',
+      details: { repository, error: errorMessage },
+    });
+  }
+}
+
+// ===== PUBLIC API FUNCTIONS =====
+
+/**
+ * Authenticate with a Docker registry
+ *
+ * Validates credentials with the registry and stores them for subsequent operations.
+ * Supports both username/password and token-based authentication.
+ *
+ * @param docker - Docker client instance
+ * @param config - Registry configuration with credentials
+ * @param logger - Logger instance
+ * @returns Result with auth config on success
+ */
+export async function authenticateRegistry(
+  docker: Docker,
+  config: RegistryConfig,
+  logger: Logger,
+): Promise<Result<{ username: string; password: string; serveraddress: string }>> {
+  try {
+    const serverAddress = normalizeRegistryUrl(config.url);
+
+    // Build auth config for dockerode
+    let authConfig: { username: string; password: string; serveraddress: string };
+
+    if (config.username && config.password) {
+      authConfig = {
+        username: config.username,
+        password: config.password,
+        serveraddress: serverAddress,
+      };
+    } else if (config.token) {
+      // For token-based auth, use token as password with empty username
+      authConfig = {
+        username: '',
+        password: config.token,
+        serveraddress: serverAddress,
+      };
+    } else {
+      return Failure('Authentication requires either username/password or token', {
+        message: 'Missing credentials',
+        hint: 'Provide either username and password, or an authentication token',
+        resolution: 'Add credentials to the registry configuration',
+      });
+    }
+
+    // Verify authentication by calling Docker auth endpoint
+    try {
+      await docker.checkAuth(authConfig);
+      logger.info({ registry: serverAddress }, 'Registry authentication successful');
+      return Success(authConfig);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return Failure(`Authentication failed: ${errorMessage}`, {
+        message: 'Registry authentication failed',
+        hint: 'Invalid credentials or registry is unavailable',
+        resolution: 'Verify your username/password or token, and ensure the registry is accessible',
+        details: { registry: serverAddress, error: errorMessage },
+      });
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Failure(`Authentication error: ${errorMessage}`, {
+      message: 'Failed to authenticate with registry',
+      hint: 'An unexpected error occurred during authentication',
+      resolution: 'Check registry URL format and network connectivity',
+      details: { error: errorMessage },
+    });
+  }
+}
+
+/**
+ * Check if a registry is accessible
+ *
+ * Performs a health check by attempting to connect to the registry's API.
+ * For Docker Hub, pings the v2 API endpoint. For private registries,
+ * checks the /v2/ endpoint which should return 200 or 401.
+ *
+ * @param registryUrl - Registry URL to check
+ * @param logger - Logger instance
+ * @returns Result with boolean indicating if registry is accessible
+ */
+export async function checkRegistryHealth(
+  registryUrl: string,
+  logger: Logger,
+): Promise<Result<boolean>> {
+  try {
+    const normalizedUrl = normalizeRegistryUrl(registryUrl);
+    const apiUrl = getRegistryApiUrl(normalizedUrl);
+
+    logger.debug({ registryUrl: apiUrl }, 'Performing registry health check');
+
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REGISTRY_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Docker Registry v2 API returns 200 for authenticated requests
+      // or 401 for unauthenticated but accessible registries
+      const isHealthy = response.status === 200 || response.status === 401;
+
+      logger.debug(
+        { registryUrl: apiUrl, status: response.status, healthy: isHealthy },
+        'Registry health check complete',
+      );
+
+      return Success(isHealthy);
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        logger.warn({ registryUrl: apiUrl }, 'Registry health check timed out');
+        return Success(false);
+      }
+
+      logger.debug({ registryUrl: apiUrl, error }, 'Registry health check failed');
+      return Success(false);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Failure(`Health check error: ${errorMessage}`, {
+      message: 'Failed to perform registry health check',
+      hint: 'Unable to connect to registry',
+      resolution: 'Verify the registry URL and network connectivity',
+      details: { error: errorMessage },
+    });
+  }
+}
+
+/**
+ * Check if an image exists locally in the Docker daemon
+ *
+ * Checks if a specific image exists in the local Docker daemon cache.
+ * This does not query remote registries - it only checks locally pulled images.
+ * Use `docker pull` first if you need to verify remote image availability.
+ *
+ * @param docker - Docker client instance
+ * @param imageName - Full image name (repository:tag or repository@digest)
+ * @param logger - Logger instance
+ * @returns Result with boolean indicating if image exists locally
+ */
+export async function checkImageExists(
+  docker: Docker,
+  imageName: string,
+  logger: Logger,
+): Promise<Result<boolean>> {
+  try {
+    // Normalize imageName to avoid subtle failures due to whitespace
+    const normalizedImageName = imageName.trim();
+
+    // Parse image name into components
+    const { repository, reference } = parseImageName(normalizedImageName);
+
+    logger.debug({ repository, reference }, 'Checking if image exists locally');
+
+    try {
+      // Use Docker API to inspect the image locally
+      // This only checks the local Docker daemon, not remote registries
+      const image = docker.getImage(normalizedImageName);
+      await image.inspect();
+
+      logger.debug({ imageName: normalizedImageName }, 'Image exists');
+      return Success(true);
+    } catch (error) {
+      // If image doesn't exist locally, Docker will throw a 404 error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (errorMessage.includes('404') || errorMessage.includes('no such image')) {
+        logger.debug({ imageName: normalizedImageName }, 'Image does not exist');
+        return Success(false);
+      }
+
+      // For other errors, return failure with guidance
+      return Failure(`Failed to check image existence: ${errorMessage}`, {
+        message: 'Unable to verify image existence',
+        hint: 'Error occurred while checking registry',
+        resolution: 'Ensure Docker daemon is running and registry is accessible',
+        details: { imageName: normalizedImageName, error: errorMessage },
+      });
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Failure(`Image existence check error: ${errorMessage}`, {
+      message: 'Failed to check if image exists',
+      hint: 'Invalid image name format or registry error',
+      resolution: 'Verify the image name format (repository:tag)',
+      details: { error: errorMessage },
+    });
+  }
+}
+
+/**
+ * List available tags for a repository
+ *
+ * Retrieves all tags for a given repository from the registry.
+ * For Docker Hub, uses the public API. For private registries,
+ * requires authentication.
+ *
+ * @param repository - Repository name (e.g., 'library/node' or 'myorg/myapp')
+ * @param logger - Logger instance
+ * @param authConfig - Optional authentication config for private registries
+ * @returns Result with array of tag names
+ */
+export async function listRepositoryTags(
+  repository: string,
+  logger: Logger,
+  authConfig?: { username: string; password: string; serveraddress: string },
+): Promise<Result<string[]>> {
+  try {
+    logger.debug({ repository }, 'Listing repository tags');
+
+    // For Docker Hub, use the public API
+    // Check only the first path segment for a hostname pattern (dot or colon)
+    const firstSegment = repository.split('/')[0] ?? '';
+    if (!/[.:]/.test(firstSegment)) {
+      return listDockerHubTags(repository, logger);
+    }
+
+    // For private registries, use Docker Registry API v2
+    return listPrivateRegistryTags(repository, logger, authConfig);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Failure(`Failed to list tags: ${errorMessage}`, {
+      message: 'Unable to retrieve repository tags',
+      hint: 'Registry API error or authentication required',
+      resolution: 'Verify repository name and ensure you have access permissions',
+      details: { repository, error: errorMessage },
+    });
+  }
 }

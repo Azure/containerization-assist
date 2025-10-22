@@ -2,7 +2,7 @@
  * Shared Runtime Logging - Harmonized Startup/Shutdown/Tool Logging
  *
  * Provides consistent logging behavior across CLI, server entry points,
- * and tool executions to ensure unified messages for Copilot transcripts.
+ * and tool executions.
  */
 
 import type { Logger } from 'pino';
@@ -168,7 +168,7 @@ export function logForcedShutdown(logger: Logger, quiet = false): void {
 }
 
 /**
- * Create a unified shutdown handler with proper logging
+ * Create a shutdown handler with proper logging
  * @public
  */
 export function createShutdownHandler(
@@ -341,46 +341,4 @@ export function logToolFailure(
   const errorMessage = typeof error === 'string' ? error : error.message;
   const logData = context ? { ...context, error: errorMessage } : { error: errorMessage };
   logger.error(logData, `Failed ${toolName}`);
-}
-
-/**
- * Create a timing wrapper for tool execution with automatic logging
- * @param toolName - Name of the tool
- * @param params - Tool parameters to log
- * @param logger - Pino logger instance
- * @returns Object with complete() and fail() methods
- * @public
- *
- * @example
- * ```typescript
- * const timer = createToolTimer('build-image', { path: './app' }, logger);
- * try {
- *   const result = await buildImage();
- *   timer.complete({ imageId: result.imageId });
- * } catch (error) {
- *   timer.fail(error);
- *   throw error;
- * }
- * ```
- */
-export function createToolTimer(
-  toolName: string,
-  params: Record<string, unknown>,
-  logger: Logger,
-): {
-  complete: (result: Record<string, unknown>) => void;
-  fail: (error: string | Error, context?: Record<string, unknown>) => void;
-} {
-  const startTime = Date.now();
-  logToolStart(toolName, params, logger);
-
-  return {
-    complete: (result: Record<string, unknown>) => {
-      const duration = Date.now() - startTime;
-      logToolComplete(toolName, result, logger, duration);
-    },
-    fail: (error: string | Error, context?: Record<string, unknown>) => {
-      logToolFailure(toolName, error, logger, context);
-    },
-  };
 }

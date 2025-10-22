@@ -6,6 +6,9 @@ import { createLogger, createTimer, type Logger, type Timer } from './logger.js'
 import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
 
+// Re-export Timer type for use by consumers
+export type { Timer };
+
 /**
  * Gets or creates a logger for a tool.
  * Consolidates the pattern: context.logger || createLogger({ name: 'tool-name' })
@@ -20,47 +23,36 @@ export function getToolLogger(context: ToolContext, toolName: string): Logger {
 }
 
 /**
- * Creates a timer for measuring tool execution time.
- * Consolidates timer creation and adds automatic cleanup.
- * Invariant: Timer is automatically ended on process exit if not ended manually
+ * Creates a timer for measuring tool execution time with safeguards.
+ * Consolidates timer creation pattern for consistent usage across tools.
+ * Wraps the timer to prevent double end/error calls which can skew metrics.
  *
  * @param logger - Logger instance for timer output
  * @param toolName - Name of the tool for timer identification
- * @returns Timer instance with auto-cleanup
+ * @returns Timer instance with double-call protection
  */
 export function createToolTimer(logger: Logger, toolName: string): Timer {
   const timer = createTimer(logger, toolName);
+  let completed = false;
 
-  // Track if timer has been ended to avoid double-ending
-  let ended = false;
-  const originalEnd = timer.end.bind(timer);
+  return {
+    end(additionalContext?: Record<string, unknown>): void {
+      if (completed) return;
+      completed = true;
+      timer.end(additionalContext);
+    },
 
-  // Auto-cleanup on process exit
-  const cleanup = (): void => {
-    if (!ended) {
-      ended = true;
-      originalEnd();
-      // Remove listeners to prevent memory leaks
-      process.removeListener('beforeExit', cleanup);
-      process.removeListener('exit', cleanup);
-    }
+    error(error: unknown, additionalContext?: Record<string, unknown>): void {
+      if (completed) return;
+      completed = true;
+      timer.error(error, additionalContext);
+    },
+
+    checkpoint(label: string, additionalContext?: Record<string, unknown>): number {
+      // Checkpoints are allowed even after completion for debugging
+      return timer.checkpoint(label, additionalContext);
+    },
   };
-
-  // Override end method to track state and clean up listeners
-  timer.end = () => {
-    if (!ended) {
-      ended = true;
-      originalEnd();
-      // Remove listeners when timer ends normally
-      process.removeListener('beforeExit', cleanup);
-      process.removeListener('exit', cleanup);
-    }
-  };
-
-  process.once('beforeExit', cleanup);
-  process.once('exit', cleanup);
-
-  return timer;
 }
 
 /**
@@ -106,4 +98,3 @@ export function createStandardizedToolTracker(
     },
   };
 }
-

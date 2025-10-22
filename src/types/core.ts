@@ -30,6 +30,8 @@ export interface ErrorGuidance {
  * - Clean async chain composition
  * - Actionable operator guidance for failures
  *
+ * @see {@link ../../docs/adr/001-result-pattern.md ADR-001: Result<T> Error Handling Pattern}
+ *
  * @example
  * ```typescript
  * const result = await riskyOperation();

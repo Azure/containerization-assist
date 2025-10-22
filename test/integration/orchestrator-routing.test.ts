@@ -13,7 +13,7 @@ import { createLogger } from '@/lib/logger';
 
 // Import only specific tools to avoid Kubernetes dependencies
 import opsToolImport from '@/tools/ops/tool';
-import inspectSessionToolImport from '@/tools/inspect-session/tool';
+import analyzeRepoToolImport from '@/tools/analyze-repo/tool';
 
 // Setup
 import '../__support__/setup/integration-setup.js';
@@ -28,7 +28,7 @@ describe('Orchestrator Routing Integration', () => {
     // Create tools map with limited tools to avoid Kubernetes dependencies
     toolsMap = new Map();
     toolsMap.set('ops', opsToolImport);
-    toolsMap.set('inspect-session', inspectSessionToolImport);
+    toolsMap.set('analyze-repo', analyzeRepoToolImport);
   });
 
   afterEach(() => {
@@ -122,7 +122,7 @@ describe('Orchestrator Routing Integration', () => {
 
   describe('MCP Server Registration Routing', () => {
     it('should route MCP tool calls through orchestrator executor', async () => {
-      const limitedTools = [opsToolImport, inspectSessionToolImport];
+      const limitedTools = [opsToolImport, analyzeRepoToolImport];
 
       // Create a mock executor that we can spy on
       const mockExecutor = jest.fn().mockResolvedValue({
@@ -280,7 +280,7 @@ describe('Orchestrator Routing Integration', () => {
         // Verify tools are properly registered in the map
         expect(toolsMap.size).toBe(2);
         expect(toolsMap.has('ops')).toBe(true);
-        expect(toolsMap.has('inspect-session')).toBe(true);
+        expect(toolsMap.has('analyze-repo')).toBe(true);
 
         // Verify tool structure
         const opsTool = toolsMap.get('ops');

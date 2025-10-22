@@ -1,13 +1,26 @@
 /**
- * Ops Tool - Modernized Implementation
+ * Ops Tool - MCP Server Diagnostics
  *
- * Provides operational utilities like ping and server status
- * Follows the new Tool interface pattern
+ * Provides health monitoring and connectivity testing for the MCP server itself.
+ * This tool operates on the server infrastructure, not on user applications.
+ *
+ * **Use Cases:**
+ * - Health checks for monitoring systems
+ * - Connectivity testing during troubleshooting
+ * - Resource usage monitoring (memory, CPU)
+ * - Server diagnostics and metadata
+ *
+ * **NOT for:**
+ * - Application containerization (use build-image, etc.)
+ * - Docker operations (use Docker tools)
+ * - Kubernetes operations (use K8s tools)
+ *
+ * @packageDocumentation
  */
 
 import * as os from 'os';
-import { extractErrorMessage } from '@/lib/error-utils';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/errors';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { opsToolSchema } from './schema';
@@ -38,8 +51,7 @@ interface PingResult {
  * @public
  */
 export async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
-  const logger = getToolLogger(context, 'ops');
-  const timer = createToolTimer(logger, 'ops-ping');
+  const { logger, timer } = setupToolContext(context, 'ops-ping');
 
   try {
     const { message = 'ping' } = config;
@@ -67,7 +79,11 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Ping failed');
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred during the ping operation',
+      resolution: 'Check the server logs for details. This is typically a server-side issue',
+    });
   }
 }
 
@@ -110,8 +126,7 @@ export async function serverStatus(
   config: ServerStatusConfig,
   context: ToolContext,
 ): Promise<Result<ServerStatusResult>> {
-  const logger = getToolLogger(context, 'ops');
-  const timer = createToolTimer(logger, 'ops-server-status');
+  const { logger, timer } = setupToolContext(context, 'ops-server-status');
 
   try {
     const { details = false } = config;
@@ -171,7 +186,11 @@ export async function serverStatus(
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Error collecting server status');
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred while collecting server status',
+      resolution: 'Check the server logs for details. This is typically a server-side issue',
+    });
   }
 }
 
@@ -203,7 +222,11 @@ async function handleOps(
         context,
       );
     default:
-      return Failure(`Unknown operation: ${input.operation}`);
+      return Failure(`Unknown operation: ${input.operation}`, {
+        message: `Unknown operation: ${input.operation}`,
+        hint: 'The requested operation is not supported',
+        resolution: 'Use one of the supported operations: "ping" for connectivity testing or "status" for server information',
+      });
   }
 }
 
@@ -214,7 +237,7 @@ import { tool } from '@/types/tool';
 
 export default tool({
   name: 'ops',
-  description: 'Operational utilities for ping and server status',
+  description: 'MCP server diagnostics: ping for connectivity testing, status for health metrics (memory, CPU, uptime). Use this for server monitoring, not application containerization.',
   category: 'utility',
   version: '2.0.0',
   schema: opsToolSchema,

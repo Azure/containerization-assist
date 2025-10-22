@@ -4,18 +4,19 @@
  */
 
 import { z } from 'zod';
-import { environmentSchema } from '@/config/environment';
+import { environmentSchema } from '@/config/constants';
 
 // Paths
 export const repositoryPath = z
   .string()
+  .min(1, 'Repository path cannot be empty')
   .describe(
     'Absolute path to the repository. Paths are automatically normalized to forward slashes on all platforms (e.g., /path/to/repo or C:/path/to/repo)',
   );
 
 export const namespaceOptional = z.string().optional().describe('Kubernetes namespace');
 
-// Unified environment schema - single source of truth
+// Environment schema
 export const environment = environmentSchema.optional();
 
 // Docker image fields
@@ -26,7 +27,6 @@ export const buildArgs = z.record(z.string(), z.string()).describe('Build argume
 // Application basics
 export const replicas = z.number().optional().describe('Number of replicas');
 export const port = z.number().optional().describe('Application port');
-
 
 // Service types
 

@@ -5,12 +5,19 @@
 import { z } from 'zod';
 import { environment } from '../shared/schemas';
 import type { ValidationResult } from '@/validation/core-types';
+import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
 export const fixDockerfileSchema = z
   .object({
     dockerfile: z.string().optional().describe('Dockerfile content to analyze for fixes'),
     path: z.string().optional().describe('Path to Dockerfile file to analyze for fixes'),
     environment: environment.describe('Target environment (production, development, etc.)'),
+    policyPath: z
+      .string()
+      .optional()
+      .describe(
+        'Optional path to specific policy file to use for organizational policy validation (defaults to all policies in policies/)',
+      ),
   })
   .refine((data) => data.dockerfile || data.path, {
     message: "Either 'dockerfile' content or 'path' must be provided",
@@ -60,6 +67,9 @@ export interface DockerfileFixPlan {
     performance: FixRecommendation[];
     bestPractices: FixRecommendation[];
   };
+
+  /** Policy validation results (if policy validation was performed) */
+  policyValidation?: PolicyValidationResult;
 
   /** Overall validation score (0-100) */
   validationScore: number;

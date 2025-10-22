@@ -3,232 +3,117 @@
  * Tool execution with optional dependency resolution
  */
 
-import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { z, type ZodTypeAny } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
-import { loadPolicy } from '@/config/policy-io';
-import { applyPolicy } from '@/config/policy-eval';
-import type { Policy } from '@/config/policy-schemas';
-import { createToolContext, type ToolContext, type ProgressReporter } from '@/mcp/context';
+import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { ERROR_MESSAGES } from '@/lib/error-messages';
-import type {
-  ToolOrchestrator,
-  OrchestratorConfig,
-  ExecuteRequest,
-  ExecuteMetadata,
-} from './orchestrator-types';
+import { ERROR_MESSAGES } from '@/lib/errors';
+import type { ToolOrchestrator, OrchestratorConfig, ExecuteRequest } from './orchestrator-types';
 import type { Logger } from 'pino';
-import type { MCPTool } from '@/types/tool';
+import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
-import { TOOL_NAME, ToolName } from '@/tools';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
+import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
+import { readdirSync, existsSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 
 // ===== Types =====
 
 /**
- * Get default policy paths
- * Returns all .yaml files in the policies/ directory
+ * Discover built-in policy files from the policies directory
+ * Returns paths to all .rego files (excluding test files)
+ *
+ * Searches upward from process.cwd() to find the policies directory.
+ * Works in both ESM (dist/) and CJS (dist-cjs/) builds.
  */
-function getDefaultPolicyPaths(): string[] {
-  const logger = createLogger({ name: 'policy-discovery' });
+function discoverBuiltInPolicies(logger: Logger): string[] {
   try {
-    const policiesDir = path.join(process.cwd(), 'policies');
+    // Start from current working directory and search upward
+    let currentDir = process.cwd();
+    let policiesDir = join(currentDir, 'policies');
+    let attempts = 0;
+    const maxAttempts = 5;
 
-    if (!fs.existsSync(policiesDir)) {
+    // Search upward for policies directory
+    while (!existsSync(policiesDir) && attempts < maxAttempts) {
+      const parentDir = dirname(currentDir);
+      if (parentDir === currentDir) {
+        // Reached filesystem root
+        break;
+      }
+      currentDir = parentDir;
+      policiesDir = join(currentDir, 'policies');
+      attempts++;
+    }
+
+    if (!existsSync(policiesDir)) {
+      logger.warn({ cwd: process.cwd(), attempts }, 'Built-in policies directory not found');
       return [];
     }
 
-    const files = fs.readdirSync(policiesDir);
-    return files
-      .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) // Alphabetical sort with numeric awareness for consistent policy load order
-      .map((f) => path.join(policiesDir, f));
+    // Find all .rego files except test files
+    const files = readdirSync(policiesDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(policiesDir, file)));
+
+    logger.info({ policiesDir, count: files.length }, 'Discovered built-in policies');
+    return files;
   } catch (error) {
-    logger.warn(
-      { error, cwd: process.cwd() },
-      'Failed to read policies directory - using no default policies',
-    );
+    logger.warn({ error }, 'Failed to discover built-in policies');
     return [];
   }
 }
 
 /**
- * Calculate policy strictness score based on rule priorities
- * Higher score = stricter policy (should override less strict ones)
+ * Create a child logger with additional bindings
+ * Assumes Pino logger (fail fast if not)
  */
-function calculatePolicyStrictness(policy: Policy): number {
-  if (policy.rules.length === 0) return 0;
-
-  // Use max priority as the strictness metric
-  // This ensures policies with the highest-priority rules take precedence
-  return policy.rules.reduce((max, r) => Math.max(max, r.priority), -Infinity);
+function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger {
+  return logger.child(bindings);
 }
 
 /**
- * Merge multiple policies into a single unified policy
- * Policies are merged in order of strictness (least strict first)
- * so that stricter policies override less strict ones for rules with the same ID
+ * Create a ToolContext for the given request
+ * Delegates to the canonical createToolContext from @mcp/context
  */
-function mergePolicies(policies: Policy[]): Policy {
-  if (policies.length === 0) {
-    throw new Error('Cannot merge empty policy list');
-  }
+function createContextForTool(
+  request: ExecuteRequest,
+  logger: Logger,
+  policy?: RegoEvaluator,
+): ToolContext {
+  const metadata = request.metadata;
 
-  // Sort policies by strictness (ascending) so stricter policies come last and override
-  const sortedPolicies = [...policies].sort(
-    (a, b) => calculatePolicyStrictness(a) - calculatePolicyStrictness(b),
-  );
-
-  if (sortedPolicies.length === 1) {
-    const singlePolicy = sortedPolicies[0];
-    if (!singlePolicy) {
-      throw new Error('Unexpected: sorted policies array is empty after validation');
-    }
-    return singlePolicy;
-  }
-
-  const firstPolicy = sortedPolicies[0];
-  if (!firstPolicy) {
-    throw new Error('Unexpected: sorted policies array is empty after validation');
-  }
-
-  // Start with the first policy as base
-  const merged: Policy = {
-    version: '2.0',
-    metadata: {
-      ...firstPolicy.metadata,
-      name: 'Merged Policy',
-      description: `Combined policy from ${sortedPolicies.length} sources`,
-    },
-    defaults: {},
-    rules: [],
-  };
-
-  // Add cache if first policy has it
-  if (firstPolicy.cache) {
-    merged.cache = firstPolicy.cache;
-  }
-
-  // Merge defaults (later policies override earlier ones)
-  for (const policy of sortedPolicies) {
-    if (policy.defaults) {
-      merged.defaults = { ...merged.defaults, ...policy.defaults };
-    }
-  }
-
-  // Merge rules using a Map to handle duplicates
-  // Rules from stricter policies (later in sorted list) override earlier ones
-  const rulesMap = new Map<string, (typeof merged.rules)[0]>();
-
-  for (const policy of sortedPolicies) {
-    for (const rule of policy.rules) {
-      rulesMap.set(rule.id, rule);
-    }
-  }
-
-  // Convert back to array and sort by priority descending
-  merged.rules = Array.from(rulesMap.values()).sort((a, b) => b.priority - a.priority);
-
-  return merged;
+  return createToolContext(logger, {
+    ...(metadata?.signal && { signal: metadata.signal }),
+    ...(metadata?.progress !== undefined && { progress: metadata.progress }),
+    ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
+    ...(policy && { policy }),
+  });
 }
 
-function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger {
-  const candidate = (logger as unknown as { child?: (bindings: Record<string, unknown>) => Logger })
-    .child;
-  return typeof candidate === 'function' ? candidate.call(logger, bindings) : logger;
-}
-
-type ContextFactoryInput<T extends MCPTool<ZodTypeAny, any>> = {
-  tool: T;
-  request: ExecuteRequest;
-  logger: Logger;
-};
-
-type ContextFactory<T extends MCPTool<ZodTypeAny, any>> = (
-  input: ContextFactoryInput<T>,
-) => Promise<ToolContext> | ToolContext;
-
-interface ExecutionEnvironment<T extends MCPTool<ZodTypeAny, any>> {
-  policy?: Policy;
+interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
   registry: Map<string, T>;
   logger: Logger;
   config: OrchestratorConfig;
-  buildContext: ContextFactory<T>;
+  server?: Server;
 }
 
 /**
  * Create a tool orchestrator
  */
-export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: {
+export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   registry: Map<string, T>;
   server?: Server;
   logger?: Logger;
   config?: OrchestratorConfig;
-  contextFactory?: ContextFactory<T>;
 }): ToolOrchestrator {
-  const { registry, config = { chainHintsMode: 'enabled' } } = options;
+  const { registry, server, config = { chainHintsMode: 'enabled' } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
-  // Load and merge policies - use defaults if not configured
-  let policy: Policy | undefined;
-  const policyPaths = config.policyPath ? [config.policyPath] : getDefaultPolicyPaths();
-
-  if (policyPaths.length > 0) {
-    // Load all policies
-    const loadedPolicies: Policy[] = [];
-    for (const policyPath of policyPaths) {
-      const policyResult = loadPolicy(policyPath);
-      if (policyResult.ok) {
-        loadedPolicies.push(policyResult.value);
-        logger.debug({ policyPath }, 'Policy loaded successfully');
-      } else {
-        logger.warn({ policyPath, error: policyResult.error }, 'Failed to load policy');
-      }
-    }
-
-    // Merge all loaded policies
-    if (loadedPolicies.length > 0) {
-      policy = mergePolicies(loadedPolicies);
-      logger.info(
-        {
-          policiesLoaded: loadedPolicies.length,
-          totalRules: policy.rules.length,
-        },
-        'Policies merged successfully',
-      );
-    } else {
-      logger.warn(
-        {
-          policyPathsAttempted: policyPaths.length,
-        },
-        'All policy files failed to load - orchestrator will run without policy enforcement',
-      );
-    }
-  }
-
-  const buildContext: ContextFactory<T> = async (input) => {
-    if (options.contextFactory) {
-      return options.contextFactory(input);
-    }
-
-    const metadata = input.request.metadata;
-
-    if (options.server) {
-      const contextOptions = {
-        ...(metadata?.signal && { signal: metadata.signal }),
-        ...(metadata?.progress !== undefined && { progress: metadata.progress }),
-        ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
-      };
-      return createToolContext(input.logger, contextOptions);
-    }
-
-    return createHostlessToolContext(input.logger, {
-      ...(metadata && { metadata }),
-    });
-  };
+  // Cache the loaded policy to avoid reloading on every execution
+  let policyCache: RegoEvaluator | undefined;
+  let policyLoadPromise: Promise<void> | undefined;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     const { toolName } = request;
@@ -243,17 +128,52 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
       ...(request.metadata?.loggerContext ?? {}),
     });
 
+    // Load policies once (with Promise-based guard to prevent race conditions)
+    if (!policyLoadPromise) {
+      policyLoadPromise = (async () => {
+        // Always load built-in policies
+        const builtInPolicies = discoverBuiltInPolicies(logger);
+
+        // Optionally add user-provided custom policy
+        const policyPaths = config.policyPath
+          ? [...builtInPolicies, config.policyPath]
+          : builtInPolicies;
+
+        if (policyPaths.length === 0) {
+          logger.warn('No policies found (built-in or custom)');
+          return;
+        }
+
+        const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
+        if (policyResult.ok) {
+          policyCache = policyResult.value;
+          logger.info({
+            builtIn: builtInPolicies.length,
+            custom: config.policyPath ? 1 : 0,
+            total: policyPaths.length,
+          }, 'Policies loaded for orchestrator');
+        } else {
+          logger.warn({ error: policyResult.error }, 'Failed to load policies, continuing without them');
+        }
+      })();
+    }
+
+    // Wait for policy loading to complete if in progress
+    await policyLoadPromise;
+
     return await executeWithOrchestration(tool, request, {
       registry,
-      ...(policy && { policy }),
       logger: contextualLogger,
       config,
-      buildContext,
-    });
+      ...(server && { server }),
+    }, policyCache);
   }
 
   function close(): void {
-    // No cleanup needed anymore
+    // Cleanup policy resources if loaded
+    if (policyCache) {
+      policyCache.close();
+    }
   }
 
   return { execute, close };
@@ -262,40 +182,21 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
 /**
  * Execute with full orchestration (dependencies, policies)
  */
-async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
+async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   tool: T,
   request: ExecuteRequest,
   env: ExecutionEnvironment<T>,
+  policy?: RegoEvaluator,
 ): Promise<Result<unknown>> {
   const { params } = request;
-  const { policy, logger } = env;
+  const { logger } = env;
 
   // Validate parameters using Zod safeParse
   const validation = validateParams(params, tool.schema);
   if (!validation.ok) return validation;
   const validatedParams = validation.value;
 
-  // Apply policies
-  if (policy) {
-    const policyResults = applyPolicy(policy, {
-      tool: tool.name,
-      params: validatedParams as Record<string, unknown>,
-    });
-
-    const blockers = policyResults
-      .filter((r) => r.matched && r.rule.actions.block)
-      .map((r) => r.rule.id);
-
-    if (blockers.length > 0) {
-      return Failure(ERROR_MESSAGES.POLICY_BLOCKED(blockers));
-    }
-  }
-
-  const toolContext = await env.buildContext({
-    tool,
-    request,
-    logger,
-  });
+  const toolContext = createContextForTool(request, logger, policy);
   const tracker = createStandardizedToolTracker(tool.name, {}, logger);
 
   const startTime = Date.now();
@@ -322,17 +223,17 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     if (result.ok) {
       let valueWithMessages = result.value;
 
-      if (env.config.chainHintsMode === 'enabled') {
-        const hint = getChainHint(tool.name as ToolName, result.ok ? 'success' : 'failure');
-        if (hint) {
-          valueWithMessages = {
-            ...valueWithMessages,
-            nextSteps: hint,
-          };
-        }
+      if (env.config.chainHintsMode === 'enabled' && tool.chainHints) {
+        valueWithMessages = {
+          ...valueWithMessages,
+          nextSteps: tool.chainHints.success,
+        };
       }
 
       result.value = valueWithMessages;
+    } else if (result.guidance && tool.chainHints) {
+      // Add failure hint to error guidance
+      result.guidance.hint = tool.chainHints.failure;
     }
     tracker.complete({});
     return result;
@@ -353,87 +254,6 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
   }
 }
 
-type outputState = 'success' | 'failure';
-function getChainHint(toolName: ToolName, outputState: outputState): string {
-  const stateToHints = chainHintMap.get(toolName);
-  if (!stateToHints) {
-    return '';
-  }
-
-  const hint = stateToHints[outputState];
-  return hint || '';
-}
-
-const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
-  [
-    TOOL_NAME.ANALYZE_REPO,
-    {
-      success: `Repository analysis completed successfully. Continue by calling the ${TOOL_NAME.GENERATE_DOCKERFILE} or ${TOOL_NAME.FIX_DOCKERFILE} tools to create or fix your Dockerfile.`,
-      failure: 'Repository analysis failed. Please check the logs for details.',
-    },
-  ],
-  [
-    TOOL_NAME.VALIDATE_DOCKERFILE,
-    {
-      success: `Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the ${TOOL_NAME.GENERATE_K8S_MANIFESTS} tool to proceed with containerization.`,
-      failure:
-        'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
-    },
-  ],
-  [
-    TOOL_NAME.BUILD_IMAGE,
-    {
-      success: `Image built successfully. Next: Call ${TOOL_NAME.SCAN_IMAGE} to check for security vulnerabilities.`,
-      failure: `Image build failed. Use ${TOOL_NAME.FIX_DOCKERFILE} to resolve issues, then retry ${TOOL_NAME.BUILD_IMAGE}.`,
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_K8S_MANIFESTS,
-    {
-      success: `Kubernetes manifests generated successfully. Next: Call ${TOOL_NAME.PREPARE_CLUSTER} to create a kind cluster to deploy to.`,
-      failure: 'Manifest generation failed. Ensure you have a valid image and try again.',
-    },
-  ],
-  [
-    TOOL_NAME.DEPLOY,
-    {
-      success: `Application deployed successfully. Use ${TOOL_NAME.VERIFY_DEPLOY} to check deployment health and status.`,
-      failure:
-        'Deployment failed. Check cluster connectivity, manifests validity, and pod status with kubectl.',
-    },
-  ],
-  [
-    TOOL_NAME.FIX_DOCKERFILE,
-    {
-      success: `Dockerfile fixes applied successfully. Next: Call ${TOOL_NAME.BUILD_IMAGE} to test the fixed Dockerfile.`,
-      failure: 'Dockerfile fix failed. Review validation errors and try manual fixes.',
-    },
-  ],
-  [
-    TOOL_NAME.PUSH_IMAGE,
-    {
-      success: `Image pushed successfully. Review AI optimization insights for push improvements.`,
-      failure:
-        'Image push failed. Check registry credentials, network connectivity, and image tag format.',
-    },
-  ],
-  [
-    TOOL_NAME.SCAN_IMAGE,
-    {
-      success: `Security scan passed! Proceed with ${TOOL_NAME.PUSH_IMAGE} to push to a registry, or continue with deployment preparation.`,
-      failure: `Security scan found vulnerabilities. Use ${TOOL_NAME.FIX_DOCKERFILE} to address security issues in your base images and dependencies.`,
-    },
-  ],
-  [
-    TOOL_NAME.PREPARE_CLUSTER,
-    {
-      success: `Cluster preparation successful. Next: Call ${TOOL_NAME.DEPLOY} to deploy to the kind cluster.`,
-      failure:
-        'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
-    },
-  ],
-]);
-
 /**
  * Validate parameters against schema using safeParse
  */
@@ -444,36 +264,4 @@ function validateParams<T extends z.ZodSchema>(params: unknown, schema: T): Resu
     return Failure(ERROR_MESSAGES.VALIDATION_FAILED(issues));
   }
   return Success(parsed.data);
-}
-
-export function createHostlessToolContext(
-  logger: Logger,
-  options: {
-    metadata?: ExecuteMetadata;
-  },
-): ToolContext {
-  const progress = coerceProgressReporter(options.metadata?.progress);
-
-  return {
-    logger,
-    signal: options.metadata?.signal,
-    progress,
-  };
-}
-
-/**
- * Coerce a progress reporter function to the expected interface
- * @public
- */
-export function coerceProgressReporter(progress: unknown): ProgressReporter | undefined {
-  if (typeof progress !== 'function') {
-    return undefined;
-  }
-
-  return async (message: string, current?: number, total?: number) => {
-    const maybePromise = progress(message, current, total);
-    if (maybePromise && typeof (maybePromise as Promise<void>).then === 'function') {
-      await maybePromise;
-    }
-  };
 }

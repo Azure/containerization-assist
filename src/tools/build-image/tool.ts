@@ -13,17 +13,15 @@
  */
 
 import path from 'path';
-import { normalizePath } from '@/lib/path-utils';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import { promises as fs } from 'node:fs';
-import { createStandardProgress } from '@/mcp/progress-helper';
+import { normalizePath } from '@/lib/platform';
+import { setupToolContext } from '@/lib/tool-context-helpers';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
-import { validatePath } from '@/lib/validation';
+import { validatePathOrFail } from '@/lib/validation-helpers';
+import { readDockerfile } from '@/lib/file-utils';
 
 import { type Result, Success, Failure } from '@/types';
-import { extractErrorMessage } from '@/lib/error-utils';
-import { fileExists } from '@/lib/file-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { type BuildImageParams, buildImageSchema } from './schema';
 
 export interface BuildImageResult {
@@ -100,13 +98,15 @@ async function handleBuildImage(
   context: ToolContext,
 ): Promise<Result<BuildImageResult>> {
   if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+    return Failure('Invalid parameters provided', {
+      message: 'Parameters must be a valid object',
+      hint: 'Tool received invalid or missing parameters',
+      resolution: 'Ensure parameters are provided as a JSON object',
+    });
   }
 
   // Optional progress reporting for complex operations (Docker build process)
-  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = getToolLogger(context, 'build-image');
-  const timer = createToolTimer(logger, 'build-image');
+  const { logger, timer } = setupToolContext(context, 'build-image');
 
   const {
     path: rawBuildPath = '.',
@@ -120,22 +120,18 @@ async function handleBuildImage(
 
   try {
     // Progress: Validating build parameters and environment
-    if (progress) await progress('VALIDATING');
+    await context.progress?.('Validating build parameters and environment', 10, 100);
 
     // Validate build context path
-    const buildContextResult = await validatePath(rawBuildPath, {
+    const buildContextResult = await validatePathOrFail(rawBuildPath, {
       mustExist: true,
       mustBeDirectory: true,
     });
-    if (!buildContextResult.ok) {
-      return buildContextResult;
-    }
+    if (!buildContextResult.ok) return buildContextResult;
 
     // Normalize paths to handle Windows separators
     const buildContext = normalizePath(buildContextResult.value);
     const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
-
-    const startTime = Date.now();
 
     const dockerClient = createDockerClient(logger);
 
@@ -145,24 +141,16 @@ async function handleBuildImage(
       ? path.resolve(repoPath, dockerfilePath)
       : path.resolve(repoPath, dockerfile);
 
-    if (!(await fileExists(finalDockerfilePath))) {
-      return Failure(
-        `Dockerfile not found at ${finalDockerfilePath}. Provide dockerfilePath parameter.`,
-      );
+    // Read Dockerfile for security analysis
+    const dockerfileContentResult = await readDockerfile({
+      path: finalDockerfilePath,
+    });
+
+    if (!dockerfileContentResult.ok) {
+      return dockerfileContentResult;
     }
 
-    // Read Dockerfile for security analysis
-    let dockerfileContent: string;
-    try {
-      dockerfileContent = await fs.readFile(finalDockerfilePath, 'utf-8');
-    } catch (error) {
-      const err = error as { code?: string };
-      if (err.code === 'EISDIR') {
-        logger.error({ path: finalDockerfilePath }, 'Attempted to read directory as file');
-        return Failure(`Dockerfile path points to a directory: ${finalDockerfilePath}`);
-      }
-      throw error;
-    }
+    const dockerfileContent = dockerfileContentResult.value;
 
     // Prepare build arguments
     const finalBuildArgs = await prepareBuildArgs(buildArgs);
@@ -193,7 +181,7 @@ async function handleBuildImage(
     }
 
     // Docker build process streams to provide real-time feedback
-    if (progress) await progress('EXECUTING');
+    await context.progress?.('Building Docker image', 50, 100);
 
     // Build the image
     logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
@@ -203,37 +191,47 @@ async function handleBuildImage(
       const errorMessage = buildResult.error ?? 'Unknown error';
 
       // Propagate Docker error guidance from infrastructure layer
-      return Failure(`Failed to build image: ${errorMessage}`, buildResult.guidance);
+      const guidance = buildResult.guidance;
+      const buildLogs = (guidance?.details?.buildLogs as string[]) || [];
+
+      let detailedError = `Failed to build image: ${errorMessage}`;
+      if (buildLogs.length > 0) {
+        detailedError += `\n\nBuild logs:\n${buildLogs.join('\n')}`;
+      }
+
+      return Failure(detailedError, guidance);
     }
 
-    const buildTime = Date.now() - startTime;
+    await context.progress?.('Finalizing build and collecting metadata', 90, 100);
 
-    if (progress) await progress('FINALIZING');
-
-    // Prepare the result
+    // Prepare the result using strongly typed values from the Docker client response.
+    // All result fields are sourced directly from the Docker client, ensuring type safety and consistency.
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
     const result: BuildImageResult = {
       success: true,
       imageId: buildResult.value.imageId,
       tags: finalTags,
-      size: (buildResult.value as unknown as { size?: number }).size ?? 0,
-      ...((buildResult.value as unknown as { layers?: number }).layers !== undefined && {
-        layers: (buildResult.value as unknown as { layers: number }).layers,
-      }),
-      buildTime,
+      size: buildResult.value.size,
+      ...(buildResult.value.layers !== undefined && { layers: buildResult.value.layers }),
+      buildTime: buildResult.value.buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
     };
 
-    timer.end({ imageId: buildResult.value.imageId, buildTime });
+    timer.end({ imageId: buildResult.value.imageId, buildTime: buildResult.value.buildTime });
 
-    if (progress) await progress('COMPLETE');
+    await context.progress?.('Build complete', 100, 100);
 
     return Success(result);
   } catch (error) {
     timer.error(error);
 
-    return Failure(extractErrorMessage(error));
+    return Failure(extractErrorMessage(error), {
+      message: extractErrorMessage(error),
+      hint: 'An unexpected error occurred during the Docker build process',
+      resolution:
+        'Check the error message above for details. Common issues include Docker daemon not running, insufficient permissions, or invalid build context',
+    });
   }
 }
 
@@ -251,6 +249,11 @@ export default tool({
   schema: buildImageSchema,
   metadata: {
     knowledgeEnhanced: false,
+  },
+  chainHints: {
+    success:
+      'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
+    failure: 'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image.',
   },
   handler: handleBuildImage,
 });

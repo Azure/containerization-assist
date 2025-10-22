@@ -9,7 +9,7 @@ import * as dockerParser from 'docker-file-parser';
 import type { CommandEntry } from 'docker-file-parser';
 import validateDockerfileSyntax from 'validate-dockerfile';
 import { Result, Success, Failure } from '@/types';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import {
   DockerfileValidationRule,
@@ -397,7 +397,7 @@ function detectBuildKitFeatures(content: string): {
 }
 
 /**
- * Validate BuildKit Dockerfile with simplified rule set
+ * Validate BuildKit Dockerfile
  * Used when standard parser fails due to BuildKit syntax
  */
 function validateBuildKitDockerfile(content: string): ValidationReport {
@@ -431,7 +431,7 @@ function validateBuildKitDockerfile(content: string): ValidationReport {
       });
     }
 
-    // Check for potential secrets (simplified check)
+    // Check for potential secrets
     if (/password|api_key|secret|token/i.test(line) && !line.startsWith('#')) {
       // Skip if it's in a comment or mount directive (secrets are OK in BuildKit mounts)
       if (!line.includes('--mount=type=secret')) {
