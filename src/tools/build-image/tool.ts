@@ -191,7 +191,15 @@ async function handleBuildImage(
       const errorMessage = buildResult.error ?? 'Unknown error';
 
       // Propagate Docker error guidance from infrastructure layer
-      return Failure(`Failed to build image: ${errorMessage}`, buildResult.guidance);
+      const guidance = buildResult.guidance;
+      const buildLogs = (guidance?.details?.buildLogs as string[]) || [];
+
+      let detailedError = `Failed to build image: ${errorMessage}`;
+      if (buildLogs.length > 0) {
+        detailedError += `\n\nBuild logs:\n${buildLogs.join('\n')}`;
+      }
+
+      return Failure(detailedError, guidance);
     }
 
     await context.progress?.('Finalizing build and collecting metadata', 90, 100);
@@ -221,7 +229,8 @@ async function handleBuildImage(
     return Failure(extractErrorMessage(error), {
       message: extractErrorMessage(error),
       hint: 'An unexpected error occurred during the Docker build process',
-      resolution: 'Check the error message above for details. Common issues include Docker daemon not running, insufficient permissions, or invalid build context',
+      resolution:
+        'Check the error message above for details. Common issues include Docker daemon not running, insufficient permissions, or invalid build context',
     });
   }
 }
