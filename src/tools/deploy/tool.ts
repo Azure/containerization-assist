@@ -14,6 +14,7 @@ import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/cli
 
 import { Success, Failure, type Result } from '@/types';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
+import { pluralize } from '@/lib/summary-helpers';
 
 // Type definitions for Kubernetes manifests
 interface KubernetesManifest {
@@ -83,6 +84,12 @@ const MANIFEST_ORDER = [
 ] as const;
 
 export interface DeployApplicationResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the deployment outcome, status, and endpoints.
+   * @example "✅ Deployed myapp to production namespace. 3 replicas ready. Available at: http://myapp.example.com"
+   */
+  summary?: string;
   success: boolean;
   namespace: string;
   deploymentName: string;
@@ -506,8 +513,16 @@ async function handleDeploy(
     // Build endpoints using helper function
     const endpoints = buildEndpoints(service, ingress, serviceName, namespace);
 
+    // Generate summary
+    const endpointText = endpoints.length > 0 ? ` Available at: ${endpoints[0]?.url}` : '';
+
+    const summary = ready
+      ? `✅ Deployed ${deploymentName} to ${namespace}. ${pluralize(readyReplicas, 'replica')} ready.${endpointText}`
+      : `⏳ Deployment ${deploymentName} started in ${namespace}. Waiting for ${pluralize(totalReplicas, 'replica')} to become ready.`;
+
     // Prepare the result
     const result: DeployApplicationResult = {
+      summary,
       success: ready, // Success depends on deployment readiness
       namespace,
       deploymentName,

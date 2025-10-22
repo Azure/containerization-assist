@@ -16,8 +16,15 @@ import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
 import { tagImageSchema } from './schema';
 import { z } from 'zod';
+import { summarizeList } from '@/lib/summary-helpers';
 
 export interface TagImageResult {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the tagging result.
+   * @example "✅ Tagged image. Applied 3 tags: v1.0.0, latest, stable. Ready to push."
+   */
+  summary?: string;
   success: boolean;
   tags: string[];
   imageId: string;
@@ -78,7 +85,12 @@ async function handleTagImage(
 
     const tags = [tag];
 
+    // Generate summary
+    const tagsList = summarizeList(tags);
+    const summary = `✅ Tagged image. Applied ${tags.length === 1 ? 'tag' : `${tags.length} tags`}: ${tagsList}. Ready to push.`;
+
     const result: TagImageResult = {
+      summary,
       success: true,
       tags,
       imageId: source,

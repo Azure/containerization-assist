@@ -54,6 +54,12 @@ export const analyzeRepoSchema = z.object({
 });
 
 export interface RepositoryAnalysis {
+  /**
+   * Natural language summary for user display.
+   * 1-3 sentences describing the analysis outcome, detected modules, and next steps.
+   * @example "✅ Analyzed repository at /app/myproject. Detected node 18.x project with Express framework. Ready for Dockerfile generation."
+   */
+  summary?: string;
   modules?: ModuleInfo[];
   isMonorepo?: boolean;
   analyzedPath?: string;
