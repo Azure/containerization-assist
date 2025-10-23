@@ -6,6 +6,7 @@
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
 import { createMockValidatePath } from '../../__support__/utilities/mocks';
+import type { ErrorGuidance } from '../../../src/types';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -48,6 +49,43 @@ jest.mock('../../../src/lib/validation-helpers', () => ({
     const { validatePath } = require('../../../src/lib/validation');
     return validatePath(...args);
   }),
+  parseImageName: jest.fn().mockImplementation((imageName: string) => {
+    // Simple mock that handles basic image name parsing
+    const colonIndex = imageName.lastIndexOf(':');
+    if (colonIndex > 0 && !imageName.substring(colonIndex + 1).includes('/')) {
+      const imagePath = imageName.substring(0, colonIndex);
+      const tag = imageName.substring(colonIndex + 1);
+      const parts = imagePath.split('/');
+      // More robust registry detection: registry if first part contains a dot or a colon (port), or is 'localhost'
+      const hasRegistry = parts.length > 1 && (
+        /^[^/]+(:\d+)?$/.test(parts[0]) && (parts[0].includes('.') || parts[0].includes(':') || parts[0] === 'localhost')
+      );
+      const hasRegistry =
+        parts.length > 1 &&
+        /^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|localhost|(\d{1,3}\.){3}\d{1,3})(:\d+)?$/.test(parts[0]);
+
+      return {
+        ok: true,
+        value: {
+          registry: hasRegistry ? parts[0] : undefined,
+          repository: hasRegistry ? parts.slice(1).join('/') : imagePath,
+          tag: tag || 'latest',
+        },
+      };
+    }
+
+    const parts = imageName.split('/');
+    const hasRegistry = parts.length > 1 && parts[0]?.includes('.');
+
+    return {
+      ok: true,
+      value: {
+        registry: hasRegistry ? parts[0] : undefined,
+        repository: hasRegistry ? parts.slice(1).join('/') : imageName,
+        tag: 'latest',
+      },
+    };
+  }),
 }));
 
 // Mock filesystem functions with proper structure
@@ -79,7 +117,14 @@ const mockDockerClient = {
       ok: boolean;
       value?: any;
       error?: string;
-      guidance?: { hint?: string; resolution?: string };
+      guidance?: ErrorGuidance;
+    }>
+  >,
+  tagImage: jest.fn() as jest.MockedFunction<
+    (imageId: string, repo: string, tag: string) => Promise<{
+      ok: boolean;
+      value?: void;
+      error?: string;
     }>
   >,
 };
@@ -152,8 +197,10 @@ CMD ["node", "index.js"]`;
         buildTime: 5000,
         logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
         warnings: [],
-      }),
-    );
+    mockDockerClient.tagImage.mockResolvedValue(createSuccessResult(undefined));
+
+    // Mock tagImage for multi-tag support
+    mockDockerClient.tagImage.mockResolvedValue(createSuccessResult(undefined));
   });
 
   describe('Successful Build', () => {
@@ -216,10 +263,60 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
-      // Verify the tool returns successfully with proper structure
+      expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toHaveProperty('imageId');
         expect(result.value).toHaveProperty('tags');
+      }
+
+    it('should include build logs in result', async () => {
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Verify logs are included
+        expect(result.value).toHaveProperty('logs');
+        expect(Array.isArray(result.value.logs)).toBe(true);
+        expect(result.value.logs.length).toBeGreaterThan(0);
+
+        // Verify logs contain expected content from mock
+        expect(result.value.logs).toContain('Step 1/8 : FROM node:18-alpine');
+        expect(result.value.logs).toContain('Successfully built mock-image-id');
+      }
+    });
+
+    it('should apply multiple tags to built image', async () => {
+      const configWithMultipleTags = {
+        ...config,
+        tags: ['myapp:latest', 'myapp:v1.0.0', 'registry.io/myapp:prod'],
+      };
+
+      const result = await buildImage(configWithMultipleTags, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // First tag is applied during build
+        expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            t: 'myapp:latest',
+          }),
+        );
+
+        // Additional tags are applied via tagImage
+        expect(mockDockerClient.tagImage).toHaveBeenCalledTimes(2);
+        expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
+          'sha256:mock-image-id',
+          'myapp',
+          'v1.0.0',
+        );
+        expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
+          'sha256:mock-image-id',
+          'registry.io/myapp',
+          'prod',
+        );
+
+        // Result includes all requested tags
+        expect(result.value.tags).toEqual(['myapp:latest', 'myapp:v1.0.0', 'registry.io/myapp:prod']);
       }
     });
   });
@@ -368,6 +465,49 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toContain('Docker build failed: syntax error');
+      }
+    });
+
+    it('should include build logs in error when build fails', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+
+      // Mock a failure with build logs in guidance
+      mockDockerClient.buildImage.mockResolvedValue({
+        ok: false,
+        error: 'RUN command failed',
+        guidance: {
+          message: 'RUN command failed',
+          hint: 'npm install failed',
+          resolution: 'Check package.json dependencies',
+          details: {
+            buildLogs: [
+              'Step 1/5 : FROM node:18-alpine',
+              'Step 2/5 : WORKDIR /app',
+              'Step 3/5 : RUN npm install',
+              'npm ERR! Cannot find module "express"',
+              'npm ERR! A complete log of this run can be found in: /root/.npm/_logs',
+              'The command \'/bin/sh -c npm install\' returned a non-zero code: 1'
+            ]
+          }
+        }
+      });
+
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        // Verify error message contains main error
+        expect(result.error).toContain('RUN command failed');
+
+        // Verify error includes build logs section
+        expect(result.error).toContain('Build logs:');
+        expect(result.error).toContain('FROM node:18-alpine');
+        expect(result.error).toContain('npm ERR! Cannot find module "express"');
+        expect(result.error).toContain('returned a non-zero code: 1');
+
+        // Verify guidance is preserved
+        expect(result.guidance?.hint).toBe('npm install failed');
+        expect(result.guidance?.resolution).toBe('Check package.json dependencies');
       }
     });
 
@@ -660,6 +800,38 @@ CMD ["node", "index.js"]`;
           }),
         }),
       );
+    });
+  });
+
+  describe('Platform Support', () => {
+    beforeEach(() => {
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+    });
+
+    it('should pass platform parameter to Docker client', async () => {
+      const configWithPlatform = {
+        ...config,
+        platform: 'linux/arm64',
+      };
+
+      const result = await buildImage(configWithPlatform, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: 'linux/arm64',
+        }),
+      );
+    });
+
+    it('should not include platform if not specified', async () => {
+      const result = await buildImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      const buildOptions = mockDockerClient.buildImage.mock.calls[0]?.[0];
+      expect(buildOptions).toBeDefined();
+      expect(buildOptions?.platform).toBeUndefined();
     });
   });
 
