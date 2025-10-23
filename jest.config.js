@@ -104,6 +104,27 @@ export default {
       coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
       maxWorkers: 1,
     },
+    {
+      displayName: 'llm-integration',
+      testMatch: ['<rootDir>/test/llm-integration/**/*.test.ts'],
+      testEnvironment: 'node',
+      moduleNameMapper: {
+        ...commonModuleNameMapper,
+        // Mock kubernetes dependencies for LLM tests
+        '@kubernetes/client-node': '<rootDir>/test/__support__/mocks/kubernetes-mock.ts',
+      },
+      transform: commonTransform,
+      collectCoverageFrom: [
+        'src/**/*.ts',
+        '!src/**/*.d.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        '!src/**/index.ts',
+      ],
+      coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
+      maxWorkers: 1, // Serial execution for LLM tests to avoid rate limits
+      testTimeout: 180000, // 3 minute timeout for LLM interactions
+    },
   ],
 
   // Transform ESM packages
@@ -165,7 +186,7 @@ export default {
     '/node_modules/',
     '/dist/',
     'test/unit/lib/kubernetes.test.ts',
-    // ES module issues resolved - integration tests enabled
+    'test/llm-integration/**/*.test.ts', // Exclude LLM integration tests from default runs
   ],
 
   // Timeout handling for different test types

@@ -1,0 +1,52 @@
+name: LLM Integration Tests
+
+on:
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  llm-integration:
+    name: LLM Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Restore build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            dist
+            dist-cjs
+            .tsbuildinfo
+            node_modules/.cache
+          key: build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig*.json', 'package-lock.json') }}
+          restore-keys: |
+            build-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run LLM Integration Tests
+        run: npm run test:llm
+        env:
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
