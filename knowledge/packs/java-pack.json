@@ -104,8 +104,8 @@
     "id": "java-jre-runtime",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk.*jdk",
-    "recommendation": "Use JRE instead of JDK for production runtime to reduce image size",
-    "example": "FROM eclipse-temurin:17-jre-alpine AS runtime\nCOPY --from=build /app/target/app.jar ./app.jar",
+    "recommendation": "Use JRE instead of JDK for production runtime to reduce image size. JRE contains only the runtime environment, significantly smaller than the full JDK.",
+    "example": "COPY --from=build /app/target/app.jar ./app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
     "severity": "medium",
     "tags": [
       "fix-dockerfile",
@@ -113,6 +113,7 @@
       "java",
       "jre",
       "production",
+      "runtime-stage",
       "size"
     ],
     "description": "JRE is sufficient for running Java applications and significantly smaller"
