@@ -26,6 +26,42 @@
       ],
       "containerization-assist-mcp/tools/*": [
         "../../src/tools/*/index.ts"
+      ],
+      "@/*": [
+        "../../src/*"
+      ],
+      "@types": [
+        "../../src/types/index.ts"
+      ],
+      "@/config/*": [
+        "../../src/config/*"
+      ],
+      "@/infra/*": [
+        "../../src/infra/*"
+      ],
+      "@/lib/*": [
+        "../../src/lib/*"
+      ],
+      "@/mcp/*": [
+        "../../src/mcp/*"
+      ],
+      "@/tools/*": [
+        "../../src/tools/*"
+      ],
+      "@/knowledge/*": [
+        "../../src/knowledge/*"
+      ],
+      "@/validation/*": [
+        "../../src/validation/*"
+      ],
+      "@/app/*": [
+        "../../src/app/*"
+      ],
+      "@/app": [
+        "../../src/app/index.ts"
+      ],
+      "@/types/*": [
+        "../../src/types/*"
       ]
     },
     "skipLibCheck": true,
