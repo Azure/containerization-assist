@@ -23,6 +23,7 @@ import {
   type GenerateK8sManifestsParams,
   type RepositoryInfo,
 } from './schema';
+import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
@@ -332,10 +333,40 @@ const runPattern = createKnowledgeTool<
             matchScore: snippet.weight,
           }));
 
+        // Determine manifest files for ACA conversion
+        const manifestFiles: Array<{ path: string; purpose: string }> = [
+          { path: './k8s/deployment.yaml', purpose: 'Application deployment' },
+        ];
+
+        // Add service if ingress is configured
+        const hasIngress = analysis.containerApps.some((app) => app.hasIngress);
+        if (hasIngress) {
+          manifestFiles.push({ path: './k8s/service.yaml', purpose: 'Service exposure' });
+        }
+
+        // Add configmap/secrets if configured
+        const hasSecrets = analysis.containerApps.some((app) => app.hasSecrets);
+        if (hasSecrets) {
+          manifestFiles.push({ path: './k8s/secret.yaml', purpose: 'Secret management' });
+        }
+
+        const nextAction: ToolNextAction = {
+          action: 'create-files',
+          instruction: `Create Kubernetes manifests in ./k8s directory by converting the ACA manifest using field mappings from recommendations.fieldMappings. Apply security considerations from recommendations.securityConsiderations and best practices from recommendations.bestPractices. Reference the acaAnalysis for container app structure.`,
+          files: manifestFiles,
+        };
+
         const totalContainers = analysis.containerApps.reduce((sum, app) => sum + app.containers, 0);
-        const summary = `✅ ACA to K8s conversion plan ready. ${pluralize(analysis.containerApps.length, 'Container App')} with ${pluralize(totalContainers, 'container')} analyzed. ${pluralize(knowledgeMatches.length, 'recommendation')} generated. Ready to convert.`;
+        const summary =
+          `🔨 ACTION REQUIRED: Convert ACA manifest to Kubernetes\n` +
+          `Container Apps: ${pluralize(analysis.containerApps.length, 'app')} (${pluralize(totalContainers, 'container')})\n` +
+          `Manifests: ${manifestFiles.map((f) => f.path.split('/').pop()).join(', ')}\n` +
+          `Field Mappings: ${fieldMappings.length} items\n` +
+          `Recommendations: ${knowledgeMatches.length} total (${fieldMappings.length} mappings, ${securityMatches.length} security, ${bestPracticeMatches.length} best practices)\n\n` +
+          `✅ Ready to create Kubernetes manifests from ACA config.`;
 
         return {
+          nextAction,
           acaAnalysis: analysis,
           manifestType: 'kubernetes',
           recommendations: {
@@ -389,14 +420,37 @@ const runPattern = createKnowledgeTool<
           matchScore: snippet.weight,
         }));
 
+      // Determine manifest files for repository mode
+      const manifestFiles: Array<{ path: string; purpose: string }> = [
+        { path: './k8s/deployment.yaml', purpose: 'Application deployment' },
+        { path: './k8s/service.yaml', purpose: 'Service exposure' },
+      ];
+
+      // Add configmap if there are ports or environment variables
+      if (input.ports && input.ports.length > 0) {
+        manifestFiles.push({ path: './k8s/configmap.yaml', purpose: 'Configuration management' });
+      }
+
+      const nextAction: ToolNextAction = {
+        action: 'create-files',
+        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, ports, and dependencies.`,
+        files: manifestFiles,
+      };
+
       const frameworksStr =
         input.frameworks && input.frameworks.length > 0
           ? ` (${input.frameworks.map((f) => f.name).join(', ')})`
           : '';
 
-      const summary = `✅ Generated ${input.manifestType} manifest plan for ${input.name || input.language || 'application'}${frameworksStr}. ${pluralize(knowledgeMatches.length, 'recommendation')} available. Ready to deploy.`;
+      const summary =
+        `🔨 ACTION REQUIRED: Create ${input.manifestType} manifests\n` +
+        `Application: ${input.name || input.language || 'application'}${frameworksStr}\n` +
+        `Manifests: ${manifestFiles.map((f) => f.path.split('/').pop()).join(', ')}\n` +
+        `Recommendations: ${knowledgeMatches.length} total (${securityMatches.length} security, ${resourceMatches.length} resources, ${bestPracticeMatches.length} best practices)\n\n` +
+        `✅ Ready to create manifests in ./k8s directory.`;
 
       return {
+        nextAction,
         repositoryInfo: {
           name: input.name,
           modulePath: input.modulePath,

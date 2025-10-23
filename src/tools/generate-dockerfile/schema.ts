@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { environment, repositoryPath } from '../shared/schemas';
+import { environment, repositoryPath, type ToolNextAction } from '../shared/schemas';
 import { ModuleInfo } from '../analyze-repo/schema';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
@@ -99,6 +99,8 @@ export interface EnhancementGuidance {
 }
 
 export interface DockerfilePlan {
+  /** Next action directive - provides explicit guidance on what files to create/update */
+  nextAction: ToolNextAction;
   repositoryInfo: ModuleInfo;
   recommendations: {
     buildStrategy: {

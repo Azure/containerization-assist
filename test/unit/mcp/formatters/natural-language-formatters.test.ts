@@ -110,6 +110,16 @@ describe('natural-language-formatters', () => {
   describe('formatDockerfilePlanNarrative', () => {
     it('should format complete Dockerfile plan', () => {
       const plan: DockerfilePlan = {
+        nextAction: {
+          action: 'create-files',
+          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images, security considerations, optimizations, and best practices from recommendations.',
+          files: [
+            {
+              path: './Dockerfile',
+              purpose: 'Container build configuration',
+            },
+          ],
+        },
         repositoryInfo: {
           name: 'my-app',
           language: 'javascript',
@@ -121,7 +131,7 @@ describe('natural-language-formatters', () => {
             {
               image: 'node:18-alpine',
               reason: 'Lightweight Alpine-based image',
-              category: 'Official',
+              category: 'size',
               matchScore: 95,
               size: '50MB',
             },
@@ -132,25 +142,36 @@ describe('natural-language-formatters', () => {
           },
           securityConsiderations: [
             {
+              id: 'sec-1',
+              category: 'security',
               recommendation: 'Run as non-root user',
               severity: 'high',
+              matchScore: 90,
             },
           ],
           optimizations: [
             {
+              id: 'opt-1',
+              category: 'optimization',
               recommendation: 'Use .dockerignore to exclude unnecessary files',
+              matchScore: 85,
             },
           ],
+          bestPractices: [],
         },
+        confidence: 0.9,
+        summary: '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: javascript 18.0.0 (Express)\nStrategy: Multi-stage build\n✅ Ready to create Dockerfile based on recommendations.',
       };
 
       const narrative = formatDockerfilePlanNarrative(plan);
 
-      expect(narrative).toContain('📝 Dockerfile Planning Complete');
+      expect(narrative).toContain('✨ CREATE DOCKERFILE');
+      expect(narrative).toContain('**Action:**');
+      expect(narrative).toContain('**Files:**');
+      expect(narrative).toContain('./Dockerfile');
       expect(narrative).toContain('**Project:** my-app');
       expect(narrative).toContain('**Language:** javascript 18.0.0 (Express)');
       expect(narrative).toContain('**Strategy:** Multi-stage build');
-      expect(narrative).toContain('**Base Image Recommendations:**');
       expect(narrative).toContain('node:18-alpine');
       expect(narrative).toContain('**Security Considerations:**');
       expect(narrative).toContain('**Optimizations:**');
@@ -159,6 +180,16 @@ describe('natural-language-formatters', () => {
 
     it('should handle existing Dockerfile analysis', () => {
       const plan: DockerfilePlan = {
+        nextAction: {
+          action: 'update-files',
+          instruction: 'Update the existing Dockerfile at ./Dockerfile by applying the enhancement recommendations.',
+          files: [
+            {
+              path: './Dockerfile',
+              purpose: 'Container build configuration (enhancement)',
+            },
+          ],
+        },
         repositoryInfo: {
           name: 'my-app',
           language: 'python',
@@ -168,42 +199,60 @@ describe('natural-language-formatters', () => {
           baseImages: [],
           buildStrategy: {
             multistage: false,
+            reason: 'Single-stage build sufficient for interpreted languages',
           },
           securityConsiderations: [],
           optimizations: [],
+          bestPractices: [],
         },
+        confidence: 0.85,
+        summary: '🔨 ACTION REQUIRED: Update Dockerfile\nPath: ./Dockerfile\nLanguage: python 3.11\n✅ Ready to update Dockerfile with enhancements.',
         existingDockerfile: {
           path: '/app/Dockerfile',
           content: 'FROM python:3.11\nWORKDIR /app',
           analysis: {
             complexity: 'simple',
-            securityPosture: 'moderate',
-            hasMultistage: false,
-            baseImage: 'python:3.11',
-            hasHealthcheck: false,
+            securityPosture: 'needs-improvement',
+            isMultistage: false,
+            baseImages: ['python:3.11'],
+            hasHealthCheck: false,
             hasNonRootUser: false,
+            instructionCount: 2,
           },
           guidance: {
-            strategy: 'enhance',
+            strategy: 'moderate-refactor',
             preserve: ['Base image selection', 'Working directory'],
             improve: ['Add non-root user', 'Add healthcheck'],
+            addMissing: [],
           },
         },
       };
 
       const narrative = formatDockerfilePlanNarrative(plan);
 
+      expect(narrative).toContain('🔧 UPDATE DOCKERFILE');
+      expect(narrative).toContain('**Action:**');
       expect(narrative).toContain('**Existing Dockerfile Analysis:**');
       expect(narrative).toContain('Path: /app/Dockerfile');
       expect(narrative).toContain('Complexity: simple');
-      expect(narrative).toContain('Security: moderate');
-      expect(narrative).toContain('Enhancement Strategy: enhance');
+      expect(narrative).toContain('Security: needs-improvement');
+      expect(narrative).toContain('Enhancement Strategy: moderate-refactor');
       expect(narrative).toContain('**Preserve:**');
       expect(narrative).toContain('**Improve:**');
     });
 
     it('should display policy validation results', () => {
       const plan: DockerfilePlan = {
+        nextAction: {
+          action: 'create-files',
+          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
+          files: [
+            {
+              path: './Dockerfile',
+              purpose: 'Container build configuration',
+            },
+          ],
+        },
         repositoryInfo: {
           name: 'my-app',
           language: 'java',
@@ -212,26 +261,33 @@ describe('natural-language-formatters', () => {
           baseImages: [],
           buildStrategy: {
             multistage: true,
+            reason: 'Multi-stage build recommended for compiled languages',
           },
           securityConsiderations: [],
           optimizations: [],
+          bestPractices: [],
         },
+        confidence: 0.8,
+        summary: '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: java\n✅ Ready to create Dockerfile based on recommendations.',
         policyValidation: {
           passed: false,
           violations: [
             {
-              rule: 'require-health-check',
+              ruleId: 'require-health-check',
               message: 'Dockerfile must include HEALTHCHECK instruction',
-              severity: 'error',
+              severity: 'blocking',
+              line: 0,
             },
           ],
           warnings: [
             {
-              rule: 'prefer-specific-versions',
+              ruleId: 'prefer-specific-versions',
               message: 'Consider using specific version tags',
               severity: 'warning',
+              line: 0,
             },
           ],
+          suggestions: [],
         },
       };
 
