@@ -56,10 +56,6 @@ jest.mock('../../../src/lib/validation-helpers', () => ({
       const imagePath = imageName.substring(0, colonIndex);
       const tag = imageName.substring(colonIndex + 1);
       const parts = imagePath.split('/');
-      // More robust registry detection: registry if first part contains a dot or a colon (port), or is 'localhost'
-      const hasRegistry = parts.length > 1 && (
-        /^[^/]+(:\d+)?$/.test(parts[0]) && (parts[0].includes('.') || parts[0].includes(':') || parts[0] === 'localhost')
-      );
       const hasRegistry =
         parts.length > 1 &&
         /^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|localhost|(\d{1,3}\.){3}\d{1,3})(:\d+)?$/.test(parts[0]);
@@ -121,14 +117,17 @@ const mockDockerClient = {
     }>
   >,
   tagImage: jest.fn() as jest.MockedFunction<
-    (imageId: string, repo: string, tag: string) => Promise<{
+    (
+      imageId: string,
+      repo: string,
+      tag: string,
+    ) => Promise<{
       ok: boolean;
       value?: void;
       error?: string;
     }>
   >,
 };
-
 
 jest.mock('../../../src/infra/docker/client', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
@@ -197,9 +196,8 @@ CMD ["node", "index.js"]`;
         buildTime: 5000,
         logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
         warnings: [],
-    mockDockerClient.tagImage.mockResolvedValue(createSuccessResult(undefined));
-
-    // Mock tagImage for multi-tag support
+      }),
+    );
     mockDockerClient.tagImage.mockResolvedValue(createSuccessResult(undefined));
   });
 
@@ -268,7 +266,7 @@ CMD ["node", "index.js"]`;
         expect(result.value).toHaveProperty('imageId');
         expect(result.value).toHaveProperty('tags');
       }
-
+    });
     it('should include build logs in result', async () => {
       const result = await buildImage(config, createMockToolContext());
 
@@ -316,7 +314,11 @@ CMD ["node", "index.js"]`;
         );
 
         // Result includes all requested tags
-        expect(result.value.tags).toEqual(['myapp:latest', 'myapp:v1.0.0', 'registry.io/myapp:prod']);
+        expect(result.value.tags).toEqual([
+          'myapp:latest',
+          'myapp:v1.0.0',
+          'registry.io/myapp:prod',
+        ]);
       }
     });
   });
@@ -486,10 +488,10 @@ CMD ["node", "index.js"]`;
               'Step 3/5 : RUN npm install',
               'npm ERR! Cannot find module "express"',
               'npm ERR! A complete log of this run can be found in: /root/.npm/_logs',
-              'The command \'/bin/sh -c npm install\' returned a non-zero code: 1'
-            ]
-          }
-        }
+              "The command '/bin/sh -c npm install' returned a non-zero code: 1",
+            ],
+          },
+        },
       });
 
       const result = await buildImage(config, createMockToolContext());
@@ -688,7 +690,8 @@ CMD ["node", "index.js"]`;
         error: 'Dockerfile parse error: unknown instruction: INVALID',
         guidance: {
           hint: 'Dockerfile contains syntax errors',
-          resolution: 'Check Dockerfile syntax and fix errors. Use "docker build" locally to debug.',
+          resolution:
+            'Check Dockerfile syntax and fix errors. Use "docker build" locally to debug.',
         },
       });
 
