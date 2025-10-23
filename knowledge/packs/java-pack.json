@@ -104,8 +104,8 @@
     "id": "java-jre-runtime",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk.*jdk",
-    "recommendation": "Use JRE instead of JDK for production runtime to reduce image size. JRE contains only the runtime environment, significantly smaller than the full JDK.",
-    "example": "COPY --from=build /app/target/app.jar ./app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "recommendation": "Use JRE instead of JDK for production runtime to reduce image size. JRE contains only the runtime environment, significantly smaller than the full JDK. Choose JRE variant of your base image (e.g., eclipse-temurin:XX-jre-alpine instead of eclipse-temurin:XX-jdk-alpine).",
+    "example": "WORKDIR /app\nCOPY --from=build /app/target/app.jar ./app.jar\nUSER nonroot\nCMD [\"java\", \"-jar\", \"app.jar\"]",
     "severity": "medium",
     "tags": [
       "fix-dockerfile",
@@ -158,18 +158,16 @@
     "id": "java-multi-stage-maven",
     "category": "dockerfile",
     "pattern": "mvn package",
-    "recommendation": "Use multi-stage build pattern to separate Maven build environment from runtime, reducing final image size by ~90%",
-    "example": "COPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn package\nCOPY --from=build /app/target/*.jar app.jar",
+    "recommendation": "Use multi-stage build pattern to separate Maven build environment from runtime, reducing final image size by ~90%. Build stage uses Maven/JDK base image, runtime stage uses JRE base image.",
+    "example": "# Build stage pattern:\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn package -DskipTests\n\n# Runtime stage pattern:\nWORKDIR /app\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
     "severity": "high",
     "tags": [
-      "build-stage",
       "fix-dockerfile",
       "generate-dockerfile",
       "java",
       "maven",
       "multistage",
-      "optimization",
-      "runtime-stage"
+      "optimization"
     ],
     "description": "Multi-stage build pattern for Maven projects - use this pattern with your chosen base images"
   },
@@ -424,16 +422,16 @@
     "id": "java-jlink-optimization",
     "category": "dockerfile",
     "pattern": "jlink|custom-jre",
-    "recommendation": "Use jlink to create custom JRE with only required modules, reducing image size by including only necessary Java modules",
-    "example": "RUN jlink \\\n  --add-modules java.base,java.logging,java.xml,java.desktop,java.management,java.naming \\\n  --strip-debug \\\n  --no-man-pages \\\n  --no-header-files \\\n  --compress=2 \\\n  --output /javaruntime",
+    "recommendation": "Use jlink in build stage to create custom JRE with only required modules, then copy the custom runtime to final image. This reduces image size significantly by including only necessary Java modules.",
+    "example": "# In build stage with full JDK:\nRUN jlink \\\n  --add-modules java.base,java.logging,java.xml,java.desktop,java.management,java.naming \\\n  --strip-debug \\\n  --no-man-pages \\\n  --no-header-files \\\n  --compress=2 \\\n  --output /javaruntime\n\n# In runtime stage:\nCOPY --from=build /javaruntime /opt/java\nENV PATH=\"/opt/java/bin:$PATH\"",
     "severity": "medium",
     "tags": [
-      "build-stage",
       "fix-dockerfile",
       "generate-dockerfile",
       "java",
       "jlink",
       "jre",
+      "multistage",
       "optimization"
     ],
     "description": "Custom JRE reduces image size by including only necessary modules"
