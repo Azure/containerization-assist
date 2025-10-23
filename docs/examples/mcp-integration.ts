@@ -1,128 +1,176 @@
 /**
- * Example: Integration with MCP SDK
- * Shows how to use Container Assist with an MCP server
+ * Example: MCP Server Integration with Container Assist
+ *
+ * This example demonstrates the standard pattern for integrating Container Assist
+ * tools into your own MCP server using createApp() and bindToMCP().
  */
 
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { createApp } from 'containerization-assist-mcp';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { createApp, analyzeRepoTool, generateDockerfileTool } from 'containerization-assist-mcp';
 
 /**
- * Example 1: Register all tools with default names
+ * Step 1: Define your custom tool schemas and types
  */
-async function registerAllToolsExample() {
-  const server = new McpServer({
-    name: 'my-mcp-server',
-    version: '1.0.0'
-  });
+const GetContainerizationPlanSchema = z.object({
+  workspaceFolder: z.string()
+    .describe("The workspace folder of the current project"),
+  servicePaths: z.array(z.string())
+    .describe("The absolute paths of each service to containerize"),
+});
 
-  const app = createApp();
-  app.bindToMCP(server);
+type GetContainerizationPlanParams = z.infer<typeof GetContainerizationPlanSchema>;
 
-  console.log('✅ All Container Assist tools registered with default names');
-
-  // List tools
-  const tools = app.listTools();
-  console.log(`Registered ${tools.length} tools:`);
-  tools.forEach(tool => console.log(`- ${tool.name}`));
-
-  // McpServer uses connect() instead of start()
-  // await server.connect(transport);
+interface ContainerToolNames {
+  analyzeRepo: string;
+  generateDockerfile: string;
 }
 
 /**
- * Example 2: Register tools with custom names
+ * Step 2: Implement your custom tool logic
+ *
+ * This tool orchestrates Container Assist tools to generate a containerization plan
  */
-async function registerCustomToolsExample() {
-  const server = new McpServer({
-    name: 'my-custom-server',
-    version: '1.0.0'
-  });
+async function handleContainerizationPlan(
+  params: GetContainerizationPlanParams,
+  toolNames: ContainerToolNames
+): Promise<string> {
+  // Your orchestration logic here
+  // This example returns a template that references the Container Assist tools
 
-  // Create app with custom tool names
-  const app = createApp({
-    toolAliases: {
-      'analyze-repo': 'analyze_repository',
-      'build-image': 'docker_build',
-      'deploy': 'k8s_deploy'
-    }
-  });
+  const serviceList = params.servicePaths
+    .map(p => `- ${p}`)
+    .join('\n');
 
-  app.bindToMCP(server);
+  return `
+# Containerization Plan
 
-  console.log('Custom tools registered:');
-  console.log('- analyze_repository (was: analyze-repo)');
-  console.log('- docker_build (was: build-image)');
-  console.log('- k8s_deploy (was: deploy)\n');
+## Services to Containerize
+${serviceList}
 
-  // McpServer uses connect() instead of start()
-  // await server.connect(transport);
+## Execution Steps
+
+1. **Scan Repository**: Use tool '${toolNames.analyzeRepo}' to analyze each service
+2. **Generate Dockerfiles**: Use tool '${toolNames.generateDockerfile}' to create Dockerfiles
+3. **Build Images**: Build Docker images for each service
+4. **Verify**: Test that images run correctly
+
+Follow these steps to containerize your application.
+`;
 }
 
 /**
- * Example 3: Register tools with comprehensive name mapping
+ * Step 3: Format tool results for MCP
  */
-async function registerWithMappingExample() {
-  console.log('=== Name Mapping Example ===\n');
+function formatToolResult(toolResult: string, isError = false): CallToolResult {
+  return {
+    isError,
+    content: [{ type: "text", text: toolResult }]
+  };
+}
 
-  const server = new McpServer({
-    name: 'mapped-server',
-    version: '1.0.0'
-  });
-
-  // Define custom names for tools
-  const app = createApp({
-    toolAliases: {
-      'analyze-repo': 'project_analyze',
-      'generate-dockerfile': 'dockerfile_create',
-      'build-image': 'image_build',
-      'scan-image': 'security_scan',
-      'deploy': 'app_deploy',
-      'verify-deploy': 'deployment_check'
+/**
+ * Step 4: Set up your MCP server with Container Assist integration
+ */
+export function setupMCPServer(): void {
+  // Create your MCP server
+  const server = new McpServer(
+    {
+      name: "my-containerization-server",
+      version: "1.0.0",
+    },
+    {
+      capabilities: {
+        logging: {},
+        tools: {},
+      }
     }
+  );
+
+  // Define custom names for Container Assist tools
+  const customAnalyzeRepoName = 'my-analyze-repository';
+  const customGenerateDockerfileName = 'my-generate-dockerfile';
+
+  // Create Container Assist app with selective tools and configuration
+  const containerAssistApp = createApp({
+    // Register only the tools you need
+    tools: [analyzeRepoTool, generateDockerfileTool],
+
+    // Use custom names (aliases) for the tools
+    toolAliases: {
+      'analyze-repo': customAnalyzeRepoName,
+      'generate-dockerfile': customGenerateDockerfileName
+    },
+
+    // Disable chain hints (automatic next-step suggestions)
+    chainHintsMode: "disabled",
+
+    // Use natural language format for rich, user-friendly output
+    outputFormat: "natural-language"
   });
 
-  app.bindToMCP(server);
+  // Bind Container Assist tools to your MCP server
+  // This automatically handles context creation and tool registration
+  containerAssistApp.bindToMCP(server);
 
-  console.log('Tools registered with custom names:');
-  const aliases = {
-    'analyze-repo': 'project_analyze',
-    'generate-dockerfile': 'dockerfile_create',
-    'build-image': 'image_build',
-    'scan-image': 'security_scan',
-    'deploy': 'app_deploy',
-    'verify-deploy': 'deployment_check'
+  // Store the tool names for use in custom orchestration tools
+  const toolNames: ContainerToolNames = {
+    analyzeRepo: customAnalyzeRepoName,
+    generateDockerfile: customGenerateDockerfileName
   };
 
-  Object.entries(aliases).forEach(([original, custom]) => {
-    console.log(`- ${custom} (was: ${original})`);
-  });
-  console.log('');
+  // Register your custom orchestration tool
+  server.tool(
+    "get-containerization-plan",
+    "Generate a containerization plan for the application",
+    GetContainerizationPlanSchema.shape,
+    { readOnlyHint: true },
+    async (args, _extra) => {
+      try {
+        const response = await handleContainerizationPlan(args, toolNames);
+        return formatToolResult(response);
+      } catch (error) {
+        console.error('Error generating plan:', error);
+        return formatToolResult(`Failed to generate plan: ${error}`, true);
+      }
+    }
+  );
 
-  // McpServer uses connect() instead of start()
-  // await server.connect(transport);
+  // Optional: Register a prompt to guide the agent
+  server.prompt(
+    "containerization-workflow",
+    "Generate a workflow for containerizing the application",
+    async (_args) => {
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: `Help me containerize my application using the get-containerization-plan tool.`
+            }
+          }
+        ]
+      };
+    }
+  );
+
+  // Connect to stdio transport
+  const transport = new StdioServerTransport();
+  server
+    .connect(transport)
+    .then(() => {
+      console.error('MCP server connected successfully.');
+    })
+    .catch((error: Error) => {
+      console.error('Failed to connect MCP server:', error);
+      process.exit(1);
+    });
 }
 
-// Run examples (choose one)
+// Run the server if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const example = process.argv[2] || 'all';
-
-  switch (example) {
-    case 'all':
-      await registerAllToolsExample();
-      break;
-    case 'custom':
-      await registerCustomToolsExample();
-      break;
-    case 'mapping':
-      await registerWithMappingExample();
-      break;
-    default:
-      console.log('Usage: tsx mcp-integration.ts [all|custom|mapping]');
-  }
+  setupMCPServer();
 }
-
-export {
-  registerAllToolsExample,
-  registerCustomToolsExample,
-  registerWithMappingExample
-};

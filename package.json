@@ -1,6 +1,6 @@
 {
   "name": "containerization-assist-mcp",
-  "version": "1.0.1-dev.1",
+  "version": "1.0.1-dev.2",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -85,7 +85,7 @@
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "@kubernetes-models/apimachinery": "^2.2.0",
-    "@kubernetes/client-node": "^1.3.0",
+    "@kubernetes/client-node": "^1.4.0",
     "@modelcontextprotocol/sdk": "1.17.3",
     "@types/xml2js": "^0.4.14",
     "commander": "^14.0.1",
@@ -94,7 +94,7 @@
     "dockerode": "^4.0.9",
     "js-yaml": "^4.1.0",
     "kubernetes-models": "^4.5.1",
-    "pino": "^9.12.0",
+    "pino": "^10.1.0",
     "tmp": "^0.2.5",
     "validate-dockerfile": "^1.8.1",
     "xml2js": "^0.6.2",
@@ -102,26 +102,26 @@
     "zod": "^3.25.6"
   },
   "devDependencies": {
-    "@eslint/js": "^9.36.0",
+    "@eslint/js": "^9.38.0",
     "@jest/globals": "^30.2.0",
     "@types/dockerode": "^3.3.44",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.6.0",
+    "@types/node": "^24.9.1",
     "@types/tar-fs": "^2.0.4",
     "@types/tmp": "^0.2.6",
-    "@typescript-eslint/eslint-plugin": "^8.45.0",
-    "@typescript-eslint/parser": "^8.45.0",
-    "eslint": "^9.36.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "eslint": "^9.38.0",
     "husky": "^9.1.7",
     "jest": "^30.2.0",
-    "lint-staged": "^16.2.3",
+    "lint-staged": "^16.2.6",
     "prettier": "^3.6.2",
-    "ts-jest": "^29.4.4",
+    "ts-jest": "^29.4.5",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.45.0"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2"
   },
   "lint-staged": {
     "src/**/*.ts": [
