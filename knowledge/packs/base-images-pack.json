@@ -1,24 +1,5 @@
 [
   {
-    "id": "java-microsoft-azure-linux",
-    "category": "dockerfile",
-    "pattern": "java|openjdk|jdk|jre",
-    "recommendation": "Use Microsoft Azure Linux (Mariner) for enterprise Java applications",
-    "example": "# Build stage\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\n# Runtime stage\nFROM mcr.microsoft.com/openjdk/jdk:17-distroless AS runtime",
-    "severity": "high",
-    "tags": [
-      "azure",
-      "enterprise",
-      "fix-dockerfile",
-      "generate-dockerfile",
-      "google",
-      "java",
-      "microsoft",
-      "security"
-    ],
-    "description": "Microsoft Azure Linux provides enterprise-grade security with reduced attack surface"
-  },
-  {
     "id": "java-official-temurin",
     "category": "dockerfile",
     "pattern": "java|openjdk|jdk|jre",
@@ -86,21 +67,21 @@
   },
   {
     "id": "distroless-security",
-    "category": "dockerfile",
+    "category": "security",
     "pattern": "runtime|production|secure",
-    "recommendation": "Consider Google Distroless images for production runtime",
-    "example": "# Java\nFROM gcr.io/distroless/java17-debian12:nonroot\n# Node.js\nFROM gcr.io/distroless/nodejs18-debian12\n# Python\nFROM gcr.io/distroless/python3",
-    "severity": "high",
+    "recommendation": "For enhanced security in production runtime stages, consider using distroless images when Azure/vendor-specific images are not available. Distroless images contain only runtime dependencies with no package managers or shells.",
+    "example": "# Use in runtime stage of multi-stage builds\n# Distroless images have no shell, so use exec form for CMD/ENTRYPOINT\nFROM gcr.io/distroless/base-debian12:nonroot\nCOPY --from=build /app/binary /app/binary\nCMD [\"/app/binary\"]",
+    "severity": "medium",
     "tags": [
-      "distroless",
       "fix-dockerfile",
       "generate-dockerfile",
       "google",
       "minimal",
       "production",
+      "runtime-stage",
       "security"
     ],
-    "description": "Distroless images contain only runtime dependencies, no package managers or shells"
+    "description": "Security guidance for using distroless images as a fallback when vendor-specific hardened images are not available"
   },
   {
     "id": "maven-wrapper-setup",
@@ -165,12 +146,11 @@
     "id": "base-image-preference-order",
     "category": "dockerfile",
     "pattern": "FROM",
-    "recommendation": "Follow enterprise preference order for base images",
-    "example": "# Preference order:\n# 1. Microsoft Azure Linux/Mariner (enterprise)\n# 2. Distroless (security-focused)\n# 3. Official language images (general purpose)\n# 4. Alpine (size-optimized)\n# 5. Ubuntu/Debian (compatibility)",
-    "severity": "medium",
+    "recommendation": "When selecting base images, follow this preference order: (1) Microsoft Azure Linux/Mariner for enterprise support, (2) Google distroless for security-focused deployments, (3) Official language images for general purpose, (4) Alpine for size optimization, (5) Ubuntu/Debian for maximum compatibility",
+    "example": "# Selection criteria:\n# - Enterprise + Microsoft ecosystem → Azure Linux/Mariner\n# - Security-focused + minimal attack surface → Distroless\n# - General purpose + broad compatibility → Official images\n# - Size-constrained environments → Alpine\n# - Legacy compatibility needs → Ubuntu/Debian",
+    "severity": "low",
     "tags": [
       "azure",
-      "base-image",
       "canonical",
       "enterprise",
       "fix-dockerfile",
@@ -179,6 +159,6 @@
       "microsoft",
       "selection"
     ],
-    "description": "Choose base images based on organizational requirements and security posture"
+    "description": "Best practice guidance for base image selection based on organizational requirements"
   }
 ]
