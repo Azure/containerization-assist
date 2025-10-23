@@ -167,7 +167,6 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
     const primaryImage = recommendations.baseImages[0];
     if (primaryImage) {
       const sizeText = primaryImage.size ? ` (${primaryImage.size})` : '';
-
       parts.push(`\n**Recommended Base Image:**`);
       parts.push(`  **${primaryImage.image}**${sizeText}`);
       parts.push(`  ${primaryImage.reason}`);
@@ -175,13 +174,13 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
     // Show alternative if available
     if (recommendations.baseImages.length > 1) {
-      const altImage = recommendations.baseImages[1];
-      if (altImage) {
-        const altSizeText = altImage.size ? ` (${altImage.size})` : '';
-        parts.push(`\n**Alternative Option:**`);
-        parts.push(`  **${altImage.image}**${altSizeText}`);
-        parts.push(`  ${altImage.reason}`);
-      }
+      // Safe to assert: length check guarantees second element exists
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const altImage = recommendations.baseImages[1]!;
+      const altSizeText = altImage.size ? ` (${altImage.size})` : '';
+      parts.push(`\n**Alternative Option:**`);
+      parts.push(`  **${altImage.image}**${altSizeText}`);
+      parts.push(`  ${altImage.reason}`);
     }
   }
 
