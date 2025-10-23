@@ -136,8 +136,20 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
 export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
   const parts: string[] = [];
 
-  // Header
-  parts.push('📝 Dockerfile Planning Complete\n');
+  // Action-oriented header
+  const actionIcon = plan.nextAction.action === 'create-files' ? '✨' : '🔧';
+  const actionVerb = plan.nextAction.action === 'create-files' ? 'CREATE' : 'UPDATE';
+  parts.push(`${actionIcon} ${actionVerb} DOCKERFILE\n`);
+
+  // Clear instruction
+  parts.push(`**Action:** ${plan.nextAction.instruction}\n`);
+
+  // Files to create/update
+  parts.push(`**Files:**`);
+  plan.nextAction.files.forEach((f) => {
+    parts.push(`  📄 ${f.path} - ${f.purpose}`);
+  });
+  parts.push('');
 
   // Project info
   const { repositoryInfo, recommendations } = plan;
@@ -225,9 +237,15 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
   // Next steps
   parts.push('\n**Next Steps:**');
-  parts.push('  → Review base image recommendations');
-  parts.push('  → Use fix-dockerfile to create or update Dockerfile');
-  parts.push('  → Build image with build-image tool');
+  if (plan.nextAction.action === 'create-files') {
+    parts.push('  1. Create Dockerfile using the base images and recommendations above');
+    parts.push('  2. Build image with build-image tool');
+    parts.push('  3. Scan for vulnerabilities with scan-image');
+  } else {
+    parts.push('  1. Update Dockerfile preserving good patterns and applying improvements');
+    parts.push('  2. Rebuild image with build-image tool');
+    parts.push('  3. Re-scan with scan-image to verify fixes');
+  }
 
   return parts.join('\n');
 }
@@ -446,9 +464,9 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): str
 
   // Pod breakdown
   if (result.pods && result.pods.length > 0) {
-    const runningPods = result.pods.filter((p: any) => p.status === 'Running').length;
-    const pendingPods = result.pods.filter((p: any) => p.status === 'Pending').length;
-    const failedPods = result.pods.filter((p: any) => p.status === 'Failed').length;
+    const runningPods = result.pods.filter((p) => p.status === 'Running').length;
+    const pendingPods = result.pods.filter((p) => p.status === 'Pending').length;
+    const failedPods = result.pods.filter((p) => p.status === 'Failed').length;
 
     parts.push(`\n**Pod Status:**`);
     if (runningPods > 0) parts.push(`  ✅ Running: ${runningPods}`);
@@ -457,7 +475,7 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): str
 
     // Show individual pod details (up to 5)
     parts.push(`\n**Pod Details:**`);
-    result.pods.slice(0, 5).forEach((pod: any) => {
+    result.pods.slice(0, 5).forEach((pod) => {
       const statusIcon = pod.ready ? '✓' : '✗';
       const healthIcon = pod.healthy ? '💚' : '💔';
       const restartWarning = pod.restarts > 0 ? ` (${pod.restarts} restarts)` : '';
@@ -506,7 +524,7 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): str
     parts.push('  → Review pod logs for error messages');
     parts.push('  → Check deployment events with kubectl describe');
     parts.push('  → Verify resource limits and constraints');
-    const failedPods = result.pods?.filter((p: any) => p.status === 'Failed').length || 0;
+    const failedPods = result.pods?.filter((p) => p.status === 'Failed').length || 0;
     if (failedPods > 0) {
       parts.push('  → Investigate failed pods with kubectl logs');
     }
@@ -681,8 +699,18 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string 
 export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): string {
   const parts: string[] = [];
 
-  // Header
-  parts.push('📦 Kubernetes Manifest Planning Complete\n');
+  // Action-oriented header
+  parts.push('✨ CREATE KUBERNETES MANIFESTS\n');
+
+  // Clear instruction
+  parts.push(`**Action:** ${result.nextAction.instruction}\n`);
+
+  // Files to create
+  parts.push(`**Files:**`);
+  result.nextAction.files.forEach((f) => {
+    parts.push(`  📄 ${f.path} - ${f.purpose}`);
+  });
+  parts.push('');
 
   // Manifest type
   parts.push(`**Manifest Type:** ${result.manifestType}`);
@@ -760,10 +788,10 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): strin
 
   // Next steps
   parts.push(`\n**Next Steps:**`);
-  parts.push('  → Review manifest recommendations for correctness');
-  parts.push('  → Use prepare-cluster to setup namespace and prerequisites');
-  parts.push('  → Use deploy to apply manifests to cluster');
-  parts.push('  → Verify deployment with verify-deploy');
+  parts.push('  1. Create manifest files using the recommendations above');
+  parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
+  parts.push('  3. Use deploy to apply manifests to cluster');
+  parts.push('  4. Verify deployment with verify-deploy');
 
   return parts.join('\n');
 }

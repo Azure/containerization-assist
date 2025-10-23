@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { environment } from '../shared/schemas';
+import { environment, type ToolNextAction } from '../shared/schemas';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
 export const generateK8sManifestsSchema = z
@@ -157,6 +157,8 @@ export interface RepositoryInfo {
 }
 
 export interface ManifestPlan {
+  /** Next action directive - provides explicit guidance on what files to create/update */
+  nextAction: ToolNextAction;
   repositoryInfo?: RepositoryInfo;
   acaAnalysis?: {
     containerApps: Array<{

@@ -141,7 +141,10 @@ describe('generate-dockerfile', () => {
         expect(result.value.recommendations.buildStrategy).toBeDefined();
         expect(result.value.recommendations.baseImages).toBeDefined();
         expect(result.value.recommendations.securityConsiderations).toBeDefined();
-        expect(result.value.summary).toContain('Dockerfile plan ready');
+        expect(result.value.nextAction).toBeDefined();
+        expect(result.value.nextAction.action).toBe('create-files');
+        expect(result.value.summary).toContain('ACTION REQUIRED');
+        expect(result.value.summary).toContain('Create Dockerfile');
       }
     });
 
@@ -163,7 +166,10 @@ CMD ["node", "index.js"]`;
         expect(result.value.existingDockerfile).toBeDefined();
         expect(result.value.existingDockerfile?.analysis).toBeDefined();
         expect(result.value.existingDockerfile?.guidance).toBeDefined();
-        expect(result.value.summary).toContain('enhancement plan ready');
+        expect(result.value.nextAction).toBeDefined();
+        expect(result.value.nextAction.action).toBe('update-files');
+        expect(result.value.summary).toContain('ACTION REQUIRED');
+        expect(result.value.summary).toContain('Update Dockerfile');
       }
     });
 
@@ -409,7 +415,9 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.existingDockerfile).toBeUndefined();
-        expect(result.value.summary).toContain('Dockerfile plan ready');
+        expect(result.value.nextAction.action).toBe('create-files');
+        expect(result.value.summary).toContain('ACTION REQUIRED');
+        expect(result.value.summary).toContain('Create Dockerfile');
       }
     });
   });

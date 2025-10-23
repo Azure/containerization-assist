@@ -20,6 +20,7 @@ import {
   type DockerfileAnalysis,
   type EnhancementGuidance,
 } from './schema';
+import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
@@ -539,47 +540,71 @@ const runPattern = createKnowledgeTool<
         }))
         .slice(0, 5); // Top 5 best practice recommendations
 
-      // Build concise summary focused on key decisions
+      // Determine file path for nextAction
+      const dockerfilePath = existingDockerfile
+        ? existingDockerfile.path
+        : nodePath.join(modulePath, 'Dockerfile');
+      const relativeDockerfilePath = nodePath.relative(path, dockerfilePath) || './Dockerfile';
+
+      // Build nextAction directive
+      const nextAction: ToolNextAction = existingDockerfile
+        ? {
+            action: 'update-files',
+            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
+            files: [
+              {
+                path: relativeDockerfilePath,
+                purpose: 'Container build configuration (enhancement)',
+              },
+            ],
+          }
+        : {
+            action: 'create-files',
+            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
+            files: [
+              {
+                path: relativeDockerfilePath,
+                purpose: 'Container build configuration',
+              },
+            ],
+          };
+
+      // Build action-oriented summary
       const languageVersionStr = input.languageVersion ? ` ${input.languageVersion}` : '';
       const frameworkStr = framework ? ` (${framework})` : '';
+      const totalRecommendations =
+        baseImageMatches.length +
+        securityMatches.length +
+        optimizationMatches.length +
+        bestPracticeMatches.length;
 
-      const summaryParts: string[] = [];
-
-      // Mode and context
+      let summary: string;
       if (existingDockerfile) {
-        const { guidance } = existingDockerfile;
-        summaryParts.push(
-          `✨ Dockerfile enhancement plan ready for ${language}${languageVersionStr}${frameworkStr}`,
-          `📁 ${modulePath}`,
-          `🔧 Strategy: ${guidance.strategy.replace(/-/g, ' ')}`,
-        );
+        const { analysis, guidance } = existingDockerfile;
+        summary =
+          `🔨 ACTION REQUIRED: Update Dockerfile\n` +
+          `Path: ${relativeDockerfilePath}\n` +
+          `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
+          `Environment: ${input.environment || 'production'}\n` +
+          `Current State: ${analysis.complexity}, ${analysis.securityPosture} security, ${analysis.instructionCount} instructions\n` +
+          `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
+          `Enhancement: ${guidance.strategy}\n` +
+          `Changes: Preserve ${guidance.preserve.length} items, Improve ${guidance.improve.length} items, Add ${guidance.addMissing.length} missing items\n` +
+          `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
+          `✅ Ready to update Dockerfile with enhancements.`;
       } else {
-        summaryParts.push(
-          `✨ Dockerfile plan ready for ${language}${languageVersionStr}${frameworkStr}`,
-          `📁 ${modulePath}`,
-          `🏗️  ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build`,
-        );
+        summary =
+          `🔨 ACTION REQUIRED: Create Dockerfile\n` +
+          `Path: ${relativeDockerfilePath}\n` +
+          `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
+          `Environment: ${input.environment || 'production'}\n` +
+          `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
+          `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
+          `✅ Ready to create Dockerfile based on recommendations.`;
       }
-
-      // Recommended base image (most important decision)
-      if (baseImageMatches.length > 0) {
-        const primaryImage = baseImageMatches[0];
-        if (primaryImage) {
-          summaryParts.push(`🐳 Recommended: ${primaryImage.image}`);
-
-          // Only show alternative if it's different category (provides different trade-off)
-          if (baseImageMatches.length > 1) {
-            const altImage = baseImageMatches[1];
-            if (altImage && altImage.category !== primaryImage.category) {
-              summaryParts.push(`   Alternative: ${altImage.image}`);
-            }
-          }
-        }
-      }
-
-      const summary = summaryParts.join('\n').trim();
 
       return {
+        nextAction,
         repositoryInfo: {
           name: modulePath.split('/').pop() || 'unknown',
           modulePath,
