@@ -32,7 +32,6 @@
     "tags": [
       "azure",
       "build-stage",
-      "build-tool",
       "fix-dockerfile",
       "generate-dockerfile",
       "java",
@@ -74,7 +73,6 @@
     "severity": "high",
     "tags": [
       "build-stage",
-      "build-tool",
       "eclipse-temurin",
       "fix-dockerfile",
       "generate-dockerfile",
@@ -87,22 +85,20 @@
   },
   {
     "id": "java-microsoft-azure-linux",
-    "category": "dockerfile",
+    "category": "security",
     "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
-    "recommendation": "Prefer Microsoft Azure Linux or distroless images for enhanced security. The Azure Linux (Mariner) images do not have tar pre-installed, so you need to install it for Maven builds. Mariner uses the useradd and groupadd commands for user management.",
-    "example": "# Azure Linux (Mariner) - preferred for Microsoft environments\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\n# Or for runtime:\nFROM mcr.microsoft.com/openjdk/jdk:17-distroless AS runtime",
+    "recommendation": "For production Java deployments, prefer Microsoft Azure distroless images for runtime (minimal attack surface) and Azure Linux (Mariner) for build stages. Azure Linux images do not have tar pre-installed, so install it for Maven builds. Use groupadd and useradd for user management in Mariner.",
+    "example": "# Build stage - Azure Linux (Mariner)\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# Runtime stage - Azure distroless (preferred)\nFROM mcr.microsoft.com/openjdk/jdk:21-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
     "severity": "high",
     "tags": [
       "azure",
-      "distroless",
       "fix-dockerfile",
       "generate-dockerfile",
-      "google",
       "java",
       "microsoft",
       "security"
     ],
-    "description": "Microsoft Azure Linux (Mariner) provides enterprise-grade security with reduced attack surface"
+    "description": "Security best practice: use Microsoft Azure distroless for runtime and Azure Linux (Mariner) for build stages"
   },
   {
     "id": "java-jre-runtime",
@@ -320,20 +316,20 @@
   },
   {
     "id": "java-distroless-base",
-    "category": "dockerfile",
+    "category": "security",
     "pattern": "FROM.*openjdk",
-    "recommendation": "Consider using Google's distroless Java images for enhanced security",
-    "example": "FROM gcr.io/distroless/java17:nonroot",
+    "recommendation": "If Microsoft Azure distroless images are not available for your Java version, consider using Google's distroless Java images as an alternative for enhanced security in production runtime",
+    "example": "# Use as fallback when Azure distroless not available\n# Available versions: java11, java17, java21\nFROM gcr.io/distroless/java17-debian12:nonroot\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD [\"app.jar\"]",
     "severity": "low",
     "tags": [
-      "distroless",
       "fix-dockerfile",
       "generate-dockerfile",
       "google",
       "java",
+      "runtime-stage",
       "security"
     ],
-    "description": "Distroless images contain only runtime dependencies, reducing attack surface"
+    "description": "Alternative security option: use Google distroless as fallback when Azure distroless images are unavailable"
   },
   {
     "id": "quarkus-native-build",
