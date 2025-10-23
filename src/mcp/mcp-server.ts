@@ -602,7 +602,7 @@ function isGenerateK8sManifestsResult(output: object): output is ManifestPlan {
 }
 
 function isTagImageResult(output: object): output is TagImageResult {
-  return 'tags' in output && 'imageId' in output && Array.isArray((output as any).tags);
+  return 'tags' in output && 'imageId' in output && Array.isArray((output as TagImageResult).tags);
 }
 
 function isPushImageResult(output: object): output is PushImageResult {

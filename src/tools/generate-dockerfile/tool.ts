@@ -20,6 +20,7 @@ import {
   type DockerfileAnalysis,
   type EnhancementGuidance,
 } from './schema';
+import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
@@ -486,30 +487,37 @@ const runPattern = createKnowledgeTool<
 
       // Extract base image recommendations from categorized knowledge
       // Pass languageVersion for dynamic version substitution
+      // Limit to top 2 recommendations to provide clear, opinionated guidance
       const baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
         .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion))
-        .sort((a, b) => b.matchScore - a.matchScore); // Sort by match score descending
+        .sort((a, b) => b.matchScore - a.matchScore) // Sort by match score descending
+        .slice(0, 2); // Take only top 2: primary recommendation + 1 alternative
 
-      const securityMatches: DockerfileRequirement[] = (knowledge.categories.security || []).map(
-        (snippet) => ({
+      // Limit security recommendations to top 5 most relevant
+      const securityMatches: DockerfileRequirement[] = (knowledge.categories.security || [])
+        .map((snippet) => ({
           id: snippet.id,
           category: snippet.category || 'security',
           recommendation: snippet.text,
           ...(snippet.tags && { tags: snippet.tags }),
           matchScore: snippet.weight,
-        }),
-      );
+        }))
+        .slice(0, 5); // Top 5 security recommendations
 
+      // Limit optimization recommendations to top 5 most relevant
       const optimizationMatches: DockerfileRequirement[] = (
         knowledge.categories.optimization || []
-      ).map((snippet) => ({
-        id: snippet.id,
-        category: snippet.category || 'optimization',
-        recommendation: snippet.text,
-        ...(snippet.tags && { tags: snippet.tags }),
-        matchScore: snippet.weight,
-      }));
+      )
+        .map((snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'optimization',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }))
+        .slice(0, 5); // Top 5 optimization recommendations
 
+      // Limit best practices to top 5 most relevant
       const bestPracticeMatches: DockerfileRequirement[] = (
         knowledge.categories.bestPractices || []
       )
@@ -529,55 +537,74 @@ const runPattern = createKnowledgeTool<
           recommendation: snippet.text,
           ...(snippet.tags && { tags: snippet.tags }),
           matchScore: snippet.weight,
-        }));
+        }))
+        .slice(0, 5); // Top 5 best practice recommendations
 
-      // Build enhanced summary with existing Dockerfile info
+      // Determine file path for nextAction
+      const dockerfilePath = existingDockerfile
+        ? existingDockerfile.path
+        : nodePath.join(modulePath, 'Dockerfile');
+      const relativeDockerfilePath = nodePath.relative(path, dockerfilePath) || './Dockerfile';
+
+      // Build nextAction directive
+      const nextAction: ToolNextAction = existingDockerfile
+        ? {
+            action: 'update-files',
+            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
+            files: [
+              {
+                path: relativeDockerfilePath,
+                purpose: 'Container build configuration (enhancement)',
+              },
+            ],
+          }
+        : {
+            action: 'create-files',
+            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
+            files: [
+              {
+                path: relativeDockerfilePath,
+                purpose: 'Container build configuration',
+              },
+            ],
+          };
+
+      // Build action-oriented summary
       const languageVersionStr = input.languageVersion ? ` ${input.languageVersion}` : '';
       const frameworkStr = framework ? ` (${framework})` : '';
-      const summaryParts = [
-        'Dockerfile Planning Summary:',
-        `- Path: ${modulePath}${input.modulePath ? ' (module)' : ''}`,
-        `- Language: ${language}${languageVersionStr}${frameworkStr}`,
-        `- Environment: ${input.environment || 'production'}`,
-        `- Build Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}`,
-      ];
-
-      if (existingDockerfile) {
-        const { analysis, guidance } = existingDockerfile;
-        summaryParts.push(
-          `- Mode: ENHANCE existing Dockerfile`,
-          `- Existing Dockerfile: ${existingDockerfile.path}`,
-          `- Analysis:`,
-          `  - Complexity: ${analysis.complexity}`,
-          `  - Security: ${analysis.securityPosture}`,
-          `  - Multi-stage: ${analysis.isMultistage ? 'Yes' : 'No'}`,
-          `  - Instructions: ${analysis.instructionCount}`,
-          `- Enhancement Strategy: ${guidance.strategy}`,
-          `- Preserve: ${guidance.preserve.length} items`,
-          `- Improve: ${guidance.improve.length} items`,
-          `- Add Missing: ${guidance.addMissing.length} items`,
-        );
-      } else {
-        summaryParts.push('- Mode: CREATE new Dockerfile');
-      }
-
       const totalRecommendations =
         baseImageMatches.length +
         securityMatches.length +
         optimizationMatches.length +
         bestPracticeMatches.length;
 
-      summaryParts.push(
-        `- Recommendations: ${totalRecommendations} total`,
-        `  - Base Images: ${baseImageMatches.length}`,
-        `  - Security: ${securityMatches.length}`,
-        `  - Optimizations: ${optimizationMatches.length}`,
-        `  - Best Practices: ${bestPracticeMatches.length}`,
-      );
-
-      const summary = summaryParts.join('\n').trim();
+      let summary: string;
+      if (existingDockerfile) {
+        const { analysis, guidance } = existingDockerfile;
+        summary =
+          `🔨 ACTION REQUIRED: Update Dockerfile\n` +
+          `Path: ${relativeDockerfilePath}\n` +
+          `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
+          `Environment: ${input.environment || 'production'}\n` +
+          `Current State: ${analysis.complexity}, ${analysis.securityPosture} security, ${analysis.instructionCount} instructions\n` +
+          `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
+          `Enhancement: ${guidance.strategy}\n` +
+          `Changes: Preserve ${guidance.preserve.length} items, Improve ${guidance.improve.length} items, Add ${guidance.addMissing.length} missing items\n` +
+          `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
+          `✅ Ready to update Dockerfile with enhancements.`;
+      } else {
+        summary =
+          `🔨 ACTION REQUIRED: Create Dockerfile\n` +
+          `Path: ${relativeDockerfilePath}\n` +
+          `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
+          `Environment: ${input.environment || 'production'}\n` +
+          `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
+          `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
+          `✅ Ready to create Dockerfile based on recommendations.`;
+      }
 
       return {
+        nextAction,
         repositoryInfo: {
           name: modulePath.split('/').pop() || 'unknown',
           modulePath,

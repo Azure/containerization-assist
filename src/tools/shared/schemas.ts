@@ -48,3 +48,26 @@ export const analysisOptions = {
 export const platform = z.string().optional().describe('Target platform (e.g., linux/amd64)');
 
 // Multi-module/monorepo support
+
+/**
+ * File action descriptor for tool next actions
+ */
+export interface ToolNextActionFile {
+  /** Relative path where file should be created/updated (e.g., "./Dockerfile" or "./k8s/deployment.yaml") */
+  path: string;
+  /** Human-readable purpose of this file (e.g., "Container build configuration") */
+  purpose: string;
+}
+
+/**
+ * Next action directive for tools that generate file content
+ * Provides explicit guidance to AI about what files to create/update
+ */
+export interface ToolNextAction {
+  /** Type of action to perform */
+  action: 'create-files' | 'update-files' | 'review-and-decide';
+  /** Clear instruction for the AI on what to do with the recommendations */
+  instruction: string;
+  /** Files to create or update */
+  files: ToolNextActionFile[];
+}
