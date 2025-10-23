@@ -88,7 +88,7 @@
     "category": "security",
     "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
     "recommendation": "For production Java deployments, prefer Microsoft Azure distroless images for runtime (minimal attack surface) and Azure Linux (Mariner) for build stages. Azure Linux images do not have tar pre-installed, so install it for Maven builds. Use groupadd and useradd for user management in Mariner.",
-    "example": "# Build stage - Azure Linux (Mariner)\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# Runtime stage - Azure distroless (preferred)\nFROM mcr.microsoft.com/openjdk/jdk:21-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "example": "RUN tdnf install -y tar\nRUN groupadd -r appuser && useradd -r -g appuser appuser",
     "severity": "high",
     "tags": [
       "azure",
@@ -157,12 +157,11 @@
     "id": "java-multi-stage-maven",
     "category": "dockerfile",
     "pattern": "mvn package",
-    "recommendation": "Use multi-stage build to separate Maven build environment from runtime",
-    "example": "FROM maven:3.9-openjdk-17 AS build\nRUN mvn package\nFROM openjdk:17-jre-alpine\nCOPY --from=build /app/target/*.jar app.jar",
+    "recommendation": "Use multi-stage build pattern to separate Maven build environment from runtime, reducing final image size by ~90%",
+    "example": "COPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn package\nCOPY --from=build /app/target/*.jar app.jar",
     "severity": "high",
     "tags": [
       "build-stage",
-      "build-tool",
       "fix-dockerfile",
       "generate-dockerfile",
       "java",
@@ -171,7 +170,7 @@
       "optimization",
       "runtime-stage"
     ],
-    "description": "Multi-stage builds exclude build tools and reduce final image size by ~90%"
+    "description": "Multi-stage build pattern for Maven projects - use this pattern with your chosen base images"
   },
   {
     "id": "java-memory-settings",
