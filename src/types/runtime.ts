@@ -40,6 +40,15 @@ export interface ExecutionMetadata {
   /** Request ID for tracing */
   requestId?: string;
 
+  /** Optional abort signal for cancellation support */
+  signal?: AbortSignal;
+
+  /** Progress reporter or request with progress token */
+  progress?: unknown;
+
+  /** MCP notification callback for progress updates */
+  sendNotification?: (notification: unknown) => Promise<void>;
+
   /** Additional metadata */
   [key: string]: unknown;
 }
