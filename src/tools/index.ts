@@ -1,6 +1,5 @@
 import analyzeRepoTool from './analyze-repo/tool';
 import buildImageTool from './build-image/tool';
-import deployTool from './deploy/tool';
 import fixDockerfileTool from './fix-dockerfile/tool';
 import generateDockerfileTool from './generate-dockerfile/tool';
 import generateK8sManifestsTool from './generate-k8s-manifests/tool';
@@ -14,7 +13,6 @@ import verifyDeployTool from './verify-deploy/tool';
 const TOOL_NAME = {
   ANALYZE_REPO: 'analyze-repo',
   BUILD_IMAGE: 'build-image',
-  DEPLOY: 'deploy',
   FIX_DOCKERFILE: 'fix-dockerfile',
   GENERATE_DOCKERFILE: 'generate-dockerfile',
   GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
@@ -31,7 +29,6 @@ export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];
 // Ensure proper names on all tools
 analyzeRepoTool.name = TOOL_NAME.ANALYZE_REPO;
 buildImageTool.name = TOOL_NAME.BUILD_IMAGE;
-deployTool.name = TOOL_NAME.DEPLOY;
 fixDockerfileTool.name = TOOL_NAME.FIX_DOCKERFILE;
 generateDockerfileTool.name = TOOL_NAME.GENERATE_DOCKERFILE;
 generateK8sManifestsTool.name = TOOL_NAME.GENERATE_K8S_MANIFESTS;
@@ -46,7 +43,6 @@ verifyDeployTool.name = TOOL_NAME.VERIFY_DEPLOY;
 export type Tool = (
   | typeof analyzeRepoTool
   | typeof buildImageTool
-  | typeof deployTool
   | typeof fixDockerfileTool
   | typeof generateDockerfileTool
   | typeof generateK8sManifestsTool
@@ -69,7 +65,6 @@ export const ALL_TOOLS: readonly Tool[] = [
 
   // Operational/deterministic tools
   buildImageTool,
-  deployTool,
   opsTool,
   prepareClusterTool,
   pushImageTool,
@@ -82,7 +77,6 @@ export {
   TOOL_NAME,
   analyzeRepoTool,
   buildImageTool,
-  deployTool,
   fixDockerfileTool,
   generateDockerfileTool,
   generateK8sManifestsTool,

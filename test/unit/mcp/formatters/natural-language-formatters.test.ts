@@ -6,13 +6,11 @@ import { describe, it, expect } from '@jest/globals';
 import {
   formatScanImageNarrative,
   formatDockerfilePlanNarrative,
-  formatDeployNarrative,
   formatBuildImageNarrative,
   formatAnalyzeRepoNarrative,
 } from '@/mcp/formatters/natural-language-formatters';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 
@@ -299,75 +297,6 @@ describe('natural-language-formatters', () => {
     });
   });
 
-  describe('formatDeployNarrative', () => {
-    it('should format successful deployment', () => {
-      const result: DeployApplicationResult = {
-        success: true,
-        namespace: 'production',
-        deploymentName: 'my-app',
-        serviceName: 'my-app-service',
-        ready: true,
-        replicas: 3,
-        endpoints: [
-          {
-            type: 'external',
-            url: 'https://my-app.example.com',
-            port: 443,
-          },
-          {
-            type: 'internal',
-            url: 'my-app-service.production.svc.cluster.local',
-            port: 8080,
-          },
-        ],
-        status: {
-          readyReplicas: 3,
-          totalReplicas: 3,
-          conditions: [
-            {
-              type: 'Available',
-              status: 'True',
-              message: 'Deployment has minimum availability',
-            },
-          ],
-        },
-      };
-
-      const narrative = formatDeployNarrative(result);
-
-      expect(narrative).toContain('✅ Deployment DEPLOYED');
-      expect(narrative).toContain('**Application:** my-app');
-      expect(narrative).toContain('**Namespace:** production');
-      expect(narrative).toContain('**Status:** 3/3 replicas ready');
-      expect(narrative).toContain('**Endpoints:**');
-      expect(narrative).toContain('🌐 External');
-      expect(narrative).toContain('🔒 Internal');
-      expect(narrative).toContain('Use verify-deploy to check deployment health');
-    });
-
-    it('should format in-progress deployment', () => {
-      const result: DeployApplicationResult = {
-        success: true,
-        namespace: 'staging',
-        deploymentName: 'my-app',
-        serviceName: 'my-app-service',
-        ready: false,
-        replicas: 3,
-        endpoints: [],
-        status: {
-          readyReplicas: 1,
-          totalReplicas: 3,
-          conditions: [],
-        },
-      };
-
-      const narrative = formatDeployNarrative(result);
-
-      expect(narrative).toContain('⏳ Deployment IN PROGRESS');
-      expect(narrative).toContain('**Status:** 1/3 replicas ready');
-      expect(narrative).toContain('Wait for all replicas to become ready');
-    });
-  });
 
   describe('formatBuildImageNarrative', () => {
     it('should format successful build with all details', () => {

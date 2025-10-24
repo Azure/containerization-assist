@@ -73,7 +73,6 @@ jest.mock('node:fs', () => ({
 }));
 
 import { buildImage } from '../../src/tools/build-image/tool';
-import { deployApplication as deploy } from '../../src/tools/deploy/tool';
 
 describe('Error Recovery', () => {
   beforeEach(() => {
@@ -161,17 +160,18 @@ describe('Error Recovery', () => {
     });
 
     it('should handle service restart scenarios', async () => {
-      mockK8sClient.applyManifest.mockRejectedValueOnce(new Error('Service unavailable'));
-      const firstResult = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      // Test the retry pattern with build-image tool instead
+      mockDockerClient.buildImage.mockRejectedValueOnce(new Error('Service unavailable'));
+      const firstResult = await buildImage(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
         createMockToolContext(),
       );
       expect(firstResult.ok).toBe(false);
 
       // After service restart - service becomes available again
-      mockK8sClient.applyManifest.mockRejectedValueOnce(new Error('Service unavailable'));
-      const secondResult = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      mockDockerClient.buildImage.mockRejectedValueOnce(new Error('Service unavailable'));
+      const secondResult = await buildImage(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
         createMockToolContext(),
       );
       // May still fail until service fully restarts - that's ok

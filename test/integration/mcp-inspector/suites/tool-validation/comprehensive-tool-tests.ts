@@ -368,64 +368,6 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
       }
     },
 
-    {
-      name: 'deploy-tool',
-      category: 'tool-validation',
-      description: 'Test application deployment functionality',
-      tags: ['tools', 'deployment', 'kubernetes'],
-      timeout: 30000,
-      execute: async () => {
-        const start = performance.now();
-
-        const result = await client.callTool({
-          name: 'deploy',
-          arguments: {
-            namespace: 'default',
-            wait: false,
-            timeout: 300
-          }
-        });
-
-        const responseTime = performance.now() - start;
-
-        if (result.isError) {
-          return {
-            success: false,
-            duration: responseTime,
-            message: `Application deployment failed: ${result.error?.message || 'Unknown error'}`
-          };
-        }
-
-        // Extract deployment results
-        let deployResults: any = {};
-        for (const content of result.content) {
-          if (content.type === 'text' && content.text) {
-            try {
-              const parsed = JSON.parse(content.text);
-              deployResults = { ...deployResults, ...parsed };
-            } catch {
-              deployResults.textContent = content.text;
-            }
-          }
-        }
-
-        const hasDeployResults = deployResults.success !== undefined || deployResults.deployed ||
-          deployResults.status || deployResults.textContent;
-
-        return {
-          success: !!hasDeployResults,
-          duration: responseTime,
-          message: hasDeployResults
-            ? 'Deployment tool responding correctly'
-            : 'Deployment results unclear',
-          details: deployResults,
-          performance: {
-            responseTime,
-            memoryUsage: 0,
-          }
-        };
-      }
-    },
 
     {
       name: 'verify-deploy-tool',

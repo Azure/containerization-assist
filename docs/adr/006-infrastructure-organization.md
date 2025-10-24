@@ -147,7 +147,6 @@ src/
 ├── docker-client.ts
 ├── kubernetes-client.ts
 ├── build-image-tool.ts
-├── deploy-tool.ts
 ├── logger.ts
 └── validation.ts
 ```
@@ -178,8 +177,7 @@ src/
 │   └── utils.ts
 └── kubernetes/
     ├── client.ts
-    ├── deploy-tool.ts
-    └── utils.ts
+        └── utils.ts
 ```
 
 **Pros:**
@@ -209,7 +207,6 @@ src/
 └── deployment/
     ├── kubernetes-client.ts
     ├── generate-manifests.ts
-    ├── deploy.ts
     └── verify.ts
 ```
 
@@ -287,10 +284,6 @@ src/
 ├── tools/                   # MCP tools
 │   ├── build-image/
 │   │   ├── tool.ts          # Uses @infra/docker + @lib/*
-│   │   ├── schema.ts
-│   │   └── index.ts
-│   ├── deploy/
-│   │   ├── tool.ts          # Uses @infra/kubernetes + @lib/*
 │   │   ├── schema.ts
 │   │   └── index.ts
 │   └── ...
