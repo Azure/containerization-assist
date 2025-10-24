@@ -105,6 +105,10 @@ export function createToolHandler(
       const { _meta, ...sanitizedParams } = params;
 
       // Execute via app.execute() - this handles all context creation
+      // Type assertions are safe here because:
+      // 1. The orchestrator validates toolName exists in the registry
+      // 2. Each tool's Zod schema validates params at runtime
+      // 3. Invalid toolName or params will return a proper Result.Failure
       const result = await app.execute(toolName as never, sanitizedParams as never, metadata);
 
       if (!result.ok) {
