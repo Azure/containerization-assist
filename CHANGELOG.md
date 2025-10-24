@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.0.1-dev.3]
+
+- Dev Release with updated tool contracts
+
 ## [1.0.1-dev.2]
 
 - Dev Release with doc and dep updates
