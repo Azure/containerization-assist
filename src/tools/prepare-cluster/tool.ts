@@ -488,7 +488,11 @@ async function verifyClusterReadiness(
   // Check permissions
   checks.permissions = await k8sClient.checkPermissions(namespace);
   if (!checks.permissions) {
-    warnings.push('Limited permissions - some operations may fail');
+    return Failure('Insufficient permissions for Kubernetes operations', {
+      message: 'Kubernetes permissions check failed',
+      hint: 'Current user/service account lacks required permissions',
+      resolution: 'Grant appropriate RBAC permissions: kubectl create clusterrolebinding <name> --clusterrole=admin --user=<user>',
+    });
   }
 
   // Check/create namespace

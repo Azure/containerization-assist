@@ -22,10 +22,36 @@ import type { DirResult } from 'tmp';
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
 import prepareClusterTool from '@/tools/prepare-cluster/tool';
-import verifyDeployTool from '@/tools/verify-deploy/tool';
+import verifyDeployTool from '../../../src/tools/verify-deploy/tool';
 
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { GenerateK8sManifestsResult } from '@/tools/generate-k8s-manifests/tool';
+
+// Mock the Kubernetes client to prevent 60-second timeouts in verify-deploy tests
+jest.mock('@/infra/kubernetes/client', () => ({
+  createKubernetesClient: jest.fn(() => ({
+    ping: jest.fn().mockResolvedValue(false),
+    waitForDeploymentReady: jest.fn().mockResolvedValue({
+      ok: false,
+      error: 'Deployment not found or cluster unreachable',
+    }),
+    getDeploymentStatus: jest.fn().mockResolvedValue({
+      ok: false,
+      error: 'Deployment not found',
+    }),
+    checkPermissions: jest.fn().mockResolvedValue(false),
+    namespaceExists: jest.fn().mockResolvedValue(false),
+    ensureNamespace: jest.fn().mockResolvedValue({
+      ok: false,
+      error: 'Cannot create namespace - cluster unreachable',
+    }),
+    applyManifest: jest.fn().mockResolvedValue({
+      ok: false,
+      error: 'Cannot apply manifest - cluster unreachable',
+    }),
+    checkIngressController: jest.fn().mockResolvedValue(false),
+  })),
+}));
 
 describe('Kubernetes Workflow Integration', () => {
   let testDir: DirResult;
@@ -225,7 +251,7 @@ spec:
 
   describe('Deployment Error Handling', () => {
     it('should provide guidance on cluster connectivity issues', async () => {
-      // Test verify-deploy with no cluster access
+      // Test verify-deploy with no cluster access - should fail quickly without long timeout
       const verifyResult = await verifyDeployTool.handler(
         {
           namespace: 'nonexistent-namespace',
@@ -234,8 +260,11 @@ spec:
         toolContext
       );
 
-      // Should handle gracefully
+      // Should handle gracefully (expect it to fail due to cluster connectivity)
       expect(verifyResult.ok !== undefined).toBe(true);
+      if (!verifyResult.ok) {
+        expect(verifyResult.error).toBeDefined();
+      }
     });
   });
 
@@ -347,8 +376,11 @@ data:
         toolContext
       );
 
-      // Should fail gracefully
+      // Should fail gracefully (expect it to fail due to non-existent deployment)
       expect(verifyResult.ok !== undefined).toBe(true);
+      if (!verifyResult.ok) {
+        expect(verifyResult.error).toBeDefined();
+      }
     });
   });
 

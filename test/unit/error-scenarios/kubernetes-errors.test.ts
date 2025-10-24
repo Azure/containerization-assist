@@ -178,10 +178,11 @@ describe('Kubernetes Error Scenarios', () => {
     });
 
     it('should handle validation errors', async () => {
+      mockK8sClient.ping.mockResolvedValue(true);
       mockK8sClient.checkPermissions.mockResolvedValue(false);
 
       const result = await prepareCluster(
-        { namespace: 'test-namespace' },
+        { namespace: 'test-namespace', environment: 'production' },
         createMockToolContext(),
       );
 

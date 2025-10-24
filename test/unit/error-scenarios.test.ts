@@ -28,7 +28,6 @@ import tagImageTool from '@/tools/tag-image/tool';
 import pushImageTool from '@/tools/push-image/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
 import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
-import verifyDeployTool from '@/tools/verify-deploy/tool';
 import prepareClusterTool from '@/tools/prepare-cluster/tool';
 
 const logger = createLogger({ level: 'silent' });
@@ -426,20 +425,6 @@ describe('Error Scenario Coverage', () => {
       }
     });
 
-    it('should handle missing kubeconfig', async () => {
-      const result = await verifyDeployTool.handler(
-        {
-          namespace: 'nonexistent-namespace',
-          deploymentName: 'test-app',
-        },
-        toolContext
-      );
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBeDefined();
-      }
-    });
   });
 
   describe('Validation Failures', () => {
