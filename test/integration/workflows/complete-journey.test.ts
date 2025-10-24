@@ -278,9 +278,22 @@ spec:
       journeyLog.push('Step 8: Deploying to Kubernetes...');
       let deploySucceeded = false;
       try {
-        const { execSync } = await import('node:child_process');
-        execSync(`kubectl apply -f ${manifestsPath} -n ${testNamespace}`, {
-          stdio: 'pipe',
+        const { spawn } = await import('node:child_process');
+
+        await new Promise<void>((resolve, reject) => {
+          const child = spawn('kubectl', ['apply', '-f', manifestsPath, '-n', testNamespace], {
+            stdio: 'pipe'
+          });
+
+          child.on('close', (code) => {
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(new Error(`kubectl apply failed with code ${code}`));
+            }
+          });
+
+          child.on('error', reject);
         });
         journeyLog.push('✓ Application deployed with kubectl apply');
         deploySucceeded = true;
@@ -308,9 +321,21 @@ spec:
 
       // Cleanup K8s resources
       try {
-        const { execSync } = await import('node:child_process');
-        execSync(`kubectl delete namespace ${testNamespace} --ignore-not-found=true`, {
-          stdio: 'pipe',
+        const { spawn } = await import('node:child_process');
+        await new Promise<void>((resolve) => {
+          const child = spawn('kubectl', ['delete', 'namespace', testNamespace, '--ignore-not-found=true'], {
+            stdio: 'pipe'
+          });
+
+          child.on('close', () => {
+            // Always resolve - cleanup errors are ignored
+            resolve();
+          });
+
+          child.on('error', () => {
+            // Always resolve - cleanup errors are ignored
+            resolve();
+          });
         });
       } catch (error) {
         // Ignore cleanup errors
@@ -521,9 +546,21 @@ CMD ["node", "index.js"]`;
       journeyLog.push('Test 3: Invalid manifests path');
       let deployErrorHandled = false;
       try {
-        const { execSync } = await import('node:child_process');
-        execSync('kubectl apply -f /nonexistent/manifests.yaml -n test', {
-          stdio: 'pipe',
+        const { spawn } = await import('node:child_process');
+        await new Promise<void>((resolve, reject) => {
+          const child = spawn('kubectl', ['apply', '-f', '/nonexistent/manifests.yaml', '-n', 'test'], {
+            stdio: 'pipe'
+          });
+
+          child.on('close', (code) => {
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(new Error(`kubectl apply failed with code ${code}`));
+            }
+          });
+
+          child.on('error', reject);
         });
       } catch (error) {
         deployErrorHandled = true;

@@ -63,7 +63,7 @@ describe('Kubernetes Workflow Integration', () => {
   });
 
   describe('Complete Kubernetes Workflow', () => {
-    it('should complete generate → prepare → kubectl apply → verify workflow', async () => {
+    it('should complete generate → prepare workflow (kubectl apply simulated)', async () => {
       if (!k8sAvailable) {
         console.log('Skipping: Kubernetes not available');
         return;

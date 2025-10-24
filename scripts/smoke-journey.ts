@@ -2,7 +2,7 @@
 /**
  * Smoke Test - End-to-End Containerization Journey
  *
- * Tests the full workflow: analyze → generate dockerfile → fix → generate k8s → build → scan → tag → deploy → verify
+ * Tests the core workflow: analyze → generate dockerfile → fix → generate k8s → build → scan → tag → prepare
  */
 
 import { createApp } from '../src/app';
@@ -114,26 +114,6 @@ async function runSmokeTest(): Promise<void> {
       },
       skipOnError: true,
     },
-    // Deploy tool removed - use kubectl apply instead
-    // {
-    //   name: 'Deploy to Kubernetes',
-    //   tool: 'deploy',
-    //   params: {
-    //     manifestPath: join(OUTPUT_DIR, 'k8s.yaml'),
-    //     namespace: 'smoke-test',
-    //   },
-    //   skipOnError: true,
-    // },
-    {
-      name: 'Verify Deployment',
-      tool: 'verify-deploy',
-      params: {
-        appName: 'smoke-test-app',
-        namespace: 'smoke-test',
-        timeout: 30,
-      },
-      skipOnError: true,
-    },
   ];
 
   let failedSteps = 0;
@@ -158,11 +138,6 @@ async function runSmokeTest(): Promise<void> {
           const outputPath = join(OUTPUT_DIR, 'scan-results.json');
           writeFileSync(outputPath, JSON.stringify(result.data, null, 2));
           logger.debug(`Saved scan results to ${outputPath}`);
-        // Deploy tool removed - no longer saving deploy results
-        // } else if (step.tool === 'deploy' && result.data) {
-        //   const outputPath = join(OUTPUT_DIR, 'deploy-results.json');
-        //   writeFileSync(outputPath, JSON.stringify(result.data, null, 2));
-        //   logger.debug(`Saved deployment info to ${outputPath}`);
         }
       } else {
         // Format error with guidance if available
