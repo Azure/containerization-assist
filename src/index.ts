@@ -114,6 +114,47 @@ export {
 } from './lib/tool-helpers.js';
 
 /**
+ * Tool registration helpers for integrating with MCP servers.
+ *
+ * These utilities allow you to register Container Assist tools with MCP servers
+ * while maintaining full control over telemetry, error handling, and lifecycle hooks.
+ * All context creation (logger, policy, etc.) is handled automatically.
+ *
+ * - `createToolHandler`: Create a handler function for use with server.tool()
+ * - `registerTool`: Register a single tool with an MCP server
+ * - `registerTools`: Register multiple tools at once
+ *
+ * @example
+ * ```typescript
+ * import { createApp, ALL_TOOLS, createToolHandler } from 'containerization-assist';
+ *
+ * const app = createApp();
+ *
+ * // Option 1: Use createToolHandler for full control
+ * for (const tool of ALL_TOOLS) {
+ *   server.tool(
+ *     tool.name,
+ *     tool.description,
+ *     tool.inputSchema,
+ *     createToolHandler(app, tool.name, {
+ *       onSuccess: (result, toolName) => {
+ *         myTelemetry.trackSuccess(toolName);
+ *       },
+ *     })
+ *   );
+ * }
+ *
+ * // Option 2: Use registerTools for convenience
+ * import { registerTools } from 'containerization-assist';
+ * registerTools(server, app, ALL_TOOLS);
+ * ```
+ *
+ * @public
+ */
+export { createToolHandler, registerTool, registerTools } from './lib/tool-registration.js';
+export type { ToolHandlerOptions } from './lib/tool-registration.js';
+
+/**
  * Parameter defaulting utilities for tool inputs.
  *
  * Provides default values for common tool parameters across different categories:

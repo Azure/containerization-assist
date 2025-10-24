@@ -261,6 +261,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
           t: options.t || options.tags?.[0],
           dockerfile: options.dockerfile,
           buildargs: options.buildargs || options.buildArgs,
+          ...(options.platform && { platform: options.platform }),
         });
 
         interface DockerBuildEvent {

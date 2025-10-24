@@ -1,10 +1,12 @@
-# Containerization Assist - MCP Integration Example
+# Containerization Assist - MCP Integration Examples
 
-This directory contains the standard integration pattern for using Container Assist tools in your own MCP server.
+This directory contains integration patterns for using Container Assist tools in your own MCP server.
 
-## Example: MCP Server Integration
+## Examples
 
-**[mcp-integration.ts](./mcp-integration.ts)** - Complete example showing how to:
+### 1. Standard Integration (Recommended)
+
+**[mcp-integration.ts](./mcp-integration.ts)** - Standard integration using `bindToMCP()`:
 - Use `createApp()` to configure Container Assist tools
 - Select specific tools (not all 12)
 - Use custom tool names (aliases)
@@ -12,9 +14,37 @@ This directory contains the standard integration pattern for using Container Ass
 - Use `bindToMCP()` to automatically register tools (handles context creation)
 - Create custom orchestration tools that reference Container Assist tools
 
-This pattern is used by the primary consumer of this package and represents the recommended integration approach.
+**Best for:** Simple integrations where you don't need custom telemetry or hooks.
 
-## Running the Example
+### 2. Integration with Telemetry (Advanced)
+
+**[mcp-integration-with-telemetry.ts](./mcp-integration-with-telemetry.ts)** - Advanced integration with telemetry hooks:
+- Use `createToolHandler()` for fine-grained control over tool registration
+- Add custom telemetry tracking for tool executions
+- Implement error reporting and monitoring
+- Track performance metrics and success rates
+- Use `onSuccess` and `onError` hooks for observability
+
+**Best for:** Production integrations requiring telemetry, monitoring, or custom error handling.
+
+## Choosing the Right Pattern
+
+### Use `bindToMCP()` (Standard) when:
+- ✅ You want the simplest integration
+- ✅ You don't need custom telemetry or error tracking
+- ✅ You're building a proof-of-concept or simple application
+- ✅ You want Container Assist to handle all context creation automatically
+
+### Use `createToolHandler()` (Telemetry) when:
+- ✅ You need to track tool execution metrics
+- ✅ You want to integrate with observability platforms (DataDog, AppInsights, etc.)
+- ✅ You need custom error reporting or alerting
+- ✅ You want per-tool or per-category telemetry configurations
+- ✅ You need lifecycle hooks (onSuccess, onError) for audit logging
+
+**Note:** Both patterns let Container Assist handle all ToolContext creation (logger, policy, etc.) automatically. The difference is only in control over telemetry and lifecycle hooks.
+
+## Running the Examples
 
 ### Prerequisites
 

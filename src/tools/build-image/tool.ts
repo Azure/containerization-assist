@@ -17,7 +17,7 @@ import { normalizePath } from '@/lib/platform';
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
-import { validatePathOrFail } from '@/lib/validation-helpers';
+import { validatePathOrFail, parseImageName } from '@/lib/validation-helpers';
 import { readDockerfile } from '@/lib/file-utils';
 
 import { type Result, Success, Failure } from '@/types';
@@ -48,6 +48,7 @@ export interface BuildImageResult {
   logs: string[];
   /** Security-related warnings discovered during build */
   securityWarnings?: string[];
+  failedTags?: string[];
 }
 
 /**
@@ -63,6 +64,37 @@ async function prepareBuildArgs(
   };
 
   return { ...defaults, ...buildArgs };
+}
+
+/**
+ * Apply additional tags to a built image, returning any tags that failed to apply
+ */
+
+async function applyAdditionalTags(
+  imageId: string,
+  tags: string[],
+  dockerClient: ReturnType<typeof createDockerClient>,
+  logger: ReturnType<typeof setupToolContext>['logger'],
+): Promise<string[]> {
+  const failedTags: string[] = [];
+  for (const tag of tags) {
+    const parsedTag = parseImageName(tag);
+    if (!parsedTag.ok) {
+      logger.warn({ imageId, tag, error: parsedTag.error }, 'Failed to parse tag - skipping');
+      failedTags.push(tag);
+      continue;
+    }
+
+    const { repository, tag: tagName, registry } = parsedTag.value;
+    const fullRepository = registry ? `${registry}/${repository}` : repository;
+
+    const tagResult = await dockerClient.tagImage(imageId, fullRepository, tagName);
+    if (!tagResult.ok) {
+      failedTags.push(tag);
+      logger.warn({ imageId, tag, error: tagResult.error }, 'Failed to apply tag');
+    }
+  }
+  return failedTags;
 }
 
 /**
@@ -98,7 +130,7 @@ function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, stri
 }
 
 /**
- * Build image handler - direct execution with selective progress
+ * Build Docker image handler
  */
 async function handleBuildImage(
   params: BuildImageParams,
@@ -112,7 +144,6 @@ async function handleBuildImage(
     });
   }
 
-  // Optional progress reporting for complex operations (Docker build process)
   const { logger, timer } = setupToolContext(context, 'build-image');
 
   const {
@@ -126,9 +157,6 @@ async function handleBuildImage(
   } = params;
 
   try {
-    // Progress: Validating build parameters and environment
-    await context.progress?.('Validating build parameters and environment', 10, 100);
-
     // Validate build context path
     const buildContextResult = await validatePathOrFail(rawBuildPath, {
       mustExist: true,
@@ -136,17 +164,13 @@ async function handleBuildImage(
     });
     if (!buildContextResult.ok) return buildContextResult;
 
-    // Normalize paths to handle Windows separators
+    // Normalize paths
     const buildContext = normalizePath(buildContextResult.value);
     const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
+    const dockerfileRelativePath = dockerfilePath || dockerfile;
+    const finalDockerfilePath = path.resolve(buildContext, dockerfileRelativePath);
 
     const dockerClient = createDockerClient(logger);
-
-    // Determine paths
-    const repoPath = buildContext;
-    const finalDockerfilePath = dockerfilePath
-      ? path.resolve(repoPath, dockerfilePath)
-      : path.resolve(repoPath, dockerfile);
 
     // Read Dockerfile for security analysis
     const dockerfileContentResult = await readDockerfile({
@@ -168,27 +192,16 @@ async function handleBuildImage(
       logger.warn({ warnings: securityWarnings }, 'Security warnings found in build');
     }
 
+    const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
+
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
-      context: repoPath, // Build context is the path parameter
-      dockerfile: path.relative(repoPath, finalDockerfilePath), // Dockerfile path relative to context
+      context: buildContext,
+      dockerfile: path.relative(buildContext, finalDockerfilePath),
       buildargs: finalBuildArgs,
       ...(platform !== undefined && { platform }),
+      ...(finalTags.length > 0 && finalTags[0] && { t: finalTags[0] }),
     };
-
-    // Add tags if provided
-    if (tags.length > 0 || imageName) {
-      const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
-      if (finalTags.length > 0) {
-        const primaryTag = finalTags[0];
-        if (primaryTag) {
-          buildOptions.t = primaryTag; // Docker buildImage expects single tag
-        }
-      }
-    }
-
-    // Docker build process streams to provide real-time feedback
-    await context.progress?.('Building Docker image', 50, 100);
 
     // Build the image
     logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
@@ -209,11 +222,24 @@ async function handleBuildImage(
       return Failure(detailedError, guidance);
     }
 
-    await context.progress?.('Finalizing build and collecting metadata', 90, 100);
-
-    // Prepare the result using strongly typed values from the Docker client response.
-    // All result fields are sourced directly from the Docker client, ensuring type safety and consistency.
-    const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
+    // Apply additional tags to the built image
+    let failedTags: string[] = [];
+    if (finalTags.length > 1 && buildResult.value.imageId) {
+      const additionalTags = finalTags.slice(1);
+      logger.info(
+        { imageId: buildResult.value.imageId, additionalTags },
+        'Applying additional tags',
+      );
+      failedTags = await applyAdditionalTags(
+        buildResult.value.imageId,
+        additionalTags,
+        dockerClient,
+        logger,
+      );
+      if (failedTags.length > 0) {
+        logger.warn({ failedTags }, 'Some tags failed to apply');
+      }
+    }
 
     // Generate summary
     const imageTag = finalTags[0] || buildResult.value.imageId;
@@ -234,12 +260,10 @@ async function handleBuildImage(
       buildTime: buildResult.value.buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
+      ...(failedTags.length > 0 && { failedTags }),
     };
 
     timer.end({ imageId: buildResult.value.imageId, buildTime: buildResult.value.buildTime });
-
-    await context.progress?.('Build complete', 100, 100);
-
     return Success(result);
   } catch (error) {
     timer.error(error);
@@ -253,9 +277,6 @@ async function handleBuildImage(
   }
 }
 
-/**
- * Build image tool with selective progress reporting
- */
 export const buildImage = handleBuildImage;
 
 import { tool } from '@/types/tool';
@@ -267,11 +288,6 @@ export default tool({
   schema: buildImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-  },
-  chainHints: {
-    success:
-      'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
-    failure: 'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image.',
   },
   handler: handleBuildImage,
 });
