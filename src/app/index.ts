@@ -132,6 +132,9 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         toolName: toolName as string,
         params,
         metadata: {
+          ...(metadata?.signal && { signal: metadata.signal }),
+          ...(metadata?.progress !== undefined && { progress: metadata.progress }),
+          ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
           loggerContext: {
             transport: metadata?.transport || 'programmatic',
             requestId: metadata?.requestId,
