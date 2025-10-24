@@ -53,30 +53,35 @@ function registerWithMaximumControl(server: McpServer) {
 
   // Register each tool individually with custom telemetry
   for (const tool of ALL_TOOLS) {
-    const startTime = Date.now();
-
     server.tool(
       tool.name,
       tool.description,
       tool.inputSchema,
-      createToolHandler(app, tool.name, {
-        transport: 'my-integration',
+      // Wrap createToolHandler to track timing per execution
+      async (params, extra) => {
+        const startTime = Date.now();
 
-        // Track successful executions
-        onSuccess: (result, toolName, params) => {
-          const duration = Date.now() - startTime;
-          telemetry.trackToolExecution(toolName, true, duration);
-          console.log(`[SUCCESS] ${toolName} executed successfully in ${duration}ms`);
-        },
+        const handler = createToolHandler(app, tool.name, {
+          transport: 'my-integration',
 
-        // Track errors
-        onError: (error, toolName, params) => {
-          const duration = Date.now() - startTime;
-          telemetry.trackToolExecution(toolName, false, duration);
-          telemetry.trackError(toolName, error);
-          console.error(`[ERROR] ${toolName} failed after ${duration}ms:`, error);
-        },
-      }),
+          // Track successful executions
+          onSuccess: (result, toolName) => {
+            const duration = Date.now() - startTime;
+            telemetry.trackToolExecution(toolName, true, duration);
+            console.log(`[SUCCESS] ${toolName} executed successfully in ${duration}ms`);
+          },
+
+          // Track errors
+          onError: (error, toolName) => {
+            const duration = Date.now() - startTime;
+            telemetry.trackToolExecution(toolName, false, duration);
+            telemetry.trackError(toolName, error);
+            console.error(`[ERROR] ${toolName} failed after ${duration}ms:`, error);
+          },
+        });
+
+        return handler(params, extra);
+      },
     );
   }
 
