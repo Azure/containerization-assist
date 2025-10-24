@@ -90,7 +90,6 @@ export function createToolHandler(
       const metadata: ExecutionMetadata = {
         transport,
         signal: extra.signal,
-        progress: params,
         ...meta,
       };
 
