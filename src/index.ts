@@ -169,7 +169,7 @@ export { tool } from './types/tool.js';
  * 1. Analysis: `analyzeRepoTool` - Detect language, framework, and dependencies
  * 2. Dockerfile: `generateDockerfileTool`, `fixDockerfileTool`, `validateDockerfileTool`
  * 3. Build: `buildImageTool`, `scanImageTool`, `tagImageTool`, `pushImageTool`
- * 4. Deploy: `generateK8sManifestsTool`, `prepareClusterTool`, `deployTool`, `verifyDeployTool`
+ * 4. Deploy: `generateK8sManifestsTool`, `prepareClusterTool`, `verifyDeployTool`
  * 5. Operations: `opsTool` - Operational utilities
  *
  * @public
@@ -178,7 +178,6 @@ export {
   ALL_TOOLS,
   analyzeRepoTool,
   buildImageTool,
-  deployTool,
   fixDockerfileTool,
   generateDockerfileTool,
   generateK8sManifestsTool,

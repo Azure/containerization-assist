@@ -602,7 +602,7 @@ async function handlePrepareCluster(
     // Generate summary
     const namespaceAction = checks.namespaceExists ? 'verified' : 'created';
     const resourcesConfigured = Object.values(checks).filter(Boolean).length;
-    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured. Ready for deployment.`;
+    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured. Ready for deployment. Use: kubectl apply -f <manifest-folder>`;
 
     const result: PrepareClusterResult = {
       summary,
@@ -661,7 +661,7 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success: 'Cluster preparation successful. Next: Call deploy to deploy to the kind cluster.',
+    success: 'Cluster preparation successful. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
     failure:
       'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
   },

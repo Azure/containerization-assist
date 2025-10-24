@@ -57,7 +57,6 @@ jest.mock('../../../src/lib/validation', () => ({
   validateK8sName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
 }));
 
-import { deployApplication as deploy } from '../../../src/tools/deploy/tool';
 import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
 
 describe('Kubernetes Error Scenarios', () => {
@@ -67,10 +66,10 @@ describe('Kubernetes Error Scenarios', () => {
 
   describe('Error Handling Pattern', () => {
     it('should return Result<T> on K8s client errors', async () => {
-      mockK8sClient.applyManifest.mockRejectedValue(new Error('K8s error'));
+      mockK8sClient.ping.mockRejectedValue(new Error('K8s error'));
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -83,21 +82,21 @@ describe('Kubernetes Error Scenarios', () => {
     });
 
     it('should never throw exceptions', async () => {
-      mockK8sClient.applyManifest.mockRejectedValue(new Error('Unexpected error'));
+      mockK8sClient.ping.mockRejectedValue(new Error('Unexpected error'));
 
       await expect(
-        deploy(
-          { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+        prepareCluster(
+          { namespace: 'test-namespace' },
           createMockToolContext(),
         ),
       ).resolves.not.toThrow();
     });
 
     it('should propagate errors through Result without throwing', async () => {
-      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Deploy failed'));
+      mockK8sClient.ensureNamespace.mockResolvedValue(createFailureResult('Namespace creation failed'));
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -112,10 +111,10 @@ describe('Kubernetes Error Scenarios', () => {
     it('should handle cluster unreachable errors', async () => {
       const err = new Error('ECONNREFUSED');
       (err as any).code = 'ECONNREFUSED';
-      mockK8sClient.applyManifest.mockRejectedValue(err);
+      mockK8sClient.ping.mockRejectedValue(err);
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -125,10 +124,10 @@ describe('Kubernetes Error Scenarios', () => {
     it('should handle authentication errors', async () => {
       const err = new Error('Unauthorized');
       (err as any).statusCode = 401;
-      mockK8sClient.applyManifest.mockRejectedValue(err);
+      mockK8sClient.ping.mockRejectedValue(err);
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -138,10 +137,10 @@ describe('Kubernetes Error Scenarios', () => {
     it('should handle timeout errors', async () => {
       const err = new Error('Timeout');
       (err as any).code = 'ETIMEDOUT';
-      mockK8sClient.applyManifest.mockRejectedValue(err);
+      mockK8sClient.ping.mockRejectedValue(err);
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -151,10 +150,11 @@ describe('Kubernetes Error Scenarios', () => {
 
   describe('Resource Operation Errors', () => {
     it('should handle namespace not found errors', async () => {
-      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Namespace not found'));
+      mockK8sClient.namespaceExists.mockResolvedValue(false);
+      mockK8sClient.ensureNamespace.mockResolvedValue(createFailureResult('Namespace not found'));
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'missing-ns' },
+      const result = await prepareCluster(
+        { namespace: 'missing-ns' },
         createMockToolContext(),
       );
 
@@ -178,10 +178,10 @@ describe('Kubernetes Error Scenarios', () => {
     });
 
     it('should handle validation errors', async () => {
-      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Validation failed'));
+      mockK8sClient.checkPermissions.mockResolvedValue(false);
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -189,12 +189,12 @@ describe('Kubernetes Error Scenarios', () => {
     });
   });
 
-  describe('Deployment Status Errors', () => {
-    it('should handle deployment failures through deploy tool', async () => {
-      mockK8sClient.applyManifest.mockResolvedValue(createFailureResult('Deployment failed'));
+  describe('Cluster Preparation Errors', () => {
+    it('should handle cluster preparation failures', async () => {
+      mockK8sClient.ping.mockResolvedValue(false);
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -204,16 +204,16 @@ describe('Kubernetes Error Scenarios', () => {
 
   describe('Guidance Structure', () => {
     it('should optionally provide guidance on errors', async () => {
-      mockK8sClient.applyManifest.mockResolvedValue(
+      mockK8sClient.ensureNamespace.mockResolvedValue(
         createFailureResult('Error', {
-          message: 'Deploy failed',
+          message: 'Cluster preparation failed',
           hint: 'Check your cluster connection',
           resolution: 'Fix the issue',
         }),
       );
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 
@@ -234,15 +234,12 @@ describe('Kubernetes Error Scenarios', () => {
 
   describe('Success Cases', () => {
     it('should handle K8s operations', async () => {
-      mockK8sClient.applyManifest.mockResolvedValue(
-        createSuccessResult({
-          success: true,
-          resources: [{ kind: 'Pod', name: 'test', status: 'Created' }],
-        }),
-      );
+      mockK8sClient.ping.mockResolvedValue(true);
+      mockK8sClient.checkPermissions.mockResolvedValue(true);
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
 
-      const result = await deploy(
-        { manifests: 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test', namespace: 'default' },
+      const result = await prepareCluster(
+        { namespace: 'test-namespace' },
         createMockToolContext(),
       );
 

@@ -3,7 +3,7 @@
  *
  * Tests the complete end-to-end containerization workflow:
  * analyze-repo → generate-dockerfile → build-image → scan-image →
- * tag-image → generate-k8s-manifests → prepare-cluster → deploy → verify-deploy
+ * tag-image → generate-k8s-manifests → prepare-cluster → kubectl apply → verify-deploy
  *
  * This mirrors the smoke journey test but as a comprehensive integration test
  * with multiple application types and detailed verification.
@@ -32,7 +32,6 @@ import scanImageTool from '@/tools/scan-image/tool';
 import tagImageTool from '@/tools/tag-image/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
 import prepareClusterTool from '@/tools/prepare-cluster/tool';
-import deployTool from '@/tools/deploy/tool';
 import verifyDeployTool from '@/tools/verify-deploy/tool';
 
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
@@ -275,19 +274,21 @@ spec:
         journeyLog.push('⚠ Cluster preparation not needed');
       }
 
-      // Step 8: Deploy
+      // Step 8: Deploy with kubectl
       journeyLog.push('Step 8: Deploying to Kubernetes...');
-      const deployResult = await deployTool.handler(
-        {
-          manifestsPath,
-          namespace: testNamespace,
-        },
-        toolContext
-      );
+      let deploySucceeded = false;
+      try {
+        const { execSync } = await import('node:child_process');
+        execSync(`kubectl apply -f ${manifestsPath} -n ${testNamespace}`, {
+          stdio: 'pipe',
+        });
+        journeyLog.push('✓ Application deployed with kubectl apply');
+        deploySucceeded = true;
+      } catch (error) {
+        journeyLog.push('⚠ Deployment skipped (expected in test environment)');
+      }
 
-      if (deployResult.ok) {
-        journeyLog.push('✓ Application deployed');
-
+      if (deploySucceeded) {
         // Step 9: Verify Deployment
         journeyLog.push('Step 9: Verifying deployment...');
         const verifyResult = await verifyDeployTool.handler(
@@ -303,8 +304,6 @@ spec:
         } else {
           journeyLog.push('⚠ Verification pending (deployment may still be starting)');
         }
-      } else {
-        journeyLog.push('⚠ Deployment skipped (expected in test environment)');
       }
 
       // Cleanup K8s resources
@@ -518,21 +517,20 @@ CMD ["node", "index.js"]`;
         journeyLog.push('✓ Build error handled');
       }
 
-      // Test 3: Invalid manifests
+      // Test 3: Invalid manifests path with kubectl
       journeyLog.push('Test 3: Invalid manifests path');
-      const deployResult = await deployTool.handler(
-        {
-          manifestsPath: '/nonexistent/manifests.yaml',
-          namespace: 'test',
-        },
-        toolContext
-      );
-
-      expect(deployResult.ok).toBe(false);
-      if (!deployResult.ok) {
-        expect(deployResult.error).toBeDefined();
+      let deployErrorHandled = false;
+      try {
+        const { execSync } = await import('node:child_process');
+        execSync('kubectl apply -f /nonexistent/manifests.yaml -n test', {
+          stdio: 'pipe',
+        });
+      } catch (error) {
+        deployErrorHandled = true;
         journeyLog.push('✓ Deploy error handled');
       }
+
+      expect(deployErrorHandled).toBe(true);
 
       console.log(journeyLog.join('\n'));
       console.log('✓ All errors handled gracefully');

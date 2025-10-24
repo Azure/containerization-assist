@@ -19,7 +19,6 @@
 
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
@@ -249,72 +248,6 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
   return parts.join('\n');
 }
 
-/**
- * Format deploy result as natural language narrative
- *
- * @param result - Deployment result with status and endpoint information
- * @returns Formatted narrative with deployment status, endpoints, conditions, and next steps
- *
- * @description
- * Produces a detailed deployment report including:
- * - Deployment status (DEPLOYED or IN PROGRESS with icon)
- * - Application, namespace, and service information
- * - Replica readiness status
- * - Endpoints (external and internal with type indicators)
- * - Deployment conditions with status icons
- * - Context-aware next steps based on ready status
- */
-export function formatDeployNarrative(result: DeployApplicationResult): string {
-  const parts: string[] = [];
-
-  // Header
-  const icon = result.ready ? '✅' : '⏳';
-  const status = result.ready ? 'DEPLOYED' : 'IN PROGRESS';
-  parts.push(`${icon} Deployment ${status}\n`);
-
-  // Deployment info
-  parts.push(`**Application:** ${result.deploymentName}`);
-  parts.push(`**Namespace:** ${result.namespace}`);
-  parts.push(`**Service:** ${result.serviceName}`);
-
-  // Status
-  if (result.status) {
-    const { readyReplicas, totalReplicas } = result.status;
-    parts.push(`**Status:** ${readyReplicas}/${totalReplicas} replicas ready`);
-  }
-
-  // Endpoints
-  if (result.endpoints.length > 0) {
-    parts.push(`\n**Endpoints:** (${result.endpoints.length} available)`);
-    result.endpoints.forEach((ep) => {
-      const type = ep.type === 'external' ? '🌐 External' : '🔒 Internal';
-      parts.push(`  ${type}: ${ep.url}:${ep.port}`);
-    });
-  }
-
-  // Conditions
-  if (result.status?.conditions) {
-    parts.push('\n**Conditions:**');
-    result.status.conditions.forEach((cond) => {
-      const statusIcon = cond.status === 'True' ? '✓' : '✗';
-      parts.push(`  ${statusIcon} ${cond.type}: ${cond.message}`);
-    });
-  }
-
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  if (result.ready) {
-    parts.push('  → Use verify-deploy to check deployment health');
-    parts.push('  → Test application endpoints');
-    parts.push('  → Monitor pod logs for issues');
-  } else {
-    parts.push('  → Wait for all replicas to become ready');
-    parts.push('  → Check pod status with kubectl get pods');
-    parts.push('  → Review pod logs if deployment stalls');
-  }
-
-  return parts.join('\n');
-}
 
 /**
  * Format build-image result as natural language narrative
@@ -789,7 +722,7 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): strin
   parts.push(`\n**Next Steps:**`);
   parts.push('  1. Create manifest files using the recommendations above');
   parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
-  parts.push('  3. Use deploy to apply manifests to cluster');
+  parts.push('  3. Use kubectl apply to deploy manifests to cluster');
   parts.push('  4. Verify deployment with verify-deploy');
 
   return parts.join('\n');
@@ -942,7 +875,7 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult): str
   parts.push(`\n**Next Steps:**`);
   if (result.success && result.clusterReady) {
     parts.push('  → Cluster is ready for deployment');
-    parts.push('  → Use deploy to deploy your application');
+    parts.push('  → Use kubectl apply to deploy your application');
     parts.push('  → Resources will be deployed to the prepared namespace');
   } else {
     parts.push('  → Check cluster connectivity');

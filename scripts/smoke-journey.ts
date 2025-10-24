@@ -114,15 +114,16 @@ async function runSmokeTest(): Promise<void> {
       },
       skipOnError: true,
     },
-    {
-      name: 'Deploy to Kubernetes',
-      tool: 'deploy',
-      params: {
-        manifestPath: join(OUTPUT_DIR, 'k8s.yaml'),
-        namespace: 'smoke-test',
-      },
-      skipOnError: true,
-    },
+    // Deploy tool removed - use kubectl apply instead
+    // {
+    //   name: 'Deploy to Kubernetes',
+    //   tool: 'deploy',
+    //   params: {
+    //     manifestPath: join(OUTPUT_DIR, 'k8s.yaml'),
+    //     namespace: 'smoke-test',
+    //   },
+    //   skipOnError: true,
+    // },
     {
       name: 'Verify Deployment',
       tool: 'verify-deploy',
@@ -157,10 +158,11 @@ async function runSmokeTest(): Promise<void> {
           const outputPath = join(OUTPUT_DIR, 'scan-results.json');
           writeFileSync(outputPath, JSON.stringify(result.data, null, 2));
           logger.debug(`Saved scan results to ${outputPath}`);
-        } else if (step.tool === 'deploy' && result.data) {
-          const outputPath = join(OUTPUT_DIR, 'deploy-results.json');
-          writeFileSync(outputPath, JSON.stringify(result.data, null, 2));
-          logger.debug(`Saved deployment info to ${outputPath}`);
+        // Deploy tool removed - no longer saving deploy results
+        // } else if (step.tool === 'deploy' && result.data) {
+        //   const outputPath = join(OUTPUT_DIR, 'deploy-results.json');
+        //   writeFileSync(outputPath, JSON.stringify(result.data, null, 2));
+        //   logger.debug(`Saved deployment info to ${outputPath}`);
         }
       } else {
         // Format error with guidance if available
