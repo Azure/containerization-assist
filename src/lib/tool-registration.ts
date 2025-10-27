@@ -208,13 +208,12 @@ export function createToolHandler<TName extends ToolName>(
  * Register a single Container Assist tool with an MCP server
  *
  * Convenience wrapper around createToolHandler() for registering individual tools.
- * Use type assertions or narrowing to get full type safety for specific tools.
+ * For full type safety, use createToolHandler() directly with literal tool names instead.
  *
- * @template TName - The tool name type (inferred from the tool parameter)
  * @param server - MCP server instance
  * @param app - AppRuntime instance
  * @param tool - Tool definition
- * @param options - Optional handler configuration
+ * @param options - Optional handler configuration (params/results will be union types)
  *
  * @example
  * ```typescript
@@ -222,25 +221,37 @@ export function createToolHandler<TName extends ToolName>(
  *
  * const app = createApp();
  *
- * // With type narrowing for full type safety:
- * const tool = analyzeRepoTool;
- * if (tool.name === 'analyze-repo') {
- *   registerTool(server, app, tool, {
+ * // Simple registration (params/result are union types)
+ * registerTool(server, app, analyzeRepoTool);
+ *
+ * // For full type safety, use createToolHandler instead:
+ * server.tool(
+ *   'analyze-repo',
+ *   analyzeRepoTool.description,
+ *   analyzeRepoTool.inputSchema,
+ *   createToolHandler(app, 'analyze-repo', {
  *     onSuccess: (result, toolName, params) => {
  *       // Fully typed as AnalyzeRepoResult and AnalyzeRepoInput!
  *       myTelemetry.track('analyze-repo-success', params.path);
  *     },
- *   });
- * }
+ *   })
+ * );
  * ```
  */
-export function registerTool<TName extends ToolName>(
+export function registerTool(
   server: McpServer,
   app: AppRuntime,
-  tool: Tool & { name: TName },
-  options?: ToolHandlerOptions<TName>,
+  tool: Tool,
+  options?: ToolHandlerOptions,
 ): void {
-  server.tool(tool.name, tool.description, tool.inputSchema, createToolHandler(app, tool.name, options));
+  // Type assertion is safe because Tool.name is validated at runtime
+  // and all tools in the registry have valid ToolName values
+  server.tool(
+    tool.name,
+    tool.description,
+    tool.inputSchema,
+    createToolHandler(app, tool.name as ToolName, options),
+  );
 }
 
 /**

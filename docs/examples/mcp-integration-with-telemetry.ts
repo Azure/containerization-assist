@@ -31,6 +31,8 @@ import {
   createToolHandler,
   registerTools,
   type ToolHandlerOptions,
+  type ToolInputMap,
+  type ToolResultMap,
 } from 'containerization-assist';
 
 /**
@@ -164,7 +166,8 @@ function registerWithMaximumControl(server: McpServer) {
       tool.name,
       tool.description,
       tool.inputSchema,
-      createToolHandler(app, tool.name as never, {
+      // Use 'as ToolName' to assert the tool name is valid while maintaining type safety
+      createToolHandler(app, tool.name as ToolName, {
         transport: 'my-integration',
         onSuccess: (result, toolName) => {
           telemetry.trackToolExecution(toolName, true);
@@ -202,14 +205,15 @@ function registerWithConvenience(server: McpServer) {
       // toolName is correctly typed as the specific tool name
       telemetry.trackToolExecution(toolName, true);
 
-      // For type-safe access, use type guards based on toolName
+      // For type-safe access, use type guards with indexed access types
+      // This is safer than inline types as it references the actual tool types
       if (toolName === 'build-image') {
-        // Now TypeScript knows this is BuildImageResult
-        const buildResult = result as { imageId: string; size: number; tags: string[] };
+        // Use indexed access type to get the exact BuildImageResult type
+        const buildResult = result as ToolResultMap['build-image'];
         console.log(`[TELEMETRY] Built image: ${buildResult.imageId}`);
       } else if (toolName === 'scan-image') {
-        // TypeScript knows this is ScanImageResult
-        const scanResult = result as { summary?: { critical?: number; high?: number } };
+        // Use indexed access type to get the exact ScanImageResult type
+        const scanResult = result as ToolResultMap['scan-image'];
         console.log(`[TELEMETRY] Vulnerabilities: ${scanResult.summary?.critical || 0} critical`);
       }
     },
