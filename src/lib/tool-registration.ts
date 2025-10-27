@@ -14,22 +14,49 @@ import {
   type ServerNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { AppRuntime, ExecutionMetadata } from '@/types/runtime';
+import type { AppRuntime, ExecutionMetadata, ToolInputMap, ToolResultMap } from '@/types/runtime';
 import type { Tool } from '@/types/tool';
+import type { ToolName } from '@/tools';
 import { extractErrorMessage } from './errors';
 
 /**
- * Tool handler wrapper options
+ * Tool handler wrapper options with type-safe callbacks
+ *
+ * When TName is a specific ToolName literal (e.g., 'build-image'), the callbacks
+ * receive strongly-typed params and results. When TName is the broader ToolName union,
+ * types are looser but still constrained to valid tool inputs/outputs.
+ *
+ * @template TName - The tool name literal type for type-safe params and results
+ *
+ * @example
+ * ```typescript
+ * // With literal tool name - fully typed
+ * const handler = createToolHandler(app, 'build-image', {
+ *   onSuccess: (result, toolName, params) => {
+ *     // result: BuildImageResult
+ *     // params: BuildImageInput
+ *     console.log(params.imageName, result.imageId);
+ *   }
+ * });
+ *
+ * // With union type - broader types
+ * const handler = createToolHandler(app, someDynamicToolName, {
+ *   onSuccess: (result, toolName, params) => {
+ *     // result: union of all tool results
+ *     // params: union of all tool inputs
+ *   }
+ * });
+ * ```
  */
-export interface ToolHandlerOptions {
+export interface ToolHandlerOptions<TName extends ToolName = ToolName> {
   /** Custom transport label for logging (default: 'external') */
   transport?: string;
 
   /** Custom error handler - called before throwing McpError */
-  onError?: (error: unknown, toolName: string, params: Record<string, unknown>) => void;
+  onError?: (error: unknown, toolName: TName, params: ToolInputMap[TName]) => void;
 
   /** Custom success handler - called after successful execution */
-  onSuccess?: (result: unknown, toolName: string, params: Record<string, unknown>) => void;
+  onSuccess?: (result: ToolResultMap[TName], toolName: TName, params: ToolInputMap[TName]) => void;
 }
 
 /**
@@ -38,6 +65,10 @@ export interface ToolHandlerOptions {
  * This allows you to use server.tool() for full control over telemetry
  * while letting Container Assist handle all context creation internally.
  *
+ * When called with a literal tool name (e.g., 'build-image'), TypeScript
+ * automatically infers the specific type, giving you fully-typed callbacks.
+ *
+ * @template TName - The tool name type (automatically inferred from literal strings)
  * @param app - AppRuntime instance (from createApp())
  * @param toolName - Name of the tool to execute
  * @param options - Optional configuration for the handler
@@ -49,28 +80,32 @@ export interface ToolHandlerOptions {
  *
  * const app = createApp();
  *
- * for (const tool of ALL_TOOLS) {
- *   server.tool(
- *     tool.name,
- *     tool.description,
- *     tool.inputSchema,
- *     createToolHandler(app, tool.name, {
- *       transport: 'my-integration',
- *       onSuccess: (result, toolName, params) => {
- *         myTelemetry.trackToolExecution(toolName, true);
- *       },
- *       onError: (error, toolName, params) => {
- *         myTelemetry.trackToolExecution(toolName, false);
- *       },
- *     })
- *   );
- * }
+ * // Fully typed - TypeScript infers TName = 'build-image'
+ * server.tool(
+ *   'build-image',
+ *   buildImageTool.description,
+ *   buildImageTool.inputSchema,
+ *   createToolHandler(app, 'build-image', {
+ *     transport: 'my-integration',
+ *     onSuccess: (result, toolName, params) => {
+ *       // result: BuildImageResult (fully typed!)
+ *       // params: BuildImageInput (fully typed!)
+ *       console.log(params.imageName, result.imageId);
+ *       myTelemetry.trackToolExecution(toolName, true);
+ *     },
+ *     onError: (error, toolName, params) => {
+ *       // params: BuildImageInput (fully typed!)
+ *       console.log(params.dockerfile);
+ *       myTelemetry.trackToolExecution(toolName, false);
+ *     },
+ *   })
+ * );
  * ```
  */
-export function createToolHandler(
+export function createToolHandler<TName extends ToolName>(
   app: AppRuntime,
-  toolName: string,
-  options: ToolHandlerOptions = {},
+  toolName: TName,
+  options: ToolHandlerOptions<TName> = {},
 ) {
   const { transport = 'external', onError, onSuccess } = options;
 
@@ -114,7 +149,11 @@ export function createToolHandler(
       if (!result.ok) {
         // Call error handler if provided
         if (onError) {
-          onError(result.error, toolName, sanitizedParams);
+          // Type assertion is safe because:
+          // 1. toolName is validated by the orchestrator at runtime
+          // 2. params are validated by the tool's Zod schema
+          // 3. The generic TName ensures type consistency between handler and callbacks
+          onError(result.error, toolName, sanitizedParams as ToolInputMap[TName]);
         }
 
         // Format error with guidance
@@ -136,7 +175,8 @@ export function createToolHandler(
 
       // Call success handler if provided
       if (onSuccess) {
-        onSuccess(result.value, toolName, sanitizedParams);
+        // Type assertion is safe for the same reasons as above
+        onSuccess(result.value as ToolResultMap[TName], toolName, sanitizedParams as ToolInputMap[TName]);
       }
 
       // Return formatted result
@@ -155,7 +195,8 @@ export function createToolHandler(
       }
 
       if (onError) {
-        onError(error, toolName, params);
+        // Type assertion is safe (params include _meta but that's acceptable for error reporting)
+        onError(error, toolName, params as unknown as ToolInputMap[TName]);
       }
 
       throw new McpError(ErrorCode.InternalError, extractErrorMessage(error));
@@ -167,7 +208,9 @@ export function createToolHandler(
  * Register a single Container Assist tool with an MCP server
  *
  * Convenience wrapper around createToolHandler() for registering individual tools.
+ * Use type assertions or narrowing to get full type safety for specific tools.
  *
+ * @template TName - The tool name type (inferred from the tool parameter)
  * @param server - MCP server instance
  * @param app - AppRuntime instance
  * @param tool - Tool definition
@@ -179,16 +222,23 @@ export function createToolHandler(
  *
  * const app = createApp();
  *
- * registerTool(server, app, analyzeRepoTool, {
- *   onSuccess: () => myTelemetry.track('analyze-repo-success'),
- * });
+ * // With type narrowing for full type safety:
+ * const tool = analyzeRepoTool;
+ * if (tool.name === 'analyze-repo') {
+ *   registerTool(server, app, tool, {
+ *     onSuccess: (result, toolName, params) => {
+ *       // Fully typed as AnalyzeRepoResult and AnalyzeRepoInput!
+ *       myTelemetry.track('analyze-repo-success', params.path);
+ *     },
+ *   });
+ * }
  * ```
  */
-export function registerTool(
+export function registerTool<TName extends ToolName>(
   server: McpServer,
   app: AppRuntime,
-  tool: Tool,
-  options?: ToolHandlerOptions,
+  tool: Tool & { name: TName },
+  options?: ToolHandlerOptions<TName>,
 ): void {
   server.tool(tool.name, tool.description, tool.inputSchema, createToolHandler(app, tool.name, options));
 }
@@ -196,12 +246,13 @@ export function registerTool(
 /**
  * Register all Container Assist tools with an MCP server
  *
- * Convenience function to register multiple tools at once.
+ * Convenience function to register multiple tools at once. For full type safety,
+ * register tools individually using createToolHandler() with literal tool names.
  *
  * @param server - MCP server instance
  * @param app - AppRuntime instance
  * @param tools - Array of tools to register
- * @param options - Optional handler configuration (applied to all tools)
+ * @param options - Optional handler configuration (applied to all tools with union types)
  *
  * @example
  * ```typescript
@@ -209,12 +260,26 @@ export function registerTool(
  *
  * const app = createApp();
  *
+ * // Bulk registration - convenient but broader types
  * registerTools(server, app, ALL_TOOLS, {
  *   transport: 'my-integration',
- *   onSuccess: (result, toolName) => {
+ *   onSuccess: (result, toolName, params) => {
+ *     // result and params are unions of all tool types
  *     myTelemetry.trackToolExecution(toolName, true);
  *   },
  * });
+ *
+ * // For type-safe registration, use createToolHandler directly:
+ * server.tool(
+ *   'build-image',
+ *   buildImageTool.description,
+ *   buildImageTool.inputSchema,
+ *   createToolHandler(app, 'build-image', {
+ *     onSuccess: (result, toolName, params) => {
+ *       // Fully typed! result: BuildImageResult, params: BuildImageInput
+ *     }
+ *   })
+ * );
  * ```
  */
 export function registerTools(
@@ -224,6 +289,13 @@ export function registerTools(
   options?: ToolHandlerOptions,
 ): void {
   for (const tool of tools) {
-    registerTool(server, app, tool, options);
+    // Type assertion is safe here because Tool.name is validated at runtime
+    // and all tools in ALL_TOOLS have valid ToolName values
+    server.tool(
+      tool.name,
+      tool.description,
+      tool.inputSchema,
+      createToolHandler(app, tool.name as ToolName, options),
+    );
   }
 }
