@@ -20,12 +20,16 @@ This directory contains integration patterns for using Container Assist tools in
 
 **[mcp-integration-with-telemetry.ts](./mcp-integration-with-telemetry.ts)** - Advanced integration with telemetry hooks:
 - Use `createToolHandler()` for fine-grained control over tool registration
+- **✨ NEW: Full TypeScript type safety** - Strongly-typed params and results in callbacks
 - Add custom telemetry tracking for tool executions
 - Implement error reporting and monitoring
 - Track performance metrics and success rates
 - Use `onSuccess` and `onError` hooks for observability
+- Access typed tool parameters and results for better error handling
 
 **Best for:** Production integrations requiring telemetry, monitoring, or custom error handling.
+
+**Type Safety:** When using literal tool names with `createToolHandler()`, TypeScript automatically infers the specific parameter and result types for your callbacks, giving you full IntelliSense support and compile-time safety.
 
 ## Choosing the Right Pattern
 
@@ -41,6 +45,41 @@ This directory contains integration patterns for using Container Assist tools in
 - ✅ You need custom error reporting or alerting
 - ✅ You want per-tool or per-category telemetry configurations
 - ✅ You need lifecycle hooks (onSuccess, onError) for audit logging
+- ✅ You want type-safe access to tool parameters and results
+
+**Type Safety Example:**
+
+```typescript
+import { createToolHandler } from 'containerization-assist';
+
+// Using a literal tool name gives you fully-typed callbacks!
+server.tool(
+  'build-image',
+  buildImageTool.description,
+  buildImageTool.inputSchema,
+  createToolHandler(app, 'build-image', {
+    onSuccess: (result, toolName, params) => {
+      // ✅ result is typed as BuildImageResult
+      console.log(`Built: ${result.imageId}, size: ${result.size} bytes`);
+
+      // ✅ params is typed as BuildImageInput
+      console.log(`Image name: ${params.imageName}`);
+
+      // ✅ Full IntelliSense support!
+      telemetry.track({
+        tool: toolName,
+        imageSize: result.size,
+        buildTime: result.buildTime,
+        tags: result.tags
+      });
+    },
+    onError: (error, toolName, params) => {
+      // ✅ params is also typed in error handler
+      console.error(`Failed to build ${params.imageName}`);
+    }
+  })
+);
+```
 
 **Note:** Both patterns let Container Assist handle all ToolContext creation (logger, policy, etc.) automatically. The difference is only in control over telemetry and lifecycle hooks.
 
