@@ -504,14 +504,18 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             (event: DockerPushEvent) => {
               logger.debug(event, 'Docker push progress');
 
-              // Capture errors from Docker events - dockerode provides explicit error fields
+              // Only treat final error events as failures, not intermediate auth challenges
               if (event.error || event.errorDetail) {
-                logger.error({ errorEvent: event }, 'Docker push error event received');
-                pushError = new Error(
-                  event.error ||
-                    (event.errorDetail as { message?: string })?.message ||
-                    'Unknown push error',
-                );
+                logger.debug({ errorEvent: event }, 'Docker push error event (may be intermediate)');
+
+                // Only set pushError for certain fatal errors, not auth challenges
+                const errorMsg = event.error || (event.errorDetail as { message?: string })?.message || '';
+
+                // Don't treat authentication challenges as fatal errors - they're part of the auth handshake
+                if (!errorMsg.includes('unauthorized') && !errorMsg.includes('authentication required')) {
+                  pushError = new Error(errorMsg || 'Unknown push error');
+                  logger.error({ errorEvent: event }, 'Fatal Docker push error event received');
+                }
               }
 
               if (event.aux?.Digest) {

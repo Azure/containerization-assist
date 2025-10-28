@@ -6,13 +6,13 @@
 import { z } from 'zod';
 
 export const pushImageSchema = z.object({
-  imageId: z.string().min(1).describe('Docker image ID to push'), // Made required
-  registry: z.string().url().describe('Target registry URL'), // Made required with URL validation
+  imageId: z.string().min(1).describe('Docker image ID or name to push'),
+  registry: z.string().min(1).describe('Target registry hostname (e.g., catestacr.azurecr.io, docker.io)'),
   credentials: z
     .object({
       username: z.string(),
       password: z.string(),
     })
     .optional()
-    .describe('Registry credentials'),
+    .describe('Registry credentials. If not provided, will attempt to use Docker credential helpers'),
 });
