@@ -588,14 +588,12 @@ export async function getKnowledgeSnippets(
     };
 
     const uniqueEntries = new Map<string, LoadedEntry>();
-    const debugInfo: { filter: string; count: number }[] = [];
 
     if (query.category) {
       const categoryEntries = getEntriesByCategory(query.category);
       for (const entry of categoryEntries) {
         uniqueEntries.set(entry.id, entry);
       }
-      debugInfo.push({ filter: 'category', count: categoryEntries.length });
     }
 
     if (query.language) {
@@ -603,7 +601,6 @@ export async function getKnowledgeSnippets(
       for (const entry of languageEntries) {
         uniqueEntries.set(entry.id, entry);
       }
-      debugInfo.push({ filter: 'language', count: languageEntries.length });
     }
 
     if (query.framework) {
@@ -611,7 +608,6 @@ export async function getKnowledgeSnippets(
       for (const entry of frameworkEntries) {
         uniqueEntries.set(entry.id, entry);
       }
-      debugInfo.push({ filter: 'framework', count: frameworkEntries.length });
     }
 
     const candidateEntries = Array.from(uniqueEntries.values());
