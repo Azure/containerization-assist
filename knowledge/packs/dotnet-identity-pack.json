@@ -62,6 +62,7 @@
       "aws",
       "dotnet",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "identity",
       "jwt",
       "scan-image",
@@ -129,12 +130,13 @@
     "example": "ENV Session__Timeout=\"00:20:00\"\nENV Session__Store=\"Redis\"\nENV ConnectionStrings__Redis=\"redis:6379\"\nENV Session__Redis__KeyPrefix=\"session:\"\nENV Session__CookieSecure=\"true\"\nENV Session__CookieHttpOnly=\"true\"\nENV Session__CookieSameSite=\"Strict\"",
     "severity": "medium",
     "tags": [
-      "dotnet",
-      "identity",
-      "session",
-      "redis",
       "distributed",
-      "scalability"
+      "dotnet",
+      "generate-k8s-manifests",
+      "identity",
+      "redis",
+      "scalability",
+      "session"
     ]
   },
   {
@@ -215,12 +217,12 @@
     "example": "ENV MultiTenancy__Strategy=\"Subdomain\"\nENV MultiTenancy__RequireTenant=\"true\"\nENV ConnectionStrings__Template=\"Server=db;Database=Identity_{tenant};User=sa;Password=${DB_PASSWORD};TrustServerCertificate=true\"\nENV TenantIsolation__Users=\"true\"\nENV TenantIsolation__Roles=\"true\"\nENV CrossTenant__AllowSharedUsers=\"false\"",
     "severity": "medium",
     "tags": [
+      "architecture",
       "dotnet",
       "identity",
-      "multi-tenant",
       "isolation",
-      "saas",
-      "architecture"
+      "multi-tenant",
+      "saas"
     ]
   },
   {
@@ -248,10 +250,10 @@
     "example": "ENV Authorization__DefaultPolicy=\"DefaultPolicy\"\nENV Authorization__RequireAuthenticatedUser=\"true\"\nENV Claims__EnableClaimsTransformation=\"true\"\nENV Claims__ClaimsIssuer=\"https://yourdomain.com\"\nENV Permissions__CacheTimeout=\"300\"\nENV Permissions__EnableHierarchy=\"true\"",
     "severity": "medium",
     "tags": [
+      "authorization",
+      "claims",
       "dotnet",
       "identity",
-      "claims",
-      "authorization",
       "rbac"
     ]
   },
@@ -298,10 +300,10 @@
     "example": "ENV Email__Provider=\"SendGrid\"\nENV Email__SendGrid__ApiKey=\"${SENDGRID_API_KEY}\"\nENV Email__SendGrid__FromEmail=\"noreply@yourdomain.com\"\nENV Identity__SignIn__RequireConfirmedEmail=\"true\"\nENV Email__ConfirmationTokenExpiration=\"24:00:00\"",
     "severity": "medium",
     "tags": [
-      "dotnet",
-      "identity",
-      "email",
       "confirmation",
+      "dotnet",
+      "email",
+      "identity",
       "registration"
     ]
   },
@@ -330,11 +332,11 @@
     "example": "ENV ConnectionStrings__DefaultConnection=\"Server=db;Database=IdentityServer;User=sa;Password=${DB_PASSWORD}\"\nENV ConnectionStrings__ConfigurationDbConnection=\"Server=db;Database=IdentityServerConfiguration;User=sa;Password=${DB_PASSWORD}\"\nENV ConnectionStrings__PersistedGrantDbConnection=\"Server=db;Database=IdentityServerGrants;User=sa;Password=${DB_PASSWORD}\"",
     "severity": "medium",
     "tags": [
+      "configuration",
+      "database",
       "dotnet",
       "identityserver",
-      "database",
-      "persistence",
-      "configuration"
+      "persistence"
     ]
   },
   {
@@ -345,12 +347,12 @@
     "example": "ENV SMS__Provider=\"Twilio\"\nENV SMS__Twilio__AccountSid=\"${TWILIO_ACCOUNT_SID}\"\nENV SMS__Twilio__AuthToken=\"${TWILIO_AUTH_TOKEN}\"\nENV SMS__Twilio__FromNumber=\"${TWILIO_PHONE_NUMBER}\"\nENV TwoFactor__SMSCodeExpiration=\"00:05:00\"",
     "severity": "medium",
     "tags": [
+      "2fa",
+      "authentication",
       "dotnet",
       "identity",
       "sms",
-      "2fa",
-      "twilio",
-      "authentication"
+      "twilio"
     ]
   },
   {
@@ -361,11 +363,11 @@
     "example": "ENV Roles__DefaultRoles=\"User,Manager,Admin\"\nENV Roles__AdminEmail=\"${ADMIN_EMAIL}\"\nENV Roles__SeedAdminOnStartup=\"true\"\nENV Authorization__EnableRoleHierarchy=\"true\"",
     "severity": "medium",
     "tags": [
+      "authorization",
+      "configuration",
       "dotnet",
       "identity",
-      "roles",
-      "authorization",
-      "configuration"
+      "roles"
     ]
   },
   {
@@ -411,9 +413,9 @@
     "example": "ENV Alerting__Enabled=\"true\"\nENV Alerting__EmailRecipients=\"${SECURITY_EMAIL}\"\nENV Alerting__SlackWebhook=\"${SLACK_WEBHOOK}\"\nENV Alerts__FailedLoginThreshold=\"5\"\nENV Alerts__PrivilegeEscalation=\"true\"\nENV Alerts__SuspiciousActivityThreshold=\"5\"",
     "severity": "medium",
     "tags": [
+      "alerting",
       "dotnet",
       "identity",
-      "alerting",
       "monitoring",
       "security"
     ]

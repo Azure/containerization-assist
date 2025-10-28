@@ -60,6 +60,7 @@
       "azure",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "python"
     ],
@@ -79,6 +80,7 @@
       "minimal",
       "production",
       "runtime-stage",
+      "scan-image",
       "security"
     ],
     "description": "Security guidance for using distroless images as a fallback when vendor-specific hardened images are not available"
@@ -155,6 +157,7 @@
       "enterprise",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "google",
       "microsoft",
       "selection"

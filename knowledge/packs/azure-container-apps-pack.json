@@ -80,6 +80,7 @@
       "generate-k8s-manifests",
       "managed-identity",
       "microsoft",
+      "scan-image",
       "security"
     ],
     "description": "Managed identities provide secure, credential-free access to Azure resources"
@@ -112,6 +113,7 @@
       "azure-container-apps",
       "configuration",
       "generate-k8s-manifests",
+      "scan-image",
       "secrets",
       "security"
     ],
@@ -415,6 +417,7 @@
       "generate-k8s-manifests",
       "key-vault",
       "managed-identity",
+      "scan-image",
       "security"
     ],
     "description": "Key Vault integration provides enterprise-grade secret management"
@@ -485,6 +488,7 @@
       "azure-container-apps",
       "generate-k8s-manifests",
       "private-endpoints",
+      "scan-image",
       "security",
       "vnet"
     ],

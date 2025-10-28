@@ -9,6 +9,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "http2",
       "kestrel",
@@ -27,6 +28,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "load-balancer",
       "ssl",
@@ -80,6 +82,7 @@
       "connection-pooling",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "httpclient"
     ],
@@ -97,6 +100,7 @@
       "compression",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "performance"
     ],
@@ -129,6 +133,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "interceptors",
       "logging",
@@ -147,6 +152,7 @@
       "clustering",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "load-balancing",
       "scalability"
@@ -164,6 +170,7 @@
       "backpressure",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "performance",
       "streaming"
@@ -181,6 +188,7 @@
       "authentication",
       "aws",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "jwt",
       "scan-image",
@@ -198,6 +206,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "metrics",
       "monitoring",
@@ -217,6 +226,7 @@
       "deadlines",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "resilience"
     ],
@@ -234,6 +244,7 @@
       "exceptions",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "status-codes"
     ],
@@ -251,6 +262,7 @@
       "cors",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "grpc-web"
     ],
@@ -283,6 +295,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "optimization",
       "protobuf",
@@ -318,6 +331,7 @@
       "dns",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "kubernetes",
       "service-discovery"
@@ -333,6 +347,7 @@
     "severity": "high",
     "tags": [
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "mtls",
       "mutual-tls",
@@ -351,6 +366,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "graceful-shutdown",
       "grpc",
       "lifecycle",
@@ -368,6 +384,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "grpc",
       "rate-limiting",
       "resource-protection",

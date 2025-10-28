@@ -10,6 +10,7 @@
       "blazor",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "server",
       "signalr",
@@ -79,6 +80,7 @@
       "blazor",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "manifest",
       "microsoft",
       "pwa",
@@ -97,6 +99,7 @@
       "blazor",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "load-balancing",
       "redis",
       "server",
@@ -258,6 +261,7 @@
       "configuration",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "httpclient",
       "webassembly"
     ],
@@ -292,6 +296,7 @@
       "caching",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "offline",
       "service-worker",
       "webassembly"
@@ -453,6 +458,7 @@
       "fix-dockerfile",
       "generate-dockerfile",
       "production",
+      "scan-image",
       "security",
       "webassembly"
     ],

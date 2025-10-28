@@ -28,6 +28,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "health-check",
       "mediatr",
       "microservice",
@@ -80,10 +81,10 @@
     "example": "ENV ConnectionStrings__WriteDatabase=\"${WRITE_DB_CONNECTION}\" \\\n    ConnectionStrings__ReadDatabase=\"${READ_DB_CONNECTION}\" \\\n    CQRS__CommandTimeout=\"30\" \\\n    CQRS__QueryTimeout=\"10\" \\\n    CQRS__EnableQueryCaching=\"true\"",
     "severity": "high",
     "tags": [
-      "dotnet",
-      "mediatr",
       "cqrs",
       "database",
+      "dotnet",
+      "mediatr",
       "separation"
     ],
     "description": "CQRS pattern with read/write database separation and query caching"
@@ -113,11 +114,11 @@
     "example": "ENV ConnectionStrings__Redis=\"${REDIS_CONNECTION}\" \\\n    DistributedCache__DefaultExpiration=\"300\" \\\n    QueryCache__Enabled=\"true\" \\\n    QueryCache__MaxMemorySize=\"100MB\"",
     "severity": "medium",
     "tags": [
+      "caching",
+      "distributed",
       "dotnet",
       "mediatr",
-      "redis",
-      "caching",
-      "distributed"
+      "redis"
     ],
     "description": "Distributed caching with Redis for MediatR query optimization"
   },
@@ -130,10 +131,10 @@
     "severity": "medium",
     "tags": [
       "dotnet",
-      "mediatr",
-      "validation",
       "fluentvalidation",
-      "pipeline"
+      "mediatr",
+      "pipeline",
+      "validation"
     ],
     "description": "MediatR with FluentValidation pipeline for request validation"
   },
@@ -147,9 +148,9 @@
     "tags": [
       "dotnet",
       "mediatr",
+      "messaging",
       "outbox",
-      "reliability",
-      "messaging"
+      "reliability"
     ],
     "description": "Outbox pattern implementation for reliable domain event publishing"
   },
@@ -163,9 +164,9 @@
     "tags": [
       "dotnet",
       "mediatr",
+      "monitoring",
       "observability",
-      "opentelemetry",
-      "monitoring"
+      "opentelemetry"
     ],
     "description": "Comprehensive monitoring and observability for MediatR with OpenTelemetry"
   },
@@ -177,11 +178,11 @@
     "example": "ENV MultiTenancy__Strategy=\"Subdomain\" \\\n    MultiTenancy__RequireTenant=\"true\" \\\n    ConnectionStrings__Template=\"Server=${DB_HOST};Database=App_{tenant};User Id=${DB_USER};Password=${DB_PASS}\" \\\n    TenantIsolation__DataIsolation=\"Database\"",
     "severity": "high",
     "tags": [
+      "architecture",
       "dotnet",
-      "mediatr",
-      "multi-tenant",
       "isolation",
-      "architecture"
+      "mediatr",
+      "multi-tenant"
     ],
     "description": "Multi-tenant MediatR application with database-per-tenant isolation"
   },
@@ -193,11 +194,11 @@
     "example": "ENV Streaming__BufferSize=\"1000\" \\\n    Streaming__MaxConcurrentStreams=\"10\" \\\n    DOTNET_gcServer=1 \\\n    DOTNET_GCHighMemPercent=75 \\\n    Kestrel__Limits__MaxRequestBodySize=\"2147483648\"",
     "severity": "medium",
     "tags": [
+      "async",
       "dotnet",
       "mediatr",
-      "streaming",
-      "async",
-      "performance"
+      "performance",
+      "streaming"
     ],
     "description": "Streaming query support for handling large datasets with MediatR"
   },
@@ -227,10 +228,11 @@
     "example": "ENV MediatR__ServiceLifetime=\"Scoped\" \\\n    MediatR__RequestTimeout=\"30000\" \\\n    DI__ValidateScopes=\"true\" \\\n    DI__ValidateOnBuild=\"true\"",
     "severity": "medium",
     "tags": [
-      "dotnet",
-      "mediatr",
+      "configuration",
       "dependency-injection",
-      "configuration"
+      "dotnet",
+      "generate-k8s-manifests",
+      "mediatr"
     ],
     "description": "Proper dependency injection configuration for MediatR services"
   },
@@ -244,8 +246,8 @@
     "tags": [
       "dotnet",
       "mediatr",
-      "resilience",
       "polly",
+      "resilience",
       "retry"
     ],
     "description": "Resilience patterns with Polly for MediatR handlers"
@@ -258,9 +260,9 @@
     "example": "ENV BatchProcessing__MaxBatchSize=\"100\" \\\n    BatchProcessing__ProcessingInterval=\"5000\" \\\n    BatchProcessing__MaxConcurrency=\"5\" \\\n    BatchProcessing__EnableAutoRetry=\"true\"",
     "severity": "medium",
     "tags": [
+      "batch",
       "dotnet",
       "mediatr",
-      "batch",
       "performance",
       "processing"
     ],
@@ -274,9 +276,9 @@
     "example": "ENV ApiVersioning__DefaultVersion=\"1.0\" \\\n    ApiVersioning__AssumeDefaultVersionWhenUnspecified=\"true\" \\\n    ApiVersioning__ReportApiVersions=\"true\" \\\n    ApiVersioning__HeaderName=\"api-version\"",
     "severity": "medium",
     "tags": [
+      "api",
       "dotnet",
       "mediatr",
-      "api",
       "versioning"
     ],
     "description": "API versioning strategy for MediatR-based APIs"
@@ -308,9 +310,10 @@
     "severity": "medium",
     "tags": [
       "dotnet",
-      "mediatr",
+      "generate-k8s-manifests",
       "grpc",
       "integration",
+      "mediatr",
       "microservices"
     ],
     "description": "gRPC service integration with MediatR for inter-service communication"

@@ -21,7 +21,9 @@ export const generateDockerfileSchema = z.object({
   languageVersion: z
     .string()
     .optional()
-    .describe('Language version (e.g., "17", "3.11", "20"). For Java, this is the java.version from pom.xml or sourceCompatibility from build.gradle.'),
+    .describe(
+      'Language version (e.g., "17", "3.11", "20"). For Java, this is the java.version from pom.xml or sourceCompatibility from build.gradle.',
+    ),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
   detectedDependencies: z
@@ -34,34 +36,18 @@ export const generateDockerfileSchema = z.object({
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;
 
-export interface DockerfileRequirement {
-  id: string;
-  category: string;
-  recommendation: string;
-  example?: string;
-  severity?: 'high' | 'medium' | 'low';
-  tags?: string[];
-  matchScore: number;
-}
+export type DockerfileRequirement = string;
 
 /**
- * Base image recommendation with details
+ * Base image recommendation
  */
 export interface BaseImageRecommendation {
   /** Full image name (e.g., "node:20-alpine") */
   image: string;
-  /** Category of the image */
-  category: 'official' | 'distroless' | 'security' | 'size';
   /** Reason for recommendation */
   reason: string;
   /** Estimated size in MB (if known) */
-  size?: string | undefined;
-  /** Security rating (if applicable) */
-  securityRating?: 'high' | 'medium' | 'low' | undefined;
-  /** Tags applied to this recommendation */
-  tags?: string[] | undefined;
-  /** Match score from knowledge base */
-  matchScore: number;
+  size?: string;
 }
 
 /**
@@ -116,7 +102,6 @@ export interface DockerfilePlan {
   summary: string;
   existingDockerfile?: {
     path: string;
-    content: string;
     analysis: DockerfileAnalysis;
     guidance: EnhancementGuidance;
   };

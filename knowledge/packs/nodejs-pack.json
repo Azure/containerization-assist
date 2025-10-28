@@ -129,7 +129,8 @@
       "express",
       "fix-dockerfile",
       "flexibility",
-      "generate-dockerfile"
+      "generate-dockerfile",
+      "generate-k8s-manifests"
     ],
     "description": "Environment-based port configuration increases deployment flexibility"
   },
@@ -178,6 +179,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "nestjs",
       "production",
       "typescript"
@@ -194,6 +196,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "nextjs",
       "optimization",
       "standalone"
@@ -424,6 +427,7 @@
     "tags": [
       "audit",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "npm",
       "npm-ci",
       "scan-image",

@@ -136,7 +136,8 @@
       "dotnet-framework",
       "fix-dockerfile",
       "gac",
-      "generate-dockerfile"
+      "generate-dockerfile",
+      "generate-k8s-manifests"
     ],
     "description": "GAC usage complicates container deployment, prefer private assemblies"
   },

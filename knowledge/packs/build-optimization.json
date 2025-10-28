@@ -125,7 +125,9 @@
       "buildkit",
       "credentials",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "npm-ci",
+      "scan-image",
       "secrets",
       "security"
     ],

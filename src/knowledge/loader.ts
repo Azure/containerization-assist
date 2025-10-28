@@ -100,8 +100,22 @@ const validateEntry = (entry: unknown): entry is KnowledgeEntry => {
 };
 
 const addEntry = (entry: KnowledgeEntry): void => {
-  // No pattern compilation - patterns are compiled on-demand during matching
-  knowledgeState.entries.set(entry.id, entry);
+  let compiledPattern: RegExp | undefined;
+
+  if (entry.pattern) {
+    try {
+      compiledPattern = new RegExp(entry.pattern, 'gmi');
+    } catch (error) {
+      logger.warn(
+        { entryId: entry.id, pattern: entry.pattern, error },
+        'Failed to compile pattern - will skip pattern matching for this entry',
+      );
+    }
+  }
+
+  const loadedEntry: LoadedEntry = compiledPattern ? { ...entry, compiledPattern } : { ...entry };
+
+  knowledgeState.entries.set(entry.id, loadedEntry);
 };
 
 const buildIndices = (): void => {
@@ -283,4 +297,26 @@ export const loadKnowledgeData = async (): Promise<{ entries: LoadedEntry[] }> =
   return {
     entries: getAllEntries(),
   };
+};
+
+/**
+ * Get entries by category using index.
+ */
+export const getEntriesByCategory = (category: string): LoadedEntry[] => {
+  if (!isKnowledgeLoaded()) {
+    logger.warn('Knowledge base not loaded, cannot filter by category');
+    return [];
+  }
+  return knowledgeState.byCategory.get(category) || [];
+};
+
+/**
+ * Get entries by tag using index.
+ */
+export const getEntriesByTag = (tag: string): LoadedEntry[] => {
+  if (!isKnowledgeLoaded()) {
+    logger.warn('Knowledge base not loaded, cannot filter by tag');
+    return [];
+  }
+  return knowledgeState.byTag.get(tag) || [];
 };

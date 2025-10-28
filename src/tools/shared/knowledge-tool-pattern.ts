@@ -237,7 +237,7 @@ export function createKnowledgeTool<
       environment: filters.environment || 'production',
       tool: config.name,
       maxChars: config.query.maxChars || 8000,
-      maxSnippets: config.query.maxSnippets || 20,
+      maxSnippets: config.query.maxSnippets || 15,
       category: config.query.category,
       ...(filters.language && { language: filters.language }),
       ...(filters.framework && { framework: filters.framework }),

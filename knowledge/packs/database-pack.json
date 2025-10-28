@@ -169,6 +169,8 @@
       "database-server",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
+      "scan-image",
       "secrets",
       "security"
     ],
@@ -205,6 +207,7 @@
       "generate-dockerfile",
       "isolation",
       "networking",
+      "scan-image",
       "security"
     ],
     "description": "Network isolation prevents unauthorized database access"
@@ -257,6 +260,7 @@
       "distributed",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "nosql"
     ],
     "description": "Proper cluster configuration ensures data distribution and availability"
@@ -580,9 +584,9 @@
     "severity": "medium",
     "tags": [
       "database",
+      "optimization",
       "performance",
-      "tuning",
-      "optimization"
+      "tuning"
     ],
     "description": "Workload-specific tuning maximizes database performance"
   },
@@ -662,10 +666,10 @@
     "severity": "high",
     "tags": [
       "database",
-      "observability",
-      "monitoring",
+      "logging",
       "metrics",
-      "logging"
+      "monitoring",
+      "observability"
     ],
     "description": "Full observability stack for database monitoring and troubleshooting"
   },
@@ -711,11 +715,11 @@
     "example": "# Debezium for CDC\nservices:\n  debezium:\n    image: debezium/connect\n    environment:\n      - BOOTSTRAP_SERVERS=kafka:9092\n      - GROUP_ID=1\n      - CONFIG_STORAGE_TOPIC=connect-configs\n      - OFFSET_STORAGE_TOPIC=connect-offsets\n      - STATUS_STORAGE_TOPIC=connect-status",
     "severity": "medium",
     "tags": [
-      "database",
       "cdc",
-      "streaming",
+      "database",
       "debezium",
-      "kafka"
+      "kafka",
+      "streaming"
     ],
     "description": "CDC enables real-time data synchronization and event streaming"
   },

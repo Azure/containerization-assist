@@ -10,6 +10,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "optimization",
       "performance",
@@ -101,6 +102,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "minimal",
       "self-contained"
@@ -221,6 +223,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "minimal-api",
       "performance"
@@ -240,6 +243,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "google",
       "performance"
     ],
@@ -256,6 +260,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "optimization",
       "size",
       "trimming"
@@ -291,6 +296,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "security",
       "single-file"
     ],
@@ -308,6 +314,7 @@
       "azure",
       "dotnet",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "scan-image",
       "secrets",
       "security",
@@ -327,6 +334,7 @@
       "configuration",
       "dotnet",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "scan-image",
       "security"
     ],

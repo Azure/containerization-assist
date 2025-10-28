@@ -2,7 +2,7 @@ import { createLogger } from '@/lib/logger';
 import type { Topic } from '@/types/topics';
 import type { KnowledgeQuery, KnowledgeMatch, LoadedEntry, KnowledgeCategory } from './types';
 import type { KnowledgeSnippet } from './schemas';
-import { loadKnowledgeData } from './loader';
+import { loadKnowledgeData, getEntriesByCategory, getEntriesByTag } from './loader';
 
 const logger = createLogger().child({ module: 'knowledge-matcher' });
 
@@ -137,29 +137,25 @@ const getEnvironmentKeywords = (environment: string): string[] => {
 };
 
 /**
- * Evaluate pattern match by compiling regex on-demand
+ * Evaluate pattern match using pre-compiled regex
  */
 const evaluatePatternMatch = (
   entry: LoadedEntry,
   query: KnowledgeQuery,
 ): { score: number; reasons: string[] } => {
-  if (!query.text || !entry.pattern) return { score: 0, reasons: [] };
+  if (!query.text || !entry.compiledPattern) {
+    return { score: 0, reasons: [] };
+  }
 
   try {
-    // Compile regex on-demand (regex compilation is fast)
-    const regex = new RegExp(entry.pattern, 'gmi');
-    if (regex.test(query.text)) {
+    if (entry.compiledPattern.test(query.text)) {
       return {
         score: SCORING.PATTERN,
         reasons: ['Pattern match'],
       };
     }
   } catch (error) {
-    // Skip entries with invalid patterns
-    logger.debug(
-      { entryId: entry.id, pattern: entry.pattern, error },
-      'Skipping entry with invalid pattern',
-    );
+    logger.debug({ entryId: entry.id, error }, 'Pattern test failed');
   }
 
   return { score: 0, reasons: [] };
@@ -563,7 +559,7 @@ export async function getKnowledgeSnippets(
   options: KnowledgeSnippetOptions,
 ): Promise<KnowledgeSnippet[]> {
   try {
-    const knowledgeData = await loadKnowledgeData();
+    await loadKnowledgeData();
 
     const queryTextParts: string[] = [topic];
     if (options.detectedDependencies && options.detectedDependencies.length > 0) {
@@ -591,8 +587,32 @@ export async function getKnowledgeSnippets(
       limit: options.maxSnippets || 10,
     };
 
-    // Find matches
-    const matches = findKnowledgeMatches(knowledgeData.entries, query);
+    const uniqueEntries = new Map<string, LoadedEntry>();
+
+    if (query.category) {
+      const categoryEntries = getEntriesByCategory(query.category);
+      for (const entry of categoryEntries) {
+        uniqueEntries.set(entry.id, entry);
+      }
+    }
+
+    if (query.language) {
+      const languageEntries = getEntriesByTag(query.language);
+      for (const entry of languageEntries) {
+        uniqueEntries.set(entry.id, entry);
+      }
+    }
+
+    if (query.framework) {
+      const frameworkEntries = getEntriesByTag(query.framework);
+      for (const entry of frameworkEntries) {
+        uniqueEntries.set(entry.id, entry);
+      }
+    }
+
+    const candidateEntries = Array.from(uniqueEntries.values());
+
+    const matches = findKnowledgeMatches(candidateEntries, query);
 
     // Convert matches to snippets
     const snippets: KnowledgeSnippet[] = matches.map((match, index) => ({

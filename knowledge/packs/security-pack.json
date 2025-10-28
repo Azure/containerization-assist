@@ -26,6 +26,7 @@
     "tags": [
       "aws",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "hardcoded",
       "scan-image",
       "secrets",
@@ -124,6 +125,7 @@
     "tags": [
       "binding",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "network",
       "scan-image",
       "security"
@@ -157,6 +159,7 @@
       "commands",
       "dockerfile",
       "fix-dockerfile",
+      "scan-image",
       "security"
     ],
     "description": "ADD has additional features that can introduce security risks"
@@ -172,6 +175,7 @@
       "fix-dockerfile",
       "health-checks",
       "information-disclosure",
+      "scan-image",
       "security"
     ],
     "description": "Health checks should not leak sensitive application information"
@@ -187,6 +191,7 @@
       "aws",
       "build-args",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "scan-image",
       "secrets",
       "security"
@@ -316,6 +321,7 @@
     "tags": [
       "aws",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "rotation",
       "scan-image",
       "secrets",
@@ -418,6 +424,7 @@
     "tags": [
       "aws",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "registry",
       "scan-image",
       "scanning",
@@ -436,6 +443,7 @@
     "tags": [
       "admission-control",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "kubernetes",
       "policy",
       "scan-image",
@@ -471,6 +479,7 @@
       "detection",
       "falco",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "runtime",
       "scan-image",
       "security"
@@ -505,6 +514,7 @@
       "configuration",
       "drift",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "monitoring",
       "scan-image",
       "security"
@@ -554,6 +564,7 @@
     "severity": "high",
     "tags": [
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "networking",
       "scan-image",
       "security",
