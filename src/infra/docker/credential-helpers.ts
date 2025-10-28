@@ -293,7 +293,7 @@ export async function getRegistryCredentials(
         return Success({
           username: creds.Username,
           password: creds.Secret,
-          serveraddress: serveraddress,
+          serveraddress,
         });
       }
 
