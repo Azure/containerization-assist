@@ -74,18 +74,6 @@ async function handlePushImage(
       // Registry provided - clean it and determine if we need to prefix
       const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-      // Debug logging for the failing test case
-      logger.debug({
-        imageId: input.imageId,
-        registry: input.registry,
-        registryHost,
-        parsedRepository: parsedImage.value.repository,
-        startsWithCheck: parsedImage.value.repository.startsWith(registryHost + '/'),
-        expectedPrefix: registryHost + '/',
-        condition1: parsedImage.value.repository.startsWith(registryHost + '/'),
-        condition2: parsedImage.value.repository.includes('/') && !parsedImage.value.repository.startsWith('docker.io/')
-      }, 'Repository resolution debugging');
-
       // Check if the image already contains the registry (avoid double prefixing)
       // Reconstruct the full image path (without tag) to compare with target registry
       const fullImagePath = parsedImage.value.registry ?
