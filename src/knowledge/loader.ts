@@ -290,10 +290,13 @@ export const isKnowledgeLoaded = (): boolean => {
  * Load knowledge data and return entries.
  * Used by prompt engine for knowledge selection.
  */
-export const loadKnowledgeData = async (): Promise<void> => {
+export const loadKnowledgeData = async (): Promise<{ entries: LoadedEntry[] }> => {
   if (!isKnowledgeLoaded()) {
     await loadKnowledgeBase();
   }
+  return {
+    entries: getAllEntries(),
+  };
 };
 
 /**
