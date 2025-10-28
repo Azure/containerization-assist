@@ -53,7 +53,7 @@ export interface ToolHandlerOptions<TName extends ToolName = ToolName> {
   /** Custom transport label for logging (default: 'external') */
   transport?: string;
 
-  /** Output format for tool results (default: 'json') */
+  /** Output format for tool results (default: 'natural-language') */
   outputFormat?: OutputFormat;
 
   /** Custom error handler - called before throwing McpError */
@@ -112,7 +112,12 @@ export function createToolHandler<TName extends ToolName>(
   toolName: TName,
   options: ToolHandlerOptions<TName> = {},
 ) {
-  const { transport = 'external', outputFormat = OUTPUTFORMAT.JSON, onError, onSuccess } = options;
+  const {
+    transport = 'external',
+    outputFormat = OUTPUTFORMAT.NATURAL_LANGUAGE,
+    onError,
+    onSuccess,
+  } = options;
 
   return async (
     rawParams: Record<string, unknown> | undefined,
