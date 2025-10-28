@@ -29,6 +29,7 @@
       "ef-core",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "migrations"
     ],
@@ -98,6 +99,7 @@
       "fix-dockerfile",
       "flexibility",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "multi-provider"
     ],
     "description": "Database provider flexibility enables deployment across different environments"
@@ -130,6 +132,7 @@
       "ef-core",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "memory",
       "optimization",
       "performance"
@@ -181,6 +184,7 @@
       "ef-core",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microservices",
       "scalability",
       "sharding"
@@ -216,6 +220,7 @@
       "ef-core",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "saga",
       "transactions"
     ],
@@ -317,6 +322,7 @@
       "ef-core",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "initialization",
       "migrations",
       "seeding"

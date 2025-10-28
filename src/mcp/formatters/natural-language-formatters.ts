@@ -29,11 +29,7 @@ import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
-import {
-  formatSize,
-  formatDuration,
-  formatVulnerabilities,
-} from '@/lib/summary-helpers';
+import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary-helpers';
 
 /**
  * Format scan-image result as natural language narrative
@@ -86,7 +82,9 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
 
   // Remediation guidance
   if (result.remediationGuidance && result.remediationGuidance.length > 0) {
-    parts.push(`\n**Remediation Recommendations:** (${result.remediationGuidance.length} available)`);
+    parts.push(
+      `\n**Remediation Recommendations:** (${result.remediationGuidance.length} available)`,
+    );
     result.remediationGuidance.slice(0, 5).forEach((guidance, idx) => {
       parts.push(`  ${idx + 1}. ${guidance.recommendation}`);
       if (guidance.example) {
@@ -154,10 +152,14 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
   // Project info
   const { repositoryInfo, recommendations } = plan;
   const langVersion = repositoryInfo.languageVersion ? ` ${repositoryInfo.languageVersion}` : '';
-  const framework = repositoryInfo.frameworks?.[0]?.name ? ` (${repositoryInfo.frameworks[0].name})` : '';
+  const framework = repositoryInfo.frameworks?.[0]?.name
+    ? ` (${repositoryInfo.frameworks[0].name})`
+    : '';
   parts.push(`**Project:** ${repositoryInfo.name}`);
   parts.push(`**Language:** ${repositoryInfo.language}${langVersion}${framework}`);
-  parts.push(`**Strategy:** ${recommendations.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build`);
+  parts.push(
+    `**Strategy:** ${recommendations.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build`,
+  );
   if (recommendations.buildStrategy.reason) {
     parts.push(`  ${recommendations.buildStrategy.reason}`);
   }
@@ -186,10 +188,11 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
   // Security
   if (recommendations.securityConsiderations.length > 0) {
-    parts.push(`\n**Security Considerations:** (${recommendations.securityConsiderations.length} items)`);
+    parts.push(
+      `\n**Security Considerations:** (${recommendations.securityConsiderations.length} items)`,
+    );
     recommendations.securityConsiderations.slice(0, 5).forEach((rec) => {
-      const severity = rec.severity ? ` [${rec.severity}]` : '';
-      parts.push(`  • ${rec.recommendation}${severity}`);
+      parts.push(`  • ${rec}`);
     });
   }
 
@@ -197,7 +200,7 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
   if (recommendations.optimizations.length > 0) {
     parts.push(`\n**Optimizations:** (${recommendations.optimizations.length} recommendations)`);
     recommendations.optimizations.slice(0, 5).forEach((rec) => {
-      parts.push(`  • ${rec.recommendation}`);
+      parts.push(`  • ${rec}`);
     });
   }
 
@@ -212,12 +215,12 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
     if (guidance.preserve.length > 0) {
       parts.push(`\n  **Preserve:** (${guidance.preserve.length} items)`);
-      guidance.preserve.forEach(item => parts.push(`    ✓ ${item}`));
+      guidance.preserve.forEach((item) => parts.push(`    ✓ ${item}`));
     }
 
     if (guidance.improve.length > 0) {
       parts.push(`\n  **Improve:** (${guidance.improve.length} items)`);
-      guidance.improve.forEach(item => parts.push(`    → ${item}`));
+      guidance.improve.forEach((item) => parts.push(`    → ${item}`));
     }
   }
 
@@ -227,7 +230,7 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
     parts.push(`\n**Policy Validation:** ${passed ? '✅ Passed' : '❌ Failed'}`);
     if (violations.length > 0) {
       parts.push(`  Violations: ${violations.length}`);
-      violations.slice(0, 3).forEach(v => parts.push(`    • ${v.message}`));
+      violations.slice(0, 3).forEach((v) => parts.push(`    • ${v.message}`));
     }
     if (warnings.length > 0) {
       parts.push(`  Warnings: ${warnings.length}`);
@@ -397,9 +400,11 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
     parts.push(`\n**Modules Found:** ${result.modules.length}`);
     result.modules.forEach((module, idx) => {
       parts.push(`\n  ${idx + 1}. **${module.name}**`);
-      parts.push(`     Language: ${module.language}${module.languageVersion ? ` ${module.languageVersion}` : ''}`);
+      parts.push(
+        `     Language: ${module.language}${module.languageVersion ? ` ${module.languageVersion}` : ''}`,
+      );
       if (module.frameworks && module.frameworks.length > 0) {
-        const frameworks = module.frameworks.map(f => f.name).join(', ');
+        const frameworks = module.frameworks.map((f) => f.name).join(', ');
         parts.push(`     Frameworks: ${frameworks}`);
       }
       if (module.buildSystem) {
@@ -569,7 +574,9 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string 
     medium: '🟡',
     low: '🟢',
   };
-  parts.push(`**Priority:** ${priorityIcon[result.priority] || '⚪'} ${result.priority.toUpperCase()}`);
+  parts.push(
+    `**Priority:** ${priorityIcon[result.priority] || '⚪'} ${result.priority.toUpperCase()}`,
+  );
   parts.push(`**Estimated Impact:** ${result.estimatedImpact}`);
   parts.push(`**Confidence:** ${Math.round(result.confidence * 100)}%`);
 

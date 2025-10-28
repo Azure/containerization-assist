@@ -10,6 +10,7 @@
       "background-service",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "hosted-service",
       "microsoft",
       "worker-service"
@@ -27,6 +28,7 @@
       "cancellation",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "graceful-shutdown",
       "reliability",
       "worker-service"
@@ -43,6 +45,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "health-checks",
       "http",
       "monitoring",
@@ -60,6 +63,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "message-queue",
       "resilience",
       "retry",
@@ -95,6 +99,7 @@
       "dependency-injection",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "memory",
       "scoped-services",
       "worker-service"
@@ -129,6 +134,7 @@
       "error-handling",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "resilience",
       "retry",
       "worker-service"
@@ -145,6 +151,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "metrics",
       "opentelemetry",
       "telemetry",
@@ -163,6 +170,7 @@
       "fix-dockerfile",
       "gc",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "memory",
       "optimization",
       "worker-service"
@@ -181,6 +189,7 @@
       "filesystem",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "volumes",
       "worker-service"
@@ -200,6 +209,7 @@
       "entity-framework",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "worker-service"
     ],
     "description": "Proper database connection management prevents leaks in long-running worker services"
@@ -215,6 +225,7 @@
       "concurrency",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "parallel",
       "performance",
       "worker-service"
@@ -232,6 +243,7 @@
       "distributed-lock",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "multi-instance",
       "redis",
       "worker-service"
@@ -250,6 +262,7 @@
       "external-services",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "resilience",
       "worker-service"
     ],
@@ -283,6 +296,7 @@
       "container",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "graceful-shutdown",
       "signals",
       "worker-service"
@@ -299,6 +313,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "health-monitoring",
       "kubernetes",
       "probes",
@@ -317,6 +332,7 @@
       "cpu",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "limits",
       "memory",
       "microsoft",
@@ -336,6 +352,7 @@
       "batch-processing",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "performance",
       "throughput",
       "worker-service"

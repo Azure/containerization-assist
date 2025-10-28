@@ -436,6 +436,7 @@
       "fix-dockerfile",
       "frankenphp",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "http2",
       "http3",
       "modern"

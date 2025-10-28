@@ -9,6 +9,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "real-time",
       "signalr",
@@ -98,6 +99,7 @@
       "abuse-prevention",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "rate-limiting",
       "security",
       "signalr"
@@ -114,6 +116,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "metrics",
       "monitoring",
       "observability",
@@ -200,6 +203,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "graceful-shutdown",
       "lifecycle",
       "reliability",
@@ -253,6 +257,7 @@
       "external-services",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "resilience",
       "signalr"
     ],

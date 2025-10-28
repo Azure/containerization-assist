@@ -173,6 +173,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "health",
       "monitoring",
       "rust",

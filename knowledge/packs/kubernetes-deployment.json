@@ -228,6 +228,7 @@
       "aws",
       "external-secrets",
       "generate-k8s-manifests",
+      "scan-image",
       "secret-management",
       "secrets",
       "security"

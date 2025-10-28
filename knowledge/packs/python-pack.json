@@ -47,6 +47,7 @@
       "generate-dockerfile",
       "production",
       "python",
+      "scan-image",
       "security",
       "slim"
     ],
@@ -543,6 +544,7 @@
       "django",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "performance",
       "pip-install"
     ],

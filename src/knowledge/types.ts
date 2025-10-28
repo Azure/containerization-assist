@@ -94,7 +94,8 @@ export interface KnowledgeMatch {
 }
 
 /**
- * LoadedEntry is just an alias for KnowledgeEntry.
- * Regex patterns are compiled on-demand for simplicity.
+ * LoadedEntry extends KnowledgeEntry with pre-compiled pattern.
  */
-export type LoadedEntry = KnowledgeEntry;
+export interface LoadedEntry extends KnowledgeEntry {
+  compiledPattern?: RegExp;
+}

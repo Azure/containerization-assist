@@ -311,7 +311,8 @@ interface DockerfileBuildRules {
  * Examples: node:20-alpine, gcr.io/distroless/nodejs, mcr.microsoft.com/openjdk/jdk:21-mariner
  * Updated to capture full registry paths including mcr.microsoft.com/path/image:tag
  */
-const DOCKER_IMAGE_NAME_REGEX = /\b([a-z0-9.-]+\/)+[a-z0-9.-]+:[a-z0-9._-]+\b|[a-z0-9.-]+:[a-z0-9._-]+\b/;
+const DOCKER_IMAGE_NAME_REGEX =
+  /\b([a-z0-9.-]+\/)+[a-z0-9.-]+:[a-z0-9._-]+\b|[a-z0-9.-]+:[a-z0-9._-]+\b/;
 
 /**
  * Substitute version in image name based on target language version
@@ -330,7 +331,7 @@ function substituteImageVersion(image: string, targetVersion: string | undefined
   const toolMatch = image.match(toolWithRuntimePattern);
 
   if (toolMatch) {
-    const [, tool, toolVersion, runtime ] = toolMatch;
+    const [, tool, toolVersion, runtime] = toolMatch;
     // Replace only the JDK version at the end
     return `${tool}:${toolVersion}-${runtime}-${targetVersion}`;
   }
@@ -371,26 +372,6 @@ function createBaseImageRecommendation(
     image = substituteImageVersion(image, languageVersion);
   }
 
-  // Determine category based on tags and content
-  let category: 'official' | 'distroless' | 'security' | 'size' = 'official';
-  if (snippet.tags?.includes('distroless') || snippet.text.toLowerCase().includes('distroless')) {
-    category = 'distroless';
-  } else if (
-    snippet.tags?.includes('security') ||
-    snippet.tags?.includes('hardened') ||
-    snippet.text.toLowerCase().includes('chainguard') ||
-    snippet.text.toLowerCase().includes('wolfi')
-  ) {
-    category = 'security';
-  } else if (
-    snippet.tags?.includes('alpine') ||
-    snippet.tags?.includes('slim') ||
-    snippet.text.toLowerCase().includes('alpine') ||
-    snippet.text.toLowerCase().includes('slim')
-  ) {
-    category = 'size';
-  }
-
   // Extract size if mentioned (e.g., "50MB", "100 MB", "1GB")
   const sizeMatch = snippet.text.match(/(\d+)\s*(MB|GB|KB|B)/i);
   const size =
@@ -398,11 +379,8 @@ function createBaseImageRecommendation(
 
   return {
     image,
-    category,
     reason: snippet.text,
-    size,
-    tags: snippet.tags,
-    matchScore: snippet.weight,
+    ...(size && { size }),
   };
 }
 
@@ -478,43 +456,20 @@ const runPattern = createKnowledgeTool<
       const language = input.language || 'auto-detect';
       const framework = input.framework;
 
-      // Access existing Dockerfile info from extended input (added in run function)
-      // Type is already ExtendedDockerfileParams, so no assertion needed
       const existingDockerfile = input.existingDockerfile;
 
-      // Note: knowledgeMatches removed to reduce verbose output - all knowledge is already
-      // categorized in recommendations.baseImages, securityConsiderations, optimizations, and bestPractices
-
-      // Extract base image recommendations from categorized knowledge
-      // Pass languageVersion for dynamic version substitution
-      // Limit to top 2 recommendations to provide clear, opinionated guidance
       const baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
-        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion))
-        .sort((a, b) => b.matchScore - a.matchScore) // Sort by match score descending
-        .slice(0, 2); // Take only top 2: primary recommendation + 1 alternative
+        .slice(0, 2) // Take only top 2: primary recommendation + 1 alternative
+        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion));
 
       // Limit security recommendations to top 5 most relevant
       const securityMatches: DockerfileRequirement[] = (knowledge.categories.security || [])
-        .map((snippet) => ({
-          id: snippet.id,
-          category: snippet.category || 'security',
-          recommendation: snippet.text,
-          ...(snippet.tags && { tags: snippet.tags }),
-          matchScore: snippet.weight,
-        }))
+        .map((snippet) => snippet.text)
         .slice(0, 5); // Top 5 security recommendations
 
       // Limit optimization recommendations to top 5 most relevant
-      const optimizationMatches: DockerfileRequirement[] = (
-        knowledge.categories.optimization || []
-      )
-        .map((snippet) => ({
-          id: snippet.id,
-          category: snippet.category || 'optimization',
-          recommendation: snippet.text,
-          ...(snippet.tags && { tags: snippet.tags }),
-          matchScore: snippet.weight,
-        }))
+      const optimizationMatches: DockerfileRequirement[] = (knowledge.categories.optimization || [])
+        .map((snippet) => snippet.text)
         .slice(0, 5); // Top 5 optimization recommendations
 
       // Limit best practices to top 5 most relevant
@@ -531,13 +486,7 @@ const runPattern = createKnowledgeTool<
           );
           return !isInSecurity && !isInOptimization;
         })
-        .map((snippet) => ({
-          id: snippet.id,
-          category: snippet.category || 'generic',
-          recommendation: snippet.text,
-          ...(snippet.tags && { tags: snippet.tags }),
-          matchScore: snippet.weight,
-        }))
+        .map((snippet) => snippet.text)
         .slice(0, 5); // Top 5 best practice recommendations
 
       // Determine file path for nextAction
@@ -666,13 +615,9 @@ function planToDockerfileText(plan: DockerfilePlan): string {
   // Check for security recommendations
   const security = plan.recommendations.securityConsiderations || [];
   const hasNonRootUser = security.some(
-    (s) =>
-      s.recommendation.toLowerCase().includes('non-root user') ||
-      s.recommendation.toLowerCase().includes('user directive'),
+    (s) => s.toLowerCase().includes('non-root user') || s.toLowerCase().includes('user directive'),
   );
-  const hasHealthCheck = security.some((s) =>
-    s.recommendation.toLowerCase().includes('healthcheck'),
-  );
+  const hasHealthCheck = security.some((s) => s.toLowerCase().includes('healthcheck'));
 
   // Add WORKDIR if mentioned in recommendations
   const allRecommendations = [
@@ -680,7 +625,7 @@ function planToDockerfileText(plan: DockerfilePlan): string {
     ...(plan.recommendations.optimizations || []),
   ];
   for (const rec of allRecommendations) {
-    if (rec.recommendation.includes('WORKDIR')) {
+    if (rec.includes('WORKDIR')) {
       lines.push('WORKDIR /app');
       break;
     }
@@ -688,7 +633,7 @@ function planToDockerfileText(plan: DockerfilePlan): string {
 
   // Add EXPOSE if mentioned in recommendations
   for (const rec of allRecommendations) {
-    if (rec.recommendation.includes('EXPOSE')) {
+    if (rec.includes('EXPOSE')) {
       lines.push('EXPOSE 8080');
       break;
     }
@@ -701,7 +646,7 @@ function planToDockerfileText(plan: DockerfilePlan): string {
 
     // Look for recommendations like "USER <username>"
     for (const s of security) {
-      const match = s.recommendation.match(/USER\s+([a-zA-Z0-9_-]+)/i);
+      const match = s.match(/USER\s+([a-zA-Z0-9_-]+)/i);
       if (match?.[1]) {
         userName = match[1];
         break;
@@ -760,12 +705,7 @@ async function validatePlanAgainstPolicy(
   logger.debug({ dockerfileText }, 'Generated Dockerfile text from plan for policy validation');
 
   // Use shared validation utility
-  return validateContentAgainstPolicy(
-    dockerfileText,
-    evaluator,
-    logger,
-    'Dockerfile plan',
-  );
+  return validateContentAgainstPolicy(dockerfileText, evaluator, logger, 'Dockerfile plan');
 }
 
 async function handleGenerateDockerfile(

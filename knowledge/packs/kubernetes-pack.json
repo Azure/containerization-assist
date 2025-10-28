@@ -58,6 +58,7 @@
       "generate-k8s-manifests",
       "kubernetes",
       "non-root",
+      "scan-image",
       "security"
     ],
     "description": "Security contexts enforce security policies at the pod and container level"
@@ -133,6 +134,7 @@
       "aws",
       "generate-k8s-manifests",
       "kubernetes",
+      "scan-image",
       "secrets",
       "security"
     ],
@@ -181,6 +183,7 @@
       "generate-k8s-manifests",
       "ingress",
       "kubernetes",
+      "scan-image",
       "security",
       "tls"
     ],
@@ -352,6 +355,7 @@
       "generate-k8s-manifests",
       "kubernetes",
       "network-policy",
+      "scan-image",
       "security",
       "zero-trust"
     ],
@@ -369,6 +373,7 @@
       "hardening",
       "kubernetes",
       "pod-security",
+      "scan-image",
       "security"
     ],
     "description": "Pod Security Standards enforce security best practices at the cluster level"
@@ -500,6 +505,7 @@
       "generate-k8s-manifests",
       "kubernetes",
       "policy",
+      "scan-image",
       "security"
     ],
     "description": "Admission controllers enforce security policies and compliance at the API level"

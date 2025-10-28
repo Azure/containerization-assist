@@ -11,6 +11,7 @@
       "dotnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "optimization",
       "runtime",
@@ -28,6 +29,7 @@
       "background-jobs",
       "dotnet",
       "fix-dockerfile",
+      "generate-k8s-manifests",
       "non-root",
       "scan-image",
       "security",
@@ -42,12 +44,13 @@
     "example": "# In Dockerfile\nENV HealthCheck__Enabled=\"true\"\nENV HealthCheck__Port=\"8080\"\nENV HealthCheck__Endpoint=\"/health\"\nEXPOSE 8080\n\n# In Program.cs\nbuilder.Services.AddHealthChecks();",
     "severity": "high",
     "tags": [
+      "background-jobs",
       "dotnet",
-      "worker",
+      "generate-k8s-manifests",
       "health-check",
       "kubernetes",
       "reliability",
-      "background-jobs"
+      "worker"
     ]
   },
   {
@@ -58,11 +61,12 @@
     "example": "ENV Shutdown__TimeoutSeconds=\"30\"\nENV Shutdown__ForceKillAfterSeconds=\"60\"\n\n# In Program.cs\nbuilder.Host.ConfigureHostOptions(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(30));",
     "severity": "medium",
     "tags": [
+      "background-jobs",
       "dotnet",
-      "worker",
-      "shutdown",
+      "generate-k8s-manifests",
       "reliability",
-      "background-jobs"
+      "shutdown",
+      "worker"
     ]
   },
   {
@@ -73,12 +77,12 @@
     "example": "# Hangfire.Redis configuration\nENV Hangfire__Storage=\"Redis\"\nENV ConnectionStrings__Redis=\"redis:6379\"\nENV Hangfire__Redis__Database=\"0\"\nENV Hangfire__Redis__Prefix=\"hangfire:\"\nENV Hangfire__WorkerCount=\"10\"",
     "severity": "medium",
     "tags": [
+      "background-jobs",
+      "distributed",
       "dotnet",
       "hangfire",
       "redis",
-      "distributed",
-      "scalability",
-      "background-jobs"
+      "scalability"
     ]
   },
   {
@@ -93,6 +97,7 @@
       "dotnet",
       "gc",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "optimization",
       "performance",
       "worker"
@@ -123,12 +128,12 @@
     "example": "ENV Quartz__Scheduler__InstanceName=\"QuartzScheduler\"\nENV Quartz__Scheduler__InstanceId=\"AUTO\"\nENV Quartz__JobStore__Type=\"Quartz.Impl.AdoJobStore.JobStoreTX, Quartz\"\nENV Quartz__JobStore__IsClustered=\"true\"\nENV Quartz__JobStore__ClusterCheckinInterval=\"20000\"",
     "severity": "high",
     "tags": [
-      "dotnet",
-      "quartz",
-      "scheduling",
-      "persistence",
+      "background-jobs",
       "clustering",
-      "background-jobs"
+      "dotnet",
+      "persistence",
+      "quartz",
+      "scheduling"
     ]
   },
   {
@@ -139,11 +144,11 @@
     "example": "ENV MessageQueue__Provider=\"RabbitMQ\"\nENV MessageQueue__RabbitMQ__Host=\"rabbitmq\"\nENV Processing__QueueName=\"background-jobs\"\nENV Processing__PrefetchCount=\"10\"\nENV Processing__MaxRetryAttempts=\"3\"\nENV Processing__DeadLetterQueue=\"background-jobs-dlq\"",
     "severity": "medium",
     "tags": [
+      "background-jobs",
       "dotnet",
-      "rabbitmq",
       "message-queue",
-      "reliability",
-      "background-jobs"
+      "rabbitmq",
+      "reliability"
     ]
   },
   {
@@ -154,12 +159,13 @@
     "example": "ENV MessageQueue__Provider=\"ServiceBus\"\nENV MessageQueue__ServiceBus__QueueName=\"background-jobs\"\nENV Processing__MaxConcurrentCalls=\"10\"\nENV Processing__MaxAutoRenewDuration=\"00:05:00\"\nENV Processing__RetryDelay=\"00:01:00\"",
     "severity": "medium",
     "tags": [
-      "dotnet",
       "azure",
-      "service-bus",
-      "message-queue",
+      "background-jobs",
       "cloud",
-      "background-jobs"
+      "dotnet",
+      "generate-k8s-manifests",
+      "message-queue",
+      "service-bus"
     ]
   },
   {
@@ -188,11 +194,11 @@
     "example": "ENV CronScheduler__TimeZone=\"UTC\"\nENV CronScheduler__MaxConcurrentJobs=\"5\"\nENV CronScheduler__MissedJobThreshold=\"00:05:00\"\n\n# Job definitions with cron expressions\nENV Jobs__DataSync__Schedule=\"0 */5 * * * *\"\nENV Jobs__Cleanup__Schedule=\"0 0 2 * * *\"",
     "severity": "medium",
     "tags": [
-      "dotnet",
+      "background-jobs",
       "cron",
-      "scheduling",
+      "dotnet",
       "ncrontab",
-      "background-jobs"
+      "scheduling"
     ]
   },
   {
@@ -203,12 +209,12 @@
     "example": "ENV EventProcessing__MaxConcurrentEvents=\"20\"\nENV EventProcessing__EventTimeout=\"00:10:00\"\nENV EventProcessing__RetryPolicy=\"Exponential\"\nENV EventProcessing__MaxRetryAttempts=\"5\"\nENV DeadLetter__Enabled=\"true\"\nENV DeadLetter__MaxRetentionDays=\"30\"",
     "severity": "medium",
     "tags": [
-      "dotnet",
-      "mediatr",
-      "events",
-      "cqrs",
       "architecture",
-      "background-jobs"
+      "background-jobs",
+      "cqrs",
+      "dotnet",
+      "events",
+      "mediatr"
     ]
   },
   {
@@ -219,11 +225,11 @@
     "example": "ENV Dashboard__Enabled=\"true\"\nENV Dashboard__Path=\"/jobs\"\nENV Monitoring__RefreshInterval=\"00:00:30\"\nENV Monitoring__JobHistoryLimit=\"1000\"\nENV Monitoring__EnableJobMetrics=\"true\"\nENV Monitoring__LogJobExecution=\"true\"",
     "severity": "medium",
     "tags": [
+      "background-jobs",
+      "dashboard",
       "dotnet",
       "monitoring",
-      "observability",
-      "dashboard",
-      "background-jobs"
+      "observability"
     ]
   },
   {
@@ -303,12 +309,12 @@
     "example": "ENV Batch__EnableCheckpointing=\"true\"\nENV Batch__CheckpointInterval=\"00:05:00\"\nENV Batch__CheckpointLocation=\"/app/data/checkpoints\"\nENV Processing__ResumeOnStartup=\"true\"",
     "severity": "medium",
     "tags": [
-      "dotnet",
+      "background-jobs",
       "batch",
       "checkpointing",
+      "dotnet",
       "reliability",
-      "resume",
-      "background-jobs"
+      "resume"
     ]
   },
   {
@@ -319,12 +325,12 @@
     "example": "ENV Hangfire__ServerName=\"${HOSTNAME}\"\nENV Hangfire__WorkerCount=\"10\"\nENV Hangfire__Queues=\"default,critical,normal,low\"\nENV Hangfire__QueuePollInterval=\"00:00:05\"\nENV Hangfire__SchedulePollingInterval=\"00:00:15\"",
     "severity": "medium",
     "tags": [
+      "background-jobs",
+      "configuration",
       "dotnet",
       "hangfire",
-      "queues",
       "priority",
-      "configuration",
-      "background-jobs"
+      "queues"
     ]
   }
 ]

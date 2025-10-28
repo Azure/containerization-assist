@@ -65,6 +65,7 @@
       "aspnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "redis",
       "scalability",
       "session",
@@ -101,6 +102,7 @@
       "endpoints",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "servicemodel",
       "wcf",
@@ -136,6 +138,7 @@
       "console",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "hosting",
       "microsoft",
       "servicebase",
@@ -244,6 +247,7 @@
       "fix-dockerfile",
       "gac",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "private-assemblies"
     ],
     "description": "GAC complicates container deployment; use private assemblies for better portability"
@@ -261,6 +265,7 @@
       "external-storage",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "profile",
       "sql-provider"
     ],
@@ -278,6 +283,7 @@
       "authentication",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "membership",
       "sql-provider"
     ],
@@ -434,6 +440,7 @@
     "tags": [
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "metadata",
       "service-behaviors",
       "throttling",
@@ -469,6 +476,7 @@
       "aspnet",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "output-cache",
       "redis",
       "scalability"
@@ -488,6 +496,7 @@
       "environment",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "microsoft",
       "transforms"
     ],
@@ -540,6 +549,7 @@
       "deployment",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "verification"
     ],
     "description": "Assembly loading should be verified during container build to catch deployment issues early"

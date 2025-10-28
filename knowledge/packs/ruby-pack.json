@@ -134,6 +134,7 @@
       "deployment",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "optimization",
       "production"
     ],

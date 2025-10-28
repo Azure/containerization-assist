@@ -12,6 +12,7 @@
       "build-stage",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "java",
       "jdk",
       "mariner",
@@ -94,8 +95,10 @@
       "azure",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "java",
       "microsoft",
+      "scan-image",
       "security"
     ],
     "description": "Security best practice: use Microsoft Azure distroless for runtime and Azure Linux (Mariner) for build stages"
@@ -325,6 +328,7 @@
       "google",
       "java",
       "runtime-stage",
+      "scan-image",
       "security"
     ],
     "description": "Alternative security option: use Google distroless as fallback when Azure distroless images are unavailable"

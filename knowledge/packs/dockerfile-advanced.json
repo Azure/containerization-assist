@@ -50,6 +50,7 @@
       "fix-dockerfile",
       "generate-dockerfile",
       "optimization",
+      "scan-image",
       "security"
     ],
     "description": "Comprehensive .dockerignore reduces build context size and prevents leaking sensitive files"
@@ -71,6 +72,7 @@
       "google",
       "minimal",
       "production",
+      "scan-image",
       "security"
     ],
     "description": "Distroless images contain only runtime dependencies, eliminating shell and package managers"
@@ -87,6 +89,7 @@
       "fix-dockerfile",
       "generate-dockerfile",
       "npm-ci",
+      "scan-image",
       "scanning",
       "security",
       "trivy",
@@ -108,6 +111,7 @@
       "nonroot",
       "npm-ci",
       "permissions",
+      "scan-image",
       "security",
       "user"
     ],
@@ -143,8 +147,10 @@
       "credentials",
       "fix-dockerfile",
       "generate-dockerfile",
+      "generate-k8s-manifests",
       "npm",
       "npm-ci",
+      "scan-image",
       "secrets",
       "security"
     ],
@@ -354,6 +360,7 @@
       "image-history",
       "layers",
       "npm-ci",
+      "scan-image",
       "secrets",
       "security"
     ],

@@ -47,6 +47,9 @@ describe('Policy Enforcement Integration Tests', () => {
       const policyPath = join(process.cwd(), 'policies', 'security-baseline.rego');
       const policyResult = await loadPolicy(policyPath);
 
+      if (!policyResult.ok) {
+        console.error('Policy load failed:', policyResult.error);
+      }
       expect(policyResult.ok).toBe(true);
       if (!policyResult.ok) return;
 

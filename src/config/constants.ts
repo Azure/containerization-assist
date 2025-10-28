@@ -88,7 +88,7 @@ export const LIMITS = {
   /** Maximum characters for AI prompt context */
   MAX_PROMPT_CHARS: 5000,
   /** Maximum snippets for AI prompt context */
-  MAX_PROMPT_SNIPPETS: 25,
+  MAX_PROMPT_SNIPPETS: 15,
 } as const;
 
 /**
