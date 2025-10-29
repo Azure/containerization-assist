@@ -71,20 +71,82 @@ async function readDockerConfig(logger: Logger): Promise<Result<DockerConfig>> {
 
 /**
  * Normalize registry hostname for credential lookup
+ *
+ * SECURITY: Uses exact hostname matching to prevent host confusion attacks.
+ * Rejects patterns like "docker.io.evil.com" or "evil.com.docker.io".
  */
 function normalizeRegistryHostname(registry: string): string {
   // Remove protocol if present
   let hostname = registry.replace(/^https?:\/\//, '');
 
-  // Remove trailing slash and path
-  hostname = hostname.split('/')[0] || hostname;
+  // Remove port, path, query, and fragment to isolate hostname
+  hostname = hostname.split('/')[0].split('?')[0].split('#')[0].split(':')[0];
 
-  // Normalize Docker Hub variants
-  if (hostname.includes('docker.io') || hostname.includes('index.docker.io')) {
+  // Normalize to lowercase and trim whitespace
+  hostname = hostname.toLowerCase().trim();
+
+  // SECURITY: Use exact matching for Docker Hub variants (not substring matching)
+  // This prevents attacks like "docker.io.evil.com" being normalized to "docker.io"
+  if (
+    hostname === 'docker.io' ||
+    hostname === 'index.docker.io' ||
+    hostname === 'registry-1.docker.io' ||
+    hostname === 'registry.hub.docker.com'
+  ) {
     return 'docker.io';
   }
 
   return hostname;
+}
+
+/**
+ * Check if a server URL is an Azure Container Registry
+ *
+ * SECURITY: Uses suffix matching to prevent host confusion attacks.
+ * Rejects patterns like ".azurecr.io.evil.com" or "fakeazurecr.io".
+ */
+function isAzureACR(serverUrl: string): boolean {
+  // Extract hostname from URL
+  const hostname = serverUrl
+    .replace(/^https?:\/\//, '')
+    .split('/')[0]
+    .split(':')[0]
+    .toLowerCase()
+    .trim();
+
+  // SECURITY: Must end with .azurecr.io exactly (suffix match, not substring)
+  // This prevents attacks like "myregistry.azurecr.io.evil.com"
+  return hostname.endsWith('.azurecr.io') && hostname.length > '.azurecr.io'.length;
+}
+
+/**
+ * Validate that credential helper response matches expected registry
+ *
+ * SECURITY: Prevents credential leakage when helper returns credentials
+ * for a different host than requested. This protects against malicious
+ * credential helpers or DNS rebinding attacks.
+ */
+function validateCredentialHelperResponse(
+  expectedRegistry: string,
+  credentialResponse: CredentialHelperResult,
+  logger: Logger,
+): boolean {
+  const normalizedExpected = normalizeRegistryHostname(expectedRegistry);
+  const normalizedResponse = normalizeRegistryHostname(credentialResponse.ServerURL);
+
+  if (normalizedExpected !== normalizedResponse) {
+    logger.warn(
+      {
+        expected: normalizedExpected,
+        received: normalizedResponse,
+        serverUrl: credentialResponse.ServerURL,
+      },
+      'SECURITY: Credential helper returned credentials for different host than requested',
+    );
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -203,6 +265,26 @@ export async function getRegistryCredentials(
   logger: Logger,
 ): Promise<Result<DockerAuthConfig | null>> {
   try {
+    // SECURITY: Validate input to prevent malicious registry hostnames
+    if (!registry || typeof registry !== 'string') {
+      return Failure('Invalid registry hostname', {
+        message: 'Registry hostname must be a non-empty string',
+        hint: 'Registry parameter is missing or invalid',
+        resolution: 'Provide a valid registry hostname',
+        details: { registry },
+      });
+    }
+
+    // SECURITY: Enforce reasonable length limits
+    if (registry.length > 255) {
+      return Failure('Invalid registry hostname', {
+        message: 'Registry hostname exceeds maximum length',
+        hint: 'Hostname must be 255 characters or less',
+        resolution: 'Provide a valid registry hostname',
+        details: { registry: registry.substring(0, 100) + '...' },
+      });
+    }
+
     // Read Docker configuration
     const configResult = await readDockerConfig(logger);
     if (!configResult.ok) {
@@ -254,23 +336,30 @@ export async function getRegistryCredentials(
       if (credResult.ok) {
         const creds = credResult.value;
 
-        // Format serveraddress correctly for different registry types
-        let serveraddress = creds.ServerURL;
+        // SECURITY: Validate that credential helper returned credentials for the correct host
+        if (!validateCredentialHelperResponse(normalizedRegistry, creds, logger)) {
+          // Don't use mismatched credentials, continue to next method
+          logger.debug('Skipping mismatched credentials from registry-specific helper');
+        } else {
+          // Format serveraddress correctly for different registry types
+          let serveraddress = creds.ServerURL;
 
-        // Azure ACR requires https:// protocol for authentication
-        if (serveraddress.includes('.azurecr.io') && !serveraddress.startsWith('https://')) {
-          serveraddress = `https://${serveraddress}`;
+          // SECURITY: Azure ACR requires https:// protocol for authentication
+          // Use secure suffix matching instead of substring matching
+          if (isAzureACR(serveraddress) && !serveraddress.startsWith('https://')) {
+            serveraddress = `https://${serveraddress}`;
+          }
+
+          return Success({
+            username: creds.Username,
+            password: creds.Secret,
+            serveraddress: serveraddress,
+          });
         }
-
-        return Success({
-          username: creds.Username,
-          password: creds.Secret,
-          serveraddress: serveraddress,
-        });
+      } else {
+        // Log the credential helper failure but continue to try global helper
+        logger.debug({ error: credResult.error }, 'Registry-specific credential helper failed, trying global helper');
       }
-
-      // Log the credential helper failure but continue to try global helper
-      logger.debug({ error: credResult.error }, 'Registry-specific credential helper failed, trying global helper');
     }
 
     // Check for global credential store
@@ -282,24 +371,31 @@ export async function getRegistryCredentials(
       if (credResult.ok) {
         const creds = credResult.value;
 
-        // Format serveraddress correctly for different registry types
-        let serveraddress = creds.ServerURL;
+        // SECURITY: Validate that credential helper returned credentials for the correct host
+        if (!validateCredentialHelperResponse(normalizedRegistry, creds, logger)) {
+          // Don't use mismatched credentials
+          logger.debug('Skipping mismatched credentials from global credential store');
+        } else {
+          // Format serveraddress correctly for different registry types
+          let serveraddress = creds.ServerURL;
 
-        // Azure ACR requires https:// protocol for authentication
-        if (serveraddress.includes('.azurecr.io') && !serveraddress.startsWith('https://')) {
-          serveraddress = `https://${serveraddress}`;
+          // SECURITY: Azure ACR requires https:// protocol for authentication
+          // Use secure suffix matching instead of substring matching
+          if (isAzureACR(serveraddress) && !serveraddress.startsWith('https://')) {
+            serveraddress = `https://${serveraddress}`;
+          }
+
+          return Success({
+            username: creds.Username,
+            password: creds.Secret,
+            serveraddress,
+          });
         }
-
-        return Success({
-          username: creds.Username,
-          password: creds.Secret,
-          serveraddress,
-        });
+      } else {
+        // If credential helper fails, log it but don't return error
+        // The caller can decide whether to proceed without credentials
+        logger.debug({ error: credResult.error }, 'Global credential store failed');
       }
-
-      // If credential helper fails, log it but don't return error
-      // The caller can decide whether to proceed without credentials
-      logger.debug({ error: credResult.error }, 'Global credential store failed');
     }
 
     // No credentials found, but this is not necessarily an error
