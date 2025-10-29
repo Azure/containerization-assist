@@ -168,7 +168,7 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Files:**');
       expect(narrative).toContain('./Dockerfile');
       expect(narrative).toContain('**Project:** my-app');
-      expect(narrative).toContain('**Language:** javascript 18.0.0 (Express)');
+      expect(narrative).toContain('**Language:** javascript (Express)');
       expect(narrative).toContain('**Strategy:** Multi-stage build');
       expect(narrative).toContain('node:18-alpine');
       expect(narrative).toContain('**Security Considerations:**');
@@ -349,15 +349,16 @@ describe('natural-language-formatters', () => {
             name: 'main',
             modulePath: '/app',
             language: 'python',
-            languageVersion: '3.11',
             frameworks: [
               { name: 'Django', version: '4.2.0' },
               { name: 'DRF', version: '3.14.0' },
             ],
-            buildSystem: {
-              type: 'pip',
-              configFile: 'requirements.txt',
-            },
+            buildSystems: [
+              {
+                type: 'pip',
+                languageVersion: '3.11',
+              },
+            ],
             entryPoint: 'manage.py',
             ports: [8000],
           },
@@ -373,9 +374,9 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Type:** Single-module project');
       expect(narrative).toContain('**Modules Found:** 1');
       expect(narrative).toContain('1. **main**');
-      expect(narrative).toContain('Language: python 3.11');
+      expect(narrative).toContain('Language: python');
       expect(narrative).toContain('Frameworks: Django, DRF');
-      expect(narrative).toContain('Build System: pip');
+      expect(narrative).toContain('Build System: pip (python 3.11)');
       expect(narrative).toContain('Entry Point: manage.py');
       expect(narrative).toContain('Ports: 8000');
       expect(narrative).toContain('Use generate-dockerfile to create container configuration');
@@ -388,7 +389,6 @@ describe('natural-language-formatters', () => {
             name: 'frontend',
             modulePath: '/app/frontend',
             language: 'typescript',
-            languageVersion: '5.0.0',
             frameworks: [{ name: 'React', version: '18.2.0' }],
             ports: [3000],
           },
@@ -396,7 +396,6 @@ describe('natural-language-formatters', () => {
             name: 'backend',
             modulePath: '/app/backend',
             language: 'go',
-            languageVersion: '1.21',
             ports: [8080],
           },
         ],
