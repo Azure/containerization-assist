@@ -18,16 +18,18 @@ function createMockDockerClient() {
 // Mock Kubernetes client for unit tests
 function createMockKubernetesClient() {
   return {
-    applyManifest: jest.fn(async () => ({ ok: true })),
-    deleteManifest: jest.fn(async () => ({ ok: true })),
-    getNamespace: jest.fn(async () => null),
-    createNamespace: jest.fn(async () => ({ ok: true })),
-    listPods: jest.fn(async () => []),
-    ping: jest.fn(async () => false),
-    namespaceExists: jest.fn(async () => false),
-    ensureNamespace: jest.fn(async () => ({ ok: false, error: 'Mock cluster unavailable' })),
-    checkPermissions: jest.fn(async () => false),
-    checkIngressController: jest.fn(async () => false),
+    applyManifest: jest.fn(),
+    deleteManifest: jest.fn(),
+    getNamespace: jest.fn(),
+    createNamespace: jest.fn(),
+    listPods: jest.fn(),
+    ping: jest.fn(),
+    namespaceExists: jest.fn(),
+    ensureNamespace: jest.fn(),
+    checkPermissions: jest.fn(),
+    checkIngressController: jest.fn(),
+    getDeploymentStatus: jest.fn(),
+    waitForDeploymentReady: jest.fn(),
   };
 }
 
