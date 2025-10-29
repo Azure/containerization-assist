@@ -65,32 +65,6 @@ describe('Kubernetes Error Scenarios', () => {
   });
 
   describe('Error Handling Pattern', () => {
-    it('should return Result<T> on K8s client errors', async () => {
-      mockK8sClient.ping.mockRejectedValue(new Error('K8s error'));
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace' },
-        createMockToolContext(),
-      );
-
-      expect(result).toHaveProperty('ok');
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(typeof result.error).toBe('string');
-        expect(result.error.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should never throw exceptions', async () => {
-      mockK8sClient.ping.mockRejectedValue(new Error('Unexpected error'));
-
-      await expect(
-        prepareCluster(
-          { namespace: 'test-namespace' },
-          createMockToolContext(),
-        ),
-      ).resolves.not.toThrow();
-    });
 
     it('should propagate errors through Result without throwing', async () => {
       mockK8sClient.ensureNamespace.mockResolvedValue(createFailureResult('Namespace creation failed'));

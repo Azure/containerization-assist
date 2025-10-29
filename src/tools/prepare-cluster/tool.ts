@@ -491,7 +491,7 @@ async function verifyClusterReadiness(
     return Failure('Insufficient permissions for Kubernetes operations', {
       message: 'Kubernetes permissions check failed',
       hint: 'Current user/service account lacks required permissions',
-      resolution: 'Grant appropriate RBAC permissions: kubectl create clusterrolebinding <name> --clusterrole=admin --user=<user>',
+      resolution: 'Verify current privileges with RBAC: run `kubectl auth can-i <verb> <resource> --namespace <namespace>` for required operations',
     });
   }
 
