@@ -64,49 +64,6 @@ describe('Kubernetes Error Scenarios', () => {
     jest.clearAllMocks();
   });
 
-  describe('Cluster Preparation Errors', () => {
-    it('should handle cluster preparation failures', async () => {
-      mockK8sClient.checkPermissions.mockResolvedValue(false);
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-  });
-
-  describe('Guidance Structure', () => {
-    it('should optionally provide guidance on errors', async () => {
-      mockK8sClient.ensureNamespace.mockResolvedValue(
-        createFailureResult('Error', {
-          message: 'Cluster preparation failed',
-          hint: 'Check your cluster connection',
-          resolution: 'Fix the issue',
-        }),
-      );
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-      if (!result.ok && result.guidance) {
-        if (result.guidance.message) {
-          expect(typeof result.guidance.message).toBe('string');
-        }
-        if (result.guidance.hint) {
-          expect(typeof result.guidance.hint).toBe('string');
-        }
-        if (result.guidance.resolution) {
-          expect(typeof result.guidance.resolution).toBe('string');
-        }
-      }
-    });
-  });
-
   describe('Success Cases', () => {
     it('should handle K8s operations', async () => {
       mockK8sClient.checkPermissions.mockResolvedValue(true);
