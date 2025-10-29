@@ -75,14 +75,14 @@ function normalizeRegistryHostname(registry: string): string {
   try {
     const urlString = registry.includes('://') ? registry : `https://${registry}`;
     const url = new URL(urlString);
-    hostname = url.hostname;
+    hostname = url.hostname ?? registry;
   } catch {
-    hostname = registry
+    hostname = (registry
       .replace(/^https?:\/\//, '')
       .split('/')[0]
-      .split('?')[0]
-      .split('#')[0]
-      .split(':')[0];
+      ?.split('?')[0]
+      ?.split('#')[0]
+      ?.split(':')[0]) ?? registry;
   }
 
   hostname = hostname.toLowerCase().trim();
@@ -105,12 +105,12 @@ function isAzureACR(serverUrl: string): boolean {
   try {
     const urlString = serverUrl.includes('://') ? serverUrl : `https://${serverUrl}`;
     const url = new URL(urlString);
-    hostname = url.hostname;
+    hostname = url.hostname ?? serverUrl;
   } catch {
-    hostname = serverUrl
+    hostname = (serverUrl
       .replace(/^https?:\/\//, '')
       .split('/')[0]
-      .split(':')[0];
+      ?.split(':')[0]) ?? serverUrl;
   }
 
   hostname = hostname.toLowerCase().trim();
