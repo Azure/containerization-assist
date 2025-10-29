@@ -203,7 +203,7 @@ async function analyzeRepositoryDeterministically(
       frameworks: primaryConfig.framework
         ? [{ name: primaryConfig.framework, version: primaryConfig.frameworkVersion }]
         : undefined,
-      buildSystems: buildSystems,
+      buildSystems: buildSystems.length > 0 ? buildSystems : undefined,
       dependencies: primaryConfig.dependencies,
       ports: primaryConfig.ports,
       entryPoint: primaryConfig.entryPoint,
