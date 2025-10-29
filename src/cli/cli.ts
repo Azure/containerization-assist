@@ -200,7 +200,7 @@ async function main(): Promise<void> {
     const app = createApp({
       logger: getLogger(),
       ...policyConfig,
-      outputFormat: OUTPUTFORMAT.MARKDOWN,
+      outputFormat: OUTPUTFORMAT.NATURAL_LANGUAGE,
     });
 
     if (options.listTools) {

@@ -170,7 +170,7 @@ export function createMCPServer<TTool extends Tool>(
 
   const server = new McpServer(serverOptions);
   const transportType = options.transport ?? 'stdio';
-  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.MARKDOWN;
+  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.NATURAL_LANGUAGE;
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
@@ -263,9 +263,7 @@ export function createMCPServer<TTool extends Tool>(
  * delegated to the orchestrator's execute function.
  * @param options - Registration options including server, tools, and executor
  */
-export function registerToolsWithServer<TTool extends Tool>(
-  options: RegisterOptions<TTool>,
-): void {
+export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
   const { server, tools, logger, transport, execute, outputFormat } = options;
 
   for (const tool of tools) {
