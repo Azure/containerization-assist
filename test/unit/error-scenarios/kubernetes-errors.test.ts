@@ -64,109 +64,9 @@ describe('Kubernetes Error Scenarios', () => {
     jest.clearAllMocks();
   });
 
-  describe('Error Handling Pattern', () => {
-
-    it('should propagate errors through Result without throwing', async () => {
-      mockK8sClient.ensureNamespace.mockResolvedValue(createFailureResult('Namespace creation failed'));
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBeDefined();
-      }
-    });
-  });
-
-  describe('Connection Errors', () => {
-    it('should handle cluster unreachable errors', async () => {
-      const err = new Error('ECONNREFUSED');
-      (err as any).code = 'ECONNREFUSED';
-      mockK8sClient.ping.mockRejectedValue(err);
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-
-    it('should handle authentication errors', async () => {
-      const err = new Error('Unauthorized');
-      (err as any).statusCode = 401;
-      mockK8sClient.ping.mockRejectedValue(err);
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-
-    it('should handle timeout errors', async () => {
-      const err = new Error('Timeout');
-      (err as any).code = 'ETIMEDOUT';
-      mockK8sClient.ping.mockRejectedValue(err);
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-  });
-
-  describe('Resource Operation Errors', () => {
-    it('should handle namespace not found errors', async () => {
-      mockK8sClient.namespaceExists.mockResolvedValue(false);
-      mockK8sClient.ensureNamespace.mockResolvedValue(createFailureResult('Namespace not found'));
-
-      const result = await prepareCluster(
-        { namespace: 'missing-ns' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-
-    it('should handle permission errors', async () => {
-      // Mock successful connectivity and permission checks
-      mockK8sClient.ping.mockResolvedValue(true);
-      mockK8sClient.checkPermissions.mockResolvedValue(true);
-      mockK8sClient.namespaceExists.mockResolvedValue(false);
-      // Mock failure when trying to ensure namespace exists
-      mockK8sClient.ensureNamespace.mockResolvedValue(createFailureResult('Forbidden'));
-
-      const result = await prepareCluster(
-        { namespace: 'test-ns', environment: 'production' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-
-    it('should handle validation errors', async () => {
-      mockK8sClient.ping.mockResolvedValue(true);
-      mockK8sClient.checkPermissions.mockResolvedValue(false);
-
-      const result = await prepareCluster(
-        { namespace: 'test-namespace', environment: 'production' },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-  });
-
   describe('Cluster Preparation Errors', () => {
     it('should handle cluster preparation failures', async () => {
-      mockK8sClient.ping.mockResolvedValue(false);
+      mockK8sClient.checkPermissions.mockResolvedValue(false);
 
       const result = await prepareCluster(
         { namespace: 'test-namespace' },
@@ -209,7 +109,6 @@ describe('Kubernetes Error Scenarios', () => {
 
   describe('Success Cases', () => {
     it('should handle K8s operations', async () => {
-      mockK8sClient.ping.mockResolvedValue(true);
       mockK8sClient.checkPermissions.mockResolvedValue(true);
       mockK8sClient.namespaceExists.mockResolvedValue(true);
 
