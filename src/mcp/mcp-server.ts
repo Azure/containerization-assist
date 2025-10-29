@@ -567,7 +567,19 @@ function isScanImageResult(output: object): output is ScanImageResult {
 }
 
 function isDockerfilePlan(output: object): output is DockerfilePlan {
-  return 'recommendations' in output && 'repositoryInfo' in output;
+  if (!('recommendations' in output && 'repositoryInfo' in output)) {
+    return false;
+  }
+  if ('manifestType' in output) {
+    return false;
+  }
+
+  const recommendations = (output as { recommendations: unknown }).recommendations;
+  return (
+    typeof recommendations === 'object' &&
+    recommendations !== null &&
+    'buildStrategy' in recommendations
+  );
 }
 
 
