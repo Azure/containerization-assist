@@ -22,7 +22,6 @@ import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
@@ -35,7 +34,6 @@ import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import {
   formatScanImageNarrative,
   formatDockerfilePlanNarrative,
-  formatDeployNarrative,
   formatBuildImageNarrative,
   formatAnalyzeRepoNarrative,
   formatVerifyDeployNarrative,
@@ -514,9 +512,6 @@ function formatAsNaturalLanguage(output: unknown): string {
   if (isDockerfilePlan(output)) {
     return formatDockerfilePlanNarrative(output);
   }
-  if (isDeployResult(output)) {
-    return formatDeployNarrative(output);
-  }
   if (isBuildImageResult(output)) {
     return formatBuildImageNarrative(output);
   }
@@ -587,9 +582,6 @@ function isDockerfilePlan(output: object): output is DockerfilePlan {
   );
 }
 
-function isDeployResult(output: object): output is DeployApplicationResult {
-  return 'deploymentName' in output && 'endpoints' in output && 'namespace' in output;
-}
 
 function isBuildImageResult(output: object): output is BuildImageResult {
   return 'imageId' in output && 'buildTime' in output;

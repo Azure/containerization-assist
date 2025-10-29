@@ -179,7 +179,6 @@ The server provides 13 MCP tools organized by functionality:
 |------|-------------|
 | `generate-k8s-manifests` | Gather insights and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation |
 | `prepare-cluster` | Prepare Kubernetes cluster for deployment |
-| `deploy` | Deploy applications to Kubernetes clusters |
 | `verify-deploy` | Verify Kubernetes deployment status |
 
 ### Utilities
