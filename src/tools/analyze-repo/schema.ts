@@ -17,7 +17,6 @@ const moduleInfo = z.object({
     .enum(['java', 'dotnet', 'javascript', 'typescript', 'python', 'rust', 'go', 'other'])
     .optional()
     .describe('Primary programming language used in the module'),
-  languageVersion: z.string().optional(),
   frameworks: z
     .array(
       z.object({
@@ -32,11 +31,11 @@ const moduleInfo = z.object({
     .array(
       z.object({
         type: z.string(),
-        configFile: z.string().optional(),
+        languageVersion: z.string().optional(),
       }),
     )
     .optional()
-    .describe('All detected build systems'),
+    .describe('All detected build systems with their language versions'),
   dependencies: z
     .array(z.string())
     .optional()

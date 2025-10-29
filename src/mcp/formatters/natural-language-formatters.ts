@@ -151,12 +151,21 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
   // Project info
   const { repositoryInfo, recommendations } = plan;
-  const langVersion = repositoryInfo.languageVersion ? ` ${repositoryInfo.languageVersion}` : '';
   const framework = repositoryInfo.frameworks?.[0]?.name
     ? ` (${repositoryInfo.frameworks[0].name})`
     : '';
   parts.push(`**Project:** ${repositoryInfo.name}`);
-  parts.push(`**Language:** ${repositoryInfo.language}${langVersion}${framework}`);
+  parts.push(`**Language:** ${repositoryInfo.language}${framework}`);
+
+  if (repositoryInfo.buildSystems && repositoryInfo.buildSystems.length > 0) {
+    repositoryInfo.buildSystems.forEach((bs) => {
+      const version = bs.languageVersion
+        ? ` (${repositoryInfo.language} ${bs.languageVersion})`
+        : '';
+      parts.push(`**Build System:** ${bs.type}${version}`);
+    });
+  }
+
   parts.push(
     `**Strategy:** ${recommendations.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build`,
   );
@@ -401,18 +410,16 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
     parts.push(`\n**Modules Found:** ${result.modules.length}`);
     result.modules.forEach((module, idx) => {
       parts.push(`\n  ${idx + 1}. **${module.name}**`);
-      parts.push(
-        `     Language: ${module.language}${module.languageVersion ? ` ${module.languageVersion}` : ''}`,
-      );
+      parts.push(`     Language: ${module.language}`);
       if (module.frameworks && module.frameworks.length > 0) {
         const frameworks = module.frameworks.map((f) => f.name).join(', ');
         parts.push(`     Frameworks: ${frameworks}`);
       }
       if (module.buildSystems && module.buildSystems.length > 0) {
-        const buildSystemTypes = module.buildSystems.map((bs) => bs.type).join(', ');
-        parts.push(
-          `     Build System${module.buildSystems.length > 1 ? 's' : ''}: ${buildSystemTypes}`,
-        );
+        module.buildSystems.forEach((bs) => {
+          const version = bs.languageVersion ? ` (${module.language} ${bs.languageVersion})` : '';
+          parts.push(`     Build System: ${bs.type}${version}`);
+        });
       }
       if (module.entryPoint) {
         parts.push(`     Entry Point: ${module.entryPoint}`);

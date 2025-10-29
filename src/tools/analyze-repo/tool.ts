@@ -174,32 +174,19 @@ async function analyzeRepositoryDeterministically(
     if (!primaryConfig) continue;
 
     const buildSystems = configs
-      .filter((c) => c.buildSystem !== undefined)
-      .map((c) => c.buildSystem)
-      .filter((bs): bs is { type: string; version?: string } => bs !== undefined)
-      .map((bs) => ({
-        type: bs.type,
-        configFile: bs.version,
+      .filter(
+        (c): c is typeof c & { buildSystem: NonNullable<typeof c.buildSystem> } =>
+          c.buildSystem !== undefined,
+      )
+      .map((c) => ({
+        type: c.buildSystem.type,
+        languageVersion: c.languageVersion,
       }));
-
-    const languageVersions = configs
-      .filter((c) => c.languageVersion !== undefined)
-      .map((c) => c.languageVersion);
-
-    if (languageVersions.length > 1) {
-      const uniqueVersions = [...new Set(languageVersions)];
-      if (uniqueVersions.length > 1) {
-        logger.warn(
-          `Conflicting language versions detected in ${dirName}: ${uniqueVersions.join(', ')}. Using: ${languageVersions[0]}`,
-        );
-      }
-    }
 
     modules.push({
       name: path.basename(dirName),
       modulePath: dirName,
       language: primaryConfig.language || 'other',
-      languageVersion: primaryConfig.languageVersion,
       frameworks: primaryConfig.framework
         ? [{ name: primaryConfig.framework, version: primaryConfig.frameworkVersion }]
         : undefined,
