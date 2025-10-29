@@ -207,11 +207,8 @@ async function handlePushImage(
     if (input.registry) {
       // Custom registry provided - use the resolved repository format
       displayTag = `${repository}:${tag}`;
-    } else if (repository.includes('/')) {
-      // No custom registry but image has namespace/path - assume docker.io
-      displayTag = `docker.io/${repository}:${tag}`;
     } else {
-      // Simple image name, no registry - add docker.io prefix
+      // No custom registry - always use docker.io prefix
       displayTag = `docker.io/${repository}:${tag}`;
     }
 
