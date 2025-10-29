@@ -206,7 +206,7 @@ describe('Error Scenario Coverage', () => {
 
     it('should reject prepare-cluster with invalid namespace', async () => {
       const result = await prepareClusterTool.handler(
-        { namespace: 'invalid--namespace' },
+        { namespace: '-invalid-namespace' },
         toolContext
       );
 
