@@ -425,10 +425,12 @@ describe('natural-language-formatters', () => {
               { name: 'Django', version: '4.2.0' },
               { name: 'DRF', version: '3.14.0' },
             ],
-            buildSystem: {
-              type: 'pip',
-              configFile: 'requirements.txt',
-            },
+            buildSystems: [
+              {
+                type: 'pip',
+                configFile: 'requirements.txt',
+              },
+            ],
             entryPoint: 'manage.py',
             ports: [8000],
           },

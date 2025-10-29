@@ -28,13 +28,15 @@ const moduleInfo = z.object({
       }),
     )
     .optional(),
-  buildSystem: z
-    .object({
-      type: z.string().optional(),
-      configFile: z.string().optional(),
-    })
+  buildSystems: z
+    .array(
+      z.object({
+        type: z.string(),
+        configFile: z.string().optional(),
+      }),
+    )
     .optional()
-    .describe('Build system information like Maven or Gradle'),
+    .describe('All detected build systems'),
   dependencies: z
     .array(z.string())
     .optional()

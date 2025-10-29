@@ -103,7 +103,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         expect(result.value.modules?.[0].frameworks?.[0]?.name).toBe('express');
         expect(result.value.modules?.[0].languageVersion).toBe('18.x');
         expect(result.value.modules?.[0].ports).toContain(3000);
-        expect(result.value.modules?.[0].buildSystem?.type).toBe('npm');
+        expect(result.value.modules?.[0].buildSystems?.[0]?.type).toBe('npm');
         expect(result.value.isMonorepo).toBe(false);
       }
     });
@@ -161,7 +161,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         expect(result.value.modules?.[0].frameworks?.[0]?.name).toBe('spring-boot');
         expect(result.value.modules?.[0].languageVersion).toBe('17');
         expect(result.value.modules?.[0].ports).toContain(8080);
-        expect(result.value.modules?.[0].buildSystem?.type).toBe('maven');
+        expect(result.value.modules?.[0].buildSystems?.[0]?.type).toBe('maven');
       }
     });
 

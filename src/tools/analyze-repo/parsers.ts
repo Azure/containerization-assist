@@ -191,8 +191,21 @@ export async function parseGradle(filePath: string): Promise<ParsedConfig> {
     else if (content.includes('io.micronaut')) framework = 'micronaut';
 
     let javaVersion: string | undefined;
-    const javaVersionMatch = content.match(/sourceCompatibility\s*=\s*['"]?(\d+)['"]?/);
-    if (javaVersionMatch) javaVersion = javaVersionMatch[1];
+
+    const toolchainMatch = content.match(/languageVersion\s*=\s*JavaLanguageVersion\.of\((\d+)\)/);
+    if (toolchainMatch) {
+      javaVersion = toolchainMatch[1];
+    }
+
+    if (!javaVersion) {
+      const sourceCompatMatch = content.match(/sourceCompatibility\s*=\s*['"]?(\d+)['"]?/);
+      if (sourceCompatMatch) javaVersion = sourceCompatMatch[1];
+    }
+
+    if (!javaVersion) {
+      const targetCompatMatch = content.match(/targetCompatibility\s*=\s*['"]?(\d+)['"]?/);
+      if (targetCompatMatch) javaVersion = targetCompatMatch[1];
+    }
 
     // Extract dependencies (limited to first 20)
     const dependencies: string[] = [];
@@ -348,7 +361,10 @@ export async function parseCsProj(filePath: string): Promise<ParsedConfig> {
     if (depStr.includes('Microsoft.AspNetCore')) framework = 'aspnet-core';
     else if (depStr.includes('Microsoft.EntityFrameworkCore')) framework = 'entity-framework';
 
-    const ports = framework === 'aspnet-core' ? [FRAMEWORK_PORTS['aspnet-core'], FRAMEWORK_PORTS['aspnet-core-https']] : [FRAMEWORK_PORTS['aspnet-core']];
+    const ports =
+      framework === 'aspnet-core'
+        ? [FRAMEWORK_PORTS['aspnet-core'], FRAMEWORK_PORTS['aspnet-core-https']]
+        : [FRAMEWORK_PORTS['aspnet-core']];
 
     const result: ParsedConfig = {
       language: 'dotnet',

@@ -101,19 +101,19 @@ async function analyzeRepositoryDeterministically(
   repoInfo: { configFiles: Record<string, string>; fileList: string[]; directoryTree: string[] },
   ctx: ToolContext,
 ): Promise<ModuleInfo[]> {
-  const modules: ModuleInfo[] = [];
+  const logger = getToolLogger(ctx, 'analyze-repo');
   const configFilePaths = Object.keys(repoInfo.configFiles);
 
-  // Track which config files we've processed to avoid duplicates
-  const processed = new Set<string>();
+  const configsByDirectory = new Map<string, ParsedConfig[]>();
 
   for (const configPath of configFilePaths) {
     const fullPath = path.join(repoPath, configPath);
     const dirName = path.dirname(fullPath);
     const fileName = path.basename(configPath);
 
-    // Skip if we've already processed this directory
-    if (processed.has(dirName)) continue;
+    logger.debug(
+      `Processing config file: ${configPath}, fileName: ${fileName}, dirName: ${dirName}`,
+    );
 
     let parsedConfig: ParsedConfig | null = null;
 
@@ -121,63 +121,93 @@ async function analyzeRepositoryDeterministically(
       // Node.js
       if (fileName === 'package.json') {
         parsedConfig = await parsePackageJson(fullPath);
-        processed.add(dirName);
       }
       // Java - Maven
       else if (fileName === 'pom.xml') {
         parsedConfig = await parsePomXml(fullPath);
-        processed.add(dirName);
       }
       // Java - Gradle
       else if (fileName.match(/^build\.gradle(\.kts)?$/)) {
         parsedConfig = await parseGradle(fullPath);
-        processed.add(dirName);
       }
       // Python
       else if (fileName === 'requirements.txt' || fileName === 'pyproject.toml') {
         parsedConfig = await parsePythonConfig(fullPath);
-        processed.add(dirName);
       }
       // Rust
       else if (fileName === 'Cargo.toml') {
         parsedConfig = await parseCargoToml(fullPath);
-        processed.add(dirName);
       }
       // .NET
       else if (fileName.match(/\.csproj$/)) {
         parsedConfig = await parseCsProj(fullPath);
-        processed.add(dirName);
       }
       // Go
       else if (fileName === 'go.mod') {
         parsedConfig = await parseGoMod(fullPath);
-        processed.add(dirName);
+      } else {
+        logger.debug(`Skipping unrecognized config file: ${configPath} (fileName: ${fileName})`);
       }
 
       if (parsedConfig) {
-        // Convert to ModuleInfo
-        modules.push({
-          name: path.basename(dirName),
-          modulePath: dirName,
-          language: parsedConfig.language || 'other',
-          languageVersion: parsedConfig.languageVersion,
-          frameworks: parsedConfig.framework
-            ? [{ name: parsedConfig.framework, version: parsedConfig.frameworkVersion }]
-            : undefined,
-          buildSystem: parsedConfig.buildSystem,
-          dependencies: parsedConfig.dependencies,
-          ports: parsedConfig.ports,
-          entryPoint: parsedConfig.entryPoint,
-        });
+        const dirConfigs = configsByDirectory.get(dirName);
+        if (dirConfigs) {
+          dirConfigs.push(parsedConfig);
+        } else {
+          configsByDirectory.set(dirName, [parsedConfig]);
+        }
       }
     } catch (error) {
       // Log but continue - don't fail entire analysis for one bad config
-      const logger = getToolLogger(ctx, 'analyze-repo');
       logger.warn(
         { configPath, error: error instanceof Error ? error.message : String(error) },
         'Failed to parse config file',
       );
     }
+  }
+
+  const modules: ModuleInfo[] = [];
+  for (const [dirName, configs] of configsByDirectory.entries()) {
+    if (configs.length === 0) continue;
+
+    const primaryConfig = configs[0];
+    if (!primaryConfig) continue;
+
+    const buildSystems = configs
+      .filter((c) => c.buildSystem !== undefined)
+      .map((c) => c.buildSystem)
+      .filter((bs): bs is { type: string; version?: string } => bs !== undefined)
+      .map((bs) => ({
+        type: bs.type,
+        configFile: bs.version,
+      }));
+
+    const languageVersions = configs
+      .filter((c) => c.languageVersion !== undefined)
+      .map((c) => c.languageVersion);
+
+    if (languageVersions.length > 1) {
+      const uniqueVersions = [...new Set(languageVersions)];
+      if (uniqueVersions.length > 1) {
+        logger.warn(
+          `Conflicting language versions detected in ${dirName}: ${uniqueVersions.join(', ')}. Using: ${languageVersions[0]}`,
+        );
+      }
+    }
+
+    modules.push({
+      name: path.basename(dirName),
+      modulePath: dirName,
+      language: primaryConfig.language || 'other',
+      languageVersion: primaryConfig.languageVersion,
+      frameworks: primaryConfig.framework
+        ? [{ name: primaryConfig.framework, version: primaryConfig.frameworkVersion }]
+        : undefined,
+      buildSystems: buildSystems,
+      dependencies: primaryConfig.dependencies,
+      ports: primaryConfig.ports,
+      entryPoint: primaryConfig.entryPoint,
+    });
   }
 
   return modules;
