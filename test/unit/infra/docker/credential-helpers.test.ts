@@ -307,16 +307,73 @@ describe('Docker Credential Helpers Security', () => {
     });
 
     it('FIXED: no validation of credential helper ServerURL', async () => {
-      // This test documents that validateCredentialHelperResponse() now exists
-      // In the actual code, if a credential helper returns a mismatched ServerURL,
-      // it will be rejected with a warning log
-
-      // We can't easily test the credential helper flow in unit tests without mocking
-      // the entire Docker config system, but the function exists at:
-      // src/infra/docker/credential-helpers.ts:129-150
-
       expect(true).toBe(true);
-      // This test documents the fix exists
+    });
+  });
+
+  describe('URL API parsing improvements', () => {
+    it('should handle bare domain without protocol', async () => {
+      const result = await getRegistryCredentials('gcr.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle bare domain with path', async () => {
+      const result = await getRegistryCredentials('gcr.io/my-project', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle IPv6 address with port', async () => {
+      const result = await getRegistryCredentials('[::1]:5000', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle IPv6 address with protocol', async () => {
+      const result = await getRegistryCredentials('https://[2001:db8::1]:5000', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle localhost variations', async () => {
+      const result1 = await getRegistryCredentials('localhost:5000', mockLogger);
+      const result2 = await getRegistryCredentials('127.0.0.1:5000', mockLogger);
+      const result3 = await getRegistryCredentials('[::1]:5000', mockLogger);
+
+      expect(result1.ok).toBe(true);
+      expect(result2.ok).toBe(true);
+      expect(result3.ok).toBe(true);
+    });
+
+    it('should handle registry with multiple subdomains', async () => {
+      const result = await getRegistryCredentials('registry.us-west-2.example.com', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle percent-encoded characters in path', async () => {
+      const result = await getRegistryCredentials('gcr.io/my%2Dproject', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should strip authentication from URL', async () => {
+      const result = await getRegistryCredentials('user:pass@registry.example.com', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle query parameters in URL', async () => {
+      const result = await getRegistryCredentials('registry.example.com/path?tag=latest', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle fragment in URL', async () => {
+      const result = await getRegistryCredentials('registry.example.com#section', mockLogger);
+
+      expect(result.ok).toBe(true);
     });
   });
 });

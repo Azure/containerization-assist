@@ -69,24 +69,24 @@ async function readDockerConfig(logger: Logger): Promise<Result<DockerConfig>> {
   }
 }
 
-/**
- * Normalize registry hostname for credential lookup
- *
- * SECURITY: Uses exact hostname matching to prevent host confusion attacks.
- * Rejects patterns like "docker.io.evil.com" or "evil.com.docker.io".
- */
 function normalizeRegistryHostname(registry: string): string {
-  // Remove protocol if present
-  let hostname = registry.replace(/^https?:\/\//, '');
+  let hostname: string;
 
-  // Remove port, path, query, and fragment to isolate hostname
-  hostname = hostname.split('/')[0].split('?')[0].split('#')[0].split(':')[0];
+  try {
+    const urlString = registry.includes('://') ? registry : `https://${registry}`;
+    const url = new URL(urlString);
+    hostname = url.hostname;
+  } catch {
+    hostname = registry
+      .replace(/^https?:\/\//, '')
+      .split('/')[0]
+      .split('?')[0]
+      .split('#')[0]
+      .split(':')[0];
+  }
 
-  // Normalize to lowercase and trim whitespace
   hostname = hostname.toLowerCase().trim();
 
-  // SECURITY: Use exact matching for Docker Hub variants (not substring matching)
-  // This prevents attacks like "docker.io.evil.com" being normalized to "docker.io"
   if (
     hostname === 'docker.io' ||
     hostname === 'index.docker.io' ||
@@ -99,23 +99,22 @@ function normalizeRegistryHostname(registry: string): string {
   return hostname;
 }
 
-/**
- * Check if a server URL is an Azure Container Registry
- *
- * SECURITY: Uses suffix matching to prevent host confusion attacks.
- * Rejects patterns like ".azurecr.io.evil.com" or "fakeazurecr.io".
- */
 function isAzureACR(serverUrl: string): boolean {
-  // Extract hostname from URL
-  const hostname = serverUrl
-    .replace(/^https?:\/\//, '')
-    .split('/')[0]
-    .split(':')[0]
-    .toLowerCase()
-    .trim();
+  let hostname: string;
 
-  // SECURITY: Must end with .azurecr.io exactly (suffix match, not substring)
-  // This prevents attacks like "myregistry.azurecr.io.evil.com"
+  try {
+    const urlString = serverUrl.includes('://') ? serverUrl : `https://${serverUrl}`;
+    const url = new URL(urlString);
+    hostname = url.hostname;
+  } catch {
+    hostname = serverUrl
+      .replace(/^https?:\/\//, '')
+      .split('/')[0]
+      .split(':')[0];
+  }
+
+  hostname = hostname.toLowerCase().trim();
+
   return hostname.endsWith('.azurecr.io') && hostname.length > '.azurecr.io'.length;
 }
 
