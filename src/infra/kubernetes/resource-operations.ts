@@ -133,7 +133,7 @@ export async function applyResource(
     const config = getResourceConfig(kc, kind);
 
     // Try to create the resource first (optimistic approach)
-    if (config && config.api) {
+    if (config?.api) {
       const createMethod = getApiMethod(config.api, config.createMethod);
 
       if (typeof createMethod !== 'function') {

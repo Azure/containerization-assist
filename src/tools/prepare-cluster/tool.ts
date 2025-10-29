@@ -606,7 +606,7 @@ async function handlePrepareCluster(
     // Generate summary
     const namespaceAction = checks.namespaceExists ? 'verified' : 'created';
     const resourcesConfigured = Object.values(checks).filter(Boolean).length;
-    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured. Ready for deployment. Use: kubectl apply -f <manifest-folder>`;
+    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured. Ready for deployment.`;
 
     const result: PrepareClusterResult = {
       summary,

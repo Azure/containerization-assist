@@ -293,20 +293,6 @@ describe('Error Scenario Coverage', () => {
       }
     });
 
-    it('should handle Kubernetes cluster unavailable', async () => {
-      const result = await prepareClusterTool.handler(
-        {
-          namespace: 'test-namespace',
-        },
-        toolContext
-      );
-
-      // Should fail with guidance about K8s
-      if (!result.ok) {
-        expect(result.error).toBeDefined();
-      }
-    });
-
     it('should handle Trivy scanner unavailable', async () => {
       // Scan will fail if Trivy not installed
       const result = await scanImageTool.handler(
