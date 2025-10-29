@@ -488,7 +488,11 @@ async function verifyClusterReadiness(
   // Check permissions
   checks.permissions = await k8sClient.checkPermissions(namespace);
   if (!checks.permissions) {
-    warnings.push('Limited permissions - some operations may fail');
+    return Failure('Insufficient permissions for Kubernetes operations', {
+      message: 'Kubernetes permissions check failed',
+      hint: 'Current user/service account lacks required permissions',
+      resolution: 'Verify current privileges with RBAC: run `kubectl auth can-i <verb> <resource> --namespace <namespace>` for required operations',
+    });
   }
 
   // Check/create namespace
@@ -661,7 +665,7 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success: 'Cluster preparation successful. Next: Call deploy to deploy to the kind cluster.',
+    success: 'Cluster preparation successful. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
     failure:
       'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
   },
