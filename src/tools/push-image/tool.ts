@@ -119,7 +119,7 @@ async function handlePushImage(
           registry: input.registry,
           username: authConfig.username,
           serveraddress: authConfig.serveraddress,
-          passwordProvided: !!authConfig.password
+          passwordProvided: !!authConfig.password,
         }, 'Using credentials from Docker credential helper');
       } else if (credResult.ok) {
         logger.debug({ registry: input.registry }, 'No credentials found in Docker credential helpers');
