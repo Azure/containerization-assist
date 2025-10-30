@@ -171,20 +171,34 @@ To modify the requirements:
 
 ### Change the Required Platform
 
-Edit `platform-and-tag.rego`, line 52:
+Edit `platform-and-tag.rego`, line 59 (the violation check):
 
 ```rego
 # Change from linux/arm64 to linux/amd64
 not contains(line, "--platform=linux/amd64")
 ```
 
+Note: The `not contains` check creates a violation when the required platform is **absent**. Change the string inside `contains()` to match your desired platform requirement.
+
+Also update line 66 (the error message) to reflect the new platform:
+```rego
+"message": "All FROM statements must specify --platform=linux/amd64. Example: FROM --platform=linux/amd64 node:20-alpine",
+```
+
 ### Change the Required Tag
 
-Edit `platform-and-tag.rego`, line 76:
+Edit `platform-and-tag.rego`, line 81 (the violation rule):
 
 ```rego
 # Change from "demo" to "production"
 not regex.match(`(?mi)^LABEL\s+.*tag\s*=\s*["']?production["']?`, input.content)
+```
+
+If you also want to update the suggestion rule, edit line 100 in the same file.
+
+Update line 88 (the error message):
+```rego
+"message": "Dockerfile must include LABEL with tag=production. Add: LABEL tag=\"production\"",
 ```
 
 ### Add Additional Rules

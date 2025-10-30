@@ -755,20 +755,20 @@ function planToDockerfileText(plan: DockerfilePlan): string {
 
 /**
  * Validate a single base image against policy
- * Returns true if the image passes policy (no blocking violations)
+ * Returns true if the image passes IMAGE-specific policy checks
+ *
+ * This function tests IMAGE-specific policies (registry restrictions, deprecated versions, etc.)
+ * and ignores Dockerfile-structure policies (platform, tags) which are enforced later on the full plan.
  */
 async function isImageCompliant(
   image: string,
   evaluator: RegoEvaluator,
   logger: Logger,
 ): Promise<boolean> {
-  // Create a test Dockerfile that passes platform/tag requirements
-  // This ensures we only filter based on IMAGE-specific violations (registry, deprecated versions, etc.)
-  // Platform and tag policies will be enforced later in the full plan validation
-
-  // Use common policy-compliant defaults to avoid false negatives
-  // These values ensure platform/tag policies pass during base image filtering
-  const dockerfileText = `FROM --platform=linux/arm64 ${image}\nLABEL tag="demo"\nUSER appuser`;
+  // Create a test Dockerfile using system defaults (not policy-specific values)
+  // We use the actual default values that will be used in the final plan
+  const defaultPlatform = detectSystemPlatform();
+  const dockerfileText = `FROM --platform=${defaultPlatform} ${image}\nLABEL tag="v1"\nUSER appuser`;
 
   logger.debug({ image, dockerfileText }, 'Validating base image against policy');
 
@@ -779,8 +779,31 @@ async function isImageCompliant(
     'base image',
   );
 
-  // Image is compliant if there are no blocking violations
-  return validation.passed;
+  // Filter out Dockerfile-structure violations (platform, tag, label format)
+  // We only care about IMAGE-specific violations here (registry, deprecation, security)
+  const imageSpecificViolations = validation.violations.filter((v: PolicyViolation) => {
+    const rule = v.ruleId.toLowerCase();
+    // Ignore platform, tag, and label format rules - those are Dockerfile structure requirements
+    return !(
+      rule.includes('platform') ||
+      rule.includes('tag') ||
+      rule.includes('label')
+    );
+  });
+
+  const isCompliant = imageSpecificViolations.length === 0;
+
+  if (!isCompliant) {
+    logger.debug(
+      {
+        image,
+        violations: imageSpecificViolations.map((v: PolicyViolation) => v.ruleId),
+      },
+      'Base image has IMAGE-specific policy violations',
+    );
+  }
+
+  return isCompliant;
 }
 
 /**

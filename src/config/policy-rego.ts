@@ -272,9 +272,17 @@ async function evaluateRegoPolicy(
             if (containerization) {
               // Dynamically merge results from ALL policy namespaces
               // This allows custom policies in any namespace (e.g., platform, compliance, etc.)
-              for (const ns of Object.keys(containerization)) {
-                const nsResult = containerization[ns]?.result;
-                if (nsResult) {
+              for (const [, nsObj] of Object.entries(containerization)) {
+                // Only process keys where value is an object with a 'result' property
+                if (
+                  nsObj &&
+                  typeof nsObj === 'object' &&
+                  'result' in nsObj &&
+                  nsObj.result &&
+                  typeof nsObj.result === 'object'
+                ) {
+                  const nsResult = nsObj.result;
+
                   // Merge allow (false if any policy blocks)
                   if (nsResult.allow === false) {
                     combinedResult.allow = false;

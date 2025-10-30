@@ -233,8 +233,10 @@ opa eval -d policies/platform-and-tag.rego -i test-dockerfile.txt "data.containe
 
 You can modify the policy to:
 
-1. **Change the required tag**: Edit line with `tag\s*=\s*["']?demo["']?` to use a different tag
-2. **Change the platform**: Edit `--platform=linux/arm64` to require different architectures
+1. **Change the required tag**: Edit `platform-and-tag.rego` at line 81 (violation rule) to change the required tag by updating the regex `tag\s*=\s*["']?demo["']?`. If you also want to update the suggestion rule, edit line 100. Don't forget to update the error message at line 88 to match.
+
+2. **Change the platform**: Edit `--platform=linux/arm64` in `platform-and-tag.rego` at line 59 (the violation check). Update the error message at line 66 to reflect the new platform requirement.
+
 3. **Add additional rules**: Follow the pattern in the policy file to add more validations
 
 ## Additional Resources
