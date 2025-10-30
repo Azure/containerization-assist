@@ -950,7 +950,7 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult, chai
  * - Health indicators
  * Note: This formatter doesn't include Next Steps as it's a simple status check
  */
-export function formatOpsPingNarrative(result: PingResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatOpsPingNarrative(result: PingResult): string {
   const parts: string[] = [];
 
   // Header
@@ -995,7 +995,7 @@ export function formatOpsPingNarrative(result: PingResult, chainHintsMode: 'enab
  * - Health summary
  * Note: This formatter doesn't include Next Steps as it's a status report
  */
-export function formatOpsStatusNarrative(result: ServerStatusResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatOpsStatusNarrative(result: ServerStatusResult): string {
   const parts: string[] = [];
 
   // Header
