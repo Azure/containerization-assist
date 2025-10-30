@@ -546,10 +546,10 @@ function formatAsNaturalLanguage(output: unknown, chainHintsMode: 'enabled' | 'd
   }
   // Check ops results (check status before ping due to field overlap)
   if (isServerStatusResult(output)) {
-    return formatOpsStatusNarrative(output, chainHintsMode);
+    return formatOpsStatusNarrative(output);
   }
   if (isPingResult(output)) {
-    return formatOpsPingNarrative(output, chainHintsMode);
+    return formatOpsPingNarrative(output);
   }
 
   // Additional tool result types can be added as needed
