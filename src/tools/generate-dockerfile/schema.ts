@@ -107,6 +107,10 @@ export interface DockerfilePlan {
       multistage: boolean;
       reason: string;
     };
+    /** Platform to use for building images (e.g., "linux/amd64", "linux/arm64") */
+    platform?: string;
+    /** Default tag to apply to built images */
+    defaultTag?: string;
     baseImages: BaseImageRecommendation[];
     securityConsiderations: DockerfileRequirement[];
     optimizations: DockerfileRequirement[];

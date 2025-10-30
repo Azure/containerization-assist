@@ -1,0 +1,24 @@
+FROM --platform=linux/arm64 node:20-alpine
+
+WORKDIR /app
+
+# Required label for demo tag enforcement
+LABEL tag="demo"
+LABEL maintainer="devops@example.com"
+LABEL version="1.0.0"
+
+# Copy application files
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+# Use non-root user for security
+USER node
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD node healthcheck.js
+
+# Start application
+CMD ["node", "server.js"]
