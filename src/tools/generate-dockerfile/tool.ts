@@ -19,6 +19,8 @@ import {
   type GenerateDockerfileParams,
   type DockerfileAnalysis,
   type EnhancementGuidance,
+  type DockerPlatform,
+  DOCKER_PLATFORMS,
 } from './schema';
 import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
@@ -43,8 +45,10 @@ const version = '2.0.0';
 /**
  * Detect the current system's Docker platform
  * Maps Node.js platform/arch to Docker platform format (e.g., linux/amd64, linux/arm64)
+ *
+ * @returns The detected Docker platform, defaults to 'linux/amd64' if detection fails
  */
-function detectSystemPlatform(): string {
+function detectSystemPlatform(): DockerPlatform {
   // Map Node.js arch to Docker arch
   const archMap: Record<string, string> = {
     x64: 'amd64',
@@ -58,7 +62,15 @@ function detectSystemPlatform(): string {
   // Docker containers typically run Linux regardless of host OS
   // For Windows/Mac, we still use linux/* for the container platform
   const dockerArch = archMap[arch] || arch;
-  return `linux/${dockerArch}`;
+  const platform = `linux/${dockerArch}`;
+
+  // Validate against known platforms, default to linux/amd64 if unknown
+  if (DOCKER_PLATFORMS.includes(platform as DockerPlatform)) {
+    return platform as DockerPlatform;
+  }
+
+  // Fallback to most common platform
+  return 'linux/amd64';
 }
 
 type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPractices';
@@ -781,6 +793,8 @@ async function isImageCompliant(
 
   // Filter out Dockerfile-structure violations (platform, tag, label format)
   // We only care about IMAGE-specific violations here (registry, deprecation, security)
+  // Note: Platform/tag/label violations are validated later in validatePlanAgainstPolicy()
+  // and included in the final plan output as improvement recommendations
   const imageSpecificViolations = validation.violations.filter((v: PolicyViolation) => {
     const rule = v.ruleId.toLowerCase();
     // Ignore platform, tag, and label format rules - those are Dockerfile structure requirements
@@ -915,8 +929,10 @@ async function handleGenerateDockerfile(
 
   const plan = result.value;
 
-  // Add detected platform and default tag to recommendations
-  plan.recommendations.platform = detectSystemPlatform();
+  // Add platform and default tag to recommendations
+  // Use targetPlatform from input if provided (allows cross-compilation, e.g., ARM Mac -> AMD64 server)
+  // Otherwise auto-detect from system
+  plan.recommendations.platform = input.targetPlatform || detectSystemPlatform();
   plan.recommendations.defaultTag = 'v1';
 
   // Filter base images based on policy if available
