@@ -56,6 +56,9 @@ export interface ToolHandlerOptions<TName extends ToolName = ToolName> {
   /** Output format for tool results (default: 'natural-language') */
   outputFormat?: OutputFormat;
 
+  /** Chain hints mode for controlling next steps in output (default: 'enabled') */
+  chainHintsMode?: 'enabled' | 'disabled';
+
   /** Custom error handler - called before throwing McpError */
   onError?: (error: unknown, toolName: TName, params: ToolInputMap[TName]) => void;
 
@@ -115,6 +118,7 @@ export function createToolHandler<TName extends ToolName>(
   const {
     transport = 'external',
     outputFormat = OUTPUTFORMAT.NATURAL_LANGUAGE,
+    chainHintsMode = 'enabled',
     onError,
     onSuccess,
   } = options;
@@ -199,7 +203,7 @@ export function createToolHandler<TName extends ToolName>(
         content: [
           {
             type: 'text' as const,
-            text: formatOutput(result.value, outputFormat),
+            text: formatOutput(result.value, outputFormat, chainHintsMode),
           },
         ],
       };

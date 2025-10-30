@@ -34,6 +34,7 @@ import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary
  * Format scan-image result as natural language narrative
  *
  * @param result - Security scan result with vulnerability data
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with severity breakdown, remediation guidance, and next steps
  *
  * @description
@@ -42,9 +43,9 @@ import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary
  * - Vulnerability summary and severity breakdown (critical, high, medium, low)
  * - Remediation recommendations (up to 5, truncated with count)
  * - Scan metadata (timestamp)
- * - Context-aware next steps based on pass/fail status
+ * - Context-aware next steps based on pass/fail status (when chainHintsMode is 'enabled')
  */
-export function formatScanImageNarrative(result: ScanImageResult): string {
+export function formatScanImageNarrative(result: ScanImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -99,15 +100,17 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
   // Scan metadata
   parts.push(`\n**Scan Completed:** ${new Date(result.scanTime).toLocaleString()}`);
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  if (result.passed) {
-    parts.push('  → Proceed with image tagging and registry push');
-    parts.push('  → Consider deploying to staging environment');
-  } else {
-    parts.push('  → Review and address critical/high vulnerabilities');
-    parts.push('  → Use fix-dockerfile to update base images');
-    parts.push('  → Re-scan after applying fixes');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push('\n**Next Steps:**');
+    if (result.passed) {
+      parts.push('  → Proceed with image tagging and registry push');
+      parts.push('  → Consider deploying to staging environment');
+    } else {
+      parts.push('  → Review and address critical/high vulnerabilities');
+      parts.push('  → Use fix-dockerfile to update base images');
+      parts.push('  → Re-scan after applying fixes');
+    }
   }
 
   return parts.join('\n');
@@ -117,6 +120,7 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
  * Format generate-dockerfile result as natural language narrative
  *
  * @param plan - Dockerfile generation plan with recommendations
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with project info, base images, security, and optimizations
  *
  * @description
@@ -128,9 +132,9 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
  * - Optimization recommendations (top 5 most relevant)
  * - Existing Dockerfile analysis (if applicable)
  * - Policy validation results (if applicable)
- * - Actionable next steps
+ * - Actionable next steps (when chainHintsMode is 'enabled')
  */
-export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
+export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Action-oriented header
@@ -246,16 +250,18 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
     }
   }
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  if (plan.nextAction.action === 'create-files') {
-    parts.push('  1. Create Dockerfile using the base images and recommendations above');
-    parts.push('  2. Build image with build-image tool');
-    parts.push('  3. Scan for vulnerabilities with scan-image');
-  } else {
-    parts.push('  1. Update Dockerfile preserving good patterns and applying improvements');
-    parts.push('  2. Rebuild image with build-image tool');
-    parts.push('  3. Re-scan with scan-image to verify fixes');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push('\n**Next Steps:**');
+    if (plan.nextAction.action === 'create-files') {
+      parts.push('  1. Create Dockerfile using the base images and recommendations above');
+      parts.push('  2. Build image with build-image tool');
+      parts.push('  3. Scan for vulnerabilities with scan-image');
+    } else {
+      parts.push('  1. Update Dockerfile preserving good patterns and applying improvements');
+      parts.push('  2. Rebuild image with build-image tool');
+      parts.push('  3. Re-scan with scan-image to verify fixes');
+    }
   }
 
   return parts.join('\n');
@@ -266,6 +272,7 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
  * Format build-image result as natural language narrative
  *
  * @param result - Build result with image details and metrics
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with image details, metrics, and next steps
  *
  * @description
@@ -275,9 +282,9 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
  * - Image size (formatted in MB/GB)
  * - Build time (formatted in seconds/minutes)
  * - Layer count (if available)
- * - Standard next steps for containerization workflow
+ * - Standard next steps for containerization workflow (when chainHintsMode is 'enabled')
  */
-export function formatBuildImageNarrative(result: BuildImageResult): string {
+export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -300,11 +307,13 @@ export function formatBuildImageNarrative(result: BuildImageResult): string {
     parts.push(`**Layers:** ${result.layers}`);
   }
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  parts.push('  → Scan image for vulnerabilities with scan-image');
-  parts.push('  → Tag image for registry with tag-image');
-  parts.push('  → Push to registry with push-image');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push('\n**Next Steps:**');
+    parts.push('  → Scan image for vulnerabilities with scan-image');
+    parts.push('  → Tag image for registry with tag-image');
+    parts.push('  → Push to registry with push-image');
+  }
 
   return parts.join('\n');
 }
@@ -313,6 +322,7 @@ export function formatBuildImageNarrative(result: BuildImageResult): string {
  * Format analyze-repo result as natural language narrative
  *
  * @param result - Repository analysis with module detection
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with repository structure, modules, and next steps
  *
  * @description
@@ -326,9 +336,9 @@ export function formatBuildImageNarrative(result: BuildImageResult): string {
  *   - Entry point
  *   - Exposed ports
  * - Graceful handling of empty or undefined modules
- * - Context-aware next steps (with monorepo-specific guidance)
+ * - Context-aware next steps (with monorepo-specific guidance, when chainHintsMode is 'enabled')
  */
-export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
+export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -366,11 +376,13 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
     parts.push('  No modules detected in repository.');
   }
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  parts.push('  → Use generate-dockerfile to create container configuration');
-  if (result.isMonorepo) {
-    parts.push('  → Consider creating separate Dockerfiles for each module');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push('\n**Next Steps:**');
+    parts.push('  → Use generate-dockerfile to create container configuration');
+    if (result.isMonorepo) {
+      parts.push('  → Consider creating separate Dockerfiles for each module');
+    }
   }
 
   return parts.join('\n');
@@ -380,6 +392,7 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
  * Format verify-deploy result as natural language narrative
  *
  * @param result - Deployment verification result with health and pod details
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with health status, pod breakdown, and next steps
  *
  * @description
@@ -389,9 +402,9 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
  * - Individual pod details (name, status, restarts)
  * - Health check results (pass/fail)
  * - Conditions and issues
- * - Context-aware next steps based on health status
+ * - Context-aware next steps based on health status (when chainHintsMode is 'enabled')
  */
-export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): string {
+export function formatVerifyDeployNarrative(result: VerifyDeploymentResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -462,19 +475,21 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): str
     });
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  if (result.ready) {
-    parts.push('  → Deployment is healthy and serving traffic');
-    parts.push('  → Monitor pod logs for application errors');
-    parts.push('  → Set up alerting for production monitoring');
-  } else {
-    parts.push('  → Review pod logs for error messages');
-    parts.push('  → Check deployment events with kubectl describe');
-    parts.push('  → Verify resource limits and constraints');
-    const failedPods = result.pods?.filter((p) => p.status === 'Failed').length || 0;
-    if (failedPods > 0) {
-      parts.push('  → Investigate failed pods with kubectl logs');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push(`\n**Next Steps:**`);
+    if (result.ready) {
+      parts.push('  → Deployment is healthy and serving traffic');
+      parts.push('  → Monitor pod logs for application errors');
+      parts.push('  → Set up alerting for production monitoring');
+    } else {
+      parts.push('  → Review pod logs for error messages');
+      parts.push('  → Check deployment events with kubectl describe');
+      parts.push('  → Verify resource limits and constraints');
+      const failedPods = result.pods?.filter((p) => p.status === 'Failed').length || 0;
+      if (failedPods > 0) {
+        parts.push('  → Investigate failed pods with kubectl logs');
+      }
     }
   }
 
@@ -485,6 +500,7 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): str
  * Format fix-dockerfile result as natural language narrative
  *
  * @param result - Dockerfile validation and fix plan
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with issues, recommendations, and validation score
  *
  * @description
@@ -494,9 +510,9 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): str
  * - Fix recommendations with priority
  * - Policy validation results
  * - Estimated impact of fixes
- * - Context-aware next steps for implementation
+ * - Context-aware next steps for implementation (when chainHintsMode is 'enabled')
  */
-export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string {
+export function formatFixDockerfileNarrative(result: DockerfileFixPlan, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header with validation grade
@@ -614,18 +630,20 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string 
     }
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  if (result.validationGrade === 'A' || result.validationGrade === 'B') {
-    parts.push('  → Dockerfile is in good shape with minor improvements available');
-    parts.push('  → Review fix recommendations for optimization');
-    parts.push('  → Proceed with build-image');
-  } else {
-    parts.push('  → Address high-priority security issues first');
-    parts.push('  → Apply recommended fixes to improve validation score');
-    parts.push('  → Re-run fix-dockerfile to verify improvements');
-    if (result.policyValidation && !result.policyValidation.passed) {
-      parts.push('  → Resolve policy violations before deployment');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push(`\n**Next Steps:**`);
+    if (result.validationGrade === 'A' || result.validationGrade === 'B') {
+      parts.push('  → Dockerfile is in good shape with minor improvements available');
+      parts.push('  → Review fix recommendations for optimization');
+      parts.push('  → Proceed with build-image');
+    } else {
+      parts.push('  → Address high-priority security issues first');
+      parts.push('  → Apply recommended fixes to improve validation score');
+      parts.push('  → Re-run fix-dockerfile to verify improvements');
+      if (result.policyValidation && !result.policyValidation.passed) {
+        parts.push('  → Resolve policy violations before deployment');
+      }
     }
   }
 
@@ -636,6 +654,7 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string 
  * Format generate-k8s-manifests result as natural language narrative
  *
  * @param result - Kubernetes manifest generation result
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with manifest details and resource breakdown
  *
  * @description
@@ -644,9 +663,9 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string 
  * - Resources and requirements
  * - Security considerations
  * - Best practices recommendations
- * - Context-aware next steps
+ * - Context-aware next steps (when chainHintsMode is 'enabled')
  */
-export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): string {
+export function formatGenerateK8sManifestsNarrative(result: ManifestPlan, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Action-oriented header
@@ -736,12 +755,14 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): strin
     }
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  parts.push('  1. Create manifest files using the recommendations above');
-  parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
-  parts.push('  3. Use kubectl apply to deploy manifests to cluster');
-  parts.push('  4. Verify deployment with verify-deploy');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push(`\n**Next Steps:**`);
+    parts.push('  1. Create manifest files using the recommendations above');
+    parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
+    parts.push('  3. Use kubectl apply to deploy manifests to cluster');
+    parts.push('  4. Verify deployment with verify-deploy');
+  }
 
   return parts.join('\n');
 }
@@ -750,6 +771,7 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): strin
  * Format push-image result as natural language narrative
  *
  * @param result - Image push result with registry and digest
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with push details and next steps
  *
  * @description
@@ -758,9 +780,9 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): strin
  * - Registry and tag information
  * - Image digest (truncated for readability)
  * - Full image reference
- * - Standard next steps
+ * - Standard next steps (when chainHintsMode is 'enabled')
  */
-export function formatPushImageNarrative(result: PushImageResult): string {
+export function formatPushImageNarrative(result: PushImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -781,12 +803,14 @@ export function formatPushImageNarrative(result: PushImageResult): string {
   parts.push(`\n**Full Reference:**`);
   parts.push(`  ${fullImage}`);
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  parts.push('  → Image is now available in the registry');
-  parts.push('  → Update Kubernetes manifests with this image');
-  parts.push('  → Use deploy to deploy to cluster');
-  parts.push('  → Consider setting up automated deployments');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push(`\n**Next Steps:**`);
+    parts.push('  → Image is now available in the registry');
+    parts.push('  → Update Kubernetes manifests with this image');
+    parts.push('  → Use deploy to deploy to cluster');
+    parts.push('  → Consider setting up automated deployments');
+  }
 
   return parts.join('\n');
 }
@@ -795,6 +819,7 @@ export function formatPushImageNarrative(result: PushImageResult): string {
  * Format tag-image result as natural language narrative
  *
  * @param result - Image tagging result
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with tags applied
  *
  * @description
@@ -802,9 +827,9 @@ export function formatPushImageNarrative(result: PushImageResult): string {
  * - Success status
  * - Image identifier
  * - Tags applied (list)
- * - Standard next steps with versioning guidance
+ * - Standard next steps with versioning guidance (when chainHintsMode is 'enabled')
  */
-export function formatTagImageNarrative(result: TagImageResult): string {
+export function formatTagImageNarrative(result: TagImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -822,12 +847,14 @@ export function formatTagImageNarrative(result: TagImageResult): string {
     parts.push(`  • ${tag}`);
   });
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  parts.push('  → Use push-image to push tagged image to registry');
-  parts.push('  → Tags can be used in Kubernetes manifests');
-  if (result.tags.some((t) => t.includes('latest'))) {
-    parts.push('  → Consider using semantic versioning instead of "latest"');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push(`\n**Next Steps:**`);
+    parts.push('  → Use push-image to push tagged image to registry');
+    parts.push('  → Tags can be used in Kubernetes manifests');
+    if (result.tags.some((t) => t.includes('latest'))) {
+      parts.push('  → Consider using semantic versioning instead of "latest"');
+    }
   }
 
   return parts.join('\n');
@@ -837,6 +864,7 @@ export function formatTagImageNarrative(result: TagImageResult): string {
  * Format prepare-cluster result as natural language narrative
  *
  * @param result - Cluster preparation result
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with setup details
  *
  * @description
@@ -845,9 +873,9 @@ export function formatTagImageNarrative(result: TagImageResult): string {
  * - Namespace and connectivity checks
  * - Resources and checks performed
  * - Warnings if any
- * - Context-aware next steps
+ * - Context-aware next steps (when chainHintsMode is 'enabled')
  */
-export function formatPrepareClusterNarrative(result: PrepareClusterResult): string {
+export function formatPrepareClusterNarrative(result: PrepareClusterResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -889,16 +917,18 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult): str
     parts.push(`\n**Local Registry:** ${result.localRegistryUrl}`);
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  if (result.success && result.clusterReady) {
-    parts.push('  → Cluster is ready for deployment');
-    parts.push('  → Use kubectl apply to deploy your application');
-    parts.push('  → Resources will be deployed to the prepared namespace');
-  } else {
-    parts.push('  → Check cluster connectivity');
-    parts.push('  → Verify RBAC permissions');
-    parts.push('  → Review error logs for details');
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === 'enabled') {
+    parts.push(`\n**Next Steps:**`);
+    if (result.success && result.clusterReady) {
+      parts.push('  → Cluster is ready for deployment');
+      parts.push('  → Use kubectl apply to deploy your application');
+      parts.push('  → Resources will be deployed to the prepared namespace');
+    } else {
+      parts.push('  → Check cluster connectivity');
+      parts.push('  → Verify RBAC permissions');
+      parts.push('  → Review error logs for details');
+    }
   }
 
   return parts.join('\n');
@@ -908,6 +938,7 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult): str
  * Format ops ping result as natural language narrative
  *
  * @param result - Server ping result
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with server status
  *
  * @description
@@ -917,8 +948,9 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult): str
  * - Server information (version, uptime, PID)
  * - Capabilities available
  * - Health indicators
+ * Note: This formatter doesn't include Next Steps as it's a simple status check
  */
-export function formatOpsPingNarrative(result: PingResult): string {
+export function formatOpsPingNarrative(result: PingResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
@@ -950,6 +982,7 @@ export function formatOpsPingNarrative(result: PingResult): string {
  * Format ops status result as natural language narrative
  *
  * @param result - Server status result with detailed metrics
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
  * @returns Formatted narrative with system health and metrics
  *
  * @description
@@ -960,8 +993,9 @@ export function formatOpsPingNarrative(result: PingResult): string {
  * - CPU information and load
  * - Tool availability
  * - Health summary
+ * Note: This formatter doesn't include Next Steps as it's a status report
  */
-export function formatOpsStatusNarrative(result: ServerStatusResult): string {
+export function formatOpsStatusNarrative(result: ServerStatusResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
   const parts: string[] = [];
 
   // Header
