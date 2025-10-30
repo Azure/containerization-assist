@@ -212,6 +212,7 @@ describe('createApp orchestration integration', () => {
 
     expect(registerToolsSpy).toHaveBeenCalledWith({
       outputFormat: OUTPUTFORMAT.MARKDOWN,
+      chainHintsMode: 'enabled',
       server: fakeServer,
       tools: expect.any(Array),
       logger: expect.any(Object),
