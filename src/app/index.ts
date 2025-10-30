@@ -160,6 +160,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         name: 'containerization-assist',
         version: '1.0.0',
         outputFormat,
+        chainHintsMode,
       };
 
       const mcpServer = createMCPServer(toolList, serverOptions, orchestratedExecute);
@@ -187,6 +188,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
 
       registerToolsWithServer({
         outputFormat,
+        chainHintsMode,
         server,
         tools: toolList,
         logger,
