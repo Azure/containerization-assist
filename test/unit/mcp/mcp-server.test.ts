@@ -295,7 +295,8 @@ describe('formatOutput', () => {
         summary: '✅ Built image',
         success: true,
         imageId: 'sha256:abc123',
-        tags: ['myapp:latest', 'myapp:1.0.0'],
+        requestedTags: ['myapp:latest', 'myapp:1.0.0'],
+        createdTags: ['myapp:latest', 'myapp:1.0.0'],
         size: 245000000,
         buildTime: 45000,
         logs: [],
@@ -305,7 +306,7 @@ describe('formatOutput', () => {
 
       expect(result).toContain('Image Built Successfully');
       expect(result).toContain('**Image:**');
-      expect(result).toContain('**Tags:**');
+      expect(result).toContain('**Tags Created:**');
       expect(result).toContain('**Size:**');
       expect(result).toContain('**Build Time:**');
       expect(result).toContain('Next Steps:');
