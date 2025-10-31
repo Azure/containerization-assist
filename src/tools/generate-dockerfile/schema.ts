@@ -7,6 +7,24 @@ import { environment, repositoryPath, type ToolNextAction } from '../shared/sche
 import { ModuleInfo } from '../analyze-repo/schema';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
+/**
+ * Supported Docker platforms for multi-architecture builds
+ * See: https://docs.docker.com/build/building/multi-platform/
+ */
+export const DOCKER_PLATFORMS = [
+  'linux/amd64',
+  'linux/arm64',
+  'linux/arm/v7',
+  'linux/arm/v6',
+  'linux/386',
+  'linux/ppc64le',
+  'linux/s390x',
+  'linux/riscv64',
+  'windows/amd64',
+] as const;
+
+export type DockerPlatform = (typeof DOCKER_PLATFORMS)[number];
+
 export const generateDockerfileSchema = z.object({
   repositoryPath: repositoryPath.describe(
     'Repository path (automatically normalized to forward slashes on all platforms).',
@@ -29,6 +47,12 @@ export const generateDockerfileSchema = z.object({
     .optional()
     .describe(
       'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
+    ),
+  targetPlatform: z
+    .enum(DOCKER_PLATFORMS)
+    .optional()
+    .describe(
+      'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). If not specified, defaults to the system platform. Use this to cross-compile for different architectures (e.g., ARM Mac targeting AMD64 servers).',
     ),
 });
 
@@ -107,6 +131,10 @@ export interface DockerfilePlan {
       multistage: boolean;
       reason: string;
     };
+    /** Platform to use for building images (e.g., "linux/amd64", "linux/arm64") */
+    platform?: DockerPlatform;
+    /** Default tag to apply to built images */
+    defaultTag?: string;
     baseImages: BaseImageRecommendation[];
     securityConsiderations: DockerfileRequirement[];
     optimizations: DockerfileRequirement[];

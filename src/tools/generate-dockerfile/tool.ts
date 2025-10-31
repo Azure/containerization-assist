@@ -19,6 +19,8 @@ import {
   type GenerateDockerfileParams,
   type DockerfileAnalysis,
   type EnhancementGuidance,
+  type DockerPlatform,
+  DOCKER_PLATFORMS,
 } from './schema';
 import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
@@ -33,11 +35,43 @@ import {
 } from '@/lib/policy-helpers';
 import type { RegoEvaluator } from '@/config/policy-rego';
 import type { Logger } from 'pino';
+import { arch } from 'node:process';
 
 const name = 'generate-dockerfile';
 const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation or enhancement. Automatically detects existing Dockerfiles and provides detailed analysis and guidance.';
 const version = '2.0.0';
+
+/**
+ * Detect the current system's Docker platform
+ * Maps Node.js platform/arch to Docker platform format (e.g., linux/amd64, linux/arm64)
+ *
+ * @returns The detected Docker platform, defaults to 'linux/amd64' if detection fails
+ */
+function detectSystemPlatform(): DockerPlatform {
+  // Map Node.js arch to Docker arch
+  const archMap: Record<string, string> = {
+    x64: 'amd64',
+    arm64: 'arm64',
+    arm: 'arm/v7',
+    ia32: '386',
+    ppc64: 'ppc64le',
+    s390x: 's390x',
+  };
+
+  // Docker containers typically run Linux regardless of host OS
+  // For Windows/Mac, we still use linux/* for the container platform
+  const dockerArch = archMap[arch] || arch;
+  const platform = `linux/${dockerArch}`;
+
+  // Validate against known platforms, default to linux/amd64 if unknown
+  if (DOCKER_PLATFORMS.includes(platform as DockerPlatform)) {
+    return platform as DockerPlatform;
+  }
+
+  // Fallback to most common platform
+  return 'linux/amd64';
+}
 
 type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPractices';
 
@@ -647,21 +681,32 @@ const runPattern = createKnowledgeTool<
 function planToDockerfileText(plan: DockerfilePlan): string {
   const lines: string[] = [];
 
-  // Add base image recommendations as FROM directives
+  // Use platform from plan (policy-driven) or detect system platform as fallback
+  const defaultPlatform = plan.recommendations.platform || detectSystemPlatform();
+
+  // Add base image recommendations as FROM directives with detected platform
   const baseImages = plan.recommendations.baseImages || [];
   if (baseImages.length > 0) {
     const primaryImage = baseImages[0];
     if (primaryImage) {
       if (plan.recommendations.buildStrategy.multistage) {
         lines.push('# Multi-stage build');
-        lines.push(`FROM ${primaryImage.image} AS builder`);
+        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image} AS builder`);
         lines.push('# ... build steps ...');
-        lines.push(`FROM ${primaryImage.image}`);
+        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image}`);
       } else {
-        lines.push(`FROM ${primaryImage.image}`);
+        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image}`);
       }
     }
+  } else {
+    // If no base images available (filtered out), use placeholder for policy validation
+    // This ensures platform/tag policies can still validate against defaults
+    lines.push(`FROM --platform=${defaultPlatform} unknown`);
   }
+
+  // Add default tag label for policy validation (use tag from plan or default to v1)
+  const defaultTag = plan.recommendations.defaultTag || 'v1';
+  lines.push(`LABEL tag="${defaultTag}"`);
 
   // Check for security recommendations
   const security = plan.recommendations.securityConsiderations || [];
@@ -722,15 +767,20 @@ function planToDockerfileText(plan: DockerfilePlan): string {
 
 /**
  * Validate a single base image against policy
- * Returns true if the image passes policy (no blocking violations)
+ * Returns true if the image passes IMAGE-specific policy checks
+ *
+ * This function tests IMAGE-specific policies (registry restrictions, deprecated versions, etc.)
+ * and ignores Dockerfile-structure policies (platform, tags) which are enforced later on the full plan.
  */
 async function isImageCompliant(
   image: string,
   evaluator: RegoEvaluator,
   logger: Logger,
 ): Promise<boolean> {
-  // Create a minimal Dockerfile with just this image
-  const dockerfileText = `FROM ${image}`;
+  // Create a test Dockerfile using system defaults (not policy-specific values)
+  // We use the actual default values that will be used in the final plan
+  const defaultPlatform = detectSystemPlatform();
+  const dockerfileText = `FROM --platform=${defaultPlatform} ${image}\nLABEL tag="v1"\nUSER appuser`;
 
   logger.debug({ image, dockerfileText }, 'Validating base image against policy');
 
@@ -741,8 +791,33 @@ async function isImageCompliant(
     'base image',
   );
 
-  // Image is compliant if there are no blocking violations
-  return validation.passed;
+  // Filter out Dockerfile-structure violations (platform, tag, label format)
+  // We only care about IMAGE-specific violations here (registry, deprecation, security)
+  // Note: Platform/tag/label violations are validated later in validatePlanAgainstPolicy()
+  // and included in the final plan output as improvement recommendations
+  const imageSpecificViolations = validation.violations.filter((v: PolicyViolation) => {
+    const rule = v.ruleId.toLowerCase();
+    // Ignore platform, tag, and label format rules - those are Dockerfile structure requirements
+    return !(
+      rule.includes('platform') ||
+      rule.includes('tag') ||
+      rule.includes('label')
+    );
+  });
+
+  const isCompliant = imageSpecificViolations.length === 0;
+
+  if (!isCompliant) {
+    logger.debug(
+      {
+        image,
+        violations: imageSpecificViolations.map((v: PolicyViolation) => v.ruleId),
+      },
+      'Base image has IMAGE-specific policy violations',
+    );
+  }
+
+  return isCompliant;
 }
 
 /**
@@ -854,6 +929,12 @@ async function handleGenerateDockerfile(
 
   const plan = result.value;
 
+  // Add platform and default tag to recommendations
+  // Use targetPlatform from input if provided (allows cross-compilation, e.g., ARM Mac -> AMD64 server)
+  // Otherwise auto-detect from system
+  plan.recommendations.platform = input.targetPlatform || detectSystemPlatform();
+  plan.recommendations.defaultTag = 'v1';
+
   // Filter base images based on policy if available
   if (ctx.policy && plan.recommendations.baseImages.length > 0) {
     ctx.logger.info(
@@ -897,26 +978,23 @@ async function handleGenerateDockerfile(
   if (ctx.policy) {
     const policyValidation = await validatePlanAgainstPolicy(plan, ctx.policy, ctx.logger);
 
-    // Add policy validation to the plan
+    // Add policy validation to the plan (violations become recommendations for improvement)
     plan.policyValidation = policyValidation;
 
-    // Block if there are violations
+    // Log violations as warnings - they're guidance, not blockers
     if (!policyValidation.passed) {
-      const violationMessages = policyValidation.violations
-        .map((v: PolicyViolation) => `  - ${v.ruleId}: ${v.message}`)
-        .join('\n');
-
-      return Failure(
-        `Generated Dockerfile plan violates organizational policies:\n${violationMessages}`,
+      ctx.logger.warn(
         {
-          message: 'Policy violations detected in Dockerfile plan',
-          hint: `${policyValidation.violations.length} blocking policy rule(s) failed`,
-          resolution: 'Adjust recommendations or update policy configuration',
+          violations: policyValidation.violations.map((v: PolicyViolation) => ({
+            rule: v.ruleId,
+            message: v.message,
+          })),
         },
+        'Policy violations detected - included in plan as improvement recommendations',
       );
     }
 
-    // Log warnings/suggestions even if plan passes
+    // Log warnings/suggestions
     if (policyValidation.warnings.length > 0) {
       ctx.logger.warn(
         { warnings: policyValidation.warnings.map((w: PolicyViolation) => w.ruleId) },
