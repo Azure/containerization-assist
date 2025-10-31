@@ -213,7 +213,7 @@ CMD ["node", "index.js"]`;
       if (result.ok) {
         expect(result.value.success).toBe(true);
         expect(result.value.imageId).toBe('sha256:mock-image-id');
-        expect(result.value.tags).toEqual(['myapp:latest', 'myapp:v1.0']);
+        expect(result.value.createdTags).toEqual(['myapp:latest', 'myapp:v1.0']);
         expect(result.value.size).toBe(123456789);
         expect(result.value.layers).toBe(8);
         expect(result.value.logs).toContain('Successfully built mock-image-id');
@@ -264,7 +264,8 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toHaveProperty('imageId');
-        expect(result.value).toHaveProperty('tags');
+        expect(result.value).toHaveProperty('requestedTags');
+        expect(result.value).toHaveProperty('createdTags');
       }
     });
     it('should include build logs in result', async () => {
@@ -314,7 +315,7 @@ CMD ["node", "index.js"]`;
         );
 
         // Result includes all requested tags
-        expect(result.value.tags).toEqual([
+        expect(result.value.createdTags).toEqual([
           'myapp:latest',
           'myapp:v1.0.0',
           'registry.io/myapp:prod',

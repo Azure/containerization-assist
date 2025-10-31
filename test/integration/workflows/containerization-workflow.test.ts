@@ -215,7 +215,7 @@ CMD ["node", "index.js"]`
       if (buildResult.ok) {
         const build = buildResult.value as BuildImageResult;
         expect(build.imageId).toBeDefined();
-        expect(build.tags).toContain(imageName);
+        expect(build.createdTags).toContain(imageName);
         testCleaner.trackImage(build.imageId);
 
         // Tag image

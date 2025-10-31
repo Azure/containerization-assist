@@ -115,10 +115,12 @@ export const DOCKER = {
   DEFAULT_CONTEXT: '.',
   /** Default registry */
   DEFAULT_REGISTRY: 'docker.io',
-  /** Local registry port for kind */
-  LOCAL_REGISTRY_PORT: 5001,
-  /** Internal registry port */
-  INTERNAL_REGISTRY_PORT: 5000,
+  /** Standard registry port for both external and internal access */
+  REGISTRY_PORT: 5000,
+  /** Registry container name */
+  REGISTRY_CONTAINER_NAME: 'ca-registry',
+  /** Registry host for external access */
+  REGISTRY_HOST: 'localhost',
 } as const;
 
 /**
