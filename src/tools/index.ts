@@ -39,8 +39,7 @@ scanImageTool.name = TOOL_NAME.SCAN_IMAGE;
 tagImageTool.name = TOOL_NAME.TAG_IMAGE;
 verifyDeployTool.name = TOOL_NAME.VERIFY_DEPLOY;
 
-// Create a union type of all tool types for better type safety
-export type Tool = (
+export type Tool =
   | typeof analyzeRepoTool
   | typeof buildImageTool
   | typeof fixDockerfileTool
@@ -51,19 +50,13 @@ export type Tool = (
   | typeof pushImageTool
   | typeof scanImageTool
   | typeof tagImageTool
-  | typeof verifyDeployTool
-) & { name: string };
+  | typeof verifyDeployTool;
 
-// Type-safe tool array using the union type
-// All tools are now deterministic plan-based or operational tools
-export const ALL_TOOLS: readonly Tool[] = [
-  // Plan-based generation tools (use knowledge to create plans)
+export const ALL_TOOLS = [
   analyzeRepoTool,
   fixDockerfileTool,
   generateDockerfileTool,
   generateK8sManifestsTool,
-
-  // Operational/deterministic tools
   buildImageTool,
   opsTool,
   prepareClusterTool,

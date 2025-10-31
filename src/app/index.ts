@@ -35,7 +35,10 @@ import { DEFAULT_CHAIN_HINTS } from './chain-hints';
 function applyToolAliases(
   tools: readonly Tool[],
   aliases?: Record<string, string>,
-): { aliasedTools: Tool[]; aliasToOriginalMap: Record<string, string> } {
+): {
+  aliasedTools: any[];
+  aliasToOriginalMap: Record<string, string>;
+} {
   if (!aliases) {
     return { aliasedTools: [...tools], aliasToOriginalMap: {} };
   }
@@ -46,17 +49,12 @@ function applyToolAliases(
     const alias = aliases[tool.name];
     if (!alias) return tool;
 
-    // Store reverse mapping (alias -> original)
     aliasToOriginalMap[alias] = tool.name;
-
-    // Create a new tool object with the alias name
     return { ...tool, name: alias };
   });
 
   return { aliasedTools, aliasToOriginalMap };
-}
-
-/**
+} /**
  * Transport configuration for MCP server
  */
 export interface TransportConfig {
@@ -75,13 +73,12 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const tools = config.tools || ALL_TOOLS;
   const { aliasedTools, aliasToOriginalMap } = applyToolAliases(tools, config.toolAliases);
 
-  // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema
-  const registryTools: Tool[] = aliasedTools.map((tool) => tool as unknown as Tool);
-
-  const toolsMap = new Map<string, Tool>();
-  for (const tool of registryTools) {
+  const toolsMap = new Map<string, any>();
+  for (const tool of aliasedTools) {
     toolsMap.set(tool.name, tool);
   }
+
+  const toolList = Array.from(toolsMap.values());
 
   const chainHintsMode = config.chainHintsMode || 'enabled';
   const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
@@ -91,8 +88,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     aliasToOriginalMap,
   };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
-
-  const toolList = Array.from(toolsMap.values());
 
   let activeServer: Server | null = null;
   let activeMcpServer: MCPServer | null = null;
@@ -199,7 +194,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
      */
     listTools: () =>
       toolList.map((t) => ({
-        name: t.name as ToolName,
+        name: t.name,
         description: t.description,
         ...(t.version && { version: t.version }),
         ...(t.category && { category: t.category }),
