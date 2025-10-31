@@ -68,9 +68,10 @@ export interface AppRuntime {
 
   /**
    * List all available tools with their metadata
+   * Note: When tool aliases are used, names may not be ToolName literals
    */
   listTools(): Array<{
-    name: ToolName;
+    name: string;
     description: string;
     version?: string;
     category?: string;

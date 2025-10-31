@@ -102,7 +102,9 @@ interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
 /**
  * Create a tool orchestrator
  */
-export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
+export function createOrchestrator<
+  T extends Tool<ZodTypeAny, any> = Tool<ZodTypeAny, any>,
+>(options: {
   registry: Map<string, T>;
   server?: Server;
   logger?: Logger;
@@ -147,13 +149,19 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
         const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
         if (policyResult.ok) {
           policyCache = policyResult.value;
-          logger.info({
-            builtIn: builtInPolicies.length,
-            custom: config.policyPath ? 1 : 0,
-            total: policyPaths.length,
-          }, 'Policies loaded for orchestrator');
+          logger.info(
+            {
+              builtIn: builtInPolicies.length,
+              custom: config.policyPath ? 1 : 0,
+              total: policyPaths.length,
+            },
+            'Policies loaded for orchestrator',
+          );
         } else {
-          logger.warn({ error: policyResult.error }, 'Failed to load policies, continuing without them');
+          logger.warn(
+            { error: policyResult.error },
+            'Failed to load policies, continuing without them',
+          );
         }
       })();
     }
@@ -161,12 +169,17 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
     // Wait for policy loading to complete if in progress
     await policyLoadPromise;
 
-    return await executeWithOrchestration(tool, request, {
-      registry,
-      logger: contextualLogger,
-      config,
-      ...(server && { server }),
-    }, policyCache);
+    return await executeWithOrchestration(
+      tool,
+      request,
+      {
+        registry,
+        logger: contextualLogger,
+        config,
+        ...(server && { server }),
+      },
+      policyCache,
+    );
   }
 
   function close(): void {

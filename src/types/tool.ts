@@ -20,9 +20,13 @@ export interface ChainHints {
  *
  * @see {@link ../../docs/adr/002-tool-interface.md ADR-002: Unified Tool Interface}
  */
-export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
+export interface Tool<
+  TSchema extends z.ZodTypeAny = z.ZodTypeAny,
+  TOut = unknown,
+  TName extends string = string,
+> {
   /** Unique tool identifier */
-  name: string;
+  name: TName;
 
   /** Human-readable description */
   description: string;
@@ -56,8 +60,8 @@ export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknow
  * Lightweight helper to create tools with reduced boilerplate
  * Automatically extracts inputSchema and creates parse method from Zod schema
  */
-export function tool<TSchema extends z.ZodTypeAny, TOut>(config: {
-  name: string;
+export function tool<TSchema extends z.ZodTypeAny, TOut, TName extends string = string>(config: {
+  name: TName;
   description: string;
   schema: TSchema;
   metadata: ToolMetadata;
@@ -65,7 +69,7 @@ export function tool<TSchema extends z.ZodTypeAny, TOut>(config: {
   category?: ToolCategory;
   version?: string;
   chainHints?: ChainHints;
-}): Tool<TSchema, TOut> {
+}): Tool<TSchema, TOut, TName> {
   return {
     ...config,
     inputSchema: extractSchemaShape(config.schema),

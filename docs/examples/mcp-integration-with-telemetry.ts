@@ -166,8 +166,7 @@ function registerWithMaximumControl(server: McpServer) {
       tool.name,
       tool.description,
       tool.inputSchema,
-      // Use 'as ToolName' to assert the tool name is valid while maintaining type safety
-      createToolHandler(app, tool.name as ToolName, {
+      createToolHandler(app, tool.name, {
         transport: 'my-integration',
         onSuccess: (result, toolName) => {
           telemetry.trackToolExecution(toolName, true);

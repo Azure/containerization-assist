@@ -15,8 +15,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import type { AppRuntime, ExecutionMetadata, ToolInputMap, ToolResultMap } from '@/types/runtime';
-import type { Tool } from '@/types/tool';
-import type { ToolName } from '@/tools';
+import type { Tool, ToolName } from '@/tools';
 import { extractErrorMessage } from './errors';
 import { formatOutput, OUTPUTFORMAT, type OutputFormat } from '@/mcp/mcp-server';
 
@@ -258,13 +257,11 @@ export function registerTool(
   tool: Tool,
   options?: ToolHandlerOptions,
 ): void {
-  // Type assertion is safe because Tool.name is validated at runtime
-  // and all tools in the registry have valid ToolName values
   server.tool(
     tool.name,
     tool.description,
     tool.inputSchema,
-    createToolHandler(app, tool.name as ToolName, options),
+    createToolHandler(app, tool.name, options),
   );
 }
 
@@ -314,13 +311,11 @@ export function registerTools(
   options?: ToolHandlerOptions,
 ): void {
   for (const tool of tools) {
-    // Type assertion is safe here because Tool.name is validated at runtime
-    // and all tools in ALL_TOOLS have valid ToolName values
     server.tool(
       tool.name,
       tool.description,
       tool.inputSchema,
-      createToolHandler(app, tool.name as ToolName, options),
+      createToolHandler(app, tool.name, options),
     );
   }
 }
