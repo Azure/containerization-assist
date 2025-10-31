@@ -270,12 +270,19 @@ async function evaluateRegoPolicy(
             const containerization = firstResult.expressions[0]?.value;
 
             if (containerization) {
-              // Merge results from all policies (security, best_practices, base_images)
-              const namespaces = ['security', 'best_practices', 'base_images'];
+              // Dynamically merge results from ALL policy namespaces
+              // This allows custom policies in any namespace (e.g., platform, compliance, etc.)
+              for (const [, nsObj] of Object.entries(containerization)) {
+                // Only process keys where value is an object with a 'result' property
+                if (
+                  nsObj &&
+                  typeof nsObj === 'object' &&
+                  'result' in nsObj &&
+                  nsObj.result &&
+                  typeof nsObj.result === 'object'
+                ) {
+                  const nsResult = nsObj.result;
 
-              for (const ns of namespaces) {
-                const nsResult = containerization[ns]?.result;
-                if (nsResult) {
                   // Merge allow (false if any policy blocks)
                   if (nsResult.allow === false) {
                     combinedResult.allow = false;
@@ -322,6 +329,7 @@ async function evaluateRegoPolicy(
           violations: violations.length,
           warnings: warnings.length,
           suggestions: suggestions.length,
+          violationDetails: violations.map(v => ({ rule: v.rule, message: v.message })),
         },
         'Rego policy evaluation completed',
       );
