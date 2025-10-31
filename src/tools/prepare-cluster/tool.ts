@@ -298,15 +298,17 @@ async function createKindCluster(clusterName: string, logger: pino.Logger): Prom
   try {
     logger.info({ clusterName }, 'Creating kind cluster...');
 
-    // Note: ${DOCKER.LOCAL_REGISTRY_PORT} is interpolated by JavaScript (to 5001),
+    // Note: ${DOCKER.LOCAL_REGISTRY_PORT} and ${DOCKER.INTERNAL_REGISTRY_PORT} are interpolated by JavaScript,
     // not by YAML. This template literal produces a valid YAML string with literal port numbers.
+    // IMPORTANT: containerd inside kind nodes communicates with registry via Docker network,
+    // so it must use the internal port (5000), NOT the host-mapped port (5001).
     const kindConfig = `
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
 - |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${DOCKER.LOCAL_REGISTRY_PORT}"]
-    endpoint = ["http://kind-registry:${DOCKER.LOCAL_REGISTRY_PORT}"]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT}"]
+    endpoint = ["http://${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.INTERNAL_REGISTRY_PORT}"]
 nodes:
 - role: control-plane
   kubeadmConfigPatches:
@@ -340,17 +342,313 @@ nodes:
   }
 }
 
+/**
+ * Check if local registry exists and is running.
+ * If container exists but is stopped, start it.
+ * Returns true if registry is running and ready.
+ */
 async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
   try {
-    const { stdout } = await execAsync(
-      'docker ps -a --filter "name=kind-registry" --format "{{.Names}}"',
+    // Check if container exists (running or stopped)
+    const { stdout: allContainers } = await execAsync(
+      `docker ps -a --filter "name=${DOCKER.REGISTRY_CONTAINER_NAME}" --format "{{.Names}}"`,
     );
-    const exists = stdout.trim() === 'kind-registry';
-    logger.debug({ exists }, 'Checking local registry existence');
-    return exists;
+    const containerExists = allContainers.trim() === DOCKER.REGISTRY_CONTAINER_NAME;
+
+    if (!containerExists) {
+      logger.debug('Local registry container does not exist');
+      return false;
+    }
+
+    // Check if container is running
+    const { stdout: runningContainers } = await execAsync(
+      `docker ps --filter "name=${DOCKER.REGISTRY_CONTAINER_NAME}" --format "{{.Names}}"`,
+    );
+    const isRunning = runningContainers.trim() === DOCKER.REGISTRY_CONTAINER_NAME;
+
+    if (isRunning) {
+      logger.debug('Local registry is running');
+      return true;
+    }
+
+    // Container exists but is stopped - try to start it
+    logger.info('Local registry container exists but is stopped, starting it...');
+    try {
+      await execAsync(`docker start ${DOCKER.REGISTRY_CONTAINER_NAME}`);
+      logger.info('Local registry started successfully');
+
+      // After starting, check if it needs to be reconnected to kind network
+      // (containers can lose network connections when stopped/restarted)
+      const kindNetworkExists = await checkDockerNetworkExists('kind', logger);
+      if (kindNetworkExists) {
+        logger.debug('Checking if restarted registry is connected to kind network...');
+        const isConnected = await checkContainerNetworkConnection(DOCKER.REGISTRY_CONTAINER_NAME, 'kind', logger);
+
+        if (!isConnected) {
+          logger.info('Registry not connected to kind network, reconnecting...');
+          try {
+            await execAsync(`docker network connect kind ${DOCKER.REGISTRY_CONTAINER_NAME}`);
+            logger.info('Registry reconnected to kind network successfully');
+
+            // Verify reconnection
+            const reconnected = await checkContainerNetworkConnection(DOCKER.REGISTRY_CONTAINER_NAME, 'kind', logger);
+            if (!reconnected) {
+              logger.warn('Failed to verify registry reconnection to kind network');
+            }
+          } catch (reconnectError) {
+            const errorMsg = extractErrorMessage(reconnectError);
+            if (errorMsg.includes('already') || errorMsg.includes('duplicate')) {
+              logger.debug('Registry already connected to kind network');
+            } else {
+              logger.warn({ error: errorMsg }, 'Failed to reconnect registry to kind network (non-fatal)');
+            }
+          }
+        } else {
+          logger.debug('Registry already connected to kind network');
+        }
+      }
+
+      return true;
+    } catch (startError) {
+      logger.error({ error: startError }, 'Failed to start existing registry container');
+      return false;
+    }
   } catch (error) {
     logger.debug({ error }, 'Error checking local registry');
     return false;
+  }
+}
+
+/**
+ * Validate registry health by checking HTTP endpoint.
+ * Retries up to 3 times with 1 second delays.
+ */
+async function validateRegistryHealth(logger: pino.Logger): Promise<boolean> {
+  const maxAttempts = 3;
+  const delayMs = 1000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const { stdout } = await execAsync(
+        `curl -sf http://${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT}/v2/ || echo "failed"`,
+      );
+      if (!stdout.includes('failed')) {
+        logger.debug({ attempt }, 'Registry health check passed');
+        return true;
+      }
+    } catch (error) {
+      logger.debug({ attempt, error }, 'Registry health check attempt failed');
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  logger.warn('Registry health check failed after all attempts');
+  return false;
+}
+
+/**
+ * Check if Docker network exists.
+ */
+async function checkDockerNetworkExists(networkName: string, logger: pino.Logger): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(`docker network ls --filter "name=${networkName}" --format "{{.Name}}"`);
+    const exists = stdout.split('\n').includes(networkName);
+    logger.debug({ networkName, exists }, 'Checking Docker network existence');
+    return exists;
+  } catch (error) {
+    logger.debug({ networkName, error }, 'Error checking Docker network');
+    return false;
+  }
+}
+
+/**
+ * Check if container is already connected to network.
+ */
+async function checkContainerNetworkConnection(
+  containerName: string,
+  networkName: string,
+  logger: pino.Logger,
+): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      `docker inspect ${containerName} --format '{{range $net, $v := .NetworkSettings.Networks}}{{$net}} {{end}}'`,
+    );
+    const networks = stdout.trim().split(' ').filter(Boolean);
+    const connected = networks.includes(networkName);
+    logger.debug({ containerName, networkName, connected, networks }, 'Checking container network connection');
+    return connected;
+  } catch (error) {
+    logger.debug({ containerName, networkName, error }, 'Error checking container network connection');
+    return false;
+  }
+}
+
+/**
+ * Wait for Docker network to exist with retries.
+ * Returns true if network exists within timeout.
+ */
+async function waitForDockerNetwork(
+  networkName: string,
+  logger: pino.Logger,
+  maxAttempts: number = 10,
+  delayMs: number = 1000,
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const exists = await checkDockerNetworkExists(networkName, logger);
+    if (exists) {
+      logger.debug({ networkName, attempt }, 'Docker network found');
+      return true;
+    }
+
+    if (attempt < maxAttempts) {
+      logger.debug({ networkName, attempt, maxAttempts }, 'Waiting for Docker network...');
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  logger.warn({ networkName, maxAttempts }, 'Docker network not found after all attempts');
+  return false;
+}
+
+/**
+ * Get container's IP address on a specific network.
+ */
+async function getContainerNetworkIP(
+  containerName: string,
+  networkName: string,
+  logger: pino.Logger,
+): Promise<string | null> {
+  try {
+    const { stdout } = await execAsync(
+      `docker inspect ${containerName} --format '{{.NetworkSettings.Networks.${networkName}.IPAddress}}'`,
+    );
+    const ip = stdout.trim();
+    if (ip && ip !== '<no value>') {
+      logger.debug({ containerName, networkName, ip }, 'Got container network IP');
+      return ip;
+    }
+    return null;
+  } catch (error) {
+    logger.debug({ containerName, networkName, error }, 'Error getting container network IP');
+    return null;
+  }
+}
+
+/**
+ * Verify registry is accessible from within the kind cluster.
+ * Uses kubectl run to create a test pod that curls the registry endpoint.
+ */
+async function verifyRegistryFromCluster(logger: pino.Logger): Promise<boolean> {
+  try {
+    logger.debug('Testing registry reachability from within cluster...');
+
+    // Create a temporary test pod that curls the registry
+    const testPodName = 'registry-test-' + Date.now();
+    const curlCommand = `curl -sf http://${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.INTERNAL_REGISTRY_PORT}/v2/ && echo "success" || echo "failed"`;
+
+    try {
+      // Run test pod and wait for completion (timeout 30s)
+      const { stdout } = await execAsync(
+        `kubectl run ${testPodName} --image=curlimages/curl:latest --restart=Never --rm -i --timeout=30s -- sh -c '${curlCommand}'`,
+        { timeout: 35000 }
+      );
+
+      const success = stdout.includes('success');
+      logger.debug({ testPodName, success, output: stdout.trim() }, 'In-cluster registry test result');
+
+      return success;
+    } catch (error) {
+      // If pod creation fails, try to clean it up
+      try {
+        await execAsync(`kubectl delete pod ${testPodName} --ignore-not-found=true`);
+      } catch {
+        // Ignore cleanup errors
+      }
+      logger.debug({ error }, 'In-cluster registry test failed');
+      return false;
+    }
+  } catch (error) {
+    logger.warn({ error }, 'Error testing registry from cluster');
+    return false;
+  }
+}
+
+/**
+ * Validate containerd mirror configuration on kind node.
+ * Checks if the registry mirror config was properly applied.
+ */
+async function validateContainerdConfig(
+  clusterName: string,
+  logger: pino.Logger,
+): Promise<boolean> {
+  try {
+    logger.debug({ clusterName }, 'Validating containerd mirror config on kind node...');
+
+    // Get the kind node container name
+    const nodeContainerName = `${clusterName}-control-plane`;
+
+    // Read containerd config from the node
+    const { stdout } = await execAsync(
+      `docker exec ${nodeContainerName} cat /etc/containerd/config.toml`
+    );
+
+    // Check for the registry mirror configuration
+    const hasLocalRegistryMirror = stdout.includes(`${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT}`);
+    const hasKindRegistryEndpoint = stdout.includes(`${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.INTERNAL_REGISTRY_PORT}`);
+
+    const isValid = hasLocalRegistryMirror && hasKindRegistryEndpoint;
+
+    logger.debug(
+      {
+        clusterName,
+        hasLocalRegistryMirror,
+        hasKindRegistryEndpoint,
+        isValid
+      },
+      'Containerd config validation result'
+    );
+
+    return isValid;
+  } catch (error) {
+    logger.warn({ clusterName, error }, 'Error validating containerd config');
+    return false;
+  }
+}
+
+/**
+ * Create local registry ConfigMap in kube-public namespace.
+ * This documents the registry location for tools and users (kind best practice).
+ */
+async function createLocalRegistryConfigMap(
+  k8sClient: KubernetesClient,
+  logger: pino.Logger,
+): Promise<void> {
+  try {
+    logger.debug('Creating local registry ConfigMap in kube-public namespace');
+
+    const configMap: K8sManifest = {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: {
+        name: 'local-registry-hosting',
+        namespace: 'kube-public',
+      },
+      data: {
+        'localRegistryHosting.v1': `host: "${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT}"\nhelp: "https://kind.sigs.k8s.io/docs/user/local-registry/"`,
+      },
+    };
+
+    const result = await k8sClient.applyManifest(configMap, 'kube-public');
+    if (result.ok) {
+      logger.info('Local registry ConfigMap created in kube-public namespace');
+    } else {
+      logger.warn({ error: result.error }, 'Failed to create local registry ConfigMap (non-fatal)');
+    }
+  } catch (error) {
+    logger.warn({ error }, 'Failed to create local registry ConfigMap (non-fatal)');
   }
 }
 
@@ -358,16 +656,63 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
   try {
     logger.info('Creating local Docker registry...');
 
-    await execAsync(`docker run -d --restart=always -p ${DOCKER.LOCAL_REGISTRY_PORT}:${DOCKER.INTERNAL_REGISTRY_PORT} --name kind-registry registry:2`);
+    await execAsync(`docker run -d --restart=always -p ${DOCKER.LOCAL_REGISTRY_PORT}:${DOCKER.INTERNAL_REGISTRY_PORT} --name ${DOCKER.REGISTRY_CONTAINER_NAME} registry:2`);
+    logger.debug({ port: DOCKER.LOCAL_REGISTRY_PORT, internalPort: DOCKER.INTERNAL_REGISTRY_PORT }, 'Registry container created');
 
-    try {
-      await execAsync('docker network connect kind kind-registry');
-    } catch {
-      logger.debug('Registry might already be connected to kind network');
+    // Check if kind network exists before attempting connection
+    const kindNetworkExists = await checkDockerNetworkExists('kind', logger);
+    if (!kindNetworkExists) {
+      logger.warn('Kind Docker network does not exist - registry will not be accessible from cluster yet');
+      const registryUrl = `${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT}`;
+      return registryUrl;
     }
 
-    const registryUrl = `localhost:${DOCKER.LOCAL_REGISTRY_PORT}`;
-    logger.info({ registryUrl }, 'Local Docker registry created successfully');
+    // Check if registry is already connected to kind network
+    const alreadyConnected = await checkContainerNetworkConnection(DOCKER.REGISTRY_CONTAINER_NAME, 'kind', logger);
+    if (alreadyConnected) {
+      logger.debug('Registry already connected to kind network');
+    } else {
+      // Connect registry to kind network
+      try {
+        logger.debug('Connecting registry to kind Docker network...');
+        await execAsync(`docker network connect kind ${DOCKER.REGISTRY_CONTAINER_NAME}`);
+        logger.info('Registry connected to kind network successfully');
+      } catch (networkError) {
+        const errorMsg = extractErrorMessage(networkError);
+        // Only treat as non-fatal if it's "already connected" error
+        if (errorMsg.includes('already') || errorMsg.includes('duplicate')) {
+          logger.debug({ error: errorMsg }, 'Registry already connected to kind network');
+        } else {
+          logger.error({ error: errorMsg }, 'Failed to connect registry to kind network');
+          throw new Error(`Failed to connect registry to kind network: ${errorMsg}`);
+        }
+      }
+
+      // Verify connection succeeded by checking again
+      logger.debug('Verifying registry network connection...');
+      const connectedAfter = await checkContainerNetworkConnection(DOCKER.REGISTRY_CONTAINER_NAME, 'kind', logger);
+      if (!connectedAfter) {
+        logger.warn('Registry network connection verification failed - may not be accessible from cluster');
+      } else {
+        // Get and log the IP address on the kind network
+        const registryIP = await getContainerNetworkIP(DOCKER.REGISTRY_CONTAINER_NAME, 'kind', logger);
+        if (registryIP) {
+          logger.info({ registryIP }, 'Registry network connection verified successfully');
+        } else {
+          logger.info('Registry network connection verified (IP not available)');
+        }
+      }
+    }
+
+    // Validate registry health
+    logger.debug('Validating registry health...');
+    const isHealthy = await validateRegistryHealth(logger);
+    if (!isHealthy) {
+      logger.warn('Registry health check failed - registry may not be fully ready');
+    }
+
+    const registryUrl = `${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT}`;
+    logger.info({ registryUrl, healthy: isHealthy }, 'Local Docker registry created successfully');
     return registryUrl;
   } catch (error) {
     logger.error({ error }, 'Failed to create local registry');
@@ -379,7 +724,7 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
  * Setup Kind cluster if needed
  */
 async function setupKindCluster(
-  cluster: string,
+  clusterName: string,
   logger: pino.Logger,
   checks: {
     kindInstalled: boolean | undefined;
@@ -387,7 +732,7 @@ async function setupKindCluster(
   },
 ): Promise<Result<void>> {
   // Validate cluster name upfront
-  const escapedNameResult = validateAndEscapeClusterName(cluster);
+  const escapedNameResult = validateAndEscapeClusterName(clusterName);
   if (!escapedNameResult.ok) {
     return escapedNameResult;
   }
@@ -400,25 +745,47 @@ async function setupKindCluster(
     logger.info('Kind installation completed');
   }
 
-  const clusterExistsResult = await checkKindClusterExists(cluster, logger);
+  const clusterExistsResult = await checkKindClusterExists(clusterName, logger);
   if (!clusterExistsResult.ok) {
     return clusterExistsResult;
   }
   const kindClusterExists = clusterExistsResult.value;
 
   if (!kindClusterExists) {
-    const createResult = await createKindCluster(cluster, logger);
+    const createResult = await createKindCluster(clusterName, logger);
     if (!createResult.ok) {
       return createResult;
     }
     checks.kindClusterCreated = true;
-    logger.info({ clusterName: cluster }, 'Kind cluster creation completed');
+    logger.info({ clusterName: clusterName }, 'Kind cluster creation completed');
 
-    // Wait for cluster to stabilize
+    // Wait for cluster to stabilize and check for node readiness
+    logger.debug('Waiting for cluster to stabilize...');
     await new Promise((resolve) => setTimeout(resolve, DEFAULT_TIMEOUTS.clusterStabilization));
+
+    // Verify cluster nodes are ready
+    try {
+      const { stdout } = await execAsync('kubectl get nodes --no-headers');
+      const nodesReady = stdout.includes('Ready');
+      logger.debug({ nodesReady, output: stdout.trim() }, 'Cluster node readiness check');
+      if (!nodesReady) {
+        logger.warn('Cluster nodes may not be fully ready yet');
+      }
+    } catch (error) {
+      logger.debug({ error }, 'Could not check node readiness (non-fatal)');
+    }
+
+    // Validate that kind network was created
+    logger.debug('Validating kind Docker network...');
+    const networkExists = await waitForDockerNetwork('kind', logger, 10, 1000);
+    if (!networkExists) {
+      logger.warn('Kind Docker network not found - registry connectivity may be impaired');
+    } else {
+      logger.info('Kind Docker network validated successfully');
+    }
   } else {
     checks.kindClusterCreated = true;
-    logger.info({ clusterName: cluster }, 'Kind cluster already exists');
+    logger.info({ clusterName: clusterName }, 'Kind cluster already exists');
   }
 
   // Export kubeconfig
@@ -441,6 +808,7 @@ async function setupLocalRegistry(
     localRegistryCreated: boolean | undefined;
   },
 ): Promise<string> {
+  logger.debug('Starting local registry setup');
   const registryExists = await checkLocalRegistryExists(logger);
   if (!registryExists) {
     const registryUrl = await createLocalRegistry(logger);
@@ -448,7 +816,7 @@ async function setupLocalRegistry(
     logger.info({ registryUrl }, 'Local registry creation completed');
     return registryUrl;
   } else {
-    const registryUrl = `localhost:${DOCKER.LOCAL_REGISTRY_PORT}`;
+    const registryUrl = `${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT}`;
     checks.localRegistryCreated = true;
     logger.info({ registryUrl }, 'Local registry already exists');
     return registryUrl;
@@ -545,7 +913,7 @@ async function handlePrepareCluster(
     return namespaceValidation;
   }
 
-  const cluster = environment === 'development' ? 'kind' : 'default';
+  const clusterName = environment === 'development' ? 'containerization-assist' : 'default';
   const shouldCreateNamespace = environment === 'production';
   const shouldSetupRbac = environment === 'production';
   const installIngress = false;
@@ -573,7 +941,7 @@ async function handlePrepareCluster(
 
     // Setup Kind cluster if in development environment
     if (shouldSetupKind) {
-      const setupResult = await setupKindCluster(cluster, logger, checks);
+      const setupResult = await setupKindCluster(clusterName, logger, checks);
       if (!setupResult.ok) {
         return setupResult;
       }
@@ -582,6 +950,29 @@ async function handlePrepareCluster(
     // Setup local Docker registry if in development environment
     if (shouldCreateLocalRegistry) {
       localRegistryUrl = await setupLocalRegistry(logger, checks);
+
+      // Create registry ConfigMap after cluster and registry are set up
+      if (shouldSetupKind) {
+        await createLocalRegistryConfigMap(k8sClient, logger);
+
+        // Validate containerd mirror configuration
+        logger.debug('Validating containerd registry mirror configuration...');
+        const containerdConfigValid = await validateContainerdConfig(clusterName, logger);
+        if (!containerdConfigValid) {
+          warnings.push(`Containerd registry mirror configuration validation failed - image pulls from ${DOCKER.REGISTRY_HOST}:${DOCKER.LOCAL_REGISTRY_PORT} may not work`);
+        } else {
+          logger.info('Containerd registry mirror configuration validated successfully');
+        }
+
+        // Test registry reachability from within cluster
+        logger.debug('Testing registry reachability from cluster...');
+        const registryReachable = await verifyRegistryFromCluster(logger);
+        if (!registryReachable) {
+          warnings.push('Registry is not reachable from within cluster - deployment may fail');
+        } else {
+          logger.info('Registry reachability from cluster validated successfully');
+        }
+      }
     }
 
     // Verify cluster readiness (connectivity, permissions, namespace, RBAC, ingress)
@@ -612,7 +1003,7 @@ async function handlePrepareCluster(
       summary,
       success: true,
       clusterReady,
-      cluster,
+      cluster: clusterName,
       namespace,
       checks: {
         connectivity: checks.connectivity,
