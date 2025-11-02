@@ -23,6 +23,13 @@ function createMockKubernetesClient() {
     getNamespace: jest.fn(),
     createNamespace: jest.fn(),
     listPods: jest.fn(),
+    ping: jest.fn(),
+    namespaceExists: jest.fn(),
+    ensureNamespace: jest.fn(),
+    checkPermissions: jest.fn(),
+    checkIngressController: jest.fn(),
+    getDeploymentStatus: jest.fn(),
+    waitForDeploymentReady: jest.fn(),
   };
 }
 

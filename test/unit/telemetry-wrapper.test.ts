@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, jest } from '@jest/globals';
-import { buildImageTool, deployTool, analyzeRepoTool } from '../../src/tools/index';
+import { buildImageTool, analyzeRepoTool } from '../../src/tools/index';
 import type { ToolContext } from '../../src/mcp/context';
 
 // Mock tool context for testing
@@ -44,7 +44,7 @@ describe('Telemetry Wrapper Pattern', () => {
     });
 
     it('should expose properties for all tools', () => {
-      const tools = [buildImageTool, deployTool, analyzeRepoTool];
+      const tools = [buildImageTool, analyzeRepoTool];
 
       for (const tool of tools) {
         expect(tool).toHaveProperty('name');
@@ -130,18 +130,6 @@ describe('Telemetry Wrapper Pattern', () => {
       }).toThrow();
     });
 
-    it('should validate complex nested structures', () => {
-      const validDeployParams = {
-        manifestsPath: '/manifests',
-        namespace: 'default',
-        replicas: 3,
-        port: 8080,
-      };
-
-      const typedInput = deployTool.parse(validDeployParams);
-
-      expect(typedInput).toMatchObject(validDeployParams);
-    });
   });
 
   describe('handler Method', () => {

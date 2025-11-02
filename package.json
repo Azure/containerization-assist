@@ -1,6 +1,6 @@
 {
   "name": "containerization-assist-mcp",
-  "version": "1.0.1-dev.3",
+  "version": "1.0.1-dev.4",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -112,9 +112,9 @@
     "@types/node": "^24.9.1",
     "@types/tar-fs": "^2.0.4",
     "@types/tmp": "^0.2.6",
-    "ai": "^5.0.76",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
+    "ai": "^5.0.76",
     "eslint": "^9.38.0",
     "husky": "^9.1.7",
     "jest": "^30.2.0",

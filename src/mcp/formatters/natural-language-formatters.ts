@@ -19,7 +19,6 @@
 
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
@@ -29,11 +28,7 @@ import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
-import {
-  formatSize,
-  formatDuration,
-  formatVulnerabilities,
-} from '@/lib/summary-helpers';
+import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary-helpers';
 
 /**
  * Format scan-image result as natural language narrative
@@ -86,7 +81,9 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
 
   // Remediation guidance
   if (result.remediationGuidance && result.remediationGuidance.length > 0) {
-    parts.push(`\n**Remediation Recommendations:** (${result.remediationGuidance.length} available)`);
+    parts.push(
+      `\n**Remediation Recommendations:** (${result.remediationGuidance.length} available)`,
+    );
     result.remediationGuidance.slice(0, 5).forEach((guidance, idx) => {
       parts.push(`  ${idx + 1}. ${guidance.recommendation}`);
       if (guidance.example) {
@@ -153,13 +150,34 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
   // Project info
   const { repositoryInfo, recommendations } = plan;
-  const langVersion = repositoryInfo.languageVersion ? ` ${repositoryInfo.languageVersion}` : '';
-  const framework = repositoryInfo.frameworks?.[0]?.name ? ` (${repositoryInfo.frameworks[0].name})` : '';
+  const framework = repositoryInfo.frameworks?.[0]?.name
+    ? ` (${repositoryInfo.frameworks[0].name})`
+    : '';
   parts.push(`**Project:** ${repositoryInfo.name}`);
-  parts.push(`**Language:** ${repositoryInfo.language}${langVersion}${framework}`);
-  parts.push(`**Strategy:** ${recommendations.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build`);
+  parts.push(`**Language:** ${repositoryInfo.language}${framework}`);
+
+  if (repositoryInfo.buildSystems && repositoryInfo.buildSystems.length > 0) {
+    repositoryInfo.buildSystems.forEach((bs) => {
+      const version = bs.languageVersion
+        ? ` (${repositoryInfo.language} ${bs.languageVersion})`
+        : '';
+      parts.push(`**Build System:** ${bs.type}${version}`);
+    });
+  }
+
+  parts.push(
+    `**Strategy:** ${recommendations.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build`,
+  );
   if (recommendations.buildStrategy.reason) {
     parts.push(`  ${recommendations.buildStrategy.reason}`);
+  }
+
+  // Platform and tag recommendations
+  if (recommendations.platform) {
+    parts.push(`**Platform:** ${recommendations.platform}`);
+  }
+  if (recommendations.defaultTag) {
+    parts.push(`**Default Tag:** ${recommendations.defaultTag}`);
   }
 
   // Base images - opinionated recommendation (top 1-2 only)
@@ -186,7 +204,9 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
   // Security
   if (recommendations.securityConsiderations.length > 0) {
-    parts.push(`\n**Security Considerations:** (${recommendations.securityConsiderations.length} items)`);
+    parts.push(
+      `\n**Security Considerations:** (${recommendations.securityConsiderations.length} items)`,
+    );
     recommendations.securityConsiderations.slice(0, 5).forEach((rec) => {
       const severity = rec.severity ? ` [${rec.severity}]` : '';
       parts.push(`  • ${rec.recommendation}${severity}`);
@@ -212,12 +232,12 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
 
     if (guidance.preserve.length > 0) {
       parts.push(`\n  **Preserve:** (${guidance.preserve.length} items)`);
-      guidance.preserve.forEach(item => parts.push(`    ✓ ${item}`));
+      guidance.preserve.forEach((item) => parts.push(`    ✓ ${item}`));
     }
 
     if (guidance.improve.length > 0) {
       parts.push(`\n  **Improve:** (${guidance.improve.length} items)`);
-      guidance.improve.forEach(item => parts.push(`    → ${item}`));
+      guidance.improve.forEach((item) => parts.push(`    → ${item}`));
     }
   }
 
@@ -227,7 +247,7 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
     parts.push(`\n**Policy Validation:** ${passed ? '✅ Passed' : '❌ Failed'}`);
     if (violations.length > 0) {
       parts.push(`  Violations: ${violations.length}`);
-      violations.slice(0, 3).forEach(v => parts.push(`    • ${v.message}`));
+      violations.slice(0, 3).forEach((v) => parts.push(`    • ${v.message}`));
     }
     if (warnings.length > 0) {
       parts.push(`  Warnings: ${warnings.length}`);
@@ -249,72 +269,6 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
   return parts.join('\n');
 }
 
-/**
- * Format deploy result as natural language narrative
- *
- * @param result - Deployment result with status and endpoint information
- * @returns Formatted narrative with deployment status, endpoints, conditions, and next steps
- *
- * @description
- * Produces a detailed deployment report including:
- * - Deployment status (DEPLOYED or IN PROGRESS with icon)
- * - Application, namespace, and service information
- * - Replica readiness status
- * - Endpoints (external and internal with type indicators)
- * - Deployment conditions with status icons
- * - Context-aware next steps based on ready status
- */
-export function formatDeployNarrative(result: DeployApplicationResult): string {
-  const parts: string[] = [];
-
-  // Header
-  const icon = result.ready ? '✅' : '⏳';
-  const status = result.ready ? 'DEPLOYED' : 'IN PROGRESS';
-  parts.push(`${icon} Deployment ${status}\n`);
-
-  // Deployment info
-  parts.push(`**Application:** ${result.deploymentName}`);
-  parts.push(`**Namespace:** ${result.namespace}`);
-  parts.push(`**Service:** ${result.serviceName}`);
-
-  // Status
-  if (result.status) {
-    const { readyReplicas, totalReplicas } = result.status;
-    parts.push(`**Status:** ${readyReplicas}/${totalReplicas} replicas ready`);
-  }
-
-  // Endpoints
-  if (result.endpoints.length > 0) {
-    parts.push(`\n**Endpoints:** (${result.endpoints.length} available)`);
-    result.endpoints.forEach((ep) => {
-      const type = ep.type === 'external' ? '🌐 External' : '🔒 Internal';
-      parts.push(`  ${type}: ${ep.url}:${ep.port}`);
-    });
-  }
-
-  // Conditions
-  if (result.status?.conditions) {
-    parts.push('\n**Conditions:**');
-    result.status.conditions.forEach((cond) => {
-      const statusIcon = cond.status === 'True' ? '✓' : '✗';
-      parts.push(`  ${statusIcon} ${cond.type}: ${cond.message}`);
-    });
-  }
-
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  if (result.ready) {
-    parts.push('  → Use verify-deploy to check deployment health');
-    parts.push('  → Test application endpoints');
-    parts.push('  → Monitor pod logs for issues');
-  } else {
-    parts.push('  → Wait for all replicas to become ready');
-    parts.push('  → Check pod status with kubectl get pods');
-    parts.push('  → Review pod logs if deployment stalls');
-  }
-
-  return parts.join('\n');
-}
 
 /**
  * Format build-image result as natural language narrative
@@ -397,13 +351,16 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
     parts.push(`\n**Modules Found:** ${result.modules.length}`);
     result.modules.forEach((module, idx) => {
       parts.push(`\n  ${idx + 1}. **${module.name}**`);
-      parts.push(`     Language: ${module.language}${module.languageVersion ? ` ${module.languageVersion}` : ''}`);
+      parts.push(`     Language: ${module.language}`);
       if (module.frameworks && module.frameworks.length > 0) {
-        const frameworks = module.frameworks.map(f => f.name).join(', ');
+        const frameworks = module.frameworks.map((f) => f.name).join(', ');
         parts.push(`     Frameworks: ${frameworks}`);
       }
-      if (module.buildSystem) {
-        parts.push(`     Build System: ${module.buildSystem.type || 'Unknown'}`);
+      if (module.buildSystems && module.buildSystems.length > 0) {
+        module.buildSystems.forEach((bs) => {
+          const version = bs.languageVersion ? ` (${module.language} ${bs.languageVersion})` : '';
+          parts.push(`     Build System: ${bs.type}${version}`);
+        });
       }
       if (module.entryPoint) {
         parts.push(`     Entry Point: ${module.entryPoint}`);
@@ -569,7 +526,9 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string 
     medium: '🟡',
     low: '🟢',
   };
-  parts.push(`**Priority:** ${priorityIcon[result.priority] || '⚪'} ${result.priority.toUpperCase()}`);
+  parts.push(
+    `**Priority:** ${priorityIcon[result.priority] || '⚪'} ${result.priority.toUpperCase()}`,
+  );
   parts.push(`**Estimated Impact:** ${result.estimatedImpact}`);
   parts.push(`**Confidence:** ${Math.round(result.confidence * 100)}%`);
 
@@ -789,7 +748,7 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): strin
   parts.push(`\n**Next Steps:**`);
   parts.push('  1. Create manifest files using the recommendations above');
   parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
-  parts.push('  3. Use deploy to apply manifests to cluster');
+  parts.push('  3. Use kubectl apply to deploy manifests to cluster');
   parts.push('  4. Verify deployment with verify-deploy');
 
   return parts.join('\n');
@@ -942,7 +901,7 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult): str
   parts.push(`\n**Next Steps:**`);
   if (result.success && result.clusterReady) {
     parts.push('  → Cluster is ready for deployment');
-    parts.push('  → Use deploy to deploy your application');
+    parts.push('  → Use kubectl apply to deploy your application');
     parts.push('  → Resources will be deployed to the prepared namespace');
   } else {
     parts.push('  → Check cluster connectivity');

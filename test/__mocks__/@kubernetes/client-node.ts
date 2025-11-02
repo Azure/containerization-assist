@@ -328,15 +328,15 @@ const mockKubeConfig = {
     }
     const apiName = ApiClass.name || ApiClass.constructor?.name || '';
     switch (apiName) {
-      case 'CoreV1Api':
+      case 'ObjectCoreV1Api':
         return createCoreV1ApiMock();
-      case 'AppsV1Api':
+      case 'ObjectAppsV1Api':
         return createAppsV1ApiMock();
-      case 'NetworkingV1Api':
+      case 'ObjectNetworkingV1Api':
         return createNetworkingV1ApiMock();
-      case 'BatchV1Api':
+      case 'ObjectBatchV1Api':
         return createBatchV1ApiMock();
-      case 'AuthorizationV1Api':
+      case 'ObjectAuthorizationV1Api':
         return { createSelfSubjectAccessReview: jest.fn().mockResolvedValue({ status: { allowed: true } }) };
       default:
         return {};
