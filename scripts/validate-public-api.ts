@@ -40,7 +40,6 @@ const PUBLIC_EXPORTS: PublicExport[] = [
   // Individual tool exports - Public API
   { file: 'src/index.ts', exportName: 'analyzeRepoTool', exportType: 'value', critical: false },
   { file: 'src/index.ts', exportName: 'buildImageTool', exportType: 'value', critical: false },
-  { file: 'src/index.ts', exportName: 'deployTool', exportType: 'value', critical: false },
   { file: 'src/index.ts', exportName: 'fixDockerfileTool', exportType: 'value', critical: false },
   { file: 'src/index.ts', exportName: 'generateDockerfileTool', exportType: 'value', critical: false },
   { file: 'src/index.ts', exportName: 'generateK8sManifestsTool', exportType: 'value', critical: false },

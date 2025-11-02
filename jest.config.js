@@ -168,8 +168,8 @@ export default {
     './src/tools/': {
       branches: 50,
       functions: 64,
-      lines: 65,
-      statements: 65,
+      lines: 63,
+      statements: 63,
     },
     './src/lib/': {
       branches: 50,

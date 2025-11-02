@@ -8,6 +8,7 @@
  */
 
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
+import { getRegistryCredentials } from '@/infra/docker/credential-helpers';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { parseImageName } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';
@@ -65,29 +66,70 @@ async function handlePushImage(
       (ctx && 'docker' in ctx && ((ctx as Record<string, unknown>).docker as DockerClient)) ||
       createDockerClient(logger);
 
-    // Extract repository and tag from parsed image
-    // Preserve original registry if present, then apply override if provided
-    let repository = parsedImage.value.registry
-      ? `${parsedImage.value.registry}/${parsedImage.value.repository}`
-      : parsedImage.value.repository;
+    // Determine the final repository and tag based on registry input
+    let repository: string;
     const tag = parsedImage.value.tag;
 
-    // Override registry if explicitly provided
     if (input.registry) {
+      // Registry provided - clean it and determine if we need to prefix
       const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      const expectedPrefix = `${registryHost}/`;
 
-      // Check if repository already starts with the registry override (avoid double-prefixing)
-      if (!repository.startsWith(expectedPrefix)) {
-        // Repository doesn't start with the override, so replace/add the registry
+      // Check if the image already contains the registry (avoid double prefixing)
+      // Reconstruct the full image path (without tag) to compare with target registry
+      const fullImagePath = parsedImage.value.registry ?
+        `${parsedImage.value.registry}/${parsedImage.value.repository}` :
+        parsedImage.value.repository;
+
+      // Check if the image already starts with the target registry
+      if (fullImagePath === registryHost || fullImagePath.startsWith(`${registryHost}/`)) {
+        // Image already contains the target registry - use the full path as-is
+        repository = fullImagePath;
+      } else if (parsedImage.value.repository.includes('/') && !parsedImage.value.repository.startsWith('docker.io/')) {
+        // Image has namespace or registry prefix that doesn't match input registry
+        // Only strip first part if it looks like a registry hostname (contains '.' or ':')
+        const imageParts = parsedImage.value.repository.split('/');
+        const firstPart = imageParts[0];
+
+        if (firstPart && (firstPart.includes('.') || firstPart.includes(':'))) {
+          // Looks like a registry hostname, replace it
+          const pathAfterRegistry = imageParts.slice(1).join('/');
+          repository = `${registryHost}/${pathAfterRegistry}`;
+        } else {
+          // Looks like a namespace/organization, keep the full path
+          repository = `${registryHost}/${parsedImage.value.repository}`;
+        }
+      } else {
+        // No registry in image or it's docker.io - prefix with input registry
         repository = `${registryHost}/${parsedImage.value.repository}`;
       }
-      // else: repository already has the correct registry prefix, keep as-is
+    } else {
+      // No registry provided - use image as-is (defaults to Docker Hub)
+      repository = parsedImage.value.repository;
     }
 
-    // Build auth config if credentials are provided
+    // Build auth config - try credential helpers first, then manual credentials
     let authConfig: { username: string; password: string; serveraddress: string } | undefined;
-    if (input.credentials && input.registry) {
+
+    // Try Docker credential helpers first (only if registry is provided)
+    if (input.registry) {
+      const credResult = await getRegistryCredentials(input.registry, logger);
+      if (credResult.ok && credResult.value) {
+        authConfig = credResult.value;
+        logger.info({
+          registry: input.registry,
+          username: authConfig.username,
+          serveraddress: authConfig.serveraddress,
+          passwordProvided: !!authConfig.password,
+        }, 'Using credentials from Docker credential helper');
+      } else if (credResult.ok) {
+        logger.debug({ registry: input.registry }, 'No credentials found in Docker credential helpers');
+      } else {
+        logger.debug({ registry: input.registry, error: credResult.error }, 'Credential helper lookup failed');
+      }
+    }
+
+    // Fall back to manual credentials if provided and no credentials found via helpers
+    if (!authConfig && input.credentials) {
       // Validate that both username and password are present
       if (!input.credentials.username || !input.credentials.password) {
         return Failure(
@@ -100,25 +142,24 @@ async function handlePushImage(
         );
       }
 
-      logger.info({ registry: input.registry }, 'Preparing registry authentication');
+      logger.info({ registry: input.registry }, 'Using provided credentials');
 
-      // Normalize registry URL for auth config - strip protocol and trailing slash
-      let registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-      // Strip /v1 or /v1/ suffix before comparison
-      registryHost = registryHost.replace(/\/v1\/?$/, '');
-
-      // Docker Hub requires canonical serveraddress to avoid auth failures
+      // Simple serveraddress: use the registry host for most cases, special case Docker Hub
       let serverAddress: string;
-      if (
-        registryHost === 'docker.io' ||
-        registryHost === 'index.docker.io' ||
-        registryHost === 'registry-1.docker.io' ||
-        registryHost === ''
-      ) {
-        serverAddress = 'https://index.docker.io/v1/';
+      if (input.registry) {
+        const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        if (
+          registryHost === 'docker.io' ||
+          registryHost === 'index.docker.io' ||
+          registryHost === 'registry-1.docker.io'
+        ) {
+          serverAddress = 'https://index.docker.io/v1/';
+        } else {
+          serverAddress = registryHost;
+        }
       } else {
-        serverAddress = registryHost;
+        // Default to Docker Hub if no registry provided
+        serverAddress = 'https://index.docker.io/v1/';
       }
 
       authConfig = {
@@ -128,23 +169,29 @@ async function handlePushImage(
       };
     }
 
-    // Tag image if registry was specified
-    if (input.registry) {
-      const tagResult = await dockerClient.tagImage(input.imageId, repository, tag);
-      if (!tagResult.ok) {
-        return Failure(
-          `Failed to tag image: ${tagResult.error}`,
-          tagResult.guidance ||
-            createErrorGuidance(
-              tagResult.error,
-              'Unable to tag the Docker image',
-              'Verify the image exists with `docker images` and the tag format is valid.',
-            ),
-        );
-      }
+    // Tag image with target registry
+    const tagResult = await dockerClient.tagImage(input.imageId, repository, tag);
+    if (!tagResult.ok) {
+      return Failure(
+        `Failed to tag image: ${tagResult.error}`,
+        tagResult.guidance ||
+          createErrorGuidance(
+            tagResult.error,
+            'Unable to tag the Docker image',
+            'Verify the image exists with `docker images` and the tag format is valid.',
+          ),
+      );
     }
 
     // Push the image with auth config if provided
+    logger.info({
+      repository,
+      tag,
+      hasAuthConfig: !!authConfig,
+      authServerAddress: authConfig?.serveraddress,
+      authUsername: authConfig?.username
+    }, 'Pushing image to registry');
+
     const pushResult = await dockerClient.pushImage(repository, tag, authConfig);
     if (!pushResult.ok) {
       // Use the guidance from the Docker client if available
@@ -152,7 +199,18 @@ async function handlePushImage(
     }
 
     const pushTime = Date.now() - startTime;
-    const pushedTag = `${repository}:${tag}`;
+    // Build pushed tag for the response - use original image format if no registry, otherwise use the resolved repository
+    const pushedTag = input.registry ? `${repository}:${tag}` : `${parsedImage.value.repository}:${tag}`;
+
+    // Build display tag for summary based on the actual registry used
+    let displayTag: string;
+    if (input.registry) {
+      // Custom registry provided - use the resolved repository format
+      displayTag = `${repository}:${tag}`;
+    } else {
+      // No custom registry - always use docker.io prefix
+      displayTag = `docker.io/${repository}:${tag}`;
+    }
 
     logger.info(
       { pushedTag, pushTime, digest: pushResult.value.digest },
@@ -160,21 +218,19 @@ async function handlePushImage(
     );
 
     // Generate summary
-    const registryName = input.registry ?? 'docker.io';
-    // Truncate digest to show algorithm + first 6 hex chars (e.g., sha256:abc123...)
     const digest = pushResult.value.digest;
-    const colonIdx = digest.indexOf(':');
-    const digestShort =
-      colonIdx !== -1 && digest.length > colonIdx + 6
-        ? digest.substring(0, colonIdx + 7) // algorithm:6chars
-        : digest.substring(0, 17); // fallback for unexpected format
-    const summary = `✅ Pushed image to registry. Image: ${registryName}/${pushedTag}. Digest: ${digestShort}...`;
+    // Truncate digest to algorithm + 6 chars (e.g. "sha256:abcdef...")
+    const colonIndex = digest.indexOf(':');
+    const digestShort = colonIndex >= 0 && digest.length > colonIndex + 7
+      ? `${digest.substring(0, colonIndex + 7)}...`
+      : digest;
+    const summary = `✅ Pushed image to registry. Image: ${displayTag}. Digest: ${digestShort}`;
 
     // Return success response
     const result: PushImageResult = {
       summary,
       success: true,
-      registry: registryName,
+      registry: input.registry || 'docker.io',
       digest: pushResult.value.digest,
       pushedTag,
     };
