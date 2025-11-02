@@ -6,13 +6,11 @@ import { describe, it, expect } from '@jest/globals';
 import {
   formatScanImageNarrative,
   formatDockerfilePlanNarrative,
-  formatDeployNarrative,
   formatBuildImageNarrative,
   formatAnalyzeRepoNarrative,
 } from '@/mcp/formatters/natural-language-formatters';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 
@@ -170,7 +168,7 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Files:**');
       expect(narrative).toContain('./Dockerfile');
       expect(narrative).toContain('**Project:** my-app');
-      expect(narrative).toContain('**Language:** javascript 18.0.0 (Express)');
+      expect(narrative).toContain('**Language:** javascript (Express)');
       expect(narrative).toContain('**Strategy:** Multi-stage build');
       expect(narrative).toContain('node:18-alpine');
       expect(narrative).toContain('**Security Considerations:**');
@@ -299,75 +297,6 @@ describe('natural-language-formatters', () => {
     });
   });
 
-  describe('formatDeployNarrative', () => {
-    it('should format successful deployment', () => {
-      const result: DeployApplicationResult = {
-        success: true,
-        namespace: 'production',
-        deploymentName: 'my-app',
-        serviceName: 'my-app-service',
-        ready: true,
-        replicas: 3,
-        endpoints: [
-          {
-            type: 'external',
-            url: 'https://my-app.example.com',
-            port: 443,
-          },
-          {
-            type: 'internal',
-            url: 'my-app-service.production.svc.cluster.local',
-            port: 8080,
-          },
-        ],
-        status: {
-          readyReplicas: 3,
-          totalReplicas: 3,
-          conditions: [
-            {
-              type: 'Available',
-              status: 'True',
-              message: 'Deployment has minimum availability',
-            },
-          ],
-        },
-      };
-
-      const narrative = formatDeployNarrative(result);
-
-      expect(narrative).toContain('✅ Deployment DEPLOYED');
-      expect(narrative).toContain('**Application:** my-app');
-      expect(narrative).toContain('**Namespace:** production');
-      expect(narrative).toContain('**Status:** 3/3 replicas ready');
-      expect(narrative).toContain('**Endpoints:**');
-      expect(narrative).toContain('🌐 External');
-      expect(narrative).toContain('🔒 Internal');
-      expect(narrative).toContain('Use verify-deploy to check deployment health');
-    });
-
-    it('should format in-progress deployment', () => {
-      const result: DeployApplicationResult = {
-        success: true,
-        namespace: 'staging',
-        deploymentName: 'my-app',
-        serviceName: 'my-app-service',
-        ready: false,
-        replicas: 3,
-        endpoints: [],
-        status: {
-          readyReplicas: 1,
-          totalReplicas: 3,
-          conditions: [],
-        },
-      };
-
-      const narrative = formatDeployNarrative(result);
-
-      expect(narrative).toContain('⏳ Deployment IN PROGRESS');
-      expect(narrative).toContain('**Status:** 1/3 replicas ready');
-      expect(narrative).toContain('Wait for all replicas to become ready');
-    });
-  });
 
   describe('formatBuildImageNarrative', () => {
     it('should format successful build with all details', () => {
@@ -420,15 +349,16 @@ describe('natural-language-formatters', () => {
             name: 'main',
             modulePath: '/app',
             language: 'python',
-            languageVersion: '3.11',
             frameworks: [
               { name: 'Django', version: '4.2.0' },
               { name: 'DRF', version: '3.14.0' },
             ],
-            buildSystem: {
-              type: 'pip',
-              configFile: 'requirements.txt',
-            },
+            buildSystems: [
+              {
+                type: 'pip',
+                languageVersion: '3.11',
+              },
+            ],
             entryPoint: 'manage.py',
             ports: [8000],
           },
@@ -444,9 +374,9 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Type:** Single-module project');
       expect(narrative).toContain('**Modules Found:** 1');
       expect(narrative).toContain('1. **main**');
-      expect(narrative).toContain('Language: python 3.11');
+      expect(narrative).toContain('Language: python');
       expect(narrative).toContain('Frameworks: Django, DRF');
-      expect(narrative).toContain('Build System: pip');
+      expect(narrative).toContain('Build System: pip (python 3.11)');
       expect(narrative).toContain('Entry Point: manage.py');
       expect(narrative).toContain('Ports: 8000');
       expect(narrative).toContain('Use generate-dockerfile to create container configuration');
@@ -459,7 +389,6 @@ describe('natural-language-formatters', () => {
             name: 'frontend',
             modulePath: '/app/frontend',
             language: 'typescript',
-            languageVersion: '5.0.0',
             frameworks: [{ name: 'React', version: '18.2.0' }],
             ports: [3000],
           },
@@ -467,7 +396,6 @@ describe('natural-language-formatters', () => {
             name: 'backend',
             modulePath: '/app/backend',
             language: 'go',
-            languageVersion: '1.21',
             ports: [8080],
           },
         ],

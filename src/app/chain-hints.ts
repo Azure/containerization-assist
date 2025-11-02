@@ -39,12 +39,6 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
     failure: 'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image.',
   },
 
-  [TOOL_NAME.DEPLOY]: {
-    success:
-      'Application deployed successfully. Use verify-deploy to check deployment health and status.',
-    failure:
-      'Deployment failed. Check cluster connectivity, manifests validity, and resource availability.',
-  },
 
   [TOOL_NAME.FIX_DOCKERFILE]: {
     success:
@@ -59,7 +53,7 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
   },
 
   [TOOL_NAME.PREPARE_CLUSTER]: {
-    success: 'Cluster preparation successful. Next: Call deploy to deploy to the kind cluster.',
+    success: 'Cluster preparation successful. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
     failure:
       'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
   },

@@ -18,6 +18,7 @@ import type { AppRuntime, ExecutionMetadata, ToolInputMap, ToolResultMap } from 
 import type { Tool } from '@/types/tool';
 import type { ToolName } from '@/tools';
 import { extractErrorMessage } from './errors';
+import { formatOutput, OUTPUTFORMAT, type OutputFormat } from '@/mcp/mcp-server';
 
 /**
  * Tool handler wrapper options with type-safe callbacks
@@ -51,6 +52,9 @@ import { extractErrorMessage } from './errors';
 export interface ToolHandlerOptions<TName extends ToolName = ToolName> {
   /** Custom transport label for logging (default: 'external') */
   transport?: string;
+
+  /** Output format for tool results (default: 'natural-language') */
+  outputFormat?: OutputFormat;
 
   /** Custom error handler - called before throwing McpError */
   onError?: (error: unknown, toolName: TName, params: ToolInputMap[TName]) => void;
@@ -87,6 +91,7 @@ export interface ToolHandlerOptions<TName extends ToolName = ToolName> {
  *   buildImageTool.inputSchema,
  *   createToolHandler(app, 'build-image', {
  *     transport: 'my-integration',
+ *     outputFormat: 'markdown', // Use markdown format instead of JSON
  *     onSuccess: (result, toolName, params) => {
  *       // result: BuildImageResult (fully typed!)
  *       // params: BuildImageInput (fully typed!)
@@ -107,7 +112,12 @@ export function createToolHandler<TName extends ToolName>(
   toolName: TName,
   options: ToolHandlerOptions<TName> = {},
 ) {
-  const { transport = 'external', onError, onSuccess } = options;
+  const {
+    transport = 'external',
+    outputFormat = OUTPUTFORMAT.NATURAL_LANGUAGE,
+    onError,
+    onSuccess,
+  } = options;
 
   return async (
     rawParams: Record<string, unknown> | undefined,
@@ -117,9 +127,10 @@ export function createToolHandler<TName extends ToolName>(
 
     try {
       // Extract _meta if present
-      const meta = params._meta && typeof params._meta === 'object'
-        ? (params._meta as Record<string, unknown>)
-        : {};
+      const meta =
+        params._meta && typeof params._meta === 'object'
+          ? (params._meta as Record<string, unknown>)
+          : {};
 
       // Extract metadata from MCP request
       const metadata: ExecutionMetadata = {
@@ -176,16 +187,19 @@ export function createToolHandler<TName extends ToolName>(
       // Call success handler if provided
       if (onSuccess) {
         // Type assertion is safe for the same reasons as above
-        onSuccess(result.value as ToolResultMap[TName], toolName, sanitizedParams as ToolInputMap[TName]);
+        onSuccess(
+          result.value as ToolResultMap[TName],
+          toolName,
+          sanitizedParams as ToolInputMap[TName],
+        );
       }
 
       // Return formatted result
-      // Note: formatting is handled by the MCP server's output format setting
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify(result.value, null, 2),
+            text: formatOutput(result.value, outputFormat),
           },
         ],
       };

@@ -22,7 +22,6 @@ import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { DeployApplicationResult } from '@/tools/deploy/tool';
 import type { BuildImageResult } from '@/tools/build-image/tool';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
@@ -35,7 +34,6 @@ import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import {
   formatScanImageNarrative,
   formatDockerfilePlanNarrative,
-  formatDeployNarrative,
   formatBuildImageNarrative,
   formatAnalyzeRepoNarrative,
   formatVerifyDeployNarrative,
@@ -170,7 +168,7 @@ export function createMCPServer<TTool extends Tool>(
 
   const server = new McpServer(serverOptions);
   const transportType = options.transport ?? 'stdio';
-  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.MARKDOWN;
+  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.NATURAL_LANGUAGE;
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
@@ -263,9 +261,7 @@ export function createMCPServer<TTool extends Tool>(
  * delegated to the orchestrator's execute function.
  * @param options - Registration options including server, tools, and executor
  */
-export function registerToolsWithServer<TTool extends Tool>(
-  options: RegisterOptions<TTool>,
-): void {
+export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
   const { server, tools, logger, transport, execute, outputFormat } = options;
 
   for (const tool of tools) {
@@ -516,9 +512,6 @@ function formatAsNaturalLanguage(output: unknown): string {
   if (isDockerfilePlan(output)) {
     return formatDockerfilePlanNarrative(output);
   }
-  if (isDeployResult(output)) {
-    return formatDeployNarrative(output);
-  }
   if (isBuildImageResult(output)) {
     return formatBuildImageNarrative(output);
   }
@@ -574,12 +567,21 @@ function isScanImageResult(output: object): output is ScanImageResult {
 }
 
 function isDockerfilePlan(output: object): output is DockerfilePlan {
-  return 'recommendations' in output && 'repositoryInfo' in output;
+  if (!('recommendations' in output && 'repositoryInfo' in output)) {
+    return false;
+  }
+  if ('manifestType' in output) {
+    return false;
+  }
+
+  const recommendations = (output as { recommendations: unknown }).recommendations;
+  return (
+    typeof recommendations === 'object' &&
+    recommendations !== null &&
+    'buildStrategy' in recommendations
+  );
 }
 
-function isDeployResult(output: object): output is DeployApplicationResult {
-  return 'deploymentName' in output && 'endpoints' in output && 'namespace' in output;
-}
 
 function isBuildImageResult(output: object): output is BuildImageResult {
   return 'imageId' in output && 'buildTime' in output;

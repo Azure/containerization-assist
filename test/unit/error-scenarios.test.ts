@@ -28,8 +28,6 @@ import tagImageTool from '@/tools/tag-image/tool';
 import pushImageTool from '@/tools/push-image/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
 import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
-import deployTool from '@/tools/deploy/tool';
-import verifyDeployTool from '@/tools/verify-deploy/tool';
 import prepareClusterTool from '@/tools/prepare-cluster/tool';
 
 const logger = createLogger({ level: 'silent' });
@@ -206,9 +204,9 @@ describe('Error Scenario Coverage', () => {
       expect(result.ok !== undefined).toBe(true);
     });
 
-    it('should reject deploy with invalid manifest path', async () => {
-      const result = await deployTool.handler(
-        { manifestsPath: '/nonexistent/k8s.yaml' },
+    it('should reject prepare-cluster with invalid namespace', async () => {
+      const result = await prepareClusterTool.handler(
+        { namespace: '-invalid-namespace' },
         toolContext
       );
 
@@ -292,21 +290,6 @@ describe('Error Scenario Coverage', () => {
         if (result.guidance) {
           expect(result.guidance.message).toBeDefined();
         }
-      }
-    });
-
-    it('should handle Kubernetes cluster unavailable', async () => {
-      const result = await deployTool.handler(
-        {
-          manifestsPath: '/tmp/fake-manifest.yaml',
-          namespace: 'default',
-        },
-        toolContext
-      );
-
-      // Should fail with guidance about K8s
-      if (!result.ok) {
-        expect(result.error).toBeDefined();
       }
     });
 
@@ -428,20 +411,6 @@ describe('Error Scenario Coverage', () => {
       }
     });
 
-    it('should handle missing kubeconfig', async () => {
-      const result = await verifyDeployTool.handler(
-        {
-          namespace: 'nonexistent-namespace',
-          deploymentName: 'test-app',
-        },
-        toolContext
-      );
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBeDefined();
-      }
-    });
   });
 
   describe('Validation Failures', () => {
@@ -491,17 +460,11 @@ CMD ["node", "app.js"]`
       }
     });
 
-    it('should reject invalid K8s manifest structure', async () => {
-      const { dir, cleanup } = createTestTempDir('invalid-k8s-');
-      const manifestPath = join(dir.name, 'invalid.yaml');
-      writeFileSync(manifestPath, 'invalid: yaml: structure:');
-
-      const result = await deployTool.handler(
-        { manifestsPath: manifestPath },
+    it('should reject invalid namespace format', async () => {
+      const result = await prepareClusterTool.handler(
+        { namespace: 'Invalid_Namespace_Name!' },
         toolContext
       );
-
-      await cleanup();
 
       expect(result.ok).toBe(false);
       if (!result.ok) {

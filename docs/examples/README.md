@@ -200,7 +200,6 @@ import {
   pushImageTool,             // Push images to registry
   generateK8sManifestsTool,  // Kubernetes manifest generation
   prepareClusterTool,        // Kubernetes cluster preparation
-  deployTool,                // Deploy applications to Kubernetes
   verifyDeployTool,          // Verify deployment status
   opsTool,                   // Operational utilities
 } from 'containerization-assist-mcp';
@@ -219,7 +218,6 @@ Use these string names when defining aliases:
 - `'push-image'` - Registry push
 - `'generate-k8s-manifests'` - K8s manifest generation
 - `'prepare-cluster'` - Cluster setup
-- `'deploy'` - Kubernetes deployment
 - `'verify-deploy'` - Deployment verification
 - `'ops'` - Operational utilities
 
