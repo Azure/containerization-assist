@@ -234,39 +234,6 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
 ];
 
 /**
- * Create a platform validation rule for a specific target platform.
- * This rule checks that all FROM instructions specify the correct --platform flag.
- */
-function createPlatformValidationRule(targetPlatform: DockerPlatform): DockerfileValidationRule {
-  return {
-    id: 'platform-specified',
-    name: 'Platform explicitly specified',
-    description: `All FROM instructions should specify --platform=${targetPlatform}`,
-    check: (commands: CommandEntry[]) => {
-      const fromCommands = commands.filter((cmd: DockerCommand) => cmd.name === 'FROM');
-
-      return fromCommands.every((cmd: DockerCommand) => {
-        const args = getArgValue(cmd);
-
-        // Check if --platform flag is present
-        const platformMatch = args.match(/--platform[=\s]+([^\s]+)/);
-
-        if (!platformMatch) {
-          return false; // No platform specified
-        }
-
-        const specifiedPlatform = platformMatch[1];
-        return specifiedPlatform === targetPlatform;
-      });
-    },
-    message: `All FROM instructions must specify --platform=${targetPlatform}`,
-    severity: ValidationSeverity.ERROR,
-    fix: `Add --platform=${targetPlatform} to all FROM instructions (e.g., FROM --platform=${targetPlatform} node:20-alpine)`,
-    category: ValidationCategory.BEST_PRACTICE,
-  };
-}
-
-/**
  * Parse Dockerfile content into commands
  */
 const parseDockerfile = (content: string): Result<DockerCommand[]> => {
@@ -579,11 +546,8 @@ export const validateDockerfileContent = async (
   // Detect BuildKit features first
   const buildKit = detectBuildKitFeatures(dockerfileContent);
 
-  // Prepare validation rules - add platform rule if strict mode is enabled
+  // Prepare validation rules
   const validationRules = [...DOCKERFILE_RULES];
-  if (options?.strictPlatformValidation && options?.targetPlatform) {
-    validationRules.push(createPlatformValidationRule(options.targetPlatform));
-  }
 
   if (buildKit.syntax || buildKit.hasHeredocs || buildKit.hasMounts) {
     // Log BuildKit features detected

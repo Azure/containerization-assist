@@ -13,15 +13,13 @@ export const fixDockerfileSchema = z
     path: z.string().optional().describe('Path to Dockerfile file to analyze for fixes'),
     environment: environment.describe('Target environment (production, development, etc.)'),
     targetPlatform: platform.describe(
-      'Target platform for deployment. Validates that all FROM lines specify matching --platform flags. Defaults to linux/amd64.',
+      'Target platform for deployment (e.g., linux/amd64, linux/arm64). Used for context in recommendations.',
     ),
     strictPlatformValidation: z
       .boolean()
       .optional()
-      .default(true)
-      .describe(
-        'Fail if FROM lines lack --platform flags or specify incompatible platforms. When true, ensures all base images explicitly target the correct architecture.',
-      ),
+      .default(false)
+      .describe('Deprecated: No longer enforces platform flags. Reserved for future use.'),
     policyPath: z
       .string()
       .optional()

@@ -1,6 +1,6 @@
 [
   {
-    "id": "java-25-microsoft-mariner",
+    "id": "java-25-microsoft-azurelinux",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk|FROM.*java",
     "recommendation": "Use Microsoft Azure Linux (Mariner) with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance. Note this image does not have tar pre-installed, so install it for Maven builds.",

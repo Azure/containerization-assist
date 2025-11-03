@@ -22,10 +22,8 @@ export const buildImageSchema = z.object({
   strictPlatformValidation: z
     .boolean()
     .optional()
-    .default(true)
-    .describe(
-      'Fail if FROM lines lack --platform flags. When true, ensures all base images explicitly specify platform flags.',
-    ),
+    .default(false)
+    .describe('Deprecated: No longer enforces platform flags. Reserved for future use.'),
 });
 
 export type BuildImageParams = z.infer<typeof buildImageSchema>;

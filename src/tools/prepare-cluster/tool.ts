@@ -551,7 +551,7 @@ apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${DOCKER.REGISTRY_HOST}:${port}"]
-    endpoint = ["http://${DOCKER.REGISTRY_CONTAINER_NAME}:5000"]
+    endpoint = ["http://${DOCKER.REGISTRY_CONTAINER_NAME}:${port}"]
 nodes:
 - role: control-plane
 ${nodeImageLine}

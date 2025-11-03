@@ -24,7 +24,6 @@ import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
 import { type BuildImageParams, buildImageSchema } from './schema';
 import { formatSize, formatDuration } from '@/lib/summary-helpers';
-import * as dockerParser from 'docker-file-parser';
 
 export interface BuildImageResult {
   /**
@@ -55,65 +54,6 @@ export interface BuildImageResult {
   securityWarnings?: string[];
 }
 
-/**
- * Validate that all FROM instructions have --platform flags specified.
- * Returns a Failure if strict mode is enabled and any FROM lines are missing platform flags.
- */
-function validatePlatformFlags(
-  dockerfileContent: string,
-  strictMode: boolean,
-): Result<boolean> {
-  if (!strictMode) {
-    return Success(true);
-  }
-
-  try {
-    const commands = dockerParser.parse(dockerfileContent);
-    const fromCommands = commands.filter((cmd) => cmd.name === 'FROM');
-
-    if (fromCommands.length === 0) {
-      return Failure('Dockerfile has no FROM instructions', {
-        message: 'Invalid Dockerfile: no FROM instructions found',
-        hint: 'Dockerfile must have at least one FROM instruction',
-        resolution: 'Add a FROM instruction to specify the base image',
-      });
-    }
-
-    const missingPlatform: number[] = [];
-
-    fromCommands.forEach((cmd, index) => {
-      const args = typeof cmd.args === 'string' ? cmd.args :
-                   Array.isArray(cmd.args) ? cmd.args.join(' ') : '';
-
-      // Check if --platform flag is present
-      const hasPlatform = /--platform[=\s]+[^\s]+/.test(args);
-
-      if (!hasPlatform) {
-        missingPlatform.push(index + 1);
-      }
-    });
-
-    if (missingPlatform.length > 0) {
-      const stageText = missingPlatform.length === 1 ? 'stage' : 'stages';
-      const lineNumbers = missingPlatform.join(', ');
-
-      return Failure(
-        `Dockerfile FROM instructions missing --platform flag (${stageText} ${lineNumbers})`,
-        {
-          message: `All FROM instructions must specify --platform flag`,
-          hint: `Found ${missingPlatform.length} FROM instruction(s) without --platform flag`,
-          resolution: `Add --platform flag to all FROM instructions. Example: FROM --platform=linux/amd64 node:20-alpine`,
-        },
-      );
-    }
-
-    return Success(true);
-  } catch (error) {
-    // If parsing fails, we'll let the Docker build process handle it
-    // This keeps the validation focused on platform flags only
-    return Success(true);
-  }
-}
 
 
 /**
@@ -267,16 +207,6 @@ async function handleBuildImage(
     }
 
     const dockerfileContent = dockerfileContentResult.value;
-
-    // Validate platform flags if strict mode is enabled
-    const platformValidation = validatePlatformFlags(
-      dockerfileContent,
-      params.strictPlatformValidation ?? true,
-    );
-
-    if (!platformValidation.ok) {
-      return platformValidation;
-    }
 
     // Prepare build arguments
     const finalBuildArgs = await prepareBuildArgs(buildArgs);
