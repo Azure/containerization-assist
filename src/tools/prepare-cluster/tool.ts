@@ -51,6 +51,7 @@ import { pluralize } from '@/lib/summary-helpers';
 const execAsync = promisify(exec);
 
 const KIND_VERSION = 'v0.20.0';
+const KIND_AMD64_NODE_IMAGE = 'kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72'
 
 /**
  * Validate and escape cluster name to prevent command injection.
@@ -155,27 +156,38 @@ async function detectClusterPlatform(logger: pino.Logger): Promise<DockerPlatfor
 /**
  * Validate that target platform is compatible with cluster platform.
  * Returns validation result with detailed guidance.
+ *
+ * @param strictMode - When true, incompatible platforms return a Failure result
  */
 async function validatePlatformCompatibility(
   targetPlatform: DockerPlatform,
   logger: pino.Logger,
   warnings: string[],
-): Promise<{
+  strictMode: boolean,
+): Promise<Result<{
   clusterPlatform: DockerPlatform | null;
   compatible: boolean;
   requiresEmulation: boolean;
-}> {
+}>> {
   const clusterPlatform = await detectClusterPlatform(logger);
 
   if (!clusterPlatform) {
-    warnings.push(
-      `Could not detect cluster platform - unable to verify compatibility with target platform ${targetPlatform}`,
-    );
-    return {
+    const message = `Could not detect cluster platform - unable to verify compatibility with target platform ${targetPlatform}`;
+
+    if (strictMode) {
+      return Failure(message, {
+        message,
+        hint: 'Cluster architecture detection failed',
+        resolution: 'Ensure cluster is running and kubectl can access node information',
+      });
+    }
+
+    warnings.push(message);
+    return Success({
       clusterPlatform: null,
       compatible: false,
       requiresEmulation: false,
-    };
+    });
   }
 
   const compatible = isPlatformCompatible(targetPlatform, clusterPlatform);
@@ -184,6 +196,17 @@ async function validatePlatformCompatibility(
     const requiresEmulation = targetPlatform !== clusterPlatform;
 
     if (requiresEmulation) {
+      const message = `Platform mismatch: cluster is ${clusterPlatform} but target platform is ${targetPlatform}`;
+
+      if (strictMode) {
+        // In strict mode, fail on any platform mismatch
+        return Failure(message, {
+          message,
+          hint: 'Cluster architecture does not match target platform',
+          resolution: `To deploy ${targetPlatform} images, either:\n  1. Recreate cluster with matching architecture, or\n  2. Set strictPlatformValidation=false to allow emulation (may have performance impact)`,
+        });
+      }
+
       // Check if this is a known emulation scenario (e.g., ARM Mac with AMD64 kind cluster)
       const systemInfo = getSystemInfo();
       const hostArch = process.arch;
@@ -202,14 +225,14 @@ async function validatePlatformCompatibility(
         warnings.push(
           `Running AMD64 cluster on ARM Mac - images will use Docker emulation (may have performance impact)`,
         );
-        return {
+        return Success({
           clusterPlatform,
-          compatible: true, // Allow this scenario
+          compatible: true, // Allow this scenario in non-strict mode
           requiresEmulation: true,
-        };
+        });
       }
 
-      // Other emulation scenarios - warn but don't block
+      // Other emulation scenarios - warn but don't block in non-strict mode
       logger.warn(
         { targetPlatform, clusterPlatform },
         'Target platform does not match cluster platform - may require emulation',
@@ -219,19 +242,19 @@ async function validatePlatformCompatibility(
       );
     }
 
-    return {
+    return Success({
       clusterPlatform,
       compatible: false,
       requiresEmulation,
-    };
+    });
   }
 
   logger.info({ targetPlatform, clusterPlatform }, 'Platform compatibility validated successfully');
-  return {
+  return Success({
     clusterPlatform,
     compatible: true,
     requiresEmulation: false,
-  };
+  });
 }
 
 export interface PrepareClusterResult {
@@ -412,6 +435,10 @@ async function installKind(logger: pino.Logger): Promise<void> {
   }
 }
 
+/**
+ * Check if kind cluster exists and validate its architecture if strictMode is enabled.
+ * Returns the cluster existence status.
+ */
 async function checkKindClusterExists(
   clusterName: string,
   logger: pino.Logger,
@@ -436,7 +463,54 @@ async function checkKindClusterExists(
   }
 }
 
-async function createKindCluster(clusterName: string, port: number, logger: pino.Logger): Promise<Result<void>> {
+/**
+ * Validate existing cluster's architecture against target platform in strict mode.
+ * Returns Failure if mismatch detected in strict mode.
+ */
+async function validateExistingClusterArchitecture(
+  clusterName: string,
+  targetPlatform: DockerPlatform,
+  strictMode: boolean,
+  logger: pino.Logger,
+): Promise<Result<void>> {
+  if (!strictMode) {
+    return Success(undefined);
+  }
+
+  logger.debug({ clusterName, targetPlatform }, 'Validating existing cluster architecture in strict mode');
+
+  const clusterPlatform = await detectClusterPlatform(logger);
+
+  if (!clusterPlatform) {
+    return Failure('Could not detect existing cluster platform', {
+      message: 'Failed to detect architecture of existing cluster',
+      hint: 'Cluster architecture detection failed',
+      resolution: `Ensure cluster '${clusterName}' is running and kubectl can access node information`,
+    });
+  }
+
+  if (clusterPlatform !== targetPlatform) {
+    return Failure(
+      `Existing cluster '${clusterName}' is ${clusterPlatform} but target platform is ${targetPlatform}`,
+      {
+        message: `Existing cluster architecture mismatch`,
+        hint: `Cluster '${clusterName}' is ${clusterPlatform} but you're targeting ${targetPlatform}`,
+        resolution: `To deploy ${targetPlatform} images, either:\n  1. Delete cluster: kind delete cluster --name ${clusterName}\n  2. Set strictPlatformValidation=false to allow emulation`,
+      },
+    );
+  }
+
+  logger.info({ clusterName, clusterPlatform, targetPlatform }, 'Existing cluster architecture validated successfully');
+  return Success(undefined);
+}
+
+async function createKindCluster(
+  clusterName: string,
+  port: number,
+  targetPlatform: DockerPlatform,
+  strictMode: boolean,
+  logger: pino.Logger,
+): Promise<Result<void>> {
   const escapedNameResult = validateAndEscapeClusterName(clusterName);
   if (!escapedNameResult.ok) {
     return escapedNameResult;
@@ -450,20 +524,25 @@ async function createKindCluster(clusterName: string, port: number, logger: pino
     const systemInfo = getSystemInfo();
     const hostArch = process.arch;
 
-    // Check if running on ARM Mac - if so, use AMD64 kind node for broader compatibility
-    // This enables testing AMD64 images on ARM development machines via Docker emulation
-    const shouldUseAMD64Node = systemInfo.isMac && hostArch === 'arm64';
+    // In strict mode, don't use cross-platform emulation
+    // In non-strict mode, use AMD64 on ARM Mac for broader compatibility
+    const shouldUseAMD64Node = !strictMode && systemInfo.isMac && hostArch === 'arm64';
 
     if (shouldUseAMD64Node) {
       logger.info({ hostArch, targetArch: 'amd64' },
         'Detected ARM Mac - creating AMD64 kind cluster for cross-platform compatibility (will use Docker emulation)',
       );
+    } else if (strictMode) {
+      logger.info(
+        { hostArch, targetPlatform, strictMode },
+        'Strict mode enabled - creating cluster with native architecture',
+      );
     }
 
-    // Build node configuration - add explicit AMD64 image on ARM Mac
+    // Build node configuration - add explicit AMD64 image on ARM Mac (non-strict mode only)
     // Use a stable AMD64 node image that works well with Docker Desktop's x86 emulation
     const nodeImageLine = shouldUseAMD64Node
-      ? '  image: kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72'
+      ? '  image: ' + KIND_AMD64_NODE_IMAGE
       : '';
 
     const kindConfig = `
@@ -908,6 +987,8 @@ async function createLocalRegistry(logger: pino.Logger): Promise<{ url: string; 
 async function setupKindCluster(
   clusterName: string,
   port: number,
+  targetPlatform: DockerPlatform,
+  strictMode: boolean,
   logger: pino.Logger,
   checks: {
     kindInstalled: boolean | undefined;
@@ -935,7 +1016,7 @@ async function setupKindCluster(
   const kindClusterExists = clusterExistsResult.value;
 
   if (!kindClusterExists) {
-    const createResult = await createKindCluster(clusterName, port, logger);
+    const createResult = await createKindCluster(clusterName, port, targetPlatform, strictMode, logger);
     if (!createResult.ok) {
       return createResult;
     }
@@ -969,6 +1050,17 @@ async function setupKindCluster(
   } else {
     checks.kindClusterCreated = true;
     logger.info({ clusterName }, 'Kind cluster already exists');
+
+    // Validate existing cluster architecture in strict mode
+    const validationResult = await validateExistingClusterArchitecture(
+      clusterName,
+      targetPlatform,
+      strictMode,
+      logger,
+    );
+    if (!validationResult.ok) {
+      return validationResult;
+    }
   }
 
   // Export kubeconfig
@@ -1114,7 +1206,7 @@ async function handlePrepareCluster(
 ): Promise<Result<PrepareClusterResult>> {
   const { logger, timer } = setupToolContext(context, 'prepare-cluster');
 
-  const { environment = 'development', namespace = 'default', targetPlatform = 'linux/amd64' } = params;
+  const { environment = 'development', namespace = 'default', targetPlatform = 'linux/amd64', strictPlatformValidation = true } = params;
 
   // Validate namespace
   const namespaceValidation = validateNamespace(namespace);
@@ -1165,7 +1257,7 @@ async function handlePrepareCluster(
     // Setup Kind cluster if in development environment
     // Pass the registry port so it can be configured in the cluster
     if (shouldSetupKind && registryPort !== undefined) {
-      const setupResult = await setupKindCluster(clusterName, registryPort, logger, checks);
+      const setupResult = await setupKindCluster(clusterName, registryPort, targetPlatform, strictPlatformValidation, logger, checks);
       if (!setupResult.ok) {
         return setupResult;
       }
@@ -1194,7 +1286,22 @@ async function handlePrepareCluster(
 
         // Test registry reachability from within cluster
         logger.debug('Testing registry reachability from cluster...');
-        const registryReachable = await verifyRegistryFromCluster(registryPort, logger);
+        let registryReachable = false;
+        const maxRetries = 2;
+        const retryDelay = 3000; // 3 seconds
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          registryReachable = await verifyRegistryFromCluster(registryPort, logger);
+          if (registryReachable) {
+            break;
+          }
+
+          if (attempt < maxRetries) {
+            logger.debug({ attempt: attempt + 1, maxRetries: maxRetries + 1 }, 'Registry reachability test failed, retrying...');
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+        }
+
         if (!registryReachable) {
           warnings.push('Registry is not reachable from within cluster - deployment may fail');
         } else {
@@ -1233,14 +1340,18 @@ async function handlePrepareCluster(
 
     // Validate platform compatibility
     logger.debug({ targetPlatform }, 'Validating platform compatibility...');
-    const platformValidation = await validatePlatformCompatibility(targetPlatform, logger, warnings);
-    checks.platformCompatible = platformValidation.compatible;
+    const platformValidation = await validatePlatformCompatibility(targetPlatform, logger, warnings, strictPlatformValidation);
+    if (!platformValidation.ok) {
+      return platformValidation;
+    }
+    const platformData = platformValidation.value;
+    checks.platformCompatible = platformData.compatible;
 
     const platformInfo: PrepareClusterResult['platform'] = {
       target: targetPlatform,
-      cluster: platformValidation.clusterPlatform,
-      compatible: platformValidation.compatible,
-      requiresEmulation: platformValidation.requiresEmulation,
+      cluster: platformData.clusterPlatform,
+      compatible: platformData.compatible,
+      requiresEmulation: platformData.requiresEmulation,
     };
 
     // Generate summary
