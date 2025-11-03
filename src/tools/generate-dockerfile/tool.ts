@@ -930,9 +930,8 @@ async function handleGenerateDockerfile(
   const plan = result.value;
 
   // Add platform and default tag to recommendations
-  // Use targetPlatform from input if provided (allows cross-compilation, e.g., ARM Mac -> AMD64 server)
-  // Otherwise auto-detect from system
-  plan.recommendations.platform = input.targetPlatform || detectSystemPlatform();
+  // targetPlatform is now required, ensuring consistent builds across environments
+  plan.recommendations.platform = input.targetPlatform;
   plan.recommendations.defaultTag = 'v1';
 
   // Filter base images based on policy if available

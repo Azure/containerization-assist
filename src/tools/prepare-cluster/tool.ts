@@ -30,8 +30,16 @@ import {
   type K8sManifest,
   type KubernetesClient,
 } from '@/infra/kubernetes/client';
-import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform';
+import {
+  getSystemInfo,
+  getDownloadOS,
+  getDownloadArch,
+  mapNodeArchToPlatform,
+  isPlatformCompatible,
+} from '@/lib/platform';
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
+import { findRegistryPort } from '@/lib/port-utils';
+import type { DockerPlatform } from '@/tools/shared/schemas';
 
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '@/types';
@@ -100,6 +108,132 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
   return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
 }
 
+/**
+ * Detect the platform architecture of Kubernetes cluster nodes.
+ * Returns the detected platform or null if detection fails.
+ */
+async function detectClusterPlatform(logger: pino.Logger): Promise<DockerPlatform | null> {
+  try {
+    logger.debug('Detecting cluster node platform...');
+
+    // Get node architecture information
+    const { stdout } = await execAsync(
+      'kubectl get nodes -o jsonpath=\'{.items[0].status.nodeInfo.architecture}\'',
+    );
+    const arch = stdout.trim().replace(/'/g, '');
+
+    if (!arch) {
+      logger.warn('Could not detect cluster node architecture');
+      return null;
+    }
+
+    // Get OS if available (usually linux for Kubernetes)
+    let os = 'linux';
+    try {
+      const { stdout: osOutput } = await execAsync(
+        'kubectl get nodes -o jsonpath=\'{.items[0].status.nodeInfo.operatingSystem}\'',
+      );
+      const detectedOS = osOutput.trim().replace(/'/g, '').toLowerCase();
+      if (detectedOS) {
+        os = detectedOS;
+      }
+    } catch {
+      // If OS detection fails, default to linux
+      logger.debug('Could not detect OS, defaulting to linux');
+    }
+
+    const platform = mapNodeArchToPlatform(arch, os);
+    logger.debug({ arch, os, platform }, 'Cluster platform detection result');
+
+    return platform;
+  } catch (error) {
+    logger.warn({ error }, 'Failed to detect cluster platform');
+    return null;
+  }
+}
+
+/**
+ * Validate that target platform is compatible with cluster platform.
+ * Returns validation result with detailed guidance.
+ */
+async function validatePlatformCompatibility(
+  targetPlatform: DockerPlatform,
+  logger: pino.Logger,
+  warnings: string[],
+): Promise<{
+  clusterPlatform: DockerPlatform | null;
+  compatible: boolean;
+  requiresEmulation: boolean;
+}> {
+  const clusterPlatform = await detectClusterPlatform(logger);
+
+  if (!clusterPlatform) {
+    warnings.push(
+      `Could not detect cluster platform - unable to verify compatibility with target platform ${targetPlatform}`,
+    );
+    return {
+      clusterPlatform: null,
+      compatible: false,
+      requiresEmulation: false,
+    };
+  }
+
+  const compatible = isPlatformCompatible(targetPlatform, clusterPlatform);
+
+  if (!compatible) {
+    const requiresEmulation = targetPlatform !== clusterPlatform;
+
+    if (requiresEmulation) {
+      // Check if this is a known emulation scenario (e.g., ARM Mac with AMD64 kind cluster)
+      const systemInfo = getSystemInfo();
+      const hostArch = process.arch;
+      const isArmMacWithAmd64 =
+        systemInfo.isMac &&
+        hostArch === 'arm64' &&
+        targetPlatform === 'linux/amd64' &&
+        clusterPlatform === 'linux/amd64';
+
+      if (isArmMacWithAmd64) {
+        // This is expected for ARM Mac development targeting AMD64
+        logger.info(
+          { targetPlatform, clusterPlatform },
+          'ARM Mac detected with AMD64 cluster - Docker emulation will be used',
+        );
+        warnings.push(
+          `Running AMD64 cluster on ARM Mac - images will use Docker emulation (may have performance impact)`,
+        );
+        return {
+          clusterPlatform,
+          compatible: true, // Allow this scenario
+          requiresEmulation: true,
+        };
+      }
+
+      // Other emulation scenarios - warn but don't block
+      logger.warn(
+        { targetPlatform, clusterPlatform },
+        'Target platform does not match cluster platform - may require emulation',
+      );
+      warnings.push(
+        `Platform mismatch: Building for ${targetPlatform} but cluster runs ${clusterPlatform}. Images may not run or may require emulation.`,
+      );
+    }
+
+    return {
+      clusterPlatform,
+      compatible: false,
+      requiresEmulation,
+    };
+  }
+
+  logger.info({ targetPlatform, clusterPlatform }, 'Platform compatibility validated successfully');
+  return {
+    clusterPlatform,
+    compatible: true,
+    requiresEmulation: false,
+  };
+}
+
 export interface PrepareClusterResult {
   /**
    * Natural language summary for user display.
@@ -111,6 +245,12 @@ export interface PrepareClusterResult {
   clusterReady: boolean;
   cluster: string;
   namespace: string;
+  platform?: {
+    target: DockerPlatform;
+    cluster: DockerPlatform | null;
+    compatible: boolean;
+    requiresEmulation: boolean;
+  };
   checks: {
     connectivity: boolean;
     permissions: boolean;
@@ -120,6 +260,7 @@ export interface PrepareClusterResult {
     kindInstalled?: boolean;
     kindClusterCreated?: boolean;
     localRegistryCreated?: boolean;
+    platformCompatible?: boolean;
   };
   warnings?: string[];
   localRegistryUrl?: string;
@@ -295,7 +436,7 @@ async function checkKindClusterExists(
   }
 }
 
-async function createKindCluster(clusterName: string, logger: pino.Logger): Promise<Result<void>> {
+async function createKindCluster(clusterName: string, port: number, logger: pino.Logger): Promise<Result<void>> {
   const escapedNameResult = validateAndEscapeClusterName(clusterName);
   if (!escapedNameResult.ok) {
     return escapedNameResult;
@@ -305,15 +446,36 @@ async function createKindCluster(clusterName: string, logger: pino.Logger): Prom
   try {
     logger.info({ clusterName }, 'Creating kind cluster...');
 
+    // Detect system architecture to determine if we need cross-platform emulation
+    const systemInfo = getSystemInfo();
+    const hostArch = process.arch;
+
+    // Check if running on ARM Mac - if so, use AMD64 kind node for broader compatibility
+    // This enables testing AMD64 images on ARM development machines via Docker emulation
+    const shouldUseAMD64Node = systemInfo.isMac && hostArch === 'arm64';
+
+    if (shouldUseAMD64Node) {
+      logger.info({ hostArch, targetArch: 'amd64' },
+        'Detected ARM Mac - creating AMD64 kind cluster for cross-platform compatibility (will use Docker emulation)',
+      );
+    }
+
+    // Build node configuration - add explicit AMD64 image on ARM Mac
+    // Use a stable AMD64 node image that works well with Docker Desktop's x86 emulation
+    const nodeImageLine = shouldUseAMD64Node
+      ? '  image: kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72'
+      : '';
+
     const kindConfig = `
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
 - |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT}"]
-    endpoint = ["http://${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.REGISTRY_PORT}"]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${DOCKER.REGISTRY_HOST}:${port}"]
+    endpoint = ["http://${DOCKER.REGISTRY_CONTAINER_NAME}:5000"]
 nodes:
 - role: control-plane
+${nodeImageLine}
   kubeadmConfigPatches:
   - |
     kind: InitConfiguration
@@ -348,9 +510,9 @@ nodes:
 /**
  * Check if local registry exists and is running.
  * If container exists but is stopped, start it.
- * Returns true if registry is running and ready.
+ * Returns the port number if registry is running and ready, or null if not.
  */
-async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
+async function checkLocalRegistryExists(logger: pino.Logger): Promise<number | null> {
   try {
     // Check if container exists (running or stopped)
     const { stdout: allContainers } = await execAsync(
@@ -360,7 +522,18 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
 
     if (!containerExists) {
       logger.debug('Local registry container does not exist');
-      return false;
+      return null;
+    }
+
+    // Get the port mapping for the existing container
+    const { stdout: portMapping } = await execAsync(
+      `docker inspect ${DOCKER.REGISTRY_CONTAINER_NAME} --format '{{range $p, $conf := .NetworkSettings.Ports}}{{if eq $p "5000/tcp"}}{{(index $conf 0).HostPort}}{{end}}{{end}}'`,
+    );
+    const port = parseInt(portMapping.trim(), 10);
+
+    if (isNaN(port)) {
+      logger.warn('Could not determine registry port mapping');
+      return null;
     }
 
     // Check if container is running
@@ -370,15 +543,15 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
     const isRunning = runningContainers.trim() === DOCKER.REGISTRY_CONTAINER_NAME;
 
     if (isRunning) {
-      logger.debug('Local registry is running');
-      return true;
+      logger.debug({ port }, 'Local registry is running');
+      return port;
     }
 
     // Container exists but is stopped - try to start it
     logger.info('Local registry container exists but is stopped, starting it...');
     try {
       await execAsync(`docker start ${DOCKER.REGISTRY_CONTAINER_NAME}`);
-      logger.info('Local registry started successfully');
+      logger.info({ port }, 'Local registry started successfully');
 
       // After starting, check if it needs to be reconnected to kind network
       // (containers can lose network connections when stopped/restarted)
@@ -411,14 +584,14 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
         }
       }
 
-      return true;
+      return port;
     } catch (startError) {
       logger.error({ error: startError }, 'Failed to start existing registry container');
-      return false;
+      return null;
     }
   } catch (error) {
     logger.debug({ error }, 'Error checking local registry');
-    return false;
+    return null;
   }
 }
 
@@ -426,14 +599,14 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
  * Validate registry health by checking HTTP endpoint.
  * Retries up to 3 times with 1 second delays.
  */
-async function validateRegistryHealth(logger: pino.Logger): Promise<boolean> {
+async function validateRegistryHealth(port: number, logger: pino.Logger): Promise<boolean> {
   const maxAttempts = 3;
   const delayMs = 1000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const { stdout } = await execAsync(
-        `curl -sf http://${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT}/v2/ || echo "failed"`,
+        `curl -sf http://${DOCKER.REGISTRY_HOST}:${port}/v2/ || echo "failed"`,
       );
       if (!stdout.includes('failed')) {
         logger.debug({ attempt }, 'Registry health check passed');
@@ -544,19 +717,19 @@ async function getContainerNetworkIP(
  * Verify registry is accessible from within the kind cluster.
  * Uses kubectl run to create a test pod that curls the registry endpoint.
  */
-async function verifyRegistryFromCluster(logger: pino.Logger): Promise<boolean> {
+async function verifyRegistryFromCluster(_port: number, logger: pino.Logger): Promise<boolean> {
   try {
     logger.debug('Testing registry reachability from within cluster...');
 
     // Create a temporary test pod that curls the registry
-    const testPodName = 'registry-test-' + Date.now();
-    const curlCommand = `curl -sf http://${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.REGISTRY_PORT}/v2/ && echo "success" || echo "failed"`;
+    const testPodName = `registry-test-${Date.now()}`;
+    const curlCommand = `curl -sf http://${DOCKER.REGISTRY_CONTAINER_NAME}:5000/v2/ && echo "success" || echo "failed"`;
 
     try {
       // Run test pod and wait for completion (timeout 30s)
       const { stdout } = await execAsync(
         `kubectl run ${testPodName} --image=curlimages/curl:latest --restart=Never --rm -i --timeout=30s -- sh -c '${curlCommand}'`,
-        { timeout: 35000 }
+        { timeout: 35000 },
       );
 
       const success = stdout.includes('success');
@@ -585,6 +758,7 @@ async function verifyRegistryFromCluster(logger: pino.Logger): Promise<boolean> 
  */
 async function validateContainerdConfig(
   clusterName: string,
+  port: number,
   logger: pino.Logger,
 ): Promise<boolean> {
   try {
@@ -595,12 +769,12 @@ async function validateContainerdConfig(
 
     // Read containerd config from the node
     const { stdout } = await execAsync(
-      `docker exec ${nodeContainerName} cat /etc/containerd/config.toml`
+      `docker exec ${nodeContainerName} cat /etc/containerd/config.toml`,
     );
 
     // Check for the registry mirror configuration
-    const hasLocalRegistryMirror = stdout.includes(`${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT}`);
-    const hasKindRegistryEndpoint = stdout.includes(`${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.REGISTRY_PORT}`);
+    const hasLocalRegistryMirror = stdout.includes(`${DOCKER.REGISTRY_HOST}:${port}`);
+    const hasKindRegistryEndpoint = stdout.includes(`${DOCKER.REGISTRY_CONTAINER_NAME}:5000`);
 
     const isValid = hasLocalRegistryMirror && hasKindRegistryEndpoint;
 
@@ -609,9 +783,9 @@ async function validateContainerdConfig(
         clusterName,
         hasLocalRegistryMirror,
         hasKindRegistryEndpoint,
-        isValid
+        isValid,
       },
-      'Containerd config validation result'
+      'Containerd config validation result',
     );
 
     return isValid;
@@ -627,6 +801,7 @@ async function validateContainerdConfig(
  */
 async function createLocalRegistryConfigMap(
   k8sClient: KubernetesClient,
+  port: number,
   logger: pino.Logger,
 ): Promise<void> {
   try {
@@ -640,7 +815,7 @@ async function createLocalRegistryConfigMap(
         namespace: 'kube-public',
       },
       data: {
-        'localRegistryHosting.v1': `host: "${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT}"\nhelp: "https://kind.sigs.k8s.io/docs/user/local-registry/"`,
+        'localRegistryHosting.v1': `host: "${DOCKER.REGISTRY_HOST}:${port}"\nhelp: "https://kind.sigs.k8s.io/docs/user/local-registry/"`,
       },
     };
 
@@ -655,19 +830,23 @@ async function createLocalRegistryConfigMap(
   }
 }
 
-async function createLocalRegistry(logger: pino.Logger): Promise<string> {
+async function createLocalRegistry(logger: pino.Logger): Promise<{ url: string; port: number }> {
   try {
     logger.info('Creating local Docker registry...');
 
-    await execAsync(`docker run -d --restart=always -p ${DOCKER.REGISTRY_PORT}:${DOCKER.REGISTRY_PORT} --name ${DOCKER.REGISTRY_CONTAINER_NAME} registry:2`);
-    logger.debug({ port: DOCKER.REGISTRY_PORT }, 'Registry container created');
+    // Find an available port
+    const port = await findRegistryPort();
+    logger.debug({ port }, 'Found available port for registry');
+
+    await execAsync(`docker run -d --restart=always -p ${port}:5000 --name ${DOCKER.REGISTRY_CONTAINER_NAME} registry:2`);
+    logger.debug({ port }, 'Registry container created');
 
     // Check if kind network exists before attempting connection
     const kindNetworkExists = await checkDockerNetworkExists('kind', logger);
     if (!kindNetworkExists) {
       logger.warn('Kind Docker network does not exist - registry will not be accessible from cluster yet');
-      const registryUrl = `${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT}`;
-      return registryUrl;
+      const registryUrl = `${DOCKER.REGISTRY_HOST}:${port}`;
+      return { url: registryUrl, port };
     }
 
     // Check if registry is already connected to kind network
@@ -709,14 +888,14 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
 
     // Validate registry health
     logger.debug('Validating registry health...');
-    const isHealthy = await validateRegistryHealth(logger);
+    const isHealthy = await validateRegistryHealth(port, logger);
     if (!isHealthy) {
       logger.warn('Registry health check failed - registry may not be fully ready');
     }
 
-    const registryUrl = `${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT}`;
+    const registryUrl = `${DOCKER.REGISTRY_HOST}:${port}`;
     logger.info({ registryUrl, healthy: isHealthy }, 'Local Docker registry created successfully');
-    return registryUrl;
+    return { url: registryUrl, port };
   } catch (error) {
     logger.error({ error }, 'Failed to create local registry');
     throw new Error(`Local registry creation failed: ${extractErrorMessage(error)}`);
@@ -728,6 +907,7 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
  */
 async function setupKindCluster(
   clusterName: string,
+  port: number,
   logger: pino.Logger,
   checks: {
     kindInstalled: boolean | undefined;
@@ -755,12 +935,12 @@ async function setupKindCluster(
   const kindClusterExists = clusterExistsResult.value;
 
   if (!kindClusterExists) {
-    const createResult = await createKindCluster(clusterName, logger);
+    const createResult = await createKindCluster(clusterName, port, logger);
     if (!createResult.ok) {
       return createResult;
     }
     checks.kindClusterCreated = true;
-    logger.info({ clusterName: clusterName }, 'Kind cluster creation completed');
+    logger.info({ clusterName }, 'Kind cluster creation completed');
 
     // Wait for cluster to stabilize and check for node readiness
     logger.debug('Waiting for cluster to stabilize...');
@@ -788,7 +968,7 @@ async function setupKindCluster(
     }
   } else {
     checks.kindClusterCreated = true;
-    logger.info({ clusterName: clusterName }, 'Kind cluster already exists');
+    logger.info({ clusterName }, 'Kind cluster already exists');
   }
 
   // Export kubeconfig
@@ -813,36 +993,39 @@ async function setupLocalRegistry(
   },
 ): Promise<{
   url: string;
+  port: number;
   healthy: boolean;
   reachableFromCluster: boolean;
 }> {
   logger.debug('Starting local registry setup');
-  const registryExists = await checkLocalRegistryExists(logger);
+  const existingPort = await checkLocalRegistryExists(logger);
   let healthy = false;
 
-  if (!registryExists) {
-    const registryUrl = await createLocalRegistry(logger);
+  if (existingPort === null) {
+    const { url: registryUrl, port } = await createLocalRegistry(logger);
     checks.localRegistryCreated = true;
 
     // Check health after creation
-    healthy = await validateRegistryHealth(logger);
+    healthy = await validateRegistryHealth(port, logger);
 
     logger.info({ registryUrl, healthy }, 'Local registry creation completed');
     return {
       url: registryUrl,
+      port,
       healthy,
       reachableFromCluster: false, // Will be checked later
     };
   } else {
-    const registryUrl = `${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT}`;
+    const registryUrl = `${DOCKER.REGISTRY_HOST}:${existingPort}`;
     checks.localRegistryCreated = true;
 
     // Check health of existing registry
-    healthy = await validateRegistryHealth(logger);
+    healthy = await validateRegistryHealth(existingPort, logger);
 
     logger.info({ registryUrl, healthy }, 'Local registry already exists');
     return {
       url: registryUrl,
+      port: existingPort,
       healthy,
       reachableFromCluster: false, // Will be checked later
     };
@@ -931,7 +1114,7 @@ async function handlePrepareCluster(
 ): Promise<Result<PrepareClusterResult>> {
   const { logger, timer } = setupToolContext(context, 'prepare-cluster');
 
-  const { environment = 'development', namespace = 'default' } = params;
+  const { environment = 'development', namespace = 'default', targetPlatform = 'linux/amd64' } = params;
 
   // Validate namespace
   const namespaceValidation = validateNamespace(namespace);
@@ -960,13 +1143,29 @@ async function handlePrepareCluster(
       kindInstalled: undefined as boolean | undefined,
       kindClusterCreated: undefined as boolean | undefined,
       localRegistryCreated: undefined as boolean | undefined,
+      platformCompatible: undefined as boolean | undefined,
     };
     let localRegistryUrl: string | undefined;
     let localRegistryInfo: PrepareClusterResult['localRegistry'] | undefined;
+    let registryPort: number | undefined;
+
+    // Determine registry port before cluster setup
+    // Either detect existing registry or find an available port for a new one
+    if (shouldSetupKind || shouldCreateLocalRegistry) {
+      const existingPort = await checkLocalRegistryExists(logger);
+      if (existingPort !== null) {
+        registryPort = existingPort;
+        logger.debug({ registryPort }, 'Using existing registry port');
+      } else {
+        registryPort = await findRegistryPort();
+        logger.debug({ registryPort }, 'Found available port for new registry');
+      }
+    }
 
     // Setup Kind cluster if in development environment
-    if (shouldSetupKind) {
-      const setupResult = await setupKindCluster(clusterName, logger, checks);
+    // Pass the registry port so it can be configured in the cluster
+    if (shouldSetupKind && registryPort !== undefined) {
+      const setupResult = await setupKindCluster(clusterName, registryPort, logger, checks);
       if (!setupResult.ok) {
         return setupResult;
       }
@@ -975,26 +1174,27 @@ async function handlePrepareCluster(
     const k8sClient = createKubernetesClient(logger);
 
     // Setup local Docker registry if in development environment
-    if (shouldCreateLocalRegistry) {
+    if (shouldCreateLocalRegistry && registryPort !== undefined) {
       const registrySetup = await setupLocalRegistry(logger, checks);
       localRegistryUrl = registrySetup.url;
+      registryPort = registrySetup.port;
 
       // Create registry ConfigMap after cluster and registry are set up
       if (shouldSetupKind) {
-        await createLocalRegistryConfigMap(k8sClient, logger);
+        await createLocalRegistryConfigMap(k8sClient, registryPort, logger);
 
         // Validate containerd mirror configuration
         logger.debug('Validating containerd registry mirror configuration...');
-        const containerdConfigValid = await validateContainerdConfig(clusterName, logger);
+        const containerdConfigValid = await validateContainerdConfig(clusterName, registryPort, logger);
         if (!containerdConfigValid) {
-          warnings.push(`Containerd registry mirror configuration validation failed - image pulls from ${DOCKER.REGISTRY_HOST}:${DOCKER.REGISTRY_PORT} may not work`);
+          warnings.push(`Containerd registry mirror configuration validation failed - image pulls from ${DOCKER.REGISTRY_HOST}:${registryPort} may not work`);
         } else {
           logger.info('Containerd registry mirror configuration validated successfully');
         }
 
         // Test registry reachability from within cluster
         logger.debug('Testing registry reachability from cluster...');
-        const registryReachable = await verifyRegistryFromCluster(logger);
+        const registryReachable = await verifyRegistryFromCluster(registryPort, logger);
         if (!registryReachable) {
           warnings.push('Registry is not reachable from within cluster - deployment may fail');
         } else {
@@ -1004,7 +1204,7 @@ async function handlePrepareCluster(
         // Populate detailed registry information
         localRegistryInfo = {
           externalUrl: registrySetup.url,
-          internalEndpoint: `${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.REGISTRY_PORT}`,
+          internalEndpoint: `${DOCKER.REGISTRY_CONTAINER_NAME}:5000`,
           containerName: DOCKER.REGISTRY_CONTAINER_NAME,
           healthy: registrySetup.healthy,
           reachableFromCluster: registryReachable,
@@ -1031,6 +1231,18 @@ async function handlePrepareCluster(
 
     const clusterReady = readinessResult.value;
 
+    // Validate platform compatibility
+    logger.debug({ targetPlatform }, 'Validating platform compatibility...');
+    const platformValidation = await validatePlatformCompatibility(targetPlatform, logger, warnings);
+    checks.platformCompatible = platformValidation.compatible;
+
+    const platformInfo: PrepareClusterResult['platform'] = {
+      target: targetPlatform,
+      cluster: platformValidation.clusterPlatform,
+      compatible: platformValidation.compatible,
+      requiresEmulation: platformValidation.requiresEmulation,
+    };
+
     // Generate summary
     const namespaceAction = checks.namespaceExists ? 'verified' : 'created';
     const resourcesConfigured = Object.values(checks).filter(Boolean).length;
@@ -1042,6 +1254,7 @@ async function handlePrepareCluster(
       clusterReady,
       cluster: clusterName,
       namespace,
+      ...(platformInfo && { platform: platformInfo }),
       checks: {
         connectivity: checks.connectivity,
         permissions: checks.permissions,
@@ -1056,6 +1269,9 @@ async function handlePrepareCluster(
         }),
         ...(checks.localRegistryCreated !== undefined && {
           localRegistryCreated: checks.localRegistryCreated,
+        }),
+        ...(checks.platformCompatible !== undefined && {
+          platformCompatible: checks.platformCompatible,
         }),
       },
       ...(warnings.length > 0 && { warnings }),

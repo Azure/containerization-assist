@@ -74,6 +74,8 @@ jest.mock('@/lib/platform', () => ({
   getSystemInfo: jest.fn(() => ({ isWindows: false, isMac: false, isLinux: true })),
   getDownloadOS: jest.fn(() => 'linux'),
   getDownloadArch: jest.fn(() => 'amd64'),
+  mapNodeArchToPlatform: jest.fn(() => 'linux/amd64'),
+  isPlatformCompatible: jest.fn(() => true),
 }));
 
 jest.mock('@/lib/file-utils', () => ({
@@ -84,7 +86,29 @@ jest.mock('@/lib/file-utils', () => ({
 }));
 
 jest.mock('node:child_process', () => ({
-  exec: jest.fn(),
+  exec: jest.fn((cmd, callback) => {
+    // Mock kubectl commands for platform detection
+    if (callback) {
+      callback(null, { stdout: 'amd64', stderr: '' }, '');
+    }
+  }),
+}));
+
+jest.mock('node:util', () => ({
+  promisify: jest.fn((fn) => {
+    return jest.fn(async (cmd) => {
+      // Mock kubectl commands for platform detection
+      if (typeof cmd === 'string' && cmd.includes('kubectl get nodes')) {
+        if (cmd.includes('architecture')) {
+          return { stdout: 'amd64', stderr: '' };
+        }
+        if (cmd.includes('operatingSystem')) {
+          return { stdout: 'linux', stderr: '' };
+        }
+      }
+      return { stdout: '', stderr: '' };
+    });
+  }),
 }));
 
 function createMockToolContext() {
@@ -100,6 +124,7 @@ describe('prepareCluster', () => {
     config = {
       namespace: 'test-namespace',
       environment: 'production',
+      targetPlatform: 'linux/amd64',
     };
 
     // Reset all mocks

@@ -98,6 +98,7 @@ describe('Docker Workflow Integration', () => {
           repositoryPath: testRepo,
           analysis: JSON.stringify(analysis),
           outputPath: dockerfilePath,
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );

@@ -115,8 +115,12 @@ export const DOCKER = {
   DEFAULT_CONTEXT: '.',
   /** Default registry */
   DEFAULT_REGISTRY: 'docker.io',
-  /** Standard registry port for both external and internal access */
-  REGISTRY_PORT: 5000,
+  /** Standard registry port for both external and internal access (default starting point, actual port may vary) */
+  REGISTRY_PORT: 6000,
+  /** Registry port search range start */
+  REGISTRY_PORT_START: 6000,
+  /** Registry port search range end */
+  REGISTRY_PORT_END: 60100,
   /** Registry container name */
   REGISTRY_CONTAINER_NAME: 'ca-registry',
   /** Registry host for external access */

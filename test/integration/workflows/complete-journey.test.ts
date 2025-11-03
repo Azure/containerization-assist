@@ -126,6 +126,7 @@ describe('Complete Containerization Journey', () => {
           repositoryPath: testRepo,
           analysis: JSON.stringify(analysis),
           outputPath: dockerfilePath,
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );
