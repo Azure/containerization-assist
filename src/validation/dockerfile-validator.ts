@@ -31,6 +31,7 @@ import {
   SECRET_PATTERN,
   TOKEN_PATTERN,
 } from '@/lib/regex-patterns';
+import type { DockerPlatform } from '@/tools/shared/schemas';
 
 type DockerCommand = CommandEntry;
 
@@ -231,6 +232,39 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     category: ValidationCategory.BEST_PRACTICE,
   },
 ];
+
+/**
+ * Create a platform validation rule for a specific target platform.
+ * This rule checks that all FROM instructions specify the correct --platform flag.
+ */
+function createPlatformValidationRule(targetPlatform: DockerPlatform): DockerfileValidationRule {
+  return {
+    id: 'platform-specified',
+    name: 'Platform explicitly specified',
+    description: `All FROM instructions should specify --platform=${targetPlatform}`,
+    check: (commands: CommandEntry[]) => {
+      const fromCommands = commands.filter((cmd: DockerCommand) => cmd.name === 'FROM');
+
+      return fromCommands.every((cmd: DockerCommand) => {
+        const args = getArgValue(cmd);
+
+        // Check if --platform flag is present
+        const platformMatch = args.match(/--platform[=\s]+([^\s]+)/);
+
+        if (!platformMatch) {
+          return false; // No platform specified
+        }
+
+        const specifiedPlatform = platformMatch[1];
+        return specifiedPlatform === targetPlatform;
+      });
+    },
+    message: `All FROM instructions must specify --platform=${targetPlatform}`,
+    severity: ValidationSeverity.ERROR,
+    fix: `Add --platform=${targetPlatform} to all FROM instructions (e.g., FROM --platform=${targetPlatform} node:20-alpine)`,
+    category: ValidationCategory.BEST_PRACTICE,
+  };
+}
 
 /**
  * Parse Dockerfile content into commands
@@ -536,10 +570,20 @@ function validateBuildKitDockerfile(content: string): ValidationReport {
  */
 export const validateDockerfileContent = async (
   dockerfileContent: string,
-  options?: { enableExternalLinter?: boolean },
+  options?: {
+    enableExternalLinter?: boolean;
+    targetPlatform?: DockerPlatform;
+    strictPlatformValidation?: boolean;
+  },
 ): Promise<ValidationReport> => {
   // Detect BuildKit features first
   const buildKit = detectBuildKitFeatures(dockerfileContent);
+
+  // Prepare validation rules - add platform rule if strict mode is enabled
+  const validationRules = [...DOCKERFILE_RULES];
+  if (options?.strictPlatformValidation && options?.targetPlatform) {
+    validationRules.push(createPlatformValidationRule(options.targetPlatform));
+  }
 
   if (buildKit.syntax || buildKit.hasHeredocs || buildKit.hasMounts) {
     // Log BuildKit features detected
@@ -555,7 +599,7 @@ export const validateDockerfileContent = async (
       // Run all validation rules directly
       const results: ValidationResult[] = [];
 
-      for (const rule of DOCKERFILE_RULES) {
+      for (const rule of validationRules) {
         const passed = rule.check(commands);
 
         // Special handling for no-secrets rule to include the specific secret name
@@ -691,7 +735,7 @@ export const validateDockerfileContent = async (
   // Run all validation rules directly
   const results: ValidationResult[] = [];
 
-  for (const rule of DOCKERFILE_RULES) {
+  for (const rule of validationRules) {
     const passed = rule.check(commands);
 
     // Special handling for no-secrets rule to include the specific secret name

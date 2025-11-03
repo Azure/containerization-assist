@@ -19,6 +19,13 @@ export const buildImageSchema = z.object({
   tags: tags.optional(),
   buildArgs: buildArgs.optional(),
   platform,
+  strictPlatformValidation: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'Fail if FROM lines lack --platform flags. When true, ensures all base images explicitly specify platform flags.',
+    ),
 });
 
 export type BuildImageParams = z.infer<typeof buildImageSchema>;
