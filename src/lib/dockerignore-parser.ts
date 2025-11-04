@@ -6,6 +6,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+const DOUBLE_STAR_PLACEHOLDER = '<!DOUBLESTAR!>';
+
 /**
  * Parse .dockerignore file content into patterns
  */
@@ -48,9 +50,9 @@ export function matchPattern(filePath: string, pattern: string): boolean {
 
   let regexPattern = cleanPattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*/g, '<!DOUBLESTAR!>')
+    .replace(/\*\*/g, DOUBLE_STAR_PLACEHOLDER)
     .replace(/\*/g, '[^/]*')
-    .replace(/<!DOUBLESTAR!>/g, '.*?')
+    .replace(new RegExp(DOUBLE_STAR_PLACEHOLDER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '.*?')
     .replace(/\?/g, '[^/]');
 
   const hasSlash = cleanPattern.includes('/');
@@ -122,6 +124,6 @@ export function createIgnoreFunction(
       }
     }
 
-    return shouldIgnore(name, patterns, exceptions);
+    return shouldIgnore(normalizedName, patterns, exceptions);
   };
 }
