@@ -10,6 +10,7 @@ import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
 import { autoDetectDockerSocket } from './socket-validation';
+import { readDockerignore, createIgnoreFunction } from '@/lib/dockerignore-parser';
 
 /**
  * Docker client configuration options.
@@ -253,9 +254,29 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
       try {
         logger.debug({ options }, 'Starting Docker build');
 
-        // Create tar stream from the build context directory
         const contextPath = options.context || '.';
-        const tarStream = tar.pack(contextPath);
+        const dockerignoreRules = await readDockerignore(contextPath);
+        let tarStream;
+
+        if (dockerignoreRules) {
+          const { patterns, exceptions } = dockerignoreRules;
+
+          const alwaysInclude = [options.dockerfile || 'Dockerfile', '.dockerignore'];
+
+          const ignoreFunction = createIgnoreFunction(patterns, exceptions, alwaysInclude);
+
+          logger.debug(
+            { patterns, exceptions, alwaysInclude, contextPath },
+            'Using .dockerignore with patterns',
+          );
+
+          tarStream = tar.pack(contextPath, {
+            ignore: ignoreFunction,
+          });
+        } else {
+          logger.debug({ contextPath }, 'No .dockerignore found, packing all files');
+          tarStream = tar.pack(contextPath);
+        }
 
         const stream = await docker.buildImage(tarStream, {
           t: options.t || options.tags?.[0],
@@ -506,10 +527,14 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 
               // Only treat final error events as failures, not intermediate auth challenges
               if (event.error || event.errorDetail) {
-                logger.debug({ errorEvent: event }, 'Docker push error event (may be intermediate)');
+                logger.debug(
+                  { errorEvent: event },
+                  'Docker push error event (may be intermediate)',
+                );
 
                 // Only set pushError for certain fatal errors, not auth challenges
-                const errorMsg = event.error || (event.errorDetail as { message?: string })?.message || '';
+                const errorMsg =
+                  event.error || (event.errorDetail as { message?: string })?.message || '';
 
                 // Don't treat authentication challenges as fatal errors - they're part of the auth handshake
                 if (
