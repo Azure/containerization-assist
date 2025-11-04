@@ -3,6 +3,7 @@ import type { Result } from './core';
 import type { ToolContext } from '@/mcp/context';
 import type { ToolCategory } from './categories';
 import type { ToolMetadata } from './tool-metadata';
+import type { ToolName } from '@/tools';
 import { extractSchemaShape } from '@/lib/zod-utils';
 
 /**
@@ -21,8 +22,8 @@ export interface ChainHints {
  * @see {@link ../../docs/adr/002-tool-interface.md ADR-002: Unified Tool Interface}
  */
 export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
-  /** Unique tool identifier */
-  name: string;
+  /** Unique tool identifier - must be a valid ToolName */
+  name: ToolName;
 
   /** Human-readable description */
   description: string;
@@ -57,7 +58,7 @@ export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknow
  * Automatically extracts inputSchema and creates parse method from Zod schema
  */
 export function tool<TSchema extends z.ZodTypeAny, TOut>(config: {
-  name: string;
+  name: ToolName;
   description: string;
   schema: TSchema;
   metadata: ToolMetadata;

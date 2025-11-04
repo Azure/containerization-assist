@@ -1,5 +1,10 @@
 # Change Log
 
+
+## [1.0.1-dev.5]
+
+- Dev Release improved telemetry
+
 ## [1.0.1-dev.4]
 
 - Dev Release with updated tool output formatting

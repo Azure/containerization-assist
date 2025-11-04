@@ -50,7 +50,8 @@ function applyToolAliases(
     aliasToOriginalMap[alias] = tool.name;
 
     // Create a new tool object with the alias name
-    return { ...tool, name: alias };
+    // Type assertion: aliases are treated as valid ToolNames for registration
+    return { ...tool, name: alias as ToolName };
   });
 
   return { aliasedTools, aliasToOriginalMap };
@@ -199,7 +200,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
      */
     listTools: () =>
       toolList.map((t) => ({
-        name: t.name as ToolName,
+        name: t.name,
         description: t.description,
         ...(t.version && { version: t.version }),
         ...(t.category && { category: t.category }),
