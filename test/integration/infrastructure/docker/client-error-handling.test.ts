@@ -43,13 +43,9 @@ describe('Docker Client Error Handling Integration Tests', () => {
     dockerClient.buildImage = async (options: DockerBuildOptions) => {
       const result = await original(options);
       if (result.ok && result.value.imageId) {
+        // Only track the actual image ID (SHA256) that was created
         testCleaner.trackImage(result.value.imageId);
         logger.debug(`Tracking created image: ${result.value.imageId}`);
-        // Also track by tag if available for easier cleanup
-        if (options.t) {
-          testCleaner.trackImage(options.t);
-          logger.debug(`Tracking created image tag: ${options.t}`);
-        }
       }
       return result;
     };
