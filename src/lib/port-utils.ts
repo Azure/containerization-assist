@@ -57,7 +57,7 @@ export async function findAvailablePort(startPort: number, endPort: number): Pro
  */
 export async function findRegistryPort(): Promise<number> {
   const startPort = 6000;
-  const endPort = 60100;
+  const endPort = 6100;
 
   const port = await findAvailablePort(startPort, endPort);
 
