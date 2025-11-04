@@ -39,6 +39,9 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Install tsx
+        run: npm install -g tsx
+
       - name: Setup Docker (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -62,7 +65,8 @@ jobs:
           kind version
 
       - name: Run local registry integration test
-        run: tsx scripts/integration-test-local-registry.ts
+        run: |
+          tsx scripts/integration-test-local-registry.ts
         timeout-minutes: 10
 
       - name: Show pod status on failure
