@@ -64,7 +64,21 @@ jobs:
           kubectl version --client
           kind version
 
+      - name: Read platform and set TARGET_PLATFORM
+        run: |
+          if [ "$(uname -m)" == "x86_64" ]; then
+            echo "TARGET_PLATFORM=linux/amd64" >> $GITHUB_ENV
+          elif [ "$(uname -m)" == "arm64" ] || [ "$(uname -m)" == "aarch64" ]; then
+            echo "TARGET_PLATFORM=linux/arm64" >> $GITHUB_ENV
+          else
+            echo "Unsupported architecture: $(uname -m)"
+            exit 1
+          fi
+
+          echo "Detected architecture: $(uname -m), set TARGET_PLATFORM=$TARGET_PLATFORM"
       - name: Run local registry integration test
+        env:
+          TARGET_PLATFORM: ${{ env.TARGET_PLATFORM }}
         run: |
           tsx scripts/integration-test-local-registry.ts
         timeout-minutes: 10

@@ -8,20 +8,34 @@
  * 4. Verifying the pod successfully runs with the image
  */
 
-import { prepareCluster } from '../dist/src/tools/prepare-cluster/tool.js';
-import { pushImage } from '../dist/src/tools/push-image/tool.js';
+import { createToolContext } from '../dist/src/mcp/context.js';
+import prepareCluster from '../dist/src/tools/prepare-cluster/tool.js';
+import pushImage from '../dist/src/tools/push-image/tool.js';
 import { execSync } from 'child_process';
 import { writeFileSync } from 'fs';
+import { createLogger } from '../dist/src/lib/logger.js';
+import { DOCKER_PLATFORMS, DockerPlatform } from '../dist/src/tools/shared/schemas.js';
 
 async function main() {
   console.log('🚀 Testing local registry integration...\n');
-
+  const logger = createLogger({ name: 'containerization-assist' });
+  const ctx = createToolContext(logger);
   // Step 1: Prepare cluster (creates kind + local registry)
   console.log('Step 1: Preparing cluster with local registry...');
-  const prepareResult = await prepareCluster.execute({
+
+  const envTargetPlatform = process.env.TARGET_PLATFORM;
+  // Validate TARGET_PLATFORM is a DockerPlatform
+  if (!envTargetPlatform || !DOCKER_PLATFORMS.includes(envTargetPlatform as DockerPlatform)) {
+    console.error(`❌ Invalid TARGET_PLATFORM: ${envTargetPlatform}`);
+    process.exit(1);
+  }
+
+  const prepareResult = await prepareCluster.handler({
+    targetPlatform: envTargetPlatform as DockerPlatform,
     environment: 'development',
     namespace: 'default',
-  });
+    strictPlatformValidation: true,
+  }, ctx);
 
   if (!prepareResult.ok) {
     console.error('❌ Cluster preparation failed:', prepareResult.error);
