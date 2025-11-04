@@ -283,6 +283,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
           dockerfile: options.dockerfile,
           buildargs: options.buildargs || options.buildArgs,
           ...(options.platform && { platform: options.platform }),
+          version: '2', // Use BuildKit backend for cross-platform builds
         });
 
         interface DockerBuildEvent {

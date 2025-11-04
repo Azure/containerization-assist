@@ -201,7 +201,6 @@ describe('Complete Containerization Journey', () => {
 
       expect(tagResult.ok).toBe(true);
       if (tagResult.ok) {
-        testCleaner.trackImage(finalTag);
         journeyLog.push(`✓ Image tagged: ${finalTag}`);
       }
 
@@ -422,7 +421,6 @@ CMD ["python", "app.py"]`
         );
 
         if (tagResult.ok) {
-          testCleaner.trackImage('journey-test-python:latest');
           journeyLog.push('✓ Image tagged');
         }
       }
@@ -631,7 +629,6 @@ CMD ["node", "index.js"]`;
           toolContext
         );
 
-        testCleaner.trackImage('perf-test:latest');
       }
 
       const duration = Date.now() - startTime;
