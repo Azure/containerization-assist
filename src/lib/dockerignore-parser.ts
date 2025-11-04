@@ -7,6 +7,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 const DOUBLE_STAR_PLACEHOLDER = '<!DOUBLESTAR!>';
+// Pre-compile regex for replacing the placeholder to avoid nested escaping
+const DOUBLE_STAR_PLACEHOLDER_REGEX = /<!DOUBLESTAR!>/g;
 
 /**
  * Parse .dockerignore file content into patterns
@@ -48,15 +50,15 @@ export function matchPattern(filePath: string, pattern: string): boolean {
   const cleanPattern = normalizedPattern.replace(/^\/+|\/+$/g, '');
   const cleanPath = normalizedPath.replace(/^\/+|\/+$/g, '');
 
+  const hasSlash = cleanPattern.includes('/');
+  const startsWithDoubleStar = cleanPattern.startsWith('**');
+
   let regexPattern = cleanPattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*\*/g, DOUBLE_STAR_PLACEHOLDER)
     .replace(/\*/g, '[^/]*')
-    .replace(new RegExp(DOUBLE_STAR_PLACEHOLDER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '.*?')
+    .replace(DOUBLE_STAR_PLACEHOLDER_REGEX, '.*?')
     .replace(/\?/g, '[^/]');
-
-  const hasSlash = cleanPattern.includes('/');
-  const startsWithDoubleStar = cleanPattern.startsWith('**');
 
   if (startsWithDoubleStar) {
     regexPattern = `^${regexPattern}`;
