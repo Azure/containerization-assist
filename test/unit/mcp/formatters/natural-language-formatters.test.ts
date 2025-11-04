@@ -303,7 +303,8 @@ describe('natural-language-formatters', () => {
       const result: BuildImageResult = {
         success: true,
         imageId: 'sha256:abc123def456',
-        tags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
+        requestedTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
+        createdTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
         size: 245000000,
         buildTime: 45000,
         layers: 12,
@@ -314,7 +315,7 @@ describe('natural-language-formatters', () => {
 
       expect(narrative).toContain('✅ Image Built Successfully');
       expect(narrative).toContain('**Image:** sha256:abc123def456');
-      expect(narrative).toContain('**Tags:** myapp:latest, myapp:1.0.0, myapp:production');
+      expect(narrative).toContain('**Tags Created:** myapp:latest, myapp:1.0.0, myapp:production');
       expect(narrative).toContain('**Size:** 234MB'); // 245000000 bytes = 234MB
       expect(narrative).toContain('**Build Time:** 45s');
       expect(narrative).toContain('**Layers:** 12');
@@ -326,7 +327,8 @@ describe('natural-language-formatters', () => {
       const result: BuildImageResult = {
         success: true,
         imageId: 'sha256:minimal',
-        tags: [],
+        requestedTags: [],
+        createdTags: [],
         size: 100000000,
         buildTime: 30000,
         logs: [],
@@ -336,7 +338,7 @@ describe('natural-language-formatters', () => {
 
       expect(narrative).toContain('✅ Image Built Successfully');
       expect(narrative).toContain('**Image:** sha256:minimal');
-      expect(narrative).not.toContain('**Tags:**');
+      expect(narrative).not.toContain('**Tags Created:**');
       expect(narrative).not.toContain('**Layers:**');
     });
   });

@@ -1,0 +1,147 @@
+name: Individual Tool Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # Test prepare-cluster + push-image tools with local registry
+  test-local-registry:
+    name: Local Registry & Push (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        os: [ubuntu-latest] # macOS doesn't support nested virtualization needed for kind currently
+      fail-fast: false
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Setup Docker and Kind (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install colima
+          brew install kind
+          brew install docker
+          colima start --cpu 2 --memory 4
+          docker context use colima
+
+      - name: Install Docker and Kind (linux)
+        if: runner.os == 'Linux'
+        run: |
+          # Install Docker
+          sudo apt-get update
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/
+          kind version
+
+      - name: Verify Docker installation
+        run: |
+          echo "=== Docker version and info ==="
+          docker --version
+          docker info
+
+          echo "=== Docker containers ==="
+          docker ps -a
+
+      - name: Read platform and set TARGET_PLATFORM
+        run: |
+          if [ "$(uname -m)" == "x86_64" ]; then
+            echo "TARGET_PLATFORM=linux/amd64" >> $GITHUB_ENV
+          elif [ "$(uname -m)" == "arm64" ] || [ "$(uname -m)" == "aarch64" ]; then
+            echo "TARGET_PLATFORM=linux/arm64" >> $GITHUB_ENV
+          else
+            echo "Unsupported architecture: $(uname -m)"
+            exit 1
+          fi
+
+          echo "Detected architecture: $(uname -m), set TARGET_PLATFORM=$TARGET_PLATFORM"
+      - name: Run local registry integration test
+        env:
+          TARGET_PLATFORM: ${{ env.TARGET_PLATFORM }}
+        run: |
+          tsx scripts/integration-test-local-registry.ts
+        timeout-minutes: 10
+
+      - name: Show pod status on failure
+        if: failure()
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -A || true
+          echo ""
+          echo "=== Pod description ==="
+          kubectl describe pod test-registry-pod || true
+          echo ""
+          echo "=== Pod events ==="
+          kubectl get events --sort-by=.lastTimestamp || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kubectl delete pod test-registry-pod --ignore-not-found=true || true
+          kind delete cluster --name containerization-assist || true
+          docker rm -f ca-registry || true
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Docker containers ==="
+          docker ps -a || true
+          echo ""
+          echo "=== Registry logs ==="
+          docker logs ca-registry || true
+          echo ""
+          echo "=== Kind clusters ==="
+          kind get clusters || true
+          echo ""
+          echo "=== kubectl version ==="
+          kubectl version || true
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🧪 Individual Tool Integration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Local Registry & Push Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tools Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- \`prepare-cluster\` - Creates kind cluster with local registry" >> $GITHUB_STEP_SUMMARY
+          echo "- \`push-image\` - Pushes image to local registry" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Flow" >> $GITHUB_STEP_SUMMARY
+          echo "1. ✅ Create kind cluster with local registry" >> $GITHUB_STEP_SUMMARY
+          echo "2. ✅ Verify registry is healthy and reachable from cluster" >> $GITHUB_STEP_SUMMARY
+          echo "3. ✅ Build test image (busybox)" >> $GITHUB_STEP_SUMMARY
+          echo "4. ✅ Push image to local registry" >> $GITHUB_STEP_SUMMARY
+          echo "5. ✅ Verify image in registry catalog" >> $GITHUB_STEP_SUMMARY
+          echo "6. ✅ Deploy pod using \`localhost:PORT/image\` format" >> $GITHUB_STEP_SUMMARY
+          echo "7. ✅ Verify pod pulls image successfully" >> $GITHUB_STEP_SUMMARY
+          echo "8. ✅ Verify pod executes successfully" >> $GITHUB_STEP_SUMMARY

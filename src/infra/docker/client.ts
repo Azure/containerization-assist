@@ -262,6 +262,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
           dockerfile: options.dockerfile,
           buildargs: options.buildargs || options.buildArgs,
           ...(options.platform && { platform: options.platform }),
+          version: '2', // Use BuildKit backend for cross-platform builds
         });
 
         interface DockerBuildEvent {
@@ -456,7 +457,10 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
       try {
         const image = docker.getImage(`${repository}:${tag}`);
         // dockerode's Image.push expects auth config inside the first options object
-        const stream = await image.push(authConfig ? { authconfig: authConfig } : {});
+        // For local registries without auth, provide an empty authconfig object to avoid X-Registry-Auth header issues
+        const stream = await image.push({ 
+          authconfig: authConfig || {}
+        });
 
         let digest = '';
         let size: number | undefined;

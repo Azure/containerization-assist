@@ -36,8 +36,12 @@ export interface BuildImageResult {
   success: boolean;
   /** Generated Docker image ID (SHA256 hash) */
   imageId: string;
-  /** Tags applied to the built image */
-  tags: string[];
+  /** All tags that were requested/attempted to be created */
+  requestedTags: string[];
+  /** Successfully created tags with full image names */
+  createdTags: string[];
+  /** Tags that failed to be created (if any) */
+  failedTags?: string[];
   /** Final image size in bytes */
   size: number;
   /** Number of layers in the image */
@@ -48,8 +52,8 @@ export interface BuildImageResult {
   logs: string[];
   /** Security-related warnings discovered during build */
   securityWarnings?: string[];
-  failedTags?: string[];
 }
+
 
 /**
  * Prepare build arguments by merging user-provided args with default build metadata
@@ -64,6 +68,26 @@ async function prepareBuildArgs(
   };
 
   return { ...defaults, ...buildArgs };
+}
+
+/**
+ * Combine image name with tag to create a full image reference
+ * If tag already contains a colon or slash (indicating it's a full reference), return as-is
+ * Otherwise, combine imageName with tag
+ */
+function combineImageNameAndTag(imageName: string | undefined, tag: string): string {
+  // If tag already looks like a full reference (contains : or /), use as-is
+  if (tag.includes(':') || tag.includes('/')) {
+    return tag;
+  }
+
+  // If no imageName provided, use tag as-is (will get 'latest' appended by Docker if needed)
+  if (!imageName) {
+    return tag;
+  }
+
+  // Combine imageName with tag
+  return `${imageName}:${tag}`;
 }
 
 /**
@@ -192,7 +216,21 @@ async function handleBuildImage(
       logger.warn({ warnings: securityWarnings }, 'Security warnings found in build');
     }
 
-    const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
+    // Determine final tags to apply to the image
+    let finalTags: string[] = [];
+    if (tags.length > 0) {
+      // Combine each tag with imageName (if tag is not already a full reference)
+      finalTags = tags.map((tag) => combineImageNameAndTag(imageName, tag));
+    } else if (imageName) {
+      // No tags provided, use imageName as-is (Docker will default to 'latest' if no tag)
+      finalTags = [imageName];
+    }
+
+    // Log the final tags that will be applied
+    logger.info(
+      { finalTags, originalTags: tags, imageName },
+      'Determined final tags for build',
+    );
 
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
@@ -242,19 +280,26 @@ async function handleBuildImage(
     }
 
     // Generate summary
-    const imageTag = finalTags[0] || buildResult.value.imageId;
+    const successfulTags = finalTags.filter((tag) => !failedTags.includes(tag));
+    const imageTag = successfulTags[0] || buildResult.value.imageId;
     const sizeText = buildResult.value.size ? ` (${formatSize(buildResult.value.size)})` : '';
     const timeText = buildResult.value.buildTime
       ? ` Build completed in ${formatDuration(Math.round(buildResult.value.buildTime / 1000))}.`
       : '';
 
-    const summary = `✅ Built image successfully. Image: ${imageTag}${sizeText}.${timeText}`;
+    const failedTagsText =
+      failedTags.length > 0
+        ? ` ⚠️  Failed to apply ${failedTags.length} tag(s): ${failedTags.join(', ')}`
+        : '';
+
+    const summary = `✅ Built image successfully. Image: ${imageTag}${sizeText}.${timeText}${failedTagsText}`;
 
     const result: BuildImageResult = {
       summary,
       success: true,
       imageId: buildResult.value.imageId,
-      tags: finalTags,
+      requestedTags: finalTags,
+      createdTags: successfulTags,
       size: buildResult.value.size,
       ...(buildResult.value.layers !== undefined && { layers: buildResult.value.layers }),
       buildTime: buildResult.value.buildTime,

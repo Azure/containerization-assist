@@ -19,8 +19,6 @@ import {
   type GenerateDockerfileParams,
   type DockerfileAnalysis,
   type EnhancementGuidance,
-  type DockerPlatform,
-  DOCKER_PLATFORMS,
 } from './schema';
 import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
@@ -35,43 +33,11 @@ import {
 } from '@/lib/policy-helpers';
 import type { RegoEvaluator } from '@/config/policy-rego';
 import type { Logger } from 'pino';
-import { arch } from 'node:process';
 
 const name = 'generate-dockerfile';
 const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation or enhancement. Automatically detects existing Dockerfiles and provides detailed analysis and guidance.';
 const version = '2.0.0';
-
-/**
- * Detect the current system's Docker platform
- * Maps Node.js platform/arch to Docker platform format (e.g., linux/amd64, linux/arm64)
- *
- * @returns The detected Docker platform, defaults to 'linux/amd64' if detection fails
- */
-function detectSystemPlatform(): DockerPlatform {
-  // Map Node.js arch to Docker arch
-  const archMap: Record<string, string> = {
-    x64: 'amd64',
-    arm64: 'arm64',
-    arm: 'arm/v7',
-    ia32: '386',
-    ppc64: 'ppc64le',
-    s390x: 's390x',
-  };
-
-  // Docker containers typically run Linux regardless of host OS
-  // For Windows/Mac, we still use linux/* for the container platform
-  const dockerArch = archMap[arch] || arch;
-  const platform = `linux/${dockerArch}`;
-
-  // Validate against known platforms, default to linux/amd64 if unknown
-  if (DOCKER_PLATFORMS.includes(platform as DockerPlatform)) {
-    return platform as DockerPlatform;
-  }
-
-  // Fallback to most common platform
-  return 'linux/amd64';
-}
 
 type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPractices';
 
@@ -364,7 +330,7 @@ function substituteImageVersion(image: string, targetVersion: string | undefined
   const toolMatch = image.match(toolWithRuntimePattern);
 
   if (toolMatch) {
-    const [, tool, toolVersion, runtime ] = toolMatch;
+    const [, tool, toolVersion, runtime] = toolMatch;
     // Replace only the JDK version at the end
     return `${tool}:${toolVersion}-${runtime}-${targetVersion}`;
   }
@@ -466,18 +432,18 @@ const runPattern = createKnowledgeTool<
       baseImages: (s) =>
         Boolean(
           s.tags?.includes('base-image') ||
-            s.tags?.includes('registry') ||
-            s.tags?.includes('official') ||
-            s.tags?.includes('distroless') ||
-            (s.tags?.includes('build-stage') && s.tags?.includes('build-tool')) ||
-            s.text.toLowerCase().includes('base image'),
+          s.tags?.includes('registry') ||
+          s.tags?.includes('official') ||
+          s.tags?.includes('distroless') ||
+          (s.tags?.includes('build-stage') && s.tags?.includes('build-tool')) ||
+          s.text.toLowerCase().includes('base image'),
         ),
       security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
       optimization: (s) =>
         Boolean(
           s.tags?.includes('optimization') ||
-            s.tags?.includes('caching') ||
-            s.tags?.includes('size'),
+          s.tags?.includes('caching') ||
+          s.tags?.includes('size'),
         ),
       bestPractices: () => true, // Catch remaining snippets as best practices
     }),
@@ -583,25 +549,25 @@ const runPattern = createKnowledgeTool<
       // Build nextAction directive
       const nextAction: ToolNextAction = existingDockerfile
         ? {
-            action: 'update-files',
-            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
-            files: [
-              {
-                path: relativeDockerfilePath,
-                purpose: 'Container build configuration (enhancement)',
-              },
-            ],
-          }
+          action: 'update-files',
+          instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
+          files: [
+            {
+              path: relativeDockerfilePath,
+              purpose: 'Container build configuration (enhancement)',
+            },
+          ],
+        }
         : {
-            action: 'create-files',
-            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
-            files: [
-              {
-                path: relativeDockerfilePath,
-                purpose: 'Container build configuration',
-              },
-            ],
-          };
+          action: 'create-files',
+          instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
+          files: [
+            {
+              path: relativeDockerfilePath,
+              purpose: 'Container build configuration',
+            },
+          ],
+        };
 
       // Build action-oriented summary
       const languageVersionStr = input.languageVersion ? ` ${input.languageVersion}` : '';
@@ -620,21 +586,23 @@ const runPattern = createKnowledgeTool<
           `Path: ${relativeDockerfilePath}\n` +
           `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
           `Environment: ${input.environment || 'production'}\n` +
+          `Target Platform: ${input.targetPlatform}\n` +
           `Current State: ${analysis.complexity}, ${analysis.securityPosture} security, ${analysis.instructionCount} instructions\n` +
           `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
           `Enhancement: ${guidance.strategy}\n` +
           `Changes: Preserve ${guidance.preserve.length} items, Improve ${guidance.improve.length} items, Add ${guidance.addMissing.length} missing items\n` +
           `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
-          `✅ Ready to update Dockerfile with enhancements.`;
+          `✅ Ready to update Dockerfile. Use 'docker buildx build --platform=${input.targetPlatform}' to build for target platform.`;
       } else {
         summary =
           `🔨 ACTION REQUIRED: Create Dockerfile\n` +
           `Path: ${relativeDockerfilePath}\n` +
           `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
           `Environment: ${input.environment || 'production'}\n` +
+          `Target Platform: ${input.targetPlatform}\n` +
           `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
           `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
-          `✅ Ready to create Dockerfile based on recommendations.`;
+          `✅ Ready to create Dockerfile. Use 'docker buildx build --platform=${input.targetPlatform}' to build for target platform.`;
       }
 
       return {
@@ -644,13 +612,13 @@ const runPattern = createKnowledgeTool<
           modulePath,
           ...(language &&
             language !== 'auto-detect' && {
-              language: language === 'java' || language === 'dotnet' ? language : 'other',
-            }),
+            language: language === 'java' || language === 'dotnet' ? language : 'other',
+          }),
           ...(input.languageVersion && { languageVersion: input.languageVersion }),
           ...(framework &&
             framework !== 'auto-detect' && {
-              frameworks: [{ name: framework }],
-            }),
+            frameworks: [{ name: framework }],
+          }),
         },
         recommendations: {
           buildStrategy: rules.buildStrategy,
@@ -681,27 +649,23 @@ const runPattern = createKnowledgeTool<
 function planToDockerfileText(plan: DockerfilePlan): string {
   const lines: string[] = [];
 
-  // Use platform from plan (policy-driven) or detect system platform as fallback
-  const defaultPlatform = plan.recommendations.platform || detectSystemPlatform();
-
-  // Add base image recommendations as FROM directives with detected platform
+  // Add base image recommendations as FROM directives without platform flags
   const baseImages = plan.recommendations.baseImages || [];
   if (baseImages.length > 0) {
     const primaryImage = baseImages[0];
     if (primaryImage) {
       if (plan.recommendations.buildStrategy.multistage) {
         lines.push('# Multi-stage build');
-        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image} AS builder`);
+        lines.push(`FROM ${primaryImage.image} AS builder`);
         lines.push('# ... build steps ...');
-        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image}`);
+        lines.push(`FROM ${primaryImage.image}`);
       } else {
-        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image}`);
+        lines.push(`FROM ${primaryImage.image}`);
       }
     }
   } else {
     // If no base images available (filtered out), use placeholder for policy validation
-    // This ensures platform/tag policies can still validate against defaults
-    lines.push(`FROM --platform=${defaultPlatform} unknown`);
+    lines.push(`FROM unknown`);
   }
 
   // Add default tag label for policy validation (use tag from plan or default to v1)
@@ -777,10 +741,8 @@ async function isImageCompliant(
   evaluator: RegoEvaluator,
   logger: Logger,
 ): Promise<boolean> {
-  // Create a test Dockerfile using system defaults (not policy-specific values)
-  // We use the actual default values that will be used in the final plan
-  const defaultPlatform = detectSystemPlatform();
-  const dockerfileText = `FROM --platform=${defaultPlatform} ${image}\nLABEL tag="v1"\nUSER appuser`;
+  // Create a test Dockerfile without platform flags
+  const dockerfileText = `FROM ${image}\nLABEL tag="v1"\nUSER appuser`;
 
   logger.debug({ image, dockerfileText }, 'Validating base image against policy');
 
@@ -870,11 +832,11 @@ async function handleGenerateDockerfile(
 
   let existingDockerfile:
     | {
-        path: string;
-        content: string;
-        analysis: DockerfileAnalysis;
-        guidance: EnhancementGuidance;
-      }
+      path: string;
+      content: string;
+      analysis: DockerfileAnalysis;
+      guidance: EnhancementGuidance;
+    }
     | undefined;
 
   try {
@@ -930,9 +892,8 @@ async function handleGenerateDockerfile(
   const plan = result.value;
 
   // Add platform and default tag to recommendations
-  // Use targetPlatform from input if provided (allows cross-compilation, e.g., ARM Mac -> AMD64 server)
-  // Otherwise auto-detect from system
-  plan.recommendations.platform = input.targetPlatform || detectSystemPlatform();
+  // targetPlatform is now required, ensuring consistent builds across environments
+  plan.recommendations.platform = input.targetPlatform;
   plan.recommendations.defaultTag = 'v1';
 
   // Filter base images based on policy if available

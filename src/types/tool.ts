@@ -3,6 +3,7 @@ import type { Result } from './core';
 import type { ToolContext } from '@/mcp/context';
 import type { ToolCategory } from './categories';
 import type { ToolMetadata } from './tool-metadata';
+import type { ToolName } from '@/tools';
 import { extractSchemaShape } from '@/lib/zod-utils';
 
 /**
