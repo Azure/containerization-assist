@@ -7,14 +7,6 @@ import { z } from 'zod';
 import { platform } from '../shared/schemas';
 
 export const pushImageSchema = z.object({
-  imageId: z.string().min(1).describe('Docker image ID or name to push'),
-  registry: z.string().min(1).describe('Target registry hostname (e.g., myregistry.azurecr.io, docker.io)'),
+  imageId: z.string().min(1).describe('Docker image ID or name to push including the registry and tag (e.g., myregistry.azurecr.io/myapp:latest)'),
   platform,
-  credentials: z
-    .object({
-      username: z.string(),
-      password: z.string(),
-    })
-    .optional()
-    .describe('Registry credentials. If not provided, will attempt to use Docker credential helpers'),
 });

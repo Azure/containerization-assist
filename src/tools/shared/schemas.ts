@@ -65,9 +65,8 @@ export const analysisOptions = {
 // Platform - Required for consistent builds across environments
 export const platform = z
   .enum(DOCKER_PLATFORMS)
-  .default('linux/amd64')
   .describe(
-    'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). Defaults to linux/amd64 for maximum compatibility. Required to ensure consistent builds across environments and cross-platform scenarios (e.g., ARM Mac targeting AMD64 servers).',
+    'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64").',
   );
 
 // Multi-module/monorepo support

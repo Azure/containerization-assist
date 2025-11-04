@@ -192,7 +192,6 @@ describe('prepareCluster', () => {
     config = {
       namespace: 'test-namespace',
       environment: 'production',
-      targetPlatform: 'linux/amd64',
     };
 
     // Reset all mocks
@@ -313,7 +312,6 @@ describe('prepareCluster', () => {
       devConfig = {
         namespace: 'default',
         environment: 'development',
-        targetPlatform: 'linux/amd64',
       };
 
       // Mock successful cluster operations
@@ -405,6 +403,7 @@ describe('prepareCluster', () => {
         expect(result.value.checks.kindClusterCreated).toBe(true);
         expect(result.value.checks.localRegistryCreated).toBe(true);
         expect(result.value.localRegistryUrl).toBe('localhost:6000');
+        expect(result.value.clusterArchitecture).toBe('linux/amd64');
         expect(result.value.localRegistry).toBeDefined();
         if (result.value.localRegistry) {
           expect(result.value.localRegistry.externalUrl).toBe('localhost:6000');

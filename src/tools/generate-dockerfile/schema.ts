@@ -41,8 +41,8 @@ export const generateDockerfileSchema = z.object({
       'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
     ),
   targetPlatform: platform.describe(
-    'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). Defaults to linux/amd64 for maximum compatibility. Use this to cross-compile for different architectures (e.g., ARM Mac targeting AMD64 servers).',
-  ),
+    'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). This should be informed by the target cluster\'s architecture.',
+  )
 });
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;

@@ -35,7 +35,6 @@ import {
   getDownloadOS,
   getDownloadArch,
   mapNodeArchToPlatform,
-  isPlatformCompatible,
 } from '@/lib/platform';
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 import { findRegistryPort } from '@/lib/port-utils';
@@ -152,109 +151,6 @@ async function detectClusterPlatform(logger: pino.Logger): Promise<DockerPlatfor
   }
 }
 
-/**
- * Validate that target platform is compatible with cluster platform.
- * Returns validation result with detailed guidance.
- *
- * @param strictMode - When true, incompatible platforms return a Failure result
- */
-async function validatePlatformCompatibility(
-  targetPlatform: DockerPlatform,
-  logger: pino.Logger,
-  warnings: string[],
-  strictMode: boolean,
-): Promise<Result<{
-  clusterPlatform: DockerPlatform | null;
-  compatible: boolean;
-  requiresEmulation: boolean;
-}>> {
-  const clusterPlatform = await detectClusterPlatform(logger);
-
-  if (!clusterPlatform) {
-    const message = `Could not detect cluster platform - unable to verify compatibility with target platform ${targetPlatform}`;
-
-    if (strictMode) {
-      return Failure(message, {
-        message,
-        hint: 'Cluster architecture detection failed',
-        resolution: 'Ensure cluster is running and kubectl can access node information',
-      });
-    }
-
-    warnings.push(message);
-    return Success({
-      clusterPlatform: null,
-      compatible: false,
-      requiresEmulation: false,
-    });
-  }
-
-  const compatible = isPlatformCompatible(targetPlatform, clusterPlatform);
-
-  if (!compatible) {
-    const requiresEmulation = targetPlatform !== clusterPlatform;
-
-    if (requiresEmulation) {
-      const message = `Platform mismatch: cluster is ${clusterPlatform} but target platform is ${targetPlatform}`;
-
-      if (strictMode) {
-        // In strict mode, fail on any platform mismatch
-        return Failure(message, {
-          message,
-          hint: 'Cluster architecture does not match target platform',
-          resolution: `To deploy ${targetPlatform} images, either:\n  1. Recreate cluster with matching architecture, or\n  2. Set strictPlatformValidation=false to allow emulation (may have performance impact)`,
-        });
-      }
-
-      // Check if this is a known emulation scenario (e.g., ARM Mac with AMD64 kind cluster)
-      const systemInfo = getSystemInfo();
-      const hostArch = process.arch;
-      const isArmMacWithAmd64 =
-        systemInfo.isMac &&
-        hostArch === 'arm64' &&
-        targetPlatform === 'linux/amd64' &&
-        clusterPlatform === 'linux/amd64';
-
-      if (isArmMacWithAmd64) {
-        // This is expected for ARM Mac development targeting AMD64
-        logger.info(
-          { targetPlatform, clusterPlatform },
-          'ARM Mac detected with AMD64 cluster - Docker emulation will be used',
-        );
-        warnings.push(
-          `Running AMD64 cluster on ARM Mac - images will use Docker emulation (may have performance impact)`,
-        );
-        return Success({
-          clusterPlatform,
-          compatible: true, // Allow this scenario in non-strict mode
-          requiresEmulation: true,
-        });
-      }
-
-      // Other emulation scenarios - warn but don't block in non-strict mode
-      logger.warn(
-        { targetPlatform, clusterPlatform },
-        'Target platform does not match cluster platform - may require emulation',
-      );
-      warnings.push(
-        `Platform mismatch: Building for ${targetPlatform} but cluster runs ${clusterPlatform}. Images may not run or may require emulation.`,
-      );
-    }
-
-    return Success({
-      clusterPlatform,
-      compatible: false,
-      requiresEmulation,
-    });
-  }
-
-  logger.info({ targetPlatform, clusterPlatform }, 'Platform compatibility validated successfully');
-  return Success({
-    clusterPlatform,
-    compatible: true,
-    requiresEmulation: false,
-  });
-}
 
 export interface PrepareClusterResult {
   /**
@@ -267,12 +163,7 @@ export interface PrepareClusterResult {
   clusterReady: boolean;
   cluster: string;
   namespace: string;
-  platform?: {
-    target: DockerPlatform;
-    cluster: DockerPlatform | null;
-    compatible: boolean;
-    requiresEmulation: boolean;
-  };
+  clusterArchitecture?: DockerPlatform | null;
   checks: {
     connectivity: boolean;
     permissions: boolean;
@@ -282,7 +173,6 @@ export interface PrepareClusterResult {
     kindInstalled?: boolean;
     kindClusterCreated?: boolean;
     localRegistryCreated?: boolean;
-    platformCompatible?: boolean;
     registryAccessValidated?: boolean;
   };
   warnings?: string[];
@@ -292,7 +182,6 @@ export interface PrepareClusterResult {
     internalEndpoint: string;
     containerName: string;
     healthy: boolean;
-    reachableFromCluster: boolean;
   };
   remoteRegistry?: {
     url: string;
@@ -468,51 +357,10 @@ async function checkKindClusterExists(
   }
 }
 
-/**
- * Validate existing cluster's architecture against target platform in strict mode.
- * Returns Failure if mismatch detected in strict mode.
- */
-async function validateExistingClusterArchitecture(
-  clusterName: string,
-  targetPlatform: DockerPlatform,
-  strictMode: boolean,
-  logger: pino.Logger,
-): Promise<Result<void>> {
-  if (!strictMode) {
-    return Success(undefined);
-  }
-
-  logger.debug({ clusterName, targetPlatform }, 'Validating existing cluster architecture in strict mode');
-
-  const clusterPlatform = await detectClusterPlatform(logger);
-
-  if (!clusterPlatform) {
-    return Failure('Could not detect existing cluster platform', {
-      message: 'Failed to detect architecture of existing cluster',
-      hint: 'Cluster architecture detection failed',
-      resolution: `Ensure cluster '${clusterName}' is running and kubectl can access node information`,
-    });
-  }
-
-  if (clusterPlatform !== targetPlatform) {
-    return Failure(
-      `Existing cluster '${clusterName}' is ${clusterPlatform} but target platform is ${targetPlatform}`,
-      {
-        message: `Existing cluster architecture mismatch`,
-        hint: `Cluster '${clusterName}' is ${clusterPlatform} but you're targeting ${targetPlatform}`,
-        resolution: `To deploy ${targetPlatform} images, either:\n  1. Delete cluster: kind delete cluster --name ${clusterName}\n  2. Set strictPlatformValidation=false to allow emulation`,
-      },
-    );
-  }
-
-  logger.info({ clusterName, clusterPlatform, targetPlatform }, 'Existing cluster architecture validated successfully');
-  return Success(undefined);
-}
 
 async function createKindCluster(
   clusterName: string,
   port: number,
-  targetPlatform: DockerPlatform,
   logger: pino.Logger,
 ): Promise<Result<void>> {
   const escapedNameResult = validateAndEscapeClusterName(clusterName);
@@ -527,7 +375,7 @@ async function createKindCluster(
     // Use native architecture for kind cluster
     const hostArch = process.arch;
     logger.info(
-      { hostArch, targetPlatform },
+      { hostArch },
       'Creating kind cluster with native architecture',
     );
 
@@ -833,45 +681,6 @@ async function getContainerNetworkIP(
 }
 
 /**
- * Verify registry is accessible from within the kind cluster.
- * Uses kubectl run to create a test pod that curls the registry endpoint.
- */
-async function verifyRegistryFromCluster(_port: number, logger: pino.Logger): Promise<boolean> {
-  try {
-    logger.debug('Testing registry reachability from within cluster...');
-
-    // Create a temporary test pod that curls the registry
-    const testPodName = `registry-test-${Date.now()}`;
-    const curlCommand = `curl -sf http://${DOCKER.REGISTRY_CONTAINER_NAME}:5000/v2/ && echo "success" || echo "failed"`;
-
-    try {
-      // Run test pod and wait for completion (timeout 30s)
-      const { stdout } = await execAsync(
-        `kubectl run ${testPodName} --image=curlimages/curl:latest --restart=Never --rm -i --timeout=30s -- sh -c '${curlCommand}'`,
-        { timeout: 35000 },
-      );
-
-      const success = stdout.includes('success');
-      logger.debug({ testPodName, success, output: stdout.trim() }, 'In-cluster registry test result');
-
-      return success;
-    } catch (error) {
-      // If pod creation fails, try to clean it up
-      try {
-        await execAsync(`kubectl delete pod ${testPodName} --ignore-not-found=true`);
-      } catch {
-        // Ignore cleanup errors
-      }
-      logger.debug({ error }, 'In-cluster registry test failed');
-      return false;
-    }
-  } catch (error) {
-    logger.warn({ error }, 'Error testing registry from cluster');
-    return false;
-  }
-}
-
-/**
  * Validate DNS resolution for registry from within the cluster.
  * Uses kubectl run to create a test pod that performs DNS lookup for the registry hostname.
  * This specifically tests if pods can resolve the registry's DNS name to its IP address.
@@ -1150,7 +959,7 @@ async function connectRegistryToKindNetwork(
  * Checks docker login status without handling credentials.
  *
  * @param registryUrl - Registry URL (e.g., myregistry.azurecr.io)
- * @param registryType - Type of registry (acr, ecr, gcr, dockerhub, generic)
+ * @param registryType - Type of registry (acr, generic)
  * @param logger - Logger instance
  * @returns Success if logged in, Failure with guidance if not
  */
@@ -1170,18 +979,6 @@ async function validateRegistryAccess(
       case 'acr':
         // For ACR, try to list repositories
         testCommand = `az acr repository list --name ${registryUrl.split('.')[0]} --output json 2>/dev/null || echo "not-logged-in"`;
-        break;
-      case 'dockerhub':
-        // For Docker Hub, we can check login status via docker info
-        testCommand = `docker info 2>/dev/null | grep -i "username" || echo "not-logged-in"`;
-        break;
-      case 'ecr':
-        // For ECR, try to get login password (without actually logging in)
-        testCommand = `aws ecr get-login-password --region us-east-1 2>/dev/null | head -c 10 || echo "not-logged-in"`;
-        break;
-      case 'gcr':
-        // For GCR, check gcloud auth
-        testCommand = `gcloud auth print-access-token 2>/dev/null | head -c 10 || echo "not-logged-in"`;
         break;
       default:
         // Generic: try to check docker config for registry credentials
@@ -1224,8 +1021,6 @@ async function validateRegistryAccess(
 async function setupKindCluster(
   clusterName: string,
   port: number,
-  targetPlatform: DockerPlatform,
-  strictMode: boolean,
   logger: pino.Logger,
   checks: {
     kindInstalled: boolean | undefined;
@@ -1253,7 +1048,7 @@ async function setupKindCluster(
   const kindClusterExists = clusterExistsResult.value;
 
   if (!kindClusterExists) {
-    const createResult = await createKindCluster(clusterName, port, targetPlatform, logger);
+    const createResult = await createKindCluster(clusterName, port, logger);
     if (!createResult.ok) {
       return createResult;
     }
@@ -1287,17 +1082,6 @@ async function setupKindCluster(
   } else {
     checks.kindClusterCreated = true;
     logger.info({ clusterName }, 'Kind cluster already exists');
-
-    // Validate existing cluster architecture in strict mode
-    const validationResult = await validateExistingClusterArchitecture(
-      clusterName,
-      targetPlatform,
-      strictMode,
-      logger,
-    );
-    if (!validationResult.ok) {
-      return validationResult;
-    }
   }
 
   // Export kubeconfig
@@ -1461,8 +1245,6 @@ async function handlePrepareCluster(
   const {
     environment = 'development',
     namespace = 'default',
-    targetPlatform = 'linux/amd64',
-    strictPlatformValidation = true,
     useRemoteCluster = false,
     clusterName: userClusterName,
     registry,
@@ -1511,7 +1293,6 @@ async function handlePrepareCluster(
       kindInstalled: undefined as boolean | undefined,
       kindClusterCreated: undefined as boolean | undefined,
       localRegistryCreated: undefined as boolean | undefined,
-      platformCompatible: undefined as boolean | undefined,
       registryAccessValidated: undefined as boolean | undefined,
     };
     let localRegistryUrl: string | undefined;
@@ -1554,7 +1335,7 @@ async function handlePrepareCluster(
     // Setup Kind cluster if in development environment
     // Pass the registry port so it can be configured in the cluster
     if (shouldSetupKind && registryPort !== undefined) {
-      const setupResult = await setupKindCluster(clusterName, registryPort, targetPlatform, strictPlatformValidation, logger, checks);
+      const setupResult = await setupKindCluster(clusterName, registryPort, logger, checks);
       if (!setupResult.ok) {
         return setupResult;
       }
@@ -1585,30 +1366,6 @@ async function handlePrepareCluster(
         logger.info('Containerd registry mirror configuration validated successfully');
       }
 
-      // Test registry reachability from within cluster
-      logger.debug('Testing registry reachability from cluster...');
-      let registryReachable = false;
-      const maxRetries = 2;
-      const retryDelay = 3000; // 3 seconds
-
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        registryReachable = await verifyRegistryFromCluster(registryPort, logger);
-        if (registryReachable) {
-          break;
-        }
-
-        if (attempt < maxRetries) {
-          logger.debug({ attempt: attempt + 1, maxRetries: maxRetries + 1 }, 'Registry reachability test failed, retrying...');
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-        }
-      }
-
-      if (!registryReachable) {
-        warnings.push('Registry is not reachable from within cluster - deployment may fail');
-      } else {
-        logger.info('Registry reachability from cluster validated successfully');
-      }
-
       // Test DNS resolution from within cluster
       logger.debug('Testing registry DNS resolution from cluster...');
       const dnsResolution = await verifyRegistryDNSResolution(logger);
@@ -1629,14 +1386,12 @@ async function handlePrepareCluster(
         internalEndpoint: `${DOCKER.REGISTRY_CONTAINER_NAME}:5000`,
         containerName: DOCKER.REGISTRY_CONTAINER_NAME,
         healthy: networkConnection.healthy,
-        reachableFromCluster: registryReachable,
       };
 
       logger.info(
         {
           connected: networkConnection.connected,
           healthy: networkConnection.healthy,
-          reachable: registryReachable
         },
         'Registry Phase 2 complete'
       );
@@ -1661,29 +1416,17 @@ async function handlePrepareCluster(
 
     const clusterReady = readinessResult.value;
 
-    // Validate platform compatibility
-    logger.debug({ targetPlatform }, 'Validating platform compatibility...');
-    const platformValidation = await validatePlatformCompatibility(targetPlatform, logger, warnings, strictPlatformValidation);
-    if (!platformValidation.ok) {
-      return platformValidation;
-    }
-    const platformData = platformValidation.value;
-    checks.platformCompatible = platformData.compatible;
-
-    const platformInfo: PrepareClusterResult['platform'] = {
-      target: targetPlatform,
-      cluster: platformData.clusterPlatform,
-      compatible: platformData.compatible,
-      requiresEmulation: platformData.requiresEmulation,
-    };
+    // Detect cluster architecture
+    logger.debug('Detecting cluster architecture...');
+    const clusterArchitecture = await detectClusterPlatform(logger);
 
     // Generate summary
     const namespaceAction = checks.namespaceExists ? 'verified' : 'created';
     const resourcesConfigured = Object.values(checks).filter(Boolean).length;
-    const platformText = platformInfo.cluster
-      ? ` Cluster platform: ${platformInfo.cluster}${platformInfo.requiresEmulation ? ' (with emulation)' : ''}.`
+    const architectureText = clusterArchitecture
+      ? ` Cluster architecture: ${clusterArchitecture}.`
       : '';
-    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured.${platformText} Ready for deployment.`;
+    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured.${architectureText} Ready for deployment.`;
 
     const result: PrepareClusterResult = {
       summary,
@@ -1691,7 +1434,7 @@ async function handlePrepareCluster(
       clusterReady,
       cluster: clusterName,
       namespace,
-      ...(platformInfo && { platform: platformInfo }),
+      clusterArchitecture,
       checks: {
         connectivity: checks.connectivity,
         permissions: checks.permissions,
@@ -1707,8 +1450,8 @@ async function handlePrepareCluster(
         ...(checks.localRegistryCreated !== undefined && {
           localRegistryCreated: checks.localRegistryCreated,
         }),
-        ...(checks.platformCompatible !== undefined && {
-          platformCompatible: checks.platformCompatible,
+        ...(checks.registryAccessValidated !== undefined && {
+          registryAccessValidated: checks.registryAccessValidated,
         }),
         ...(checks.registryAccessValidated !== undefined && {
           registryAccessValidated: checks.registryAccessValidated,
