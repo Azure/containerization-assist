@@ -55,7 +55,6 @@ export interface BuildImageResult {
 }
 
 
-
 /**
  * Prepare build arguments by merging user-provided args with default build metadata
  */

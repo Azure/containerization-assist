@@ -51,7 +51,7 @@ import { pluralize } from '@/lib/summary-helpers';
 const execAsync = promisify(exec);
 
 const KIND_VERSION = 'v0.20.0';
-const KIND_AMD64_NODE_IMAGE = 'kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72'
+const KIND_AMD64_NODE_IMAGE = 'kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72';
 
 /**
  * Validate and escape cluster name to prevent command injection.
