@@ -2,6 +2,7 @@
  * Port utility functions for finding and checking available ports
  */
 
+import { DOCKER } from '@/config';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -56,8 +57,8 @@ export async function findAvailablePort(startPort: number, endPort: number): Pro
  * Returns the first available port or throws an error if none are available
  */
 export async function findRegistryPort(): Promise<number> {
-  const startPort = 6000;
-  const endPort = 6100;
+  const startPort = DOCKER.REGISTRY_PORT_START;
+  const endPort = DOCKER.REGISTRY_PORT_END;
 
   const port = await findAvailablePort(startPort, endPort);
 

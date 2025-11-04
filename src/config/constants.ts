@@ -120,7 +120,7 @@ export const DOCKER = {
   /** Registry port search range start */
   REGISTRY_PORT_START: 6000,
   /** Registry port search range end */
-  REGISTRY_PORT_END: 60100,
+  REGISTRY_PORT_END: 6100,
   /** Registry container name */
   REGISTRY_CONTAINER_NAME: 'ca-registry',
   /** Registry host for external access */

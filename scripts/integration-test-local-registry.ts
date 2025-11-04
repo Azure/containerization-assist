@@ -10,7 +10,6 @@
 
 import { createToolContext } from '../dist/src/mcp/context.js';
 import prepareCluster from '../dist/src/tools/prepare-cluster/tool.js';
-import pushImage from '../dist/src/tools/push-image/tool.js';
 import { execSync } from 'child_process';
 import { writeFileSync } from 'fs';
 import { createLogger } from '../dist/src/lib/logger.js';
@@ -147,9 +146,7 @@ spec:
     }
 
     attempts++;
-    if (!podReady) {
-      execSync('sleep 2');
-    }
+    execSync('sleep 2');
   }
 
   if (!podReady) {
