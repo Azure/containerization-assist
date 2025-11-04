@@ -104,11 +104,11 @@ export function setupMCPServer(): void {
       'generate-dockerfile': customGenerateDockerfileName
     },
 
-    // Disable chain hints (automatic next-step suggestions)
-    chainHintsMode: "disabled",
-
     // Use natural language format for rich, user-friendly output
     outputFormat: "natural-language"
+
+    // Note: chainHintsMode defaults to 'enabled' - omit to use default
+    // Set to 'disabled' only if you want to suppress next-step suggestions
   });
 
   // Bind Container Assist tools to your MCP server

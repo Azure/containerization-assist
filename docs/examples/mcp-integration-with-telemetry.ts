@@ -4,23 +4,25 @@
  * This example shows how to integrate Container Assist tools with an MCP server
  * while maintaining full control over telemetry, error handling, and lifecycle hooks.
  *
- * ✨ NEW: Full TypeScript type safety for params and results!
+ * ✨ Full TypeScript type safety for params and results
+ * 🔒 Safe telemetry practices to protect customer data
  *
  * When you use literal tool names (e.g., 'build-image') with createToolHandler,
- * TypeScript automatically infers the specific types for:
+ * TypeScript automatically infers the specific types:
  * - params: Strongly typed input parameters (e.g., BuildImageInput)
  * - result: Strongly typed result object (e.g., BuildImageResult)
  * - toolName: Literal type (e.g., 'build-image' instead of string)
  *
- * Use this pattern when you need:
- * - Custom telemetry tracking for tool executions with type-safe data access
- * - Error reporting and monitoring with typed parameters
- * - Custom logging and observability with full IntelliSense support
- * - Fine-grained control over tool registration
+ * This gives you:
+ * - Custom telemetry tracking with type-safe data access
+ * - Error reporting with typed parameters
+ * - Full IntelliSense support
+ * - Compile-time safety
  *
- * Type Safety Summary:
- * ✅ createToolHandler(app, 'build-image', {...}) - Fully typed callbacks
- * ⚠️ registerTools(server, app, ALL_TOOLS, {...}) - Union types (broader, less specific)
+ * Security Principle: "When in doubt, hash it out"
+ * - Never log customer file paths, code content, or sensitive identifiers
+ * - Use telemetry sanitization utilities to hash/obfuscate sensitive data
+ * - Only log aggregate metrics and enum values
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -29,44 +31,59 @@ import {
   createApp,
   ALL_TOOLS,
   createToolHandler,
-  registerTools,
-  type ToolHandlerOptions,
   type ToolInputMap,
   type ToolResultMap,
 } from 'containerization-assist';
+import {
+  createSafeTelemetryEvent,
+  type SafeTelemetryEvent,
+} from 'containerization-assist/lib/telemetry-utils';
 
 /**
- * Example telemetry service
+ * Example telemetry service with safe logging
  * Replace this with your actual telemetry provider
  */
-class TelemetryService {
-  trackToolExecution(toolName: string, success: boolean, durationMs?: number) {
-    console.log(`[TELEMETRY] Tool: ${toolName}, Success: ${success}, Duration: ${durationMs}ms`);
-    // Send to your telemetry backend (e.g., Application Insights, DataDog, etc.)
+class SafeTelemetryService {
+  /**
+   * Track tool execution with sanitized data
+   * All customer-specific information is hashed or omitted
+   */
+  trackToolExecution(event: SafeTelemetryEvent) {
+    // Log safe metrics only
+    console.log('[TELEMETRY]', JSON.stringify(event, null, 2));
+
+    // Send to your telemetry backend
+    // Example integrations:
+    // - Application Insights: this.appInsights.trackEvent('tool-execution', event);
+    // - DataDog: this.datadogClient.increment('tool.execution', event);
+    // - Custom backend: await fetch('/api/telemetry', { body: JSON.stringify(event) });
   }
 
-  trackError(toolName: string, error: unknown) {
-    console.error(`[TELEMETRY] Tool ${toolName} failed:`, error);
-    // Send to your error tracking service
+  /**
+   * Track errors without exposing customer data
+   */
+  trackError(toolName: string, errorType: string) {
+    console.error(`[TELEMETRY] Tool ${toolName} failed: ${errorType}`);
+    // Send error type only (not full error message which may contain paths)
   }
 }
 
-const telemetry = new TelemetryService();
+const telemetry = new SafeTelemetryService();
 
 /**
- * Option 1: Use createToolHandler for maximum control and type safety
+ * Register tools with type-safe telemetry
  *
- * This gives you full control over each tool registration with strongly-typed
- * callbacks when you use literal tool names.
+ * Uses createToolHandler for per-tool control with strongly-typed callbacks
+ * and automatic customer data sanitization.
  */
-function registerWithMaximumControl(server: McpServer) {
+function registerWithSafeTelemetry(server: McpServer) {
   const app = createApp({
     outputFormat: 'natural-language',
     chainHintsMode: 'enabled',
   });
 
-  // Example 1: Type-safe registration with literal tool name
-  // TypeScript automatically infers the types for 'build-image'
+  // Example 1: Safe telemetry with build-image
+  // Customer paths and image names are hashed, only metrics are logged
   server.tool(
     'build-image',
     ALL_TOOLS.find((t) => t.name === 'build-image')!.description,
@@ -76,28 +93,45 @@ function registerWithMaximumControl(server: McpServer) {
 
       // ✅ result is typed as BuildImageResult
       // ✅ params is typed as BuildImageInput
+      // 🔒 Customer data is sanitized before logging
       onSuccess: (result, toolName, params) => {
-        telemetry.trackToolExecution(toolName, true);
+        // Create safe telemetry event - paths/names are hashed
+        const event = createSafeTelemetryEvent(
+          toolName,
+          params as Record<string, unknown>,
+          { ok: true, value: result as Record<string, unknown> },
+        );
 
-        // Fully typed access to result properties!
-        console.log(`[SUCCESS] Built image: ${result.imageId}`);
-        console.log(`[SUCCESS] Image size: ${result.size} bytes`);
-        console.log(`[SUCCESS] Tags: ${result.tags.join(', ')}`);
+        telemetry.trackToolExecution(event);
 
-        // Fully typed access to params!
-        console.log(`[SUCCESS] Built from: ${params.path || 'current directory'}`);
+        // ✅ Safe: Log aggregate metrics only
+        console.log(`[SUCCESS] Image built - Size: ${result.size} bytes, Build time: ${result.buildTime}ms`);
+
+        // ❌ UNSAFE: Don't log customer paths or image names directly
+        // console.log(`[UNSAFE] Built image: ${result.imageId}`); // Contains customer data!
+        // console.log(`[UNSAFE] Tags: ${result.tags.join(', ')}`); // Contains customer data!
       },
 
       onError: (error, toolName, params) => {
-        telemetry.trackError(toolName, error);
+        // Create safe telemetry event for errors
+        const event = createSafeTelemetryEvent(
+          toolName,
+          params as Record<string, unknown>,
+          { ok: false, error: String(error) },
+        );
 
-        // Fully typed params in error handler too!
-        console.error(`[ERROR] Failed to build ${params.imageName}`);
+        telemetry.trackToolExecution(event);
+
+        // ✅ Safe: Log error type only
+        console.error(`[ERROR] Build failed: ${error instanceof Error ? error.constructor.name : 'Error'}`);
+
+        // ❌ UNSAFE: Don't log customer image names
+        // console.error(`[UNSAFE] Failed to build ${params.imageName}`); // Exposes customer data!
       },
     }),
   );
 
-  // Example 2: Type-safe registration for deploy tool
+  // Example 2: Safe telemetry with deploy tool
   server.tool(
     'deploy',
     ALL_TOOLS.find((t) => t.name === 'deploy')!.description,
@@ -107,26 +141,38 @@ function registerWithMaximumControl(server: McpServer) {
 
       // ✅ result is typed as DeployResult
       // ✅ params is typed as DeployInput
+      // 🔒 Deployment names and namespaces are hashed
       onSuccess: (result, toolName, params) => {
-        telemetry.trackToolExecution(toolName, true);
+        const event = createSafeTelemetryEvent(
+          toolName,
+          params as Record<string, unknown>,
+          { ok: true, value: result as Record<string, unknown> },
+        );
 
-        // Access typed deployment details
-        console.log(`[SUCCESS] Deployed to namespace: ${result.namespace}`);
-        console.log(`[SUCCESS] Status: ${result.status}`);
-        console.log(`[SUCCESS] Replicas ready: ${result.readyReplicas}/${result.replicas}`);
+        telemetry.trackToolExecution(event);
 
-        // Access typed input parameters
-        console.log(`[SUCCESS] Deployment name: ${params.deploymentName}`);
+        // ✅ Safe: Log aggregate metrics only
+        console.log(`[SUCCESS] Deployment complete - Replicas: ${result.readyReplicas}/${result.replicas}, Status: ${result.status}`);
+
+        // ❌ UNSAFE: Don't log customer namespace/deployment names
+        // console.log(`[UNSAFE] Deployed to namespace: ${result.namespace}`); // Customer data!
+        // console.log(`[UNSAFE] Deployment name: ${params.deploymentName}`); // Customer data!
       },
 
       onError: (error, toolName, params) => {
-        telemetry.trackError(toolName, error);
-        console.error(`[ERROR] Deploy failed for ${params.deploymentName}`);
+        const event = createSafeTelemetryEvent(
+          toolName,
+          params as Record<string, unknown>,
+          { ok: false, error: String(error) },
+        );
+
+        telemetry.trackToolExecution(event);
+        console.error(`[ERROR] Deployment failed: ${error instanceof Error ? error.constructor.name : 'Error'}`);
       },
     }),
   );
 
-  // Example 3: Scan image with typed security results
+  // Example 3: Safe telemetry with security scanning
   server.tool(
     'scan-image',
     ALL_TOOLS.find((t) => t.name === 'scan-image')!.description,
@@ -135,28 +181,47 @@ function registerWithMaximumControl(server: McpServer) {
       transport: 'my-integration',
 
       // ✅ result is typed as ScanImageResult with vulnerability details
+      // 🔒 Image names are hashed, only vulnerability counts are logged
       onSuccess: (result, toolName, params) => {
-        telemetry.trackToolExecution(toolName, true);
+        const event = createSafeTelemetryEvent(
+          toolName,
+          params as Record<string, unknown>,
+          { ok: true, value: result as Record<string, unknown> },
+        );
 
-        // Access typed vulnerability data
-        console.log(`[SECURITY] Scanned ${params.imageName}`);
-        console.log(`[SECURITY] Critical: ${result.summary?.critical || 0}`);
-        console.log(`[SECURITY] High: ${result.summary?.high || 0}`);
-        console.log(`[SECURITY] Medium: ${result.summary?.medium || 0}`);
-        console.log(`[SECURITY] Low: ${result.summary?.low || 0}`);
+        telemetry.trackToolExecution(event);
 
-        // Send detailed metrics to telemetry
-        telemetry.trackToolExecution(toolName, true, undefined);
+        // ✅ Safe: Log aggregate vulnerability counts
+        const critical = result.summary?.critical || 0;
+        const high = result.summary?.high || 0;
+        const medium = result.summary?.medium || 0;
+        const low = result.summary?.low || 0;
+
+        console.log(`[SECURITY] Scan complete - Critical: ${critical}, High: ${high}, Medium: ${medium}, Low: ${low}`);
+
+        // Alert if critical vulnerabilities found (safe - just counts)
+        if (critical > 0) {
+          console.error(`[ALERT] ${critical} CRITICAL vulnerabilities detected!`);
+        }
+
+        // ❌ UNSAFE: Don't log customer image names
+        // console.log(`[UNSAFE] Scanned ${params.imageName}`); // Customer data!
       },
 
       onError: (error, toolName, params) => {
-        telemetry.trackError(toolName, error);
-        console.error(`[ERROR] Security scan failed for ${params.imageName}`);
+        const event = createSafeTelemetryEvent(
+          toolName,
+          params as Record<string, unknown>,
+          { ok: false, error: String(error) },
+        );
+
+        telemetry.trackToolExecution(event);
+        console.error(`[ERROR] Security scan failed: ${error instanceof Error ? error.constructor.name : 'Error'}`);
       },
     }),
   );
 
-  // For other tools, you can still use a loop with broader types
+  // For other tools, use safe telemetry with broader types
   const remainingTools = ALL_TOOLS.filter(
     (t) => !['build-image', 'deploy', 'scan-image'].includes(t.name),
   );
@@ -166,182 +231,35 @@ function registerWithMaximumControl(server: McpServer) {
       tool.name,
       tool.description,
       tool.inputSchema,
-      // Use 'as ToolName' to assert the tool name is valid while maintaining type safety
-      createToolHandler(app, tool.name as ToolName, {
+      createToolHandler(app, tool.name, {
         transport: 'my-integration',
-        onSuccess: (result, toolName) => {
-          telemetry.trackToolExecution(toolName, true);
+        onSuccess: (result, toolName, params) => {
+          // Create safe telemetry event
+          const event = createSafeTelemetryEvent(
+            toolName,
+            params as Record<string, unknown>,
+            { ok: true, value: result as Record<string, unknown> },
+          );
+
+          telemetry.trackToolExecution(event);
           console.log(`[SUCCESS] ${toolName} completed`);
         },
-        onError: (error, toolName) => {
-          telemetry.trackError(toolName, error);
+        onError: (error, toolName, params) => {
+          // Create safe telemetry event for errors
+          const event = createSafeTelemetryEvent(
+            toolName,
+            params as Record<string, unknown>,
+            { ok: false, error: String(error) },
+          );
+
+          telemetry.trackToolExecution(event);
           console.error(`[ERROR] ${toolName} failed`);
         },
       }),
     );
   }
 
-  console.log(`✅ Registered ${ALL_TOOLS.length} tools with type-safe telemetry`);
-}
-
-/**
- * Option 2: Use registerTools for convenience
- *
- * This is simpler when you want the same telemetry configuration for all tools.
- * Note: params and result are union types (all possible tool inputs/outputs),
- * so you won't get specific type safety. Best for simple logging/metrics.
- */
-function registerWithConvenience(server: McpServer) {
-  const app = createApp({
-    outputFormat: 'natural-language',
-  });
-
-  // Register all tools at once with shared telemetry configuration
-  // ⚠️ result and params are union types here - not fully type-safe
-  registerTools(server, app, ALL_TOOLS, {
-    transport: 'my-integration',
-
-    onSuccess: (result, toolName, params) => {
-      // toolName is correctly typed as the specific tool name
-      telemetry.trackToolExecution(toolName, true);
-
-      // For type-safe access, use type guards with indexed access types
-      // This is safer than inline types as it references the actual tool types
-      if (toolName === 'build-image') {
-        // Use indexed access type to get the exact BuildImageResult type
-        const buildResult = result as ToolResultMap['build-image'];
-        console.log(`[TELEMETRY] Built image: ${buildResult.imageId}`);
-      } else if (toolName === 'scan-image') {
-        // Use indexed access type to get the exact ScanImageResult type
-        const scanResult = result as ToolResultMap['scan-image'];
-        console.log(`[TELEMETRY] Vulnerabilities: ${scanResult.summary?.critical || 0} critical`);
-      }
-    },
-
-    onError: (error, toolName, params) => {
-      telemetry.trackToolExecution(toolName, false);
-      telemetry.trackError(toolName, error);
-
-      // Log error message with proper handling
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`[TELEMETRY] ${toolName} failed: ${errorMsg}`);
-    },
-  });
-
-  console.log(`✅ Registered ${ALL_TOOLS.length} tools with shared telemetry`);
-}
-
-/**
- * Option 3: Per-tool telemetry with different configurations and full type safety
- *
- * Use different telemetry settings for different categories of tools
- * while maintaining type safety for critical tools.
- */
-function registerWithPerToolConfig(server: McpServer) {
-  const app = createApp();
-
-  // Critical tools with detailed, type-safe telemetry
-  // Register each with literal tool names for full type inference
-
-  // Build image - with typed telemetry
-  server.tool(
-    'build-image',
-    ALL_TOOLS.find((t) => t.name === 'build-image')!.description,
-    ALL_TOOLS.find((t) => t.name === 'build-image')!.inputSchema,
-    createToolHandler(app, 'build-image', {
-      transport: 'critical-path',
-      onSuccess: (result, toolName, params) => {
-        telemetry.trackToolExecution(toolName, true);
-        // ✅ Fully typed - result is BuildImageResult
-        console.log(`[CRITICAL] Built ${result.tags[0]}, size: ${result.size} bytes`);
-        // Send detailed metrics to monitoring system
-        // monitoringSystem.recordMetric('build.size', result.size);
-        // monitoringSystem.recordMetric('build.duration', result.buildTime);
-      },
-      onError: (error, toolName, params) => {
-        telemetry.trackToolExecution(toolName, false);
-        telemetry.trackError(toolName, error);
-        // ✅ Fully typed params
-        console.error(`[ALERT] Failed to build ${params.imageName}!`);
-        // Send alert to PagerDuty or similar
-      },
-    }),
-  );
-
-  // Deploy - with typed telemetry
-  server.tool(
-    'deploy',
-    ALL_TOOLS.find((t) => t.name === 'deploy')!.description,
-    ALL_TOOLS.find((t) => t.name === 'deploy')!.inputSchema,
-    createToolHandler(app, 'deploy', {
-      transport: 'critical-path',
-      onSuccess: (result, toolName, params) => {
-        telemetry.trackToolExecution(toolName, true);
-        // ✅ Fully typed - result is DeployResult
-        console.log(
-          `[CRITICAL] Deployed ${params.deploymentName} - ${result.readyReplicas}/${result.replicas} ready`,
-        );
-        if (result.readyReplicas !== result.replicas) {
-          console.warn(`[CRITICAL] Not all replicas ready for ${params.deploymentName}`);
-        }
-      },
-      onError: (error, toolName, params) => {
-        telemetry.trackToolExecution(toolName, false);
-        telemetry.trackError(toolName, error);
-        console.error(`[ALERT] Deploy failed for ${params.deploymentName}!`);
-      },
-    }),
-  );
-
-  // Security scan - with typed vulnerability tracking
-  server.tool(
-    'scan-image',
-    ALL_TOOLS.find((t) => t.name === 'scan-image')!.description,
-    ALL_TOOLS.find((t) => t.name === 'scan-image')!.inputSchema,
-    createToolHandler(app, 'scan-image', {
-      transport: 'critical-path',
-      onSuccess: (result, toolName, params) => {
-        telemetry.trackToolExecution(toolName, true);
-        // ✅ Fully typed - result is ScanImageResult
-        const criticalCount = result.summary?.critical || 0;
-        const highCount = result.summary?.high || 0;
-
-        console.log(
-          `[CRITICAL] Scanned ${params.imageName}: ${criticalCount} critical, ${highCount} high vulnerabilities`,
-        );
-
-        // Alert if critical vulnerabilities found
-        if (criticalCount > 0) {
-          console.error(`[ALERT] ${criticalCount} CRITICAL vulnerabilities in ${params.imageName}!`);
-          // Send security alert
-        }
-      },
-      onError: (error, toolName, params) => {
-        telemetry.trackToolExecution(toolName, false);
-        telemetry.trackError(toolName, error);
-        console.error(`[ALERT] Security scan failed for ${params.imageName}!`);
-      },
-    }),
-  );
-
-  // Other tools with basic telemetry (no type safety needed)
-  const otherTools = ALL_TOOLS.filter(
-    (t) => !['build-image', 'deploy', 'scan-image'].includes(t.name),
-  );
-
-  registerTools(server, app, otherTools, {
-    transport: 'standard',
-    onSuccess: (result, toolName) => {
-      telemetry.trackToolExecution(toolName, true);
-      console.log(`[INFO] ${toolName} completed successfully`);
-    },
-    onError: (error, toolName) => {
-      telemetry.trackToolExecution(toolName, false);
-      console.error(`[INFO] ${toolName} failed`);
-    },
-  });
-
-  console.log(`✅ Registered 3 critical tools (type-safe) and ${otherTools.length} standard tools`);
+  console.log(`✅ Registered ${ALL_TOOLS.length} tools with safe telemetry`);
 }
 
 /**
@@ -353,22 +271,15 @@ async function main() {
     version: '1.0.0',
   });
 
-  // Choose your registration strategy:
-
-  // Option 1: Maximum control (recommended for complex telemetry)
-  registerWithMaximumControl(server);
-
-  // Option 2: Convenience (recommended for simple telemetry)
-  // registerWithConvenience(server);
-
-  // Option 3: Per-tool configuration (recommended for mixed requirements)
-  // registerWithPerToolConfig(server);
+  // Register tools with type-safe telemetry
+  registerWithSafeTelemetry(server);
 
   // Start the server
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.log('🚀 Container Assist MCP server started with telemetry integration');
+  console.log('🚀 Container Assist MCP server started with safe telemetry integration');
+  console.log('📊 All customer data is sanitized - only aggregate metrics are logged');
 }
 
 // Handle graceful shutdown

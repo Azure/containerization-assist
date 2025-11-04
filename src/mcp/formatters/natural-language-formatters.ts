@@ -176,6 +176,14 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMo
     parts.push(`  ${recommendations.buildStrategy.reason}`);
   }
 
+  // Platform and tag recommendations
+  if (recommendations.platform) {
+    parts.push(`**Platform:** ${recommendations.platform}`);
+  }
+  if (recommendations.defaultTag) {
+    parts.push(`**Default Tag:** ${recommendations.defaultTag}`);
+  }
+
   // Base images - opinionated recommendation (top 1-2 only)
   if (recommendations.baseImages.length > 0) {
     const primaryImage = recommendations.baseImages[0];
