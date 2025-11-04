@@ -261,7 +261,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         if (dockerignoreRules) {
           const { patterns, exceptions } = dockerignoreRules;
 
-          const alwaysInclude = [options.dockerfile || 'Dockerfile', '.dockerignore'];
+          const alwaysInclude = [options.dockerfile || 'Dockerfile'];
 
           const ignoreFunction = createIgnoreFunction(patterns, exceptions, alwaysInclude);
 
