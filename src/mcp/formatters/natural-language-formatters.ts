@@ -924,8 +924,15 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult, chai
   }
 
   // Local registry if created
-  if (result.localRegistryUrl) {
-    parts.push(`\n**Local Registry:** ${result.localRegistryUrl}`);
+  if (result.localRegistry) {
+    parts.push(`\n**Local Registry Details:**`);
+    const healthIcon = result.localRegistry.healthy ? '✅' : '⚠️';
+    const reachableIcon = result.localRegistry.reachableFromCluster ? '✅' : '⚠️';
+    parts.push(`  External URL: ${result.localRegistry.externalUrl}`);
+    parts.push(`  Internal Endpoint: ${result.localRegistry.internalEndpoint}`);
+    parts.push(`  Container Name: ${result.localRegistry.containerName}`);
+    parts.push(`  Health Status: ${healthIcon} ${result.localRegistry.healthy ? 'Healthy' : 'Unhealthy'}`);
+    parts.push(`  Reachable from Cluster: ${reachableIcon} ${result.localRegistry.reachableFromCluster ? 'Yes' : 'No'}`);
   }
 
   // Next steps (only if chainHintsMode is enabled)
