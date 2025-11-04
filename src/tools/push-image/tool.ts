@@ -10,7 +10,7 @@
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
 import { getRegistryCredentials } from '@/infra/docker/credential-helpers';
 import { getToolLogger } from '@/lib/tool-helpers';
-import { parseImageName } from '@/lib/validation-helpers';
+import { parseImageName, mergeRegistryWithImage } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
@@ -71,37 +71,8 @@ async function handlePushImage(
     const tag = parsedImage.value.tag;
 
     if (input.registry) {
-      // Registry provided - clean it and determine if we need to prefix
-      const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-      // Check if the image already contains the registry (avoid double prefixing)
-      // Reconstruct the full image path (without tag) to compare with target registry
-      const fullImagePath = parsedImage.value.registry ?
-        `${parsedImage.value.registry}/${parsedImage.value.repository}` :
-        parsedImage.value.repository;
-
-      // Check if the image already starts with the target registry
-      if (fullImagePath === registryHost || fullImagePath.startsWith(`${registryHost}/`)) {
-        // Image already contains the target registry - use the full path as-is
-        repository = fullImagePath;
-      } else if (parsedImage.value.repository.includes('/') && !parsedImage.value.repository.startsWith('docker.io/')) {
-        // Image has namespace or registry prefix that doesn't match input registry
-        // Only strip first part if it looks like a registry hostname (contains '.' or ':')
-        const imageParts = parsedImage.value.repository.split('/');
-        const firstPart = imageParts[0];
-
-        if (firstPart && (firstPart.includes('.') || firstPart.includes(':'))) {
-          // Looks like a registry hostname, replace it
-          const pathAfterRegistry = imageParts.slice(1).join('/');
-          repository = `${registryHost}/${pathAfterRegistry}`;
-        } else {
-          // Looks like a namespace/organization, keep the full path
-          repository = `${registryHost}/${parsedImage.value.repository}`;
-        }
-      } else {
-        // No registry in image or it's docker.io - prefix with input registry
-        repository = `${registryHost}/${parsedImage.value.repository}`;
-      }
+      // Use the new helper to merge registry with image name
+      repository = mergeRegistryWithImage(parsedImage.value, input.registry);
     } else {
       // No registry provided - use image as-is (defaults to Docker Hub)
       repository = parsedImage.value.repository;

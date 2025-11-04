@@ -51,7 +51,6 @@ import { pluralize } from '@/lib/summary-helpers';
 const execAsync = promisify(exec);
 
 const KIND_VERSION = 'v0.20.0';
-const KIND_AMD64_NODE_IMAGE = 'kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72';
 
 /**
  * Validate and escape cluster name to prevent command injection.
@@ -284,6 +283,7 @@ export interface PrepareClusterResult {
     kindClusterCreated?: boolean;
     localRegistryCreated?: boolean;
     platformCompatible?: boolean;
+    registryAccessValidated?: boolean;
   };
   warnings?: string[];
   localRegistryUrl?: string;
@@ -293,6 +293,11 @@ export interface PrepareClusterResult {
     containerName: string;
     healthy: boolean;
     reachableFromCluster: boolean;
+  };
+  remoteRegistry?: {
+    url: string;
+    type: string;
+    accessValidated: boolean;
   };
 }
 
@@ -508,7 +513,6 @@ async function createKindCluster(
   clusterName: string,
   port: number,
   targetPlatform: DockerPlatform,
-  strictMode: boolean,
   logger: pino.Logger,
 ): Promise<Result<void>> {
   const escapedNameResult = validateAndEscapeClusterName(clusterName);
@@ -520,30 +524,14 @@ async function createKindCluster(
   try {
     logger.info({ clusterName }, 'Creating kind cluster...');
 
-    // Detect system architecture to determine if we need cross-platform emulation
-    const systemInfo = getSystemInfo();
+    // Use native architecture for kind cluster
     const hostArch = process.arch;
+    logger.info(
+      { hostArch, targetPlatform },
+      'Creating kind cluster with native architecture',
+    );
 
-    // In strict mode, don't use cross-platform emulation
-    // In non-strict mode, use AMD64 on ARM Mac for broader compatibility
-    const shouldUseAMD64Node = !strictMode && systemInfo.isMac && hostArch === 'arm64';
-
-    if (shouldUseAMD64Node) {
-      logger.info({ hostArch, targetArch: 'amd64' },
-        'Detected ARM Mac - creating AMD64 kind cluster for cross-platform compatibility (will use Docker emulation)',
-      );
-    } else if (strictMode) {
-      logger.info(
-        { hostArch, targetPlatform, strictMode },
-        'Strict mode enabled - creating cluster with native architecture',
-      );
-    }
-
-    // Build node configuration - add explicit AMD64 image on ARM Mac (non-strict mode only)
-    // Use a stable AMD64 node image that works well with Docker Desktop's x86 emulation
-    const nodeImageLine = shouldUseAMD64Node
-      ? '  image: ' + KIND_AMD64_NODE_IMAGE
-      : '';
+    const nodeImageLine = ''; // Let kind use default image for native architecture
 
     const kindConfig = `
 kind: Cluster
@@ -1158,6 +1146,79 @@ async function connectRegistryToKindNetwork(
 }
 
 /**
+ * Validate that the user is already logged into the specified registry.
+ * Checks docker login status without handling credentials.
+ *
+ * @param registryUrl - Registry URL (e.g., myregistry.azurecr.io)
+ * @param registryType - Type of registry (acr, ecr, gcr, dockerhub, generic)
+ * @param logger - Logger instance
+ * @returns Success if logged in, Failure with guidance if not
+ */
+async function validateRegistryAccess(
+  registryUrl: string,
+  registryType: string,
+  logger: pino.Logger,
+): Promise<Result<void>> {
+  try {
+    logger.debug({ registryUrl, registryType }, 'Checking Docker login status for registry...');
+
+    // Attempt a lightweight operation to verify access
+    // This varies by registry type
+    let testCommand: string;
+
+    switch (registryType) {
+      case 'acr':
+        // For ACR, try to list repositories
+        testCommand = `az acr repository list --name ${registryUrl.split('.')[0]} --output json 2>/dev/null || echo "not-logged-in"`;
+        break;
+      case 'dockerhub':
+        // For Docker Hub, we can check login status via docker info
+        testCommand = `docker info 2>/dev/null | grep -i "username" || echo "not-logged-in"`;
+        break;
+      case 'ecr':
+        // For ECR, try to get login password (without actually logging in)
+        testCommand = `aws ecr get-login-password --region us-east-1 2>/dev/null | head -c 10 || echo "not-logged-in"`;
+        break;
+      case 'gcr':
+        // For GCR, check gcloud auth
+        testCommand = `gcloud auth print-access-token 2>/dev/null | head -c 10 || echo "not-logged-in"`;
+        break;
+      default:
+        // Generic: try to check docker config for registry credentials
+        testCommand = `docker-credential-desktop list 2>/dev/null | grep -i "${registryUrl}" || echo "not-logged-in"`;
+    }
+
+    const { stdout: testResult } = await execAsync(testCommand);
+
+    if (testResult.includes('not-logged-in') || testResult.trim() === '') {
+      return Failure(
+        `Not logged into registry: ${registryUrl}`,
+        {
+          message: `Docker login credentials not found for registry: ${registryUrl}`,
+          hint: `User must be logged into the registry before running prepare-cluster`,
+          resolution: `Log in to the registry using:\n  - For ACR: az acr login --name ${registryUrl.split('.')[0]}\n  - For ECR: aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin ${registryUrl}\n  - For GCR: gcloud auth configure-docker\n  - For generic: docker login ${registryUrl}\nThen retry prepare-cluster.`,
+        }
+      );
+    }
+
+    logger.debug({ registryUrl, testResult: testResult.substring(0, 100) }, 'Registry access validation passed');
+    return Success(undefined);
+  } catch (error) {
+    const errorMsg = extractErrorMessage(error);
+    logger.warn({ registryUrl, error: errorMsg }, 'Registry access validation failed');
+
+    return Failure(
+      `Registry access validation failed: ${errorMsg}`,
+      {
+        message: `Could not verify login status for registry: ${registryUrl}`,
+        hint: `Unable to confirm Docker login credentials for the registry`,
+        resolution: `Ensure you are logged in:\n  - For ACR: az acr login --name ${registryUrl.split('.')[0]}\n  - For ECR: aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin ${registryUrl}\n  - For GCR: gcloud auth configure-docker\n  - For generic: docker login ${registryUrl}\nThen retry prepare-cluster.`,
+      }
+    );
+  }
+}
+
+/**
  * Setup Kind cluster if needed
  */
 async function setupKindCluster(
@@ -1192,7 +1253,7 @@ async function setupKindCluster(
   const kindClusterExists = clusterExistsResult.value;
 
   if (!kindClusterExists) {
-    const createResult = await createKindCluster(clusterName, port, targetPlatform, strictMode, logger);
+    const createResult = await createKindCluster(clusterName, port, targetPlatform, logger);
     if (!createResult.ok) {
       return createResult;
     }
@@ -1397,7 +1458,15 @@ async function handlePrepareCluster(
 ): Promise<Result<PrepareClusterResult>> {
   const { logger, timer } = setupToolContext(context, 'prepare-cluster');
 
-  const { environment = 'development', namespace = 'default', targetPlatform = 'linux/amd64', strictPlatformValidation = true } = params;
+  const {
+    environment = 'development',
+    namespace = 'default',
+    targetPlatform = 'linux/amd64',
+    strictPlatformValidation = true,
+    useRemoteCluster = false,
+    clusterName: userClusterName,
+    registry,
+  } = params;
 
   // Validate namespace
   const namespaceValidation = validateNamespace(namespace);
@@ -1405,16 +1474,32 @@ async function handlePrepareCluster(
     return namespaceValidation;
   }
 
-  const clusterName = environment === 'development' ? 'containerization-assist' : 'default';
+  // Determine cluster name
+  const clusterName = useRemoteCluster
+    ? (userClusterName || 'remote-cluster')
+    : (environment === 'development' ? 'containerization-assist' : 'default');
+
   const shouldCreateNamespace = environment === 'production';
   const shouldSetupRbac = environment === 'production';
   const installIngress = false;
   const checkRequirements = true;
-  const shouldSetupKind = environment === 'development';
-  const shouldCreateLocalRegistry = environment === 'development';
+  const shouldSetupKind = !useRemoteCluster && environment === 'development';
+  const shouldCreateLocalRegistry = !useRemoteCluster && environment === 'development';
 
   try {
-    logger.info({ environment, namespace }, 'Starting Kubernetes cluster preparation');
+    logger.info({ environment, namespace, useRemoteCluster }, 'Starting Kubernetes cluster preparation');
+
+    // Validate remote registry access if using remote cluster
+    if (useRemoteCluster && registry) {
+      logger.info({ registryUrl: registry.url, registryType: registry.type }, 'Validating registry access...');
+
+      const registryValidation = await validateRegistryAccess(registry.url, registry.type, logger);
+      if (!registryValidation.ok) {
+        return registryValidation;
+      }
+
+      logger.info({ registryUrl: registry.url }, 'Registry access validated - user is logged in');
+    }
 
     const warnings: string[] = [];
     const checks = {
@@ -1427,10 +1512,22 @@ async function handlePrepareCluster(
       kindClusterCreated: undefined as boolean | undefined,
       localRegistryCreated: undefined as boolean | undefined,
       platformCompatible: undefined as boolean | undefined,
+      registryAccessValidated: undefined as boolean | undefined,
     };
     let localRegistryUrl: string | undefined;
     let localRegistryInfo: PrepareClusterResult['localRegistry'] | undefined;
+    let remoteRegistryInfo: PrepareClusterResult['remoteRegistry'] | undefined;
     let registryPort: number | undefined;
+
+    // Mark registry as validated if we checked it
+    if (useRemoteCluster && registry) {
+      checks.registryAccessValidated = true;
+      remoteRegistryInfo = {
+        url: registry.url,
+        type: registry.type,
+        accessValidated: true,
+      };
+    }
 
     // Determine registry port before cluster setup
     // Either detect existing registry or find an available port for a new one
@@ -1583,7 +1680,10 @@ async function handlePrepareCluster(
     // Generate summary
     const namespaceAction = checks.namespaceExists ? 'verified' : 'created';
     const resourcesConfigured = Object.values(checks).filter(Boolean).length;
-    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured. Ready for deployment.`;
+    const platformText = platformInfo.cluster
+      ? ` Cluster platform: ${platformInfo.cluster}${platformInfo.requiresEmulation ? ' (with emulation)' : ''}.`
+      : '';
+    const summary = `✅ Cluster prepared. Namespace '${namespace}' ${namespaceAction}. ${pluralize(resourcesConfigured, 'resource')} configured.${platformText} Ready for deployment.`;
 
     const result: PrepareClusterResult = {
       summary,
@@ -1610,10 +1710,14 @@ async function handlePrepareCluster(
         ...(checks.platformCompatible !== undefined && {
           platformCompatible: checks.platformCompatible,
         }),
+        ...(checks.registryAccessValidated !== undefined && {
+          registryAccessValidated: checks.registryAccessValidated,
+        }),
       },
       ...(warnings.length > 0 && { warnings }),
       ...(localRegistryUrl && { localRegistryUrl }),
       ...(localRegistryInfo && { localRegistry: localRegistryInfo }),
+      ...(remoteRegistryInfo && { remoteRegistry: remoteRegistryInfo }),
     };
 
     logger.info({ clusterReady, checks }, 'Cluster preparation completed');
@@ -1647,9 +1751,9 @@ export default tool({
     knowledgeEnhanced: false,
   },
   chainHints: {
-    success: 'Cluster preparation successful. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
+    success: 'Cluster preparation successful. For local kind clusters with local registry, use `localhost:<port>/<image>:<tag>` format when building images. For remote clusters with ACR/ECR/GCR, use the registry URL format. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
     failure:
-      'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
+      'Cluster preparation found issues. Check connectivity, permissions, namespace configuration, and registry access (if using remote cluster).',
   },
   handler: handlePrepareCluster,
 });
