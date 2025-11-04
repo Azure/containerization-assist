@@ -75,7 +75,7 @@ async function main() {
   console.log('\nStep 3: Pushing to local registry...');
   const pushResult = await pushImage.handler({
     imageId: 'test-app:v1.0.0',
-    registry: registryUrl,
+    registry: 'http://' + registryUrl,
     platform: envTargetPlatform as DockerPlatform,
   }, ctx);
 

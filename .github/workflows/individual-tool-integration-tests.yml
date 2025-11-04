@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest] # macOS doesn't support nested virtualization needed for kind currently
       fail-fast: false
     permissions:
       contents: read
