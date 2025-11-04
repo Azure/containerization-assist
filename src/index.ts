@@ -155,6 +155,50 @@ export { createToolHandler, registerTool, registerTools } from './lib/tool-regis
 export type { ToolHandlerOptions } from './lib/tool-registration.js';
 
 /**
+ * Telemetry sanitization utilities for safe logging.
+ *
+ * Provides functions to hash, obfuscate, and extract safe metrics from tool inputs
+ * and outputs. Protects customer workspace information (file paths, code snippets,
+ * identifiers) while preserving aggregate metrics for observability.
+ *
+ * Security Principle: "When in doubt, hash it out"
+ *
+ * - `hashValue`: Hash a string using SHA256 (first 16 chars)
+ * - `sanitizePath`: Replace path segments with hashed values
+ * - `sanitizeToolInput`: Remove or hash sensitive fields from tool inputs
+ * - `extractSafeTelemetryMetrics`: Extract only aggregate metrics from tool results
+ * - `createSafeTelemetryEvent`: Create a complete safe telemetry event
+ * - `SafeTelemetryEvent`: Type for safe telemetry events
+ *
+ * @example
+ * ```typescript
+ * import { createSafeTelemetryEvent } from 'containerization-assist';
+ *
+ * // In your telemetry callback
+ * onSuccess: (result, toolName, params) => {
+ *   const event = createSafeTelemetryEvent(
+ *     toolName,
+ *     params,
+ *     { ok: true, value: result }
+ *   );
+ *   // Event contains only hashed paths and aggregate metrics
+ *   telemetry.track(event);
+ * }
+ * ```
+ *
+ * @see docs/TELEMETRY_GUIDELINES.md for detailed security guidelines
+ * @public
+ */
+export {
+  hashValue,
+  sanitizePath,
+  sanitizeToolInput,
+  extractSafeTelemetryMetrics,
+  createSafeTelemetryEvent,
+} from './lib/telemetry-utils.js';
+export type { SafeTelemetryEvent } from './lib/telemetry-utils.js';
+
+/**
  * Parameter defaulting utilities for tool inputs.
  *
  * Provides default values for common tool parameters across different categories:
