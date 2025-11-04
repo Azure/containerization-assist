@@ -2,13 +2,13 @@ name: Individual Tool Integration Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
 
 jobs:
   # Test prepare-cluster + push-image tools with local registry
@@ -31,7 +31,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -43,7 +43,6 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install docker
-          colima start --cpu 2 --memory 4
 
       - name: Setup kubectl & kind
         run: |
