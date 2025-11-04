@@ -231,7 +231,7 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
       }
 
       result.value = valueWithMessages;
-    } else if (result.guidance && tool.chainHints) {
+    } else if (env.config.chainHintsMode === 'enabled' && result.guidance && tool.chainHints) {
       // Add failure hint to error guidance
       result.guidance.hint = tool.chainHints.failure;
     }

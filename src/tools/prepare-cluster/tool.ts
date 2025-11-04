@@ -542,7 +542,7 @@ async function createKindCluster(
     // Build node configuration - add explicit AMD64 image on ARM Mac (non-strict mode only)
     // Use a stable AMD64 node image that works well with Docker Desktop's x86 emulation
     const nodeImageLine = shouldUseAMD64Node
-      ? '  image: ' + KIND_AMD64_NODE_IMAGE
+      ? `  image: ${KIND_AMD64_NODE_IMAGE}`
       : '';
 
     const kindConfig = `
@@ -914,14 +914,14 @@ async function verifyRegistryDNSResolution(logger: pino.Logger): Promise<{
       if (success) {
         // nslookup output format: "Address 1: <IP> <hostname>"
         const ipMatch = stdout.match(/Address\s+\d+:\s+(\d+\.\d+\.\d+\.\d+)/);
-        if (ipMatch && ipMatch[1]) {
+        if (ipMatch?.[1]) {
           resolvedIP = ipMatch[1];
         }
       }
 
       logger.debug(
         { testPodName, resolves: success, resolvedIP, output: stdout.trim() },
-        'In-cluster DNS resolution test result'
+        'In-cluster DNS resolution test result',
       );
 
       return resolvedIP ? { resolves: success, resolvedIP } : { resolves: success };
@@ -968,7 +968,7 @@ async function validateContainerdConfig(
 
     // Pattern 1: Check for mirror registry host (external access point)
     const mirrorHostPattern = new RegExp(
-      `\\[plugins\\."io\\.containerd\\.grpc\\.v1\\.cri"\\.registry\\.mirrors\\."${DOCKER.REGISTRY_HOST}:${port}"\\]`
+      `\\[plugins\\."io\\.containerd\\.grpc\\.v1\\.cri"\\.registry\\.mirrors\\."${DOCKER.REGISTRY_HOST}:${port}"\\]`,
     );
     const hasLocalRegistryMirror = mirrorHostPattern.test(stdout);
 
@@ -978,7 +978,7 @@ async function validateContainerdConfig(
     // or
     // endpoint = ["http://registry-name:5000"]
     const endpointPattern = new RegExp(
-      `endpoint\\s*=\\s*\\["http://${DOCKER.REGISTRY_CONTAINER_NAME}:5000"\\]`
+      `endpoint\\s*=\\s*\\["http://${DOCKER.REGISTRY_CONTAINER_NAME}:5000"\\]`,
     );
     const hasKindRegistryEndpoint = endpointPattern.test(stdout);
 
@@ -988,7 +988,7 @@ async function validateContainerdConfig(
     if (!isValid) {
       // Extract the relevant registry config section for debugging
       const registryConfigMatch = stdout.match(
-        /\[plugins\."io\.containerd\.grpc\.v1\.cri"\.registry\.mirrors.*?\n(?:.*?\n){0,5}/
+        /\[plugins\."io\.containerd\.grpc\.v1\.cri"\.registry\.mirrors.*?\n(?:.*?\n){0,5}/,
       );
       const configSnippet = registryConfigMatch ? registryConfigMatch[0] : 'Config section not found';
 
@@ -1539,9 +1539,9 @@ async function handlePrepareCluster(
         {
           connected: networkConnection.connected,
           healthy: networkConnection.healthy,
-          reachable: registryReachable
+          reachable: registryReachable,
         },
-        'Registry Phase 2 complete'
+        'Registry Phase 2 complete',
       );
     }
 

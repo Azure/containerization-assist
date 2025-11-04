@@ -31,6 +31,20 @@ import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary-helpers';
 
 /**
+ * Helper function to append nextSteps if present (respects chainHintsMode)
+ * Only adds next steps section if the result has a nextSteps field
+ * (which is only present when chainHintsMode is 'enabled')
+ */
+function appendNextStepsIfPresent(parts: string[], result: unknown): void {
+  if (typeof result === 'object' && result !== null && 'nextSteps' in result) {
+    const nextSteps = (result as { nextSteps?: string }).nextSteps;
+    if (nextSteps) {
+      parts.push(`\n${nextSteps}`);
+    }
+  }
+}
+
+/**
  * Format scan-image result as natural language narrative
  *
  * @param result - Security scan result with vulnerability data
@@ -99,16 +113,8 @@ export function formatScanImageNarrative(result: ScanImageResult): string {
   // Scan metadata
   parts.push(`\n**Scan Completed:** ${new Date(result.scanTime).toLocaleString()}`);
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  if (result.passed) {
-    parts.push('  → Proceed with image tagging and registry push');
-    parts.push('  → Consider deploying to staging environment');
-  } else {
-    parts.push('  → Review and address critical/high vulnerabilities');
-    parts.push('  → Use fix-dockerfile to update base images');
-    parts.push('  → Re-scan after applying fixes');
-  }
+  // Next steps - only show if chainHintsMode is enabled
+  appendNextStepsIfPresent(parts, result);
 
   return parts.join('\n');
 }
@@ -254,17 +260,8 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan): string {
     }
   }
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  if (plan.nextAction.action === 'create-files') {
-    parts.push('  1. Create Dockerfile using the base images and recommendations above');
-    parts.push('  2. Build image with build-image tool');
-    parts.push('  3. Scan for vulnerabilities with scan-image');
-  } else {
-    parts.push('  1. Update Dockerfile preserving good patterns and applying improvements');
-    parts.push('  2. Rebuild image with build-image tool');
-    parts.push('  3. Re-scan with scan-image to verify fixes');
-  }
+  // Next steps - only show if chainHintsMode is enabled
+  appendNextStepsIfPresent(parts, plan);
 
   return parts.join('\n');
 }
@@ -311,11 +308,12 @@ export function formatBuildImageNarrative(result: BuildImageResult): string {
     parts.push(`**Layers:** ${result.layers}`);
   }
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  parts.push('  → Scan image for vulnerabilities with scan-image');
-  parts.push('  → Tag image for registry with tag-image');
-  parts.push('  → Push to registry with push-image');
+  // Next steps - only show if chainHintsMode is enabled
+
+
+  appendNextStepsIfPresent(parts, result);
+
+
 
   return parts.join('\n');
 }
@@ -377,12 +375,8 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis): string {
     parts.push('  No modules detected in repository.');
   }
 
-  // Next steps
-  parts.push('\n**Next Steps:**');
-  parts.push('  → Use generate-dockerfile to create container configuration');
-  if (result.isMonorepo) {
-    parts.push('  → Consider creating separate Dockerfiles for each module');
-  }
+  // Next steps - only show if chainHintsMode is enabled
+  appendNextStepsIfPresent(parts, result);
 
   return parts.join('\n');
 }
@@ -473,21 +467,8 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult): str
     });
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  if (result.ready) {
-    parts.push('  → Deployment is healthy and serving traffic');
-    parts.push('  → Monitor pod logs for application errors');
-    parts.push('  → Set up alerting for production monitoring');
-  } else {
-    parts.push('  → Review pod logs for error messages');
-    parts.push('  → Check deployment events with kubectl describe');
-    parts.push('  → Verify resource limits and constraints');
-    const failedPods = result.pods?.filter((p) => p.status === 'Failed').length || 0;
-    if (failedPods > 0) {
-      parts.push('  → Investigate failed pods with kubectl logs');
-    }
-  }
+  // Next steps - only show if chainHintsMode is enabled
+  appendNextStepsIfPresent(parts, result);
 
   return parts.join('\n');
 }
@@ -625,20 +606,8 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan): string 
     }
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  if (result.validationGrade === 'A' || result.validationGrade === 'B') {
-    parts.push('  → Dockerfile is in good shape with minor improvements available');
-    parts.push('  → Review fix recommendations for optimization');
-    parts.push('  → Proceed with build-image');
-  } else {
-    parts.push('  → Address high-priority security issues first');
-    parts.push('  → Apply recommended fixes to improve validation score');
-    parts.push('  → Re-run fix-dockerfile to verify improvements');
-    if (result.policyValidation && !result.policyValidation.passed) {
-      parts.push('  → Resolve policy violations before deployment');
-    }
-  }
+  // Next steps - only show if chainHintsMode is enabled
+  appendNextStepsIfPresent(parts, result);
 
   return parts.join('\n');
 }
@@ -747,12 +716,12 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan): strin
     }
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  parts.push('  1. Create manifest files using the recommendations above');
-  parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
-  parts.push('  3. Use kubectl apply to deploy manifests to cluster');
-  parts.push('  4. Verify deployment with verify-deploy');
+  // Next steps - only show if chainHintsMode is enabled
+
+
+  appendNextStepsIfPresent(parts, result);
+
+
 
   return parts.join('\n');
 }
@@ -792,12 +761,12 @@ export function formatPushImageNarrative(result: PushImageResult): string {
   parts.push(`\n**Full Reference:**`);
   parts.push(`  ${fullImage}`);
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  parts.push('  → Image is now available in the registry');
-  parts.push('  → Update Kubernetes manifests with this image');
-  parts.push('  → Use deploy to deploy to cluster');
-  parts.push('  → Consider setting up automated deployments');
+  // Next steps - only show if chainHintsMode is enabled
+
+
+  appendNextStepsIfPresent(parts, result);
+
+
 
   return parts.join('\n');
 }
@@ -833,13 +802,8 @@ export function formatTagImageNarrative(result: TagImageResult): string {
     parts.push(`  • ${tag}`);
   });
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  parts.push('  → Use push-image to push tagged image to registry');
-  parts.push('  → Tags can be used in Kubernetes manifests');
-  if (result.tags.some((t) => t.includes('latest'))) {
-    parts.push('  → Consider using semantic versioning instead of "latest"');
-  }
+  // Next steps - only show if chainHintsMode is enabled
+  appendNextStepsIfPresent(parts, result);
 
   return parts.join('\n');
 }
@@ -912,17 +876,8 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult): str
     parts.push(`  Reachable from Cluster: ${reachableIcon} ${result.localRegistry.reachableFromCluster ? 'Yes' : 'No'}`);
   }
 
-  // Next steps
-  parts.push(`\n**Next Steps:**`);
-  if (result.success && result.clusterReady) {
-    parts.push('  → Cluster is ready for deployment');
-    parts.push('  → Use kubectl apply to deploy your application');
-    parts.push('  → Resources will be deployed to the prepared namespace');
-  } else {
-    parts.push('  → Check cluster connectivity');
-    parts.push('  → Verify RBAC permissions');
-    parts.push('  → Review error logs for details');
-  }
+  // Next steps - only show if chainHintsMode is enabled
+  appendNextStepsIfPresent(parts, result);
 
   return parts.join('\n');
 }

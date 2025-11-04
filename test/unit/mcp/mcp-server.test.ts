@@ -287,7 +287,6 @@ describe('formatOutput', () => {
       expect(result).toContain('Security Scan');
       expect(result).toContain('PASSED');
       expect(result).toContain('Vulnerabilities:');
-      expect(result).toContain('Next Steps:');
     });
 
     it('detects and formats build-image results', () => {
@@ -309,7 +308,6 @@ describe('formatOutput', () => {
       expect(result).toContain('**Tags Created:**');
       expect(result).toContain('**Size:**');
       expect(result).toContain('**Build Time:**');
-      expect(result).toContain('Next Steps:');
     });
 
     it('detects and formats analyze-repo results', () => {
@@ -335,7 +333,6 @@ describe('formatOutput', () => {
       expect(result).toContain('**Path:**');
       expect(result).toContain('**Type:**');
       expect(result).toContain('**Modules Found:**');
-      expect(result).toContain('Next Steps:');
     });
 
     it('falls back to summary when type is not recognized', () => {

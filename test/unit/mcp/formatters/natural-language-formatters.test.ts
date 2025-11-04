@@ -37,8 +37,6 @@ describe('natural-language-formatters', () => {
 
       expect(narrative).toContain('✅ Security Scan PASSED');
       expect(narrative).toContain('Vulnerabilities:');
-      expect(narrative).toContain('Next Steps:');
-      expect(narrative).toContain('Proceed with image tagging');
     });
 
     it('should format failed scan with critical vulnerabilities', () => {
@@ -73,7 +71,6 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('🟡 Medium: 12');
       expect(narrative).toContain('Remediation Recommendations:');
       expect(narrative).toContain('Upgrade base image');
-      expect(narrative).toContain('Review and address critical/high vulnerabilities');
     });
 
     it('should truncate remediation guidance after 5 items', () => {
@@ -173,7 +170,6 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('node:18-alpine');
       expect(narrative).toContain('**Security Considerations:**');
       expect(narrative).toContain('**Optimizations:**');
-      expect(narrative).toContain('Next Steps:');
     });
 
     it('should handle existing Dockerfile analysis', () => {
@@ -319,8 +315,6 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Size:** 234MB'); // 245000000 bytes = 234MB
       expect(narrative).toContain('**Build Time:** 45s');
       expect(narrative).toContain('**Layers:** 12');
-      expect(narrative).toContain('Next Steps:');
-      expect(narrative).toContain('Scan image for vulnerabilities');
     });
 
     it('should handle minimal build result', () => {
@@ -381,7 +375,6 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('Build System: pip (python 3.11)');
       expect(narrative).toContain('Entry Point: manage.py');
       expect(narrative).toContain('Ports: 8000');
-      expect(narrative).toContain('Use generate-dockerfile to create container configuration');
     });
 
     it('should format monorepo with multiple modules', () => {
@@ -411,7 +404,6 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Modules Found:** 2');
       expect(narrative).toContain('1. **frontend**');
       expect(narrative).toContain('2. **backend**');
-      expect(narrative).toContain('Consider creating separate Dockerfiles for each module');
     });
 
     it('should handle empty modules list', () => {
