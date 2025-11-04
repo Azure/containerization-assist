@@ -47,6 +47,9 @@ jobs:
         run: |
           brew install colima
           brew install kind
+          brew install docker
+          colima start --cpu 2 --memory 4
+          docker context use colima
 
       - name: Install Docker and Kind (linux)
         if: runner.os == 'Linux'
@@ -57,6 +60,15 @@ jobs:
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/
           kind version
+
+      - name: Verify Docker installation
+        run: |
+          echo "=== Docker version and info ==="
+          docker --version
+          docker info
+
+          echo "=== Docker containers ==="
+          docker ps -a
 
       - name: Read platform and set TARGET_PLATFORM
         run: |
