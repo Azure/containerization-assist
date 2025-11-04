@@ -335,7 +335,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
           expect(pushResult.ok).toBe(false);
           if (!pushResult.ok) {
             // Should detect authentication issues with meaningful error message
-            expect(pushResult.error).toMatch(/authentication|unauthorized|access denied|401|403|X-Registry-Auth|bad parameters/i);
+            expect(pushResult.error).toMatch(/authentication|unauthorized|access denied|denied|401|403|X-Registry-Auth|bad parameters/i);
             expect(pushResult.error).not.toBe('Failed to push image: Unknown error');
           }
         }
