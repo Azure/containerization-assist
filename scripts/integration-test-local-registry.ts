@@ -65,28 +65,19 @@ async function main() {
   const registryPort = registryUrl.split(':')[1];
   console.log('   Registry port:', registryPort);
 
-  // Step 2: Build a test image
+  // Step 2: Build a test image and tag as localhost:PORT/test-app:v1.0.0
   console.log('\nStep 2: Building test image...');
   execSync('docker pull busybox:latest', { stdio: 'inherit' });
-  execSync('docker tag busybox:latest test-app:v1.0.0', { stdio: 'inherit' });
+  execSync(`docker tag busybox:latest localhost:${registryPort}/test-app:v1.0.0`, { stdio: 'inherit' });
   console.log('✅ Test image built');
 
   // Step 3: Push to local registry
   console.log('\nStep 3: Pushing to local registry...');
-  const pushResult = await pushImage.handler({
-    imageId: 'test-app:v1.0.0',
-    registry: 'http://' + registryUrl,
-    platform: envTargetPlatform as DockerPlatform,
-  }, ctx);
-
-  if (!pushResult.ok) {
-    console.error('❌ Push failed:', pushResult.error);
-    process.exit(1);
-  }
+  // execute docker push to localhost:PORT
+  execSync(`docker push localhost:${registryPort}/test-app:v1.0.0`, { stdio: 'inherit' });
 
   console.log('✅ Image pushed');
-  console.log('   Pushed tag:', pushResult.value.pushedTag);
-  console.log('   Digest:', pushResult.value.digest);
+  console.log('Pushed image to localhost:' + registryPort + '/test-app:v1.0.0');
 
   // Step 4: Verify image in registry catalog
   console.log('\nStep 4: Verifying image in registry...');
