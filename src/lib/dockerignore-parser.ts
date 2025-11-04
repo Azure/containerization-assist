@@ -1,131 +1,31 @@
-/**
- * Simple .dockerignore parser
- * Implements basic Docker ignore pattern matching without external dependencies
- */
-
 import { promises as fs } from 'fs';
+import { glob } from 'fs/promises';
 import path from 'path';
 
-const DOUBLE_STAR_PLACEHOLDER = '<!DOUBLESTAR!>';
-// Pre-compile regex for replacing the placeholder to avoid nested escaping
-const DOUBLE_STAR_PLACEHOLDER_REGEX = /<!DOUBLESTAR!>/g;
-
-/**
- * Parse .dockerignore file content into patterns
- */
-export function parseDockerignore(content: string): { patterns: string[]; exceptions: string[] } {
-  const lines = content.split('\n');
-  const patterns: string[] = [];
-  const exceptions: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (!trimmed || trimmed.startsWith('#')) {
-      continue;
-    }
-
-    if (trimmed.startsWith('!')) {
-      exceptions.push(trimmed.substring(1).trim());
-    } else {
-      patterns.push(trimmed);
-    }
-  }
-
-  return { patterns, exceptions };
-}
-
-/**
- * Check if a path matches a dockerignore pattern
- * Implements simplified Docker pattern matching:
- * - * matches any sequence of non-separator characters
- * - ** matches any sequence including separators
- * - ? matches any single non-separator character
- */
-export function matchPattern(filePath: string, pattern: string): boolean {
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const normalizedPattern = pattern.replace(/\\/g, '/');
-  const hasLeadingSlash = normalizedPattern.startsWith('/');
-
-  const cleanPattern = normalizedPattern.replace(/^\/+|\/+$/g, '');
-  const cleanPath = normalizedPath.replace(/^\/+|\/+$/g, '');
-
-  const hasSlash = cleanPattern.includes('/');
-  const startsWithDoubleStar = cleanPattern.startsWith('**');
-
-  let regexPattern = cleanPattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*/g, DOUBLE_STAR_PLACEHOLDER)
-    .replace(/\*/g, '[^/]*')
-    .replace(DOUBLE_STAR_PLACEHOLDER_REGEX, '.*?')
-    .replace(/\?/g, '[^/]');
-
-  if (startsWithDoubleStar) {
-    regexPattern = `^${regexPattern}`;
-  } else if (hasLeadingSlash || hasSlash) {
-    regexPattern = `^${regexPattern}(/|$)`;
-  } else {
-    regexPattern = `(^|/)${regexPattern}(/|$)`;
-  }
-
-  const regex = new RegExp(regexPattern);
-  return regex.test(cleanPath);
-}
-
-/**
- * Check if a file should be ignored based on dockerignore rules
- */
-export function shouldIgnore(filePath: string, patterns: string[], exceptions: string[]): boolean {
-  const isIgnored = patterns.some((pattern) => matchPattern(filePath, pattern));
-
-  if (!isIgnored) {
-    return false;
-  }
-
-  const isException = exceptions.some((exception) => matchPattern(filePath, exception));
-  return !isException;
-}
-
-/**
- * Read and parse .dockerignore file from a directory
- */
-export async function readDockerignore(
-  contextPath: string,
-): Promise<{ patterns: string[]; exceptions: string[] } | null> {
+export async function getDockerBuildFiles(contextPath: string): Promise<string[]> {
   const dockerignorePath = path.join(contextPath, '.dockerignore');
 
+  let excludePatterns: string[] = [];
   try {
     const content = await fs.readFile(dockerignorePath, 'utf-8');
-    return parseDockerignore(content);
+    excludePatterns = content
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#') && line !== 'Dockerfile');
   } catch {
-    return null;
+    // No .dockerignore file exists
   }
-}
 
-/**
- * Create an ignore filter function for tar-fs
- * @param patterns - Ignore patterns from .dockerignore
- * @param exceptions - Exception patterns (starting with !)
- * @param alwaysInclude - Files that should never be ignored (e.g., Dockerfile)
- */
-export function createIgnoreFunction(
-  patterns: string[],
-  exceptions: string[],
-  alwaysInclude: string[] = [],
-): (name: string) => boolean {
-  return (name: string) => {
-    const normalizedName = name.replace(/\\/g, '/');
+  const filesIterator = glob('**/*', {
+    cwd: contextPath,
+    exclude: excludePatterns,
+    withFileTypes: false,
+  });
 
-    for (const includePath of alwaysInclude) {
-      const normalizedInclude = includePath.replace(/\\/g, '/');
-      if (
-        normalizedName === normalizedInclude ||
-        normalizedName.endsWith(`/${normalizedInclude}`)
-      ) {
-        return false;
-      }
-    }
+  const files: string[] = [];
+  for await (const file of filesIterator) {
+    files.push(file);
+  }
 
-    return shouldIgnore(normalizedName, patterns, exceptions);
-  };
+  return files;
 }

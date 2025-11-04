@@ -10,7 +10,7 @@ import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
 import { autoDetectDockerSocket } from './socket-validation';
-import { readDockerignore, createIgnoreFunction } from '@/lib/dockerignore-parser';
+import { getDockerBuildFiles } from '@/lib/dockerignore-parser';
 
 /**
  * Docker client configuration options.
@@ -255,28 +255,11 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         logger.debug({ options }, 'Starting Docker build');
 
         const contextPath = options.context || '.';
-        const dockerignoreRules = await readDockerignore(contextPath);
-        let tarStream;
+        const files = await getDockerBuildFiles(contextPath);
 
-        if (dockerignoreRules) {
-          const { patterns, exceptions } = dockerignoreRules;
-
-          const alwaysInclude = [options.dockerfile || 'Dockerfile'];
-
-          const ignoreFunction = createIgnoreFunction(patterns, exceptions, alwaysInclude);
-
-          logger.debug(
-            { patterns, exceptions, alwaysInclude, contextPath },
-            'Using .dockerignore with patterns',
-          );
-
-          tarStream = tar.pack(contextPath, {
-            ignore: ignoreFunction,
-          });
-        } else {
-          logger.debug({ contextPath }, 'No .dockerignore found, packing all files');
-          tarStream = tar.pack(contextPath);
-        }
+        const tarStream = tar.pack(contextPath, {
+          entries: files,
+        });
 
         const stream = await docker.buildImage(tarStream, {
           t: options.t || options.tags?.[0],
@@ -479,8 +462,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         const image = docker.getImage(`${repository}:${tag}`);
         // dockerode's Image.push expects auth config inside the first options object
         // For local registries without auth, provide an empty authconfig object to avoid X-Registry-Auth header issues
-        const stream = await image.push({ 
-          authconfig: authConfig || {}
+        const stream = await image.push({
+          authconfig: authConfig || {},
         });
 
         let digest = '';
