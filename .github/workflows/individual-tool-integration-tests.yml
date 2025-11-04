@@ -42,15 +42,21 @@ jobs:
       - name: Install tsx
         run: npm install -g tsx
 
-      - name: Setup Docker (macOS)
+      - name: Setup Docker and Kind (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install docker
+          brew install colima
+          brew install kind
 
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
-        with:
-          install_only: true
+      - name: Install Docker and Kind (linux)
+        if: runner.os == 'Linux'
+        run: |
+          # Install Docker
+          sudo apt-get update
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/
+          kind version
 
       - name: Read platform and set TARGET_PLATFORM
         run: |
