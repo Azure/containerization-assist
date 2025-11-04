@@ -47,22 +47,10 @@ jobs:
         run: |
           brew install docker
 
-      - name: Setup kubectl & kind
-        run: |
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            brew install kubectl kind
-          else
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-
-            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
-            chmod +x ./kind
-            sudo mv ./kind /usr/local/bin/
-          fi
-
-          kubectl version --client
-          kind version
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
 
       - name: Read platform and set TARGET_PLATFORM
         run: |
