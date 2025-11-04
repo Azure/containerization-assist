@@ -225,7 +225,6 @@ CMD ["node", "index.js"]`
         }, toolContext);
 
         if (tagResult.ok) {
-          testCleaner.trackImage('docker-ops-test:latest');
           expect(tagResult.value).toBeDefined();
         }
 
