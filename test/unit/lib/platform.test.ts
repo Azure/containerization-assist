@@ -1,4 +1,112 @@
-import { normalizePath } from '../../../src/lib/platform';
+import { normalizePath, mapNodeArchToPlatform, isPlatformCompatible } from '../../../src/lib/platform';
+
+describe('mapNodeArchToPlatform', () => {
+  it('should map common amd64 architectures to linux/amd64', () => {
+    expect(mapNodeArchToPlatform('amd64')).toBe('linux/amd64');
+    expect(mapNodeArchToPlatform('x86_64')).toBe('linux/amd64');
+    expect(mapNodeArchToPlatform('AMD64')).toBe('linux/amd64'); // case insensitive
+    expect(mapNodeArchToPlatform('X86_64')).toBe('linux/amd64');
+  });
+
+  it('should map common arm64 architectures to linux/arm64', () => {
+    expect(mapNodeArchToPlatform('arm64')).toBe('linux/arm64');
+    expect(mapNodeArchToPlatform('aarch64')).toBe('linux/arm64');
+    expect(mapNodeArchToPlatform('ARM64')).toBe('linux/arm64');
+    expect(mapNodeArchToPlatform('AARCH64')).toBe('linux/arm64');
+  });
+
+  it('should map arm v7 and v6 architectures', () => {
+    expect(mapNodeArchToPlatform('armv7l')).toBe('linux/arm/v7');
+    expect(mapNodeArchToPlatform('armv6l')).toBe('linux/arm/v6');
+    expect(mapNodeArchToPlatform('ARMV7L')).toBe('linux/arm/v7');
+  });
+
+  it('should map 386 architectures to linux/386', () => {
+    expect(mapNodeArchToPlatform('386')).toBe('linux/386');
+    expect(mapNodeArchToPlatform('i386')).toBe('linux/386');
+    expect(mapNodeArchToPlatform('i686')).toBe('linux/386');
+    expect(mapNodeArchToPlatform('I386')).toBe('linux/386');
+  });
+
+  it('should map other architectures', () => {
+    expect(mapNodeArchToPlatform('ppc64le')).toBe('linux/ppc64le');
+    expect(mapNodeArchToPlatform('s390x')).toBe('linux/s390x');
+    expect(mapNodeArchToPlatform('riscv64')).toBe('linux/riscv64');
+  });
+
+  it('should support custom OS parameter', () => {
+    expect(mapNodeArchToPlatform('amd64', 'windows')).toBe('windows/amd64');
+    expect(mapNodeArchToPlatform('amd64', 'linux')).toBe('linux/amd64');
+  });
+
+  it('should return null for unknown architectures', () => {
+    expect(mapNodeArchToPlatform('unknown')).toBe(null);
+    expect(mapNodeArchToPlatform('mips')).toBe(null);
+    expect(mapNodeArchToPlatform('sparc')).toBe(null);
+    expect(mapNodeArchToPlatform('')).toBe(null);
+  });
+
+  it('should return null for unsupported OS/arch combinations', () => {
+    // windows/arm64 is not in the valid platforms list
+    expect(mapNodeArchToPlatform('arm64', 'windows')).toBe(null);
+    expect(mapNodeArchToPlatform('amd64', 'darwin')).toBe(null);
+  });
+
+  it('should handle edge cases', () => {
+    expect(mapNodeArchToPlatform('  amd64  ')).toBe(null); // whitespace not trimmed
+    expect(mapNodeArchToPlatform('amd64\n')).toBe(null);
+  });
+});
+
+describe('isPlatformCompatible', () => {
+  it('should return true for exact platform matches', () => {
+    expect(isPlatformCompatible('linux/amd64', 'linux/amd64')).toBe(true);
+    expect(isPlatformCompatible('linux/arm64', 'linux/arm64')).toBe(true);
+    expect(isPlatformCompatible('linux/arm/v7', 'linux/arm/v7')).toBe(true);
+    expect(isPlatformCompatible('windows/amd64', 'windows/amd64')).toBe(true);
+  });
+
+  it('should allow ARM64 cluster to run ARM/v7 and ARM/v6 images', () => {
+    expect(isPlatformCompatible('linux/arm/v7', 'linux/arm64')).toBe(true);
+    expect(isPlatformCompatible('linux/arm/v6', 'linux/arm64')).toBe(true);
+  });
+
+  it('should not allow ARM/v7 or ARM/v6 cluster to run ARM64 images', () => {
+    expect(isPlatformCompatible('linux/arm64', 'linux/arm/v7')).toBe(false);
+    expect(isPlatformCompatible('linux/arm64', 'linux/arm/v6')).toBe(false);
+  });
+
+  it('should allow AMD64 cluster to run 386 images', () => {
+    expect(isPlatformCompatible('linux/386', 'linux/amd64')).toBe(true);
+  });
+
+  it('should not allow 386 cluster to run AMD64 images', () => {
+    expect(isPlatformCompatible('linux/amd64', 'linux/386')).toBe(false);
+  });
+
+  it('should return false for incompatible platforms', () => {
+    expect(isPlatformCompatible('linux/amd64', 'linux/arm64')).toBe(false);
+    expect(isPlatformCompatible('linux/arm64', 'linux/amd64')).toBe(false);
+    expect(isPlatformCompatible('linux/amd64', 'linux/arm/v7')).toBe(false);
+    expect(isPlatformCompatible('linux/arm/v7', 'linux/amd64')).toBe(false);
+  });
+
+  it('should return false for cross-OS platforms', () => {
+    expect(isPlatformCompatible('linux/amd64', 'windows/amd64')).toBe(false);
+    expect(isPlatformCompatible('windows/amd64', 'linux/amd64')).toBe(false);
+  });
+
+  it('should handle all supported platform combinations', () => {
+    // Test a few more edge cases
+    expect(isPlatformCompatible('linux/ppc64le', 'linux/ppc64le')).toBe(true);
+    expect(isPlatformCompatible('linux/s390x', 'linux/s390x')).toBe(true);
+    expect(isPlatformCompatible('linux/riscv64', 'linux/riscv64')).toBe(true);
+
+    // These should be incompatible
+    expect(isPlatformCompatible('linux/ppc64le', 'linux/amd64')).toBe(false);
+    expect(isPlatformCompatible('linux/s390x', 'linux/arm64')).toBe(false);
+  });
+});
 
 describe('normalizePath', () => {
   it('should convert Windows backslashes to forward slashes', () => {

@@ -300,8 +300,11 @@ export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMo
 
   // Build info
   parts.push(`**Image:** ${result.imageId}`);
-  if (result.tags && result.tags.length > 0) {
-    parts.push(`**Tags:** ${result.tags.join(', ')}`);
+  if (result.createdTags && result.createdTags.length > 0) {
+    parts.push(`**Tags Created:** ${result.createdTags.join(', ')}`);
+  }
+  if (result.failedTags && result.failedTags.length > 0) {
+    parts.push(`**Failed Tags:** ${result.failedTags.join(', ')}`);
   }
   if (result.size) {
     parts.push(`**Size:** ${formatSize(result.size)}`);

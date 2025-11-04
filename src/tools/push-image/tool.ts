@@ -189,7 +189,7 @@ async function handlePushImage(
       tag,
       hasAuthConfig: !!authConfig,
       authServerAddress: authConfig?.serveraddress,
-      authUsername: authConfig?.username
+      authUsername: authConfig?.username,
     }, 'Pushing image to registry');
 
     const pushResult = await dockerClient.pushImage(repository, tag, authConfig);

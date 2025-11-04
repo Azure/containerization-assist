@@ -3,27 +3,19 @@
  */
 
 import { z } from 'zod';
-import { environment, repositoryPath, type ToolNextAction } from '../shared/schemas';
+import {
+  environment,
+  repositoryPath,
+  platform,
+  DOCKER_PLATFORMS,
+  type DockerPlatform,
+  type ToolNextAction,
+} from '../shared/schemas';
 import { ModuleInfo } from '../analyze-repo/schema';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
-/**
- * Supported Docker platforms for multi-architecture builds
- * See: https://docs.docker.com/build/building/multi-platform/
- */
-export const DOCKER_PLATFORMS = [
-  'linux/amd64',
-  'linux/arm64',
-  'linux/arm/v7',
-  'linux/arm/v6',
-  'linux/386',
-  'linux/ppc64le',
-  'linux/s390x',
-  'linux/riscv64',
-  'windows/amd64',
-] as const;
-
-export type DockerPlatform = (typeof DOCKER_PLATFORMS)[number];
+// Re-export for backward compatibility
+export { DOCKER_PLATFORMS, type DockerPlatform };
 
 export const generateDockerfileSchema = z.object({
   repositoryPath: repositoryPath.describe(
@@ -48,12 +40,9 @@ export const generateDockerfileSchema = z.object({
     .describe(
       'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
     ),
-  targetPlatform: z
-    .enum(DOCKER_PLATFORMS)
-    .optional()
-    .describe(
-      'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). If not specified, defaults to the system platform. Use this to cross-compile for different architectures (e.g., ARM Mac targeting AMD64 servers).',
-    ),
+  targetPlatform: platform.describe(
+    'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). Defaults to linux/amd64 for maximum compatibility. Use this to cross-compile for different architectures (e.g., ARM Mac targeting AMD64 servers).',
+  ),
 });
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;

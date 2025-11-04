@@ -19,6 +19,11 @@ export const buildImageSchema = z.object({
   tags: tags.optional(),
   buildArgs: buildArgs.optional(),
   platform,
+  strictPlatformValidation: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Deprecated: No longer enforces platform flags. Reserved for future use.'),
 });
 
 export type BuildImageParams = z.infer<typeof buildImageSchema>;

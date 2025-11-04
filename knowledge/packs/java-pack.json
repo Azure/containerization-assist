@@ -1,10 +1,10 @@
 [
   {
-    "id": "java-25-microsoft-mariner",
+    "id": "java-25-microsoft-azurelinux",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk|FROM.*java",
-    "recommendation": "Use Microsoft Azure Linux (Mariner) with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance.",
-    "example": "# Multi-stage build with Java 25 on Microsoft Azure Linux (Mariner)\nFROM mcr.microsoft.com/openjdk/jdk:25-mariner AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "recommendation": "Use Microsoft Azure Linux (Mariner) with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance. Note this image does not have tar pre-installed, so install it for Maven builds.",
+    "example": "# Multi-stage build with Java 25 on Microsoft Azure Linux (Mariner)\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
     "severity": "high",
     "tags": [
       "azure",
@@ -15,6 +15,7 @@
       "java",
       "jdk",
       "mariner",
+      "azurelinux",
       "microsoft",
       "multistage",
       "official",
@@ -26,8 +27,8 @@
     "id": "java-25-microsoft-maven",
     "category": "dockerfile",
     "pattern": "mvn|maven",
-    "recommendation": "Use Maven on Microsoft Azure Linux with Java 25 for reproducible enterprise builds",
-    "example": "# Maven build with Java 25 on Microsoft Azure Linux\nFROM mcr.microsoft.com/openjdk/jdk:25-mariner AS build\nRUN tdnf install -y tar maven\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "recommendation": "Use Maven on Microsoft Azure Linux with Java 25 for reproducible enterprise builds. Note this image does not have tar pre-installed, so install it for Maven builds.",
+    "example": "# Maven build with Java 25 on Microsoft Azure Linux\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS build\nRUN tdnf install -y tar maven\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
     "severity": "high",
     "tags": [
       "azure",
