@@ -1008,13 +1008,25 @@ async function validateRegistryAccess(
     let testCommand: string;
 
     switch (registryType) {
-      case RegistryType.ACR:
+      case RegistryType.ACR: {
         // For ACR, try to list repositories
-        testCommand = `az acr repository list --name ${registryUrl.split('.')[0]} --output json 2>/dev/null || echo "not-logged-in"`;
+        // Extract registry name (before first dot, or entire URL if no dot)
+        const registryName = registryUrl.includes('.') ? registryUrl.split('.')[0] : registryUrl;
+        if (!registryName) {
+          return Failure(`Invalid ACR registry URL: ${registryUrl}`, {
+            message: `Could not extract registry name from URL: ${registryUrl}`,
+            hint: `ACR registry URL should be in format: <registry-name>.azurecr.io`,
+            resolution: `Provide a valid ACR registry URL like 'myregistry.azurecr.io'`,
+          });
+        }
+        // Escape for shell safety (single quotes prevent expansion)
+        testCommand = `az acr repository list --name '${registryName.replace(/'/g, "'\\''")}' --output json 2>/dev/null || echo "not-logged-in"`;
         break;
+      }
       default:
         // Generic: try to check docker config for registry credentials
-        testCommand = `docker-credential-desktop list 2>/dev/null | grep -i "${registryUrl}" || echo "not-logged-in"`;
+        // Escape registry URL for grep (single quotes prevent shell expansion)
+        testCommand = `docker-credential-desktop list 2>/dev/null | grep -iF '${registryUrl.replace(/'/g, "'\\''")}' || echo "not-logged-in"`;
     }
 
     const { stdout: testResult } = await execAsync(testCommand);
