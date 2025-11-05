@@ -486,6 +486,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 
         await new Promise<void>((resolve, reject) => {
           let pushError: Error | null = null;
+          let lastErrorEvent: DockerPushEvent | null = null;
 
           docker.modem.followProgress(
             stream,
@@ -509,6 +510,13 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
               } else if (pushError) {
                 // Reject if we encountered an error event during the push
                 reject(pushError);
+              } else if (lastErrorEvent) {
+                // If we have an error event at the end but no pushError, it's likely a final auth failure
+                const errorMsg = lastErrorEvent.error ||
+                  (lastErrorEvent.errorDetail as { message?: string })?.message || '';
+                const finalError = new Error(errorMsg || 'Push failed');
+                logger.error({ errorEvent: lastErrorEvent }, 'Final Docker push error event');
+                reject(finalError);
               } else {
                 resolve();
               }
@@ -516,22 +524,27 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             (event: DockerPushEvent) => {
               logger.debug(event, 'Docker push progress');
 
-              // Only treat final error events as failures, not intermediate auth challenges
+              // Track error events to determine if they're fatal or intermediate
               if (event.error || event.errorDetail) {
-                logger.debug(
-                  { errorEvent: event },
-                  'Docker push error event (may be intermediate)',
-                );
-
-                // Only set pushError for certain fatal errors, not auth challenges
                 const errorMsg =
                   event.error || (event.errorDetail as { message?: string })?.message || '';
 
-                // Don't treat authentication challenges as fatal errors - they're part of the auth handshake
+                logger.debug(
+                  { errorEvent: event, errorMsg },
+                  'Docker push error event detected',
+                );
+
+                // Store the last error event - we'll decide if it's fatal at the end
+                lastErrorEvent = event;
+
+                // Set pushError immediately for certain non-auth errors
                 if (
                   !errorMsg.toLowerCase().includes('unauthorized') &&
                   !errorMsg.toLowerCase().includes('authentication required') &&
-                  !errorMsg.toLowerCase().includes('denied')
+                  !errorMsg.toLowerCase().includes('denied') &&
+                  !errorMsg.toLowerCase().includes('authentication') &&
+                  !errorMsg.toLowerCase().includes('401') &&
+                  !errorMsg.toLowerCase().includes('403')
                 ) {
                   pushError = new Error(errorMsg || 'Unknown push error');
                   logger.error({ errorEvent: event }, 'Fatal Docker push error event received');
@@ -540,6 +553,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 
               if (event.aux?.Digest) {
                 digest = event.aux.Digest;
+                // If we got a digest, clear the error as the push succeeded
+                lastErrorEvent = null;
               }
               if (event.aux?.Size) {
                 size = event.aux.Size;
