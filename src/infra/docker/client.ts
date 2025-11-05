@@ -530,7 +530,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
                 // Don't treat authentication challenges as fatal errors - they're part of the auth handshake
                 if (
                   !errorMsg.toLowerCase().includes('unauthorized') &&
-                  !errorMsg.toLowerCase().includes('authentication required')
+                  !errorMsg.toLowerCase().includes('authentication required') &&
+                  !errorMsg.toLowerCase().includes('denied')
                 ) {
                   pushError = new Error(errorMsg || 'Unknown push error');
                   logger.error({ errorEvent: event }, 'Fatal Docker push error event received');

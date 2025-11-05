@@ -78,12 +78,11 @@ async function handlePushImage(
 
     // Only try credential helpers for non-Docker Hub registries
     // (ACR, generic registries, local/kind registries)
-    if (parsedImage.value.registry &&
-      parsedImage.value.registry !== 'docker.io' &&
-      parsedImage.value.registry !== 'index.docker.io' &&
-      parsedImage.value.registry !== 'registry-1.docker.io') {
+    if (registry !== 'docker.io' &&
+      registry !== 'index.docker.io' &&
+      registry !== 'registry-1.docker.io') {
 
-      const credResult = await getRegistryCredentials(parsedImage.value.registry, logger);
+      const credResult = await getRegistryCredentials(registry, logger);
       if (credResult.ok && credResult.value) {
         authConfig = credResult.value;
         logger.info({
@@ -93,9 +92,9 @@ async function handlePushImage(
           passwordProvided: !!authConfig.password,
         }, 'Using credentials from Docker credential helper');
       } else if (credResult.ok) {
-        logger.debug({ registry: parsedImage.value.registry }, 'No credentials found in Docker credential helpers');
+        logger.debug({ registry }, 'No credentials found in Docker credential helpers');
       } else {
-        logger.debug({ registry: parsedImage.value.registry, error: credResult.error }, 'Credential helper lookup failed');
+        logger.debug({ registry, error: credResult.error }, 'Credential helper lookup failed');
       }
     }
 
