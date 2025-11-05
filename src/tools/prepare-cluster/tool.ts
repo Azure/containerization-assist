@@ -43,43 +43,20 @@ import type { DockerPlatform } from '@/tools/shared/schemas';
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { prepareClusterSchema, type PrepareClusterParams, RegistryType } from './schema';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawnSync } from 'node:child_process';
 import { pluralize } from '@/lib/summary-helpers';
-
-const execAsync = promisify(exec);
 
 const KIND_VERSION = 'v0.20.0';
 
 /**
- * Validate and escape cluster name to prevent command injection.
- * Cluster names must follow Kubernetes naming conventions.
+ * Validate cluster name to ensure it follows Kubernetes naming conventions.
+ * With spawnSync and argument arrays, we no longer need shell escaping.
  *
- * SECURITY MODEL:
- * - Primary defense: Strict regex validation allowing only [a-z0-9-] characters
- * - Secondary defense: Shell escaping with single quotes (redundant but defensive)
- * - The regex makes command injection impossible as no shell metacharacters are allowed
- *
- * IMPORTANT: Returns the cluster name wrapped in single quotes for shell safety.
- * The returned value must be used with template literal interpolation only.
- * DO NOT use with string concatenation or you may get double-quoting issues.
- *
- * @example
- * ```typescript
- * const result = validateAndEscapeClusterName("my-cluster");
- * if (result.ok) {
- *   // ✅ Correct - template literal interpolation
- *   await execAsync(`kind create cluster --name ${result.value}`);
- *   // Result: kind create cluster --name 'my-cluster'
- *
- *   // ❌ Wrong - string concatenation causes double quoting
- *   await execAsync("kind create cluster --name " + result.value);
- * }
- * ```
+ * @param clusterName - The cluster name to validate
+ * @returns Success with the validated name, or Failure with error details
  */
-function validateAndEscapeClusterName(clusterName: string): Result<string> {
+function validateClusterName(clusterName: string): Result<string> {
   // Kubernetes resource names must be lowercase alphanumeric with dashes
-  // This regex is the primary security mechanism - it prevents ALL shell metacharacters
   const nameRegex = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
   if (!nameRegex.test(clusterName)) {
@@ -102,10 +79,7 @@ function validateAndEscapeClusterName(clusterName: string): Result<string> {
     });
   }
 
-  // Wrap in single quotes for defense-in-depth shell safety
-  // Note: The regex already prevents single quotes, so the replace is technically
-  // unnecessary, but we keep it as a defensive measure in case validation changes
-  return Success(`'${clusterName.replace(/'/g, "'\\''")}'`);
+  return Success(clusterName);
 }
 
 /**
@@ -117,11 +91,19 @@ async function detectClusterPlatform(logger: pino.Logger): Promise<DockerPlatfor
     logger.debug('Detecting cluster node platform...');
 
     // Get node architecture information
-    const { stdout } = await execAsync(
-      "kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}'",
-    );
-    const arch = stdout.trim().replace(/'/g, '');
+    const archResult = spawnSync('kubectl', [
+      'get',
+      'nodes',
+      '-o',
+      "jsonpath={.items[0].status.nodeInfo.architecture}",
+    ]);
 
+    if (archResult.error || archResult.status !== 0) {
+      logger.warn({ error: archResult.error, stderr: archResult.stderr?.toString() }, 'Could not detect cluster node architecture');
+      return null;
+    }
+
+    const arch = archResult.stdout.toString().trim();
     if (!arch) {
       logger.warn('Could not detect cluster node architecture');
       return null;
@@ -129,16 +111,19 @@ async function detectClusterPlatform(logger: pino.Logger): Promise<DockerPlatfor
 
     // Get OS if available (usually linux for Kubernetes)
     let os = 'linux';
-    try {
-      const { stdout: osOutput } = await execAsync(
-        "kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.operatingSystem}'",
-      );
-      const detectedOS = osOutput.trim().replace(/'/g, '').toLowerCase();
+    const osResult = spawnSync('kubectl', [
+      'get',
+      'nodes',
+      '-o',
+      "jsonpath={.items[0].status.nodeInfo.operatingSystem}",
+    ]);
+
+    if (osResult.status === 0 && osResult.stdout) {
+      const detectedOS = osResult.stdout.toString().trim().toLowerCase();
       if (detectedOS) {
         os = detectedOS;
       }
-    } catch {
-      // If OS detection fails, default to linux
+    } else {
       logger.debug('Could not detect OS, defaulting to linux');
     }
 
@@ -262,14 +247,13 @@ async function checkIngressController(
 }
 
 async function checkKindInstalled(logger: pino.Logger): Promise<boolean> {
-  try {
-    await execAsync('kind version');
+  const result = spawnSync('kind', ['version']);
+  if (result.status === 0) {
     logger.debug('Kind is already installed');
     return true;
-  } catch {
-    logger.debug('Kind is not installed');
-    return false;
   }
+  logger.debug('Kind is not installed');
+  return false;
 }
 
 async function installKind(logger: pino.Logger): Promise<void> {
@@ -299,26 +283,28 @@ async function installKind(logger: pino.Logger): Promise<void> {
     }
 
     if (systemInfo.isWindows) {
-      try {
-        await execAsync(`move ${kindExecutable} "%ProgramFiles%\\kind\\${kindExecutable}"`);
-      } catch {
-        try {
-          await execAsync(
-            `mkdir "%USERPROFILE%\\bin" 2>nul & move ${kindExecutable} "%USERPROFILE%\\bin\\${kindExecutable}"`,
-          );
-        } catch {
+      // Try to move to Program Files
+      let moveResult = spawnSync('cmd', ['/c', 'move', kindExecutable, `%ProgramFiles%\\kind\\${kindExecutable}`]);
+
+      if (moveResult.error || moveResult.status !== 0) {
+        // Try user bin directory as fallback
+        spawnSync('cmd', ['/c', 'mkdir', '%USERPROFILE%\\bin']); // mkdir might fail if directory exists, that's ok
+        moveResult = spawnSync('cmd', ['/c', 'move', kindExecutable, `%USERPROFILE%\\bin\\${kindExecutable}`]);
+
+        if (moveResult.error || moveResult.status !== 0) {
           logger.warn('Failed to move kind executable to PATH, it may need manual installation');
         }
       }
     } else {
-      try {
-        await execAsync(`sudo mv ./${kindExecutable} /usr/local/bin/${kindExecutable}`);
-      } catch {
-        try {
-          await execAsync(
-            `mkdir -p ~/.local/bin && mv ./${kindExecutable} ~/.local/bin/${kindExecutable}`,
-          );
-        } catch {
+      // Try to move to /usr/local/bin with sudo
+      let moveResult = spawnSync('sudo', ['mv', `./${kindExecutable}`, `/usr/local/bin/${kindExecutable}`]);
+
+      if (moveResult.error || moveResult.status !== 0) {
+        // Try user local bin directory as fallback
+        spawnSync('mkdir', ['-p', `${process.env.HOME}/.local/bin`]); // mkdir might fail, that's ok if directory exists
+        moveResult = spawnSync('mv', [`./${kindExecutable}`, `${process.env.HOME}/.local/bin/${kindExecutable}`]);
+
+        if (moveResult.error || moveResult.status !== 0) {
           logger.warn('Failed to move kind executable to PATH, it may need manual installation');
         }
       }
@@ -332,31 +318,32 @@ async function installKind(logger: pino.Logger): Promise<void> {
 }
 
 /**
- * Check if kind cluster exists and validate its architecture if strictMode is enabled.
+ * Check if kind cluster exists.
  * Returns the cluster existence status.
  */
 async function checkKindClusterExists(
   clusterName: string,
   logger: pino.Logger,
 ): Promise<Result<boolean>> {
-  const escapedNameResult = validateAndEscapeClusterName(clusterName);
-  if (!escapedNameResult.ok) {
-    return escapedNameResult;
+  const validationResult = validateClusterName(clusterName);
+  if (!validationResult.ok) {
+    return validationResult;
   }
 
-  try {
-    const { stdout } = await execAsync('kind get clusters');
-    const clusters = stdout
-      .trim()
-      .split('\n')
-      .filter((line: string) => line.trim());
-    const exists = clusters.includes(clusterName);
-    logger.debug({ clusterName, exists, clusters }, 'Checking kind cluster existence');
-    return Success(exists);
-  } catch (error) {
-    logger.debug({ error }, 'Error checking kind clusters');
+  const result = spawnSync('kind', ['get', 'clusters']);
+  if (result.error || result.status !== 0) {
+    logger.debug({ error: result.error, stderr: result.stderr?.toString() }, 'Error checking kind clusters');
     return Success(false);
   }
+
+  const stdout = result.stdout.toString();
+  const clusters = stdout
+    .trim()
+    .split('\n')
+    .filter((line: string) => line.trim());
+  const exists = clusters.includes(clusterName);
+  logger.debug({ clusterName, exists, clusters }, 'Checking kind cluster existence');
+  return Success(exists);
 }
 
 
@@ -365,11 +352,10 @@ async function createKindCluster(
   port: number,
   logger: pino.Logger,
 ): Promise<Result<void>> {
-  const escapedNameResult = validateAndEscapeClusterName(clusterName);
-  if (!escapedNameResult.ok) {
-    return escapedNameResult;
+  const validationResult = validateClusterName(clusterName);
+  if (!validationResult.ok) {
+    return validationResult;
   }
-  const escapedName = escapedNameResult.value;
 
   try {
     logger.info({ clusterName }, 'Creating kind cluster...');
@@ -413,8 +399,14 @@ ${nodeImageLine}
     const configPath = await createTempFile(kindConfig, '.yaml');
 
     try {
-      // escapedName is already wrapped in single quotes for shell safety
-      await execAsync(`kind create cluster --name ${escapedName} --config "${configPath}"`);
+      const result = spawnSync('kind', ['create', 'cluster', '--name', clusterName, '--config', configPath]);
+
+      if (result.error || result.status !== 0) {
+        const errorMsg = result.error?.message || result.stderr?.toString() || 'Unknown error';
+        logger.error({ clusterName, error: errorMsg, stderr: result.stderr?.toString() }, 'Failed to create kind cluster');
+        return Failure(`Kind cluster creation failed: ${errorMsg}`);
+      }
+
       logger.info({ clusterName }, 'Kind cluster created successfully');
       return Success(undefined);
     } finally {
@@ -434,9 +426,21 @@ ${nodeImageLine}
 async function checkLocalRegistryExists(logger: pino.Logger): Promise<number | null> {
   try {
     // Check if container exists (running or stopped)
-    const { stdout: allContainers } = await execAsync(
-      `docker ps -a --filter "name=${DOCKER.REGISTRY_CONTAINER_NAME}" --format "{{.Names}}"`,
-    );
+    const allContainersResult = spawnSync('docker', [
+      'ps',
+      '-a',
+      '--filter',
+      `name=${DOCKER.REGISTRY_CONTAINER_NAME}`,
+      '--format',
+      '{{.Names}}',
+    ]);
+
+    if (allContainersResult.error || allContainersResult.status !== 0) {
+      logger.debug({ error: allContainersResult.error }, 'Error checking for registry container');
+      return null;
+    }
+
+    const allContainers = allContainersResult.stdout.toString();
     const containerExists = allContainers.trim() === DOCKER.REGISTRY_CONTAINER_NAME;
 
     if (!containerExists) {
@@ -445,9 +449,19 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<number | n
     }
 
     // Get the port mapping for the existing container
-    const { stdout: portMapping } = await execAsync(
-      `docker inspect ${DOCKER.REGISTRY_CONTAINER_NAME} --format '{{range $p, $conf := .NetworkSettings.Ports}}{{if eq $p "5000/tcp"}}{{(index $conf 0).HostPort}}{{end}}{{end}}'`,
-    );
+    const portMappingResult = spawnSync('docker', [
+      'inspect',
+      DOCKER.REGISTRY_CONTAINER_NAME,
+      '--format',
+      '{{range $p, $conf := .NetworkSettings.Ports}}{{if eq $p "5000/tcp"}}{{(index $conf 0).HostPort}}{{end}}{{end}}',
+    ]);
+
+    if (portMappingResult.error || portMappingResult.status !== 0) {
+      logger.warn('Could not determine registry port mapping');
+      return null;
+    }
+
+    const portMapping = portMappingResult.stdout.toString();
     const port = parseInt(portMapping.trim(), 10);
 
     if (isNaN(port)) {
@@ -456,9 +470,15 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<number | n
     }
 
     // Check if container is running
-    const { stdout: runningContainers } = await execAsync(
-      `docker ps --filter "name=${DOCKER.REGISTRY_CONTAINER_NAME}" --format "{{.Names}}"`,
-    );
+    const runningResult = spawnSync('docker', [
+      'ps',
+      '--filter',
+      `name=${DOCKER.REGISTRY_CONTAINER_NAME}`,
+      '--format',
+      '{{.Names}}',
+    ]);
+
+    const runningContainers = runningResult.status === 0 ? runningResult.stdout.toString() : '';
     const isRunning = runningContainers.trim() === DOCKER.REGISTRY_CONTAINER_NAME;
 
     if (isRunning) {
@@ -469,7 +489,11 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<number | n
     // Container exists but is stopped - try to start it
     logger.info('Local registry container exists but is stopped, starting it...');
     try {
-      await execAsync(`docker start ${DOCKER.REGISTRY_CONTAINER_NAME}`);
+      const startResult = spawnSync('docker', ['start', DOCKER.REGISTRY_CONTAINER_NAME]);
+      if (startResult.error || startResult.status !== 0) {
+        logger.error({ error: startResult.error, stderr: startResult.stderr?.toString() }, 'Failed to start existing registry container');
+        return null;
+      }
       logger.info({ port }, 'Local registry started successfully');
 
       // Validate registry health after restart with enhanced health check
@@ -502,7 +526,11 @@ async function checkLocalRegistryExists(logger: pino.Logger): Promise<number | n
         if (!isConnected) {
           logger.info('Registry not connected to kind network, reconnecting...');
           try {
-            await execAsync(`docker network connect kind ${DOCKER.REGISTRY_CONTAINER_NAME}`);
+            const connectResult = spawnSync('docker', ['network', 'connect', 'kind', DOCKER.REGISTRY_CONTAINER_NAME]);
+            if (connectResult.error || connectResult.status !== 0) {
+              const errorMsg = connectResult.error?.message || connectResult.stderr?.toString() || 'Unknown error';
+              throw new Error(errorMsg);
+            }
             logger.info('Registry reconnected to kind network successfully');
 
             // Verify reconnection
@@ -556,34 +584,37 @@ async function validateRegistryHealth(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     // First check if container is running
-    try {
-      const { stdout: status } = await execAsync(
-        `docker inspect ${DOCKER.REGISTRY_CONTAINER_NAME} --format '{{.State.Status}}'`,
-      );
+    const statusResult = spawnSync('docker', [
+      'inspect',
+      DOCKER.REGISTRY_CONTAINER_NAME,
+      '--format',
+      '{{.State.Status}}',
+    ]);
 
+    if (statusResult.status === 0) {
+      const status = statusResult.stdout.toString();
       if (status.trim() !== 'running') {
         logger.debug({ attempt, status: status.trim() }, 'Registry container not running yet');
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         delayMs = Math.min(delayMs * 1.5, maxDelay); // Exponential backoff
         continue;
       }
-    } catch (error) {
-      logger.debug({ attempt, error }, 'Container status check failed');
+    } else {
+      logger.debug({ attempt, error: statusResult.stderr?.toString() }, 'Container status check failed');
     }
 
     // Then check HTTP endpoint
-    try {
-      const { stdout } = await execAsync(
-        `curl -sf --max-time 3 http://${DOCKER.REGISTRY_HOST}:${port}/v2/ || echo "failed"`,
-        { timeout: 4000 },
-      );
+    const curlResult = spawnSync(
+      'curl',
+      ['-sf', '--max-time', '3', `http://${DOCKER.REGISTRY_HOST}:${port}/v2/`],
+      { timeout: 4000 },
+    );
 
-      if (!stdout.includes('failed')) {
-        logger.debug({ attempt }, 'Registry health check passed');
-        return { healthy: true, attempts: attempt };
-      }
-    } catch (error) {
-      logger.debug({ attempt, error }, 'Registry health check attempt failed');
+    if (curlResult.status === 0) {
+      logger.debug({ attempt }, 'Registry health check passed');
+      return { healthy: true, attempts: attempt };
+    } else {
+      logger.debug({ attempt, error: curlResult.stderr?.toString() }, 'Registry health check attempt failed');
     }
 
     if (attempt < maxAttempts) {
@@ -594,13 +625,10 @@ async function validateRegistryHealth(
   }
 
   // Check container logs on failure for debugging
-  try {
-    const { stdout: logs } = await execAsync(
-      `docker logs --tail 20 ${DOCKER.REGISTRY_CONTAINER_NAME}`,
-    );
+  const logsResult = spawnSync('docker', ['logs', '--tail', '20', DOCKER.REGISTRY_CONTAINER_NAME]);
+  if (logsResult.status === 0) {
+    const logs = logsResult.stdout.toString();
     logger.error({ logs }, 'Registry container logs (failed health check)');
-  } catch {
-    // Ignore log fetch errors
   }
 
   logger.warn({ maxAttempts }, 'Registry health check failed after all attempts');
@@ -614,17 +642,24 @@ async function checkDockerNetworkExists(
   networkName: string,
   logger: pino.Logger,
 ): Promise<boolean> {
-  try {
-    const { stdout } = await execAsync(
-      `docker network ls --filter "name=${networkName}" --format "{{.Name}}"`,
-    );
-    const exists = stdout.split('\n').includes(networkName);
-    logger.debug({ networkName, exists }, 'Checking Docker network existence');
-    return exists;
-  } catch (error) {
-    logger.debug({ networkName, error }, 'Error checking Docker network');
+  const result = spawnSync('docker', [
+    'network',
+    'ls',
+    '--filter',
+    `name=${networkName}`,
+    '--format',
+    '{{.Name}}',
+  ]);
+
+  if (result.error || result.status !== 0) {
+    logger.debug({ networkName, error: result.error }, 'Error checking Docker network');
     return false;
   }
+
+  const stdout = result.stdout.toString();
+  const exists = stdout.split('\n').includes(networkName);
+  logger.debug({ networkName, exists }, 'Checking Docker network existence');
+  return exists;
 }
 
 /**
@@ -635,24 +670,29 @@ async function checkContainerNetworkConnection(
   networkName: string,
   logger: pino.Logger,
 ): Promise<boolean> {
-  try {
-    const { stdout } = await execAsync(
-      `docker inspect ${containerName} --format '{{range $net, $v := .NetworkSettings.Networks}}{{$net}} {{end}}'`,
-    );
-    const networks = stdout.trim().split(' ').filter(Boolean);
-    const connected = networks.includes(networkName);
+  const result = spawnSync('docker', [
+    'inspect',
+    containerName,
+    '--format',
+    '{{range $net, $v := .NetworkSettings.Networks}}{{$net}} {{end}}',
+  ]);
+
+  if (result.error || result.status !== 0) {
     logger.debug(
-      { containerName, networkName, connected, networks },
-      'Checking container network connection',
-    );
-    return connected;
-  } catch (error) {
-    logger.debug(
-      { containerName, networkName, error },
+      { containerName, networkName, error: result.error },
       'Error checking container network connection',
     );
     return false;
   }
+
+  const stdout = result.stdout.toString();
+  const networks = stdout.trim().split(' ').filter(Boolean);
+  const connected = networks.includes(networkName);
+  logger.debug(
+    { containerName, networkName, connected, networks },
+    'Checking container network connection',
+  );
+  return connected;
 }
 
 /**
@@ -690,20 +730,25 @@ async function getContainerNetworkIP(
   networkName: string,
   logger: pino.Logger,
 ): Promise<string | null> {
-  try {
-    const { stdout } = await execAsync(
-      `docker inspect ${containerName} --format '{{.NetworkSettings.Networks.${networkName}.IPAddress}}'`,
-    );
-    const ip = stdout.trim();
-    if (ip && ip !== '<no value>') {
-      logger.debug({ containerName, networkName, ip }, 'Got container network IP');
-      return ip;
-    }
-    return null;
-  } catch (error) {
-    logger.debug({ containerName, networkName, error }, 'Error getting container network IP');
+  const result = spawnSync('docker', [
+    'inspect',
+    containerName,
+    '--format',
+    `{{.NetworkSettings.Networks.${networkName}.IPAddress}}`,
+  ]);
+
+  if (result.error || result.status !== 0) {
+    logger.debug({ containerName, networkName, error: result.error }, 'Error getting container network IP');
     return null;
   }
+
+  const stdout = result.stdout.toString();
+  const ip = stdout.trim();
+  if (ip && ip !== '<no value>') {
+    logger.debug({ containerName, networkName, ip }, 'Got container network IP');
+    return ip;
+  }
+  return null;
 }
 
 /**
@@ -720,16 +765,33 @@ async function verifyRegistryDNSResolution(logger: pino.Logger): Promise<{
 
     // Create a temporary test pod that performs DNS lookup
     const testPodName = `registry-dns-test-${Date.now()}`;
-    // Use nslookup to resolve the registry hostname
-    const nslookupCommand = `nslookup ${DOCKER.REGISTRY_CONTAINER_NAME} && echo "DNS_SUCCESS" || echo "DNS_FAILED"`;
 
     try {
       // Run test pod and wait for completion (timeout 30s)
-      const { stdout } = await execAsync(
-        `kubectl run ${testPodName} --image=busybox:latest --restart=Never --rm -i --timeout=30s -- sh -c '${nslookupCommand}'`,
+      const result = spawnSync(
+        'kubectl',
+        [
+          'run',
+          testPodName,
+          '--image=busybox:latest',
+          '--restart=Never',
+          '--rm',
+          '-i',
+          '--timeout=30s',
+          '--',
+          'sh',
+          '-c',
+          `nslookup ${DOCKER.REGISTRY_CONTAINER_NAME} && echo "DNS_SUCCESS" || echo "DNS_FAILED"`,
+        ],
         { timeout: 35000 },
       );
 
+      if (result.error) {
+        logger.debug({ error: result.error }, 'In-cluster DNS resolution test failed');
+        return { resolves: false };
+      }
+
+      const stdout = result.stdout.toString();
       const success = stdout.includes('DNS_SUCCESS') && !stdout.includes('DNS_FAILED');
 
       // Try to extract the resolved IP address from nslookup output
@@ -750,10 +812,9 @@ async function verifyRegistryDNSResolution(logger: pino.Logger): Promise<{
       return resolvedIP ? { resolves: success, resolvedIP } : { resolves: success };
     } catch (error) {
       // If pod creation fails, try to clean it up
-      try {
-        await execAsync(`kubectl delete pod ${testPodName} --ignore-not-found=true`);
-      } catch {
-        // Ignore cleanup errors
+      const cleanupResult = spawnSync('kubectl', ['delete', 'pod', testPodName, '--ignore-not-found=true']);
+      if (cleanupResult.error) {
+        logger.debug({ error: cleanupResult.error }, 'Failed to cleanup test pod');
       }
       logger.debug({ error }, 'In-cluster DNS resolution test failed');
       return { resolves: false };
@@ -781,9 +842,14 @@ async function validateContainerdConfig(
     const nodeContainerName = `${clusterName}-control-plane`;
 
     // Read containerd config from the node
-    const { stdout } = await execAsync(
-      `docker exec ${nodeContainerName} cat /etc/containerd/config.toml`,
-    );
+    const result = spawnSync('docker', ['exec', nodeContainerName, 'cat', '/etc/containerd/config.toml']);
+
+    if (result.error || result.status !== 0) {
+      logger.warn({ clusterName, error: result.error, stderr: result.stderr?.toString() }, 'Error validating containerd config');
+      return false;
+    }
+
+    const stdout = result.stdout.toString();
 
     // Enhanced validation: check for the registry mirror configuration structure
     // The config should have a [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:PORT"] section
@@ -889,9 +955,23 @@ async function createRegistryContainerOnly(port: number, logger: pino.Logger): P
   try {
     logger.info({ port }, 'Creating local Docker registry container...');
 
-    await execAsync(
-      `docker run -d --restart=always -p ${port}:${DOCKER.REGISTRY_INTERNAL_PORT} --name ${DOCKER.REGISTRY_CONTAINER_NAME} registry:2`,
-    );
+    const result = spawnSync('docker', [
+      'run',
+      '-d',
+      '--restart=always',
+      '-p',
+      `${port}:${DOCKER.REGISTRY_INTERNAL_PORT}`,
+      '--name',
+      DOCKER.REGISTRY_CONTAINER_NAME,
+      'registry:2',
+    ]);
+
+    if (result.error || result.status !== 0) {
+      const errorMsg = result.error?.message || result.stderr?.toString() || 'Unknown error';
+      logger.error({ error: errorMsg }, 'Failed to create registry container');
+      throw new Error(`Registry container creation failed: ${errorMsg}`);
+    }
+
     logger.debug({ port }, 'Registry container created (network connection deferred)');
   } catch (error) {
     logger.error({ error }, 'Failed to create registry container');
@@ -929,12 +1009,11 @@ async function connectRegistryToKindNetwork(
     logger.debug('Registry already connected to kind network');
   } else {
     // Connect registry to kind network
-    try {
-      logger.debug('Connecting registry to kind Docker network...');
-      await execAsync(`docker network connect kind ${DOCKER.REGISTRY_CONTAINER_NAME}`);
-      logger.info('Registry connected to kind network successfully');
-    } catch (networkError) {
-      const errorMsg = extractErrorMessage(networkError);
+    logger.debug('Connecting registry to kind Docker network...');
+    const connectResult = spawnSync('docker', ['network', 'connect', 'kind', DOCKER.REGISTRY_CONTAINER_NAME]);
+
+    if (connectResult.error || connectResult.status !== 0) {
+      const errorMsg = connectResult.error?.message || connectResult.stderr?.toString() || '';
       // Only treat as non-fatal if it's "already connected" error
       if (errorMsg.includes('already') || errorMsg.includes('duplicate')) {
         logger.debug({ error: errorMsg }, 'Registry already connected to kind network');
@@ -942,6 +1021,8 @@ async function connectRegistryToKindNetwork(
         logger.error({ error: errorMsg }, 'Failed to connect registry to kind network');
         throw new Error(`Failed to connect registry to kind network: ${errorMsg}`);
       }
+    } else {
+      logger.info('Registry connected to kind network successfully');
     }
 
     // Verify connection succeeded by checking again
@@ -1003,9 +1084,7 @@ async function validateRegistryAccess(
   try {
     logger.debug({ registryUrl, registryType }, 'Checking Docker login status for registry...');
 
-    // Attempt a lightweight operation to verify access
-    // This varies by registry type
-    let testCommand: string;
+    let testResult: string;
 
     switch (registryType) {
       case RegistryType.ACR: {
@@ -1019,17 +1098,32 @@ async function validateRegistryAccess(
             resolution: `Provide a valid ACR registry URL like 'myregistry.azurecr.io'`,
           });
         }
-        // Escape for shell safety (single quotes prevent expansion)
-        testCommand = `az acr repository list --name '${registryName.replace(/'/g, "'\\''")}' --output json 2>/dev/null || echo "not-logged-in"`;
+
+        const acrResult = spawnSync('az', ['acr', 'repository', 'list', '--name', registryName, '--output', 'json'], {
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+
+        if (acrResult.error || acrResult.status !== 0) {
+          testResult = 'not-logged-in';
+        } else {
+          testResult = acrResult.stdout.toString();
+        }
         break;
       }
-      default:
+      default: {
         // Generic: try to check docker config for registry credentials
-        // Escape registry URL for grep (single quotes prevent shell expansion)
-        testCommand = `docker-credential-desktop list 2>/dev/null | grep -iF '${registryUrl.replace(/'/g, "'\\''")}' || echo "not-logged-in"`;
-    }
+        const dockerCredResult = spawnSync('docker-credential-desktop', ['list'], {
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
 
-    const { stdout: testResult } = await execAsync(testCommand);
+        if (dockerCredResult.error || dockerCredResult.status !== 0) {
+          testResult = 'not-logged-in';
+        } else {
+          const credOutput = dockerCredResult.stdout.toString();
+          testResult = credOutput.toLowerCase().includes(registryUrl.toLowerCase()) ? credOutput : 'not-logged-in';
+        }
+      }
+    }
 
     if (testResult.includes('not-logged-in') || testResult.trim() === '') {
       return Failure(
@@ -1072,11 +1166,10 @@ async function setupKindCluster(
   },
 ): Promise<Result<void>> {
   // Validate cluster name upfront
-  const escapedNameResult = validateAndEscapeClusterName(clusterName);
-  if (!escapedNameResult.ok) {
-    return escapedNameResult;
+  const validationResult = validateClusterName(clusterName);
+  if (!validationResult.ok) {
+    return validationResult;
   }
-  const escapedName = escapedNameResult.value;
 
   checks.kindInstalled = await checkKindInstalled(logger);
   if (!checks.kindInstalled) {
@@ -1104,15 +1197,16 @@ async function setupKindCluster(
     await new Promise((resolve) => setTimeout(resolve, DEFAULT_TIMEOUTS.clusterStabilization));
 
     // Verify cluster nodes are ready
-    try {
-      const { stdout } = await execAsync('kubectl get nodes --no-headers');
+    const nodesResult = spawnSync('kubectl', ['get', 'nodes', '--no-headers']);
+    if (nodesResult.status === 0) {
+      const stdout = nodesResult.stdout.toString();
       const nodesReady = stdout.includes('Ready');
       logger.debug({ nodesReady, output: stdout.trim() }, 'Cluster node readiness check');
       if (!nodesReady) {
         logger.warn('Cluster nodes may not be fully ready yet');
       }
-    } catch (error) {
-      logger.debug({ error }, 'Could not check node readiness (non-fatal)');
+    } else {
+      logger.debug({ error: nodesResult.stderr?.toString() }, 'Could not check node readiness (non-fatal)');
     }
 
     // Validate that kind network was created
@@ -1129,11 +1223,12 @@ async function setupKindCluster(
   }
 
   // Export kubeconfig
-  try {
-    // escapedName is already wrapped in single quotes for shell safety
-    await execAsync(`kind export kubeconfig --name ${escapedName}`);
-  } catch (error) {
-    logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
+  const exportResult = spawnSync('kind', ['export', 'kubeconfig', '--name', clusterName]);
+  if (exportResult.error || exportResult.status !== 0) {
+    logger.warn(
+      { error: exportResult.error?.message, stderr: exportResult.stderr?.toString() },
+      'Failed to export kubeconfig, continuing anyway'
+    );
   }
 
   return Success(undefined);
