@@ -6,10 +6,12 @@
 
 import Docker, { DockerOptions } from 'dockerode';
 import tar from 'tar-fs';
+import path from 'path';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
 import { autoDetectDockerSocket } from './socket-validation';
+import { getDockerBuildFiles } from '@/lib/dockerignore-parser';
 
 /**
  * Docker client configuration options.
@@ -253,9 +255,15 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
       try {
         logger.debug({ options }, 'Starting Docker build');
 
-        // Create tar stream from the build context directory
         const contextPath = options.context || '.';
-        const tarStream = tar.pack(contextPath);
+        const dockerfilePath = options.dockerfile
+          ? path.resolve(contextPath, options.dockerfile)
+          : undefined;
+        const files = await getDockerBuildFiles(contextPath, dockerfilePath);
+
+        const tarStream = tar.pack(contextPath, {
+          entries: files,
+        });
 
         const stream = await docker.buildImage(tarStream, {
           t: options.t || options.tags?.[0],
@@ -458,8 +466,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         const image = docker.getImage(`${repository}:${tag}`);
         // dockerode's Image.push expects auth config inside the first options object
         // For local registries without auth, provide an empty authconfig object to avoid X-Registry-Auth header issues
-        const stream = await image.push({ 
-          authconfig: authConfig || {}
+        const stream = await image.push({
+          authconfig: authConfig || {},
         });
 
         let digest = '';
@@ -510,10 +518,14 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 
               // Only treat final error events as failures, not intermediate auth challenges
               if (event.error || event.errorDetail) {
-                logger.debug({ errorEvent: event }, 'Docker push error event (may be intermediate)');
+                logger.debug(
+                  { errorEvent: event },
+                  'Docker push error event (may be intermediate)',
+                );
 
                 // Only set pushError for certain fatal errors, not auth challenges
-                const errorMsg = event.error || (event.errorDetail as { message?: string })?.message || '';
+                const errorMsg =
+                  event.error || (event.errorDetail as { message?: string })?.message || '';
 
                 // Don't treat authentication challenges as fatal errors - they're part of the auth handshake
                 if (

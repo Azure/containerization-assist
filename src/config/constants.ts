@@ -125,6 +125,8 @@ export const DOCKER = {
   REGISTRY_CONTAINER_NAME: 'ca-registry',
   /** Registry host for external access */
   REGISTRY_HOST: 'localhost',
+  /** Registry internal port (inside container) */
+  REGISTRY_INTERNAL_PORT: 5000,
 } as const;
 
 /**
@@ -145,8 +147,10 @@ export const KUBERNETES = {
   DEFAULT_ENVIRONMENT: 'development' as const,
   /** Default cluster */
   DEFAULT_CLUSTER: 'default',
-  /** Default port */
-  DEFAULT_PORT: 80,
+  /** Default HTTP port */
+  DEFAULT_HTTP_PORT: 80,
+  /** Default HTTPS port */
+  DEFAULT_HTTPS_PORT: 443,
   /** Pending LoadBalancer URL placeholder */
   PENDING_LB_URL: 'http://pending-loadbalancer',
   /** Default ingress host */
