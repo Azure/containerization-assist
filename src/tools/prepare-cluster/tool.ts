@@ -42,7 +42,7 @@ import type { DockerPlatform } from '@/tools/shared/schemas';
 
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '@/types';
-import { prepareClusterSchema, type PrepareClusterParams } from './schema';
+import { prepareClusterSchema, type PrepareClusterParams, RegistryType } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pluralize } from '@/lib/summary-helpers';
@@ -1008,7 +1008,7 @@ async function validateRegistryAccess(
     let testCommand: string;
 
     switch (registryType) {
-      case 'acr':
+      case RegistryType.ACR:
         // For ACR, try to list repositories
         testCommand = `az acr repository list --name ${registryUrl.split('.')[0]} --output json 2>/dev/null || echo "not-logged-in"`;
         break;

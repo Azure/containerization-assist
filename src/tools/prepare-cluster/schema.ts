@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { environmentSchema } from '@/config/constants';
 
+export const RegistryType = {
+  ACR: 'acr',
+  DOCKERHUB: 'dockerhub',
+  GENERIC: 'generic',
+} as const;
+
+export type RegistryType = typeof RegistryType[keyof typeof RegistryType];
+
 export const prepareClusterSchema = z.object({
   environment: environmentSchema.optional(),
   namespace: z.string().optional().describe('Kubernetes namespace'),
@@ -15,7 +23,7 @@ export const prepareClusterSchema = z.object({
     .describe('Name of the remote cluster (for display purposes)'),
   registry: z
     .object({
-      type: z.enum(['acr', 'ecr', 'gcr', 'dockerhub', 'generic']).describe('Registry type'),
+      type: z.enum([RegistryType.ACR, RegistryType.DOCKERHUB, RegistryType.GENERIC]).describe('Registry type'),
       url: z.string().describe('Registry URL (e.g., myregistry.azurecr.io)'),
     })
     .optional()
