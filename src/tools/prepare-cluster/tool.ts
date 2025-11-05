@@ -1512,9 +1512,6 @@ async function handlePrepareCluster(
         ...(checks.registryAccessValidated !== undefined && {
           registryAccessValidated: checks.registryAccessValidated,
         }),
-        ...(checks.registryAccessValidated !== undefined && {
-          registryAccessValidated: checks.registryAccessValidated,
-        }),
       },
       ...(warnings.length > 0 && { warnings }),
       ...(localRegistryUrl && { localRegistryUrl }),
