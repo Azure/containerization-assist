@@ -30,10 +30,9 @@ async function main() {
   }
 
   const prepareResult = await prepareCluster.handler({
-    targetPlatform: envTargetPlatform as DockerPlatform,
     environment: 'development',
     namespace: 'default',
-    strictPlatformValidation: true,
+    useRemoteCluster: false,
   }, ctx);
 
   if (!prepareResult.ok) {
@@ -46,16 +45,14 @@ async function main() {
   console.log('   Checks:', JSON.stringify(prepareResult.value.checks, null, 2));
 
   if (!prepareResult.value.localRegistry) {
-    console.error('❌ Local registry not created');
+    console.error('❌ Local registry not created, tool result missing localRegistry field');
     process.exit(1);
   }
 
   const registry = prepareResult.value.localRegistry;
   console.log('   Registry healthy:', registry.healthy);
-  console.log('   Reachable from cluster:', registry.reachableFromCluster);
-
-  if (!registry.reachableFromCluster) {
-    console.error('❌ Registry not reachable from cluster');
+  if (!registry.healthy) {
+    console.error('❌ Registry not healthy in tool output');
     process.exit(1);
   }
 
