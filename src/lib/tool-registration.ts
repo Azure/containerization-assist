@@ -19,6 +19,7 @@ import type { Tool } from '@/types/tool';
 import type { ToolName } from '@/tools';
 import { extractErrorMessage } from './errors';
 import { formatOutput, OUTPUTFORMAT, type OutputFormat } from '@/mcp/mcp-server';
+import { ChainHintsMode } from '@/app/orchestrator-types';
 
 /**
  * Tool handler wrapper options with type-safe callbacks
@@ -57,7 +58,7 @@ export interface ToolHandlerOptions<TName extends ToolName = ToolName> {
   outputFormat?: OutputFormat;
 
   /** Chain hints mode for controlling next steps in output (default: 'enabled') */
-  chainHintsMode?: 'enabled' | 'disabled';
+  chainHintsMode?: ChainHintsMode;
 
   /** Custom error handler - called before throwing McpError */
   onError?: (error: unknown, toolName: TName, params: ToolInputMap[TName]) => void;
