@@ -66,9 +66,12 @@ async function handlePushImage(
       (ctx && 'docker' in ctx && ((ctx as Record<string, unknown>).docker as DockerClient)) ||
       createDockerClient(logger);
 
-    // Determine the final repository and tag based on registry input
+    // Determine the final repository and tag
     const tag = parsedImage.value.tag;
-    let repository = parsedImage.value.repository;
+    const repository = parsedImage.value.repository;
+
+    // Determine actual registry (default to docker.io if not specified)
+    const registry = parsedImage.value.registry || 'docker.io';
 
     // Build auth config - try credential helpers first, then manual credentials
     let authConfig: { username: string; password: string; serveraddress: string } | undefined;
@@ -126,11 +129,14 @@ async function handlePushImage(
     }
 
     const pushTime = Date.now() - startTime;
-    // Build pushed tag for the response - use original image format if no registry, otherwise use the resolved repository
-    const pushedTag = `${parsedImage.value.repository}:${tag}`;
 
-    // No custom registry - always use docker.io prefix
-    let displayTag = `${parsedImage.value.repository}:${tag}`;
+    // Build pushed tag - include registry in full image name
+    const pushedTag = parsedImage.value.registry
+      ? `${parsedImage.value.registry}/${repository}:${tag}`
+      : `${repository}:${tag}`;
+
+    // Display tag for summary - always show registry (including docker.io for clarity)
+    const displayTag = `${registry}/${repository}:${tag}`;
 
     logger.info(
       { pushedTag, pushTime, digest: pushResult.value.digest },
@@ -150,7 +156,7 @@ async function handlePushImage(
     const result: PushImageResult = {
       summary,
       success: true,
-      registry: parsedImage.value.registry || '',
+      registry,
       digest: pushResult.value.digest,
       pushedTag,
     };
