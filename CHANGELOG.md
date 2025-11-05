@@ -1,6 +1,6 @@
 # Change Log
 
-## [1.0.1-dev.6]
+## [1.0.1-dev.7]
 
 - Dev Release with bug fixes, add enum to disable chain hints across natural language formatter
 
