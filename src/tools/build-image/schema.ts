@@ -18,7 +18,7 @@ export const buildImageSchema = z.object({
   imageName: imageName.optional(),
   tags: tags.optional(),
   buildArgs: buildArgs.optional(),
-  platform,
+  platform: platform.optional(),
   strictPlatformValidation: z
     .boolean()
     .optional()
