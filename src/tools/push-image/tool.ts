@@ -129,9 +129,11 @@ async function handlePushImage(
 
     const pushTime = Date.now() - startTime;
 
-    // Build pushed tag - include registry in full image name
+    // Build pushed tag - include registry in full image name, but avoid duplicating registry if repository already includes it
     const pushedTag = parsedImage.value.registry
-      ? `${parsedImage.value.registry}/${repository}:${tag}`
+      ? (repository.startsWith(parsedImage.value.registry + '/') 
+          ? `${repository}:${tag}` 
+          : `${parsedImage.value.registry}/${repository}:${tag}`)
       : `${repository}:${tag}`;
 
     // Display tag for summary - always show registry (including docker.io for clarity)
