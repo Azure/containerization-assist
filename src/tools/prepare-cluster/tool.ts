@@ -183,6 +183,7 @@ export interface PrepareClusterResult {
     internalEndpoint: string;
     containerName: string;
     healthy: boolean;
+    reachableFromCluster: boolean;
   };
   remoteRegistry?: {
     url: string;
@@ -1443,6 +1444,7 @@ async function handlePrepareCluster(
         internalEndpoint: `${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.REGISTRY_INTERNAL_PORT}`,
         containerName: DOCKER.REGISTRY_CONTAINER_NAME,
         healthy: networkConnection.healthy,
+        reachableFromCluster: dnsResolution.resolves,
       };
 
       logger.info(
