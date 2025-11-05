@@ -6,6 +6,7 @@
 
 import Docker, { DockerOptions } from 'dockerode';
 import tar from 'tar-fs';
+import path from 'path';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
@@ -255,7 +256,10 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         logger.debug({ options }, 'Starting Docker build');
 
         const contextPath = options.context || '.';
-        const files = await getDockerBuildFiles(contextPath);
+        const dockerfilePath = options.dockerfile
+          ? path.resolve(contextPath, options.dockerfile)
+          : undefined;
+        const files = await getDockerBuildFiles(contextPath, dockerfilePath);
 
         const tarStream = tar.pack(contextPath, {
           entries: files,
