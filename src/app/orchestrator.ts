@@ -9,7 +9,7 @@ import { createLogger } from '@/lib/logger';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
-import type { ToolOrchestrator, OrchestratorConfig, ExecuteRequest } from './orchestrator-types';
+import { type ToolOrchestrator, type OrchestratorConfig, type ExecuteRequest, CHAINHINTSMODE } from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
@@ -108,7 +108,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   logger?: Logger;
   config?: OrchestratorConfig;
 }): ToolOrchestrator {
-  const { registry, server, config = { chainHintsMode: 'enabled' } } = options;
+  const { registry, server, config = { chainHintsMode: CHAINHINTSMODE.ENABLED } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
   // Cache the loaded policy to avoid reloading on every execution
@@ -223,7 +223,7 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
     if (result.ok) {
       let valueWithMessages = result.value;
 
-      if (env.config.chainHintsMode === 'enabled' && tool.chainHints) {
+      if (env.config.chainHintsMode === CHAINHINTSMODE.ENABLED && tool.chainHints) {
         valueWithMessages = {
           ...valueWithMessages,
           nextSteps: tool.chainHints.success,

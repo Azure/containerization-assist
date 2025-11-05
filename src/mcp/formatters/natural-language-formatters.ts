@@ -29,6 +29,8 @@ import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary-helpers';
+import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
+import { checkImageExists } from '@/infra/docker/registry';
 
 /**
  * Format scan-image result as natural language narrative
@@ -45,7 +47,7 @@ import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary
  * - Scan metadata (timestamp)
  * - Context-aware next steps based on pass/fail status (when chainHintsMode is 'enabled')
  */
-export function formatScanImageNarrative(result: ScanImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatScanImageNarrative(result: ScanImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header
@@ -101,7 +103,7 @@ export function formatScanImageNarrative(result: ScanImageResult, chainHintsMode
   parts.push(`\n**Scan Completed:** ${new Date(result.scanTime).toLocaleString()}`);
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push('\n**Next Steps:**');
     if (result.passed) {
       parts.push('  → Proceed with image tagging and registry push');
@@ -134,7 +136,7 @@ export function formatScanImageNarrative(result: ScanImageResult, chainHintsMode
  * - Policy validation results (if applicable)
  * - Actionable next steps (when chainHintsMode is 'enabled')
  */
-export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Action-oriented header
@@ -259,7 +261,7 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMo
   }
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push('\n**Next Steps:**');
     if (plan.nextAction.action === 'create-files') {
       parts.push('  1. Create Dockerfile using the base images and recommendations above');
@@ -292,7 +294,7 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMo
  * - Layer count (if available)
  * - Standard next steps for containerization workflow (when chainHintsMode is 'enabled')
  */
-export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header
@@ -319,7 +321,7 @@ export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMo
   }
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push('\n**Next Steps:**');
     parts.push('  → Scan image for vulnerabilities with scan-image');
     parts.push('  → Tag image for registry with tag-image');
@@ -349,7 +351,7 @@ export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMo
  * - Graceful handling of empty or undefined modules
  * - Context-aware next steps (with monorepo-specific guidance, when chainHintsMode is 'enabled')
  */
-export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header
@@ -388,7 +390,7 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis, chainHint
   }
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push('\n**Next Steps:**');
     parts.push('  → Use generate-dockerfile to create container configuration');
     if (result.isMonorepo) {
@@ -415,7 +417,7 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis, chainHint
  * - Conditions and issues
  * - Context-aware next steps based on health status (when chainHintsMode is 'enabled')
  */
-export function formatVerifyDeployNarrative(result: VerifyDeploymentResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatVerifyDeployNarrative(result: VerifyDeploymentResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header
@@ -487,7 +489,7 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult, chai
   }
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push(`\n**Next Steps:**`);
     if (result.ready) {
       parts.push('  → Deployment is healthy and serving traffic');
@@ -523,7 +525,7 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult, chai
  * - Estimated impact of fixes
  * - Context-aware next steps for implementation (when chainHintsMode is 'enabled')
  */
-export function formatFixDockerfileNarrative(result: DockerfileFixPlan, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatFixDockerfileNarrative(result: DockerfileFixPlan, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header with validation grade
@@ -642,7 +644,7 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan, chainHin
   }
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push(`\n**Next Steps:**`);
     if (result.validationGrade === 'A' || result.validationGrade === 'B') {
       parts.push('  → Dockerfile is in good shape with minor improvements available');
@@ -676,7 +678,7 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan, chainHin
  * - Best practices recommendations
  * - Context-aware next steps (when chainHintsMode is 'enabled')
  */
-export function formatGenerateK8sManifestsNarrative(result: ManifestPlan, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatGenerateK8sManifestsNarrative(result: ManifestPlan, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Action-oriented header
@@ -767,7 +769,7 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan, chainH
   }
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push(`\n**Next Steps:**`);
     parts.push('  1. Create manifest files using the recommendations above');
     parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
@@ -793,7 +795,7 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan, chainH
  * - Full image reference
  * - Standard next steps (when chainHintsMode is 'enabled')
  */
-export function formatPushImageNarrative(result: PushImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatPushImageNarrative(result: PushImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header
@@ -815,7 +817,7 @@ export function formatPushImageNarrative(result: PushImageResult, chainHintsMode
   parts.push(`  ${fullImage}`);
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push(`\n**Next Steps:**`);
     parts.push('  → Image is now available in the registry');
     parts.push('  → Update Kubernetes manifests with this image');
@@ -840,7 +842,7 @@ export function formatPushImageNarrative(result: PushImageResult, chainHintsMode
  * - Tags applied (list)
  * - Standard next steps with versioning guidance (when chainHintsMode is 'enabled')
  */
-export function formatTagImageNarrative(result: TagImageResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatTagImageNarrative(result: TagImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header
@@ -859,7 +861,7 @@ export function formatTagImageNarrative(result: TagImageResult, chainHintsMode: 
   });
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push(`\n**Next Steps:**`);
     parts.push('  → Use push-image to push tagged image to registry');
     parts.push('  → Tags can be used in Kubernetes manifests');
@@ -886,7 +888,7 @@ export function formatTagImageNarrative(result: TagImageResult, chainHintsMode: 
  * - Warnings if any
  * - Context-aware next steps (when chainHintsMode is 'enabled')
  */
-export function formatPrepareClusterNarrative(result: PrepareClusterResult, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatPrepareClusterNarrative(result: PrepareClusterResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   const parts: string[] = [];
 
   // Header
@@ -941,7 +943,7 @@ export function formatPrepareClusterNarrative(result: PrepareClusterResult, chai
   }
 
   // Next steps (only if chainHintsMode is enabled)
-  if (chainHintsMode === 'enabled') {
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push(`\n**Next Steps:**`);
     if (result.success && result.clusterReady) {
       parts.push('  → Cluster is ready for deployment');

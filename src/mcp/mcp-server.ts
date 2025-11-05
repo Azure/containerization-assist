@@ -18,7 +18,7 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import { extractErrorMessage } from '@/lib/errors';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
-import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
+import { type ExecuteRequest, type ExecuteMetadata, type ChainHintsMode, CHAINHINTSMODE } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
@@ -84,7 +84,7 @@ export interface ServerOptions {
   name?: string;
   version?: string;
   outputFormat?: OutputFormat;
-  chainHintsMode?: 'enabled' | 'disabled';
+  chainHintsMode?: ChainHintsMode;
 }
 
 /**
@@ -115,7 +115,7 @@ export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
 
 export interface RegisterOptions<TTool extends Tool = Tool> {
   outputFormat: OutputFormat;
-  chainHintsMode?: 'enabled' | 'disabled';
+  chainHintsMode?: ChainHintsMode;
   server: McpServer;
   tools: readonly TTool[];
   logger: Logger;
@@ -171,7 +171,7 @@ export function createMCPServer<TTool extends Tool>(
   const server = new McpServer(serverOptions);
   const transportType = options.transport ?? 'stdio';
   const outputFormat = options.outputFormat ?? OUTPUTFORMAT.NATURAL_LANGUAGE;
-  const chainHintsMode = options.chainHintsMode ?? 'enabled';
+  const chainHintsMode = options.chainHintsMode ?? CHAINHINTSMODE.ENABLED;
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
@@ -266,7 +266,7 @@ export function createMCPServer<TTool extends Tool>(
  * @param options - Registration options including server, tools, and executor
  */
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
-  const { server, tools, logger, transport, execute, outputFormat, chainHintsMode = 'enabled' } = options;
+  const { server, tools, logger, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
 
   for (const tool of tools) {
     server.tool(
@@ -337,8 +337,8 @@ function createLoggerContext(
     ...(meta?.requestId && typeof meta.requestId === 'string' && { requestId: meta.requestId }),
     ...(meta?.invocationId &&
       typeof meta.invocationId === 'string' && {
-        invocationId: meta.invocationId,
-      }),
+      invocationId: meta.invocationId,
+    }),
   };
 }
 
@@ -443,7 +443,7 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
  * The NATURAL_LANGUAGE format uses type detection to provide tool-specific
  * rich narratives with sections, formatting, and next steps.
  */
-export function formatOutput(output: unknown, format: OutputFormat, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+export function formatOutput(output: unknown, format: OutputFormat, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   switch (format) {
     case OUTPUTFORMAT.JSON:
       return JSON.stringify(output, null, 2);
@@ -455,7 +455,7 @@ export function formatOutput(output: unknown, format: OutputFormat, chainHintsMo
     case OUTPUTFORMAT.MARKDOWN:
       // Check if output has a summary field
       if (typeof output === 'object' && output !== null && 'summary' in output) {
-        const { summary, ...rest } = output as { summary: string; [key: string]: unknown };
+        const { summary, ...rest } = output as { summary: string;[key: string]: unknown };
 
         // Display summary prominently, with structured data collapsed
         return `${summary}\n\n<details>\n<summary>View detailed output</summary>\n\n\`\`\`json\n${JSON.stringify(rest, null, 2)}\n\`\`\`\n</details>`;
@@ -505,7 +505,7 @@ export function formatOutput(output: unknown, format: OutputFormat, chainHintsMo
  *
  * Falls back to summary field or JSON for other tool types.
  */
-function formatAsNaturalLanguage(output: unknown, chainHintsMode: 'enabled' | 'disabled' = 'enabled'): string {
+function formatAsNaturalLanguage(output: unknown, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   if (!output || typeof output !== 'object') {
     return String(output);
   }
