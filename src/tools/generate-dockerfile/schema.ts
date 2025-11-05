@@ -42,7 +42,7 @@ export const generateDockerfileSchema = z.object({
     ),
   targetPlatform: platform.describe(
     'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). This should be informed by the target cluster\'s architecture.',
-  )
+  ),
 });
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;
