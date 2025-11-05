@@ -114,7 +114,7 @@ describe('push-image tool', () => {
   });
 
   describe('success scenarios', () => {
-    it('should push Docker Hub image with default registry', async () => {
+    it('should push Docker Hub image without registry parameter (defaults to docker.io)', async () => {
       const result = await pushImageTool.handler({
         imageId: 'myapp:v1.0.0'
       }, createMockContext());
@@ -132,9 +132,29 @@ describe('push-image tool', () => {
       }
     });
 
-    it('should push to GCR with fully qualified image name', async () => {
+    it('should push to custom registry using registry parameter', async () => {
       const result = await pushImageTool.handler({
-        imageId: 'gcr.io/my-project/myapp:v1.0.0'
+        imageId: 'myapp:v1.0.0',
+        registry: 'myregistry.azurecr.io'
+      }, createMockContext());
+
+      expect(result.ok).toBe(true);
+      expect(tagImageCalled).toBe(true);
+      expect(pushImageCalled).toBe(true);
+
+      if (result.ok) {
+        expect(result.value).toMatchObject({
+          success: true,
+          registry: 'myregistry.azurecr.io',
+          pushedTag: 'myregistry.azurecr.io/myapp:v1.0.0'
+        });
+      }
+    });
+
+    it('should push to GCR using registry parameter', async () => {
+      const result = await pushImageTool.handler({
+        imageId: 'my-project/myapp:v1.0.0',
+        registry: 'gcr.io'
       }, createMockContext());
 
       expect(result.ok).toBe(true);
@@ -150,9 +170,10 @@ describe('push-image tool', () => {
       }
     });
 
-    it('should push to ACR with fully qualified image name', async () => {
+    it('should push to ACR using registry parameter with namespace', async () => {
       const result = await pushImageTool.handler({
-        imageId: 'myregistry.azurecr.io/production/myapp:v1.0.0'
+        imageId: 'production/myapp:v1.0.0',
+        registry: 'myregistry.azurecr.io'
       }, createMockContext());
 
       expect(result.ok).toBe(true);
@@ -168,9 +189,10 @@ describe('push-image tool', () => {
       }
     });
 
-    it('should push to localhost registry', async () => {
+    it('should push to localhost registry using registry parameter', async () => {
       const result = await pushImageTool.handler({
-        imageId: 'localhost:5000/myapp:v1.0.0'
+        imageId: 'myapp:v1.0.0',
+        registry: 'localhost:5000'
       }, createMockContext());
 
       expect(result.ok).toBe(true);
@@ -263,14 +285,15 @@ describe('push-image tool', () => {
       }
     });
 
-    it('should generate summary for custom registry', async () => {
+    it('should generate summary for custom registry with registry parameter', async () => {
       fakeDocker.pushImage = async () => ({
         ok: true,
         value: { digest: 'sha256:abcdef1234567890abcdef1234567890' }
       });
 
       const result = await pushImageTool.handler({
-        imageId: 'gcr.io/my-project/myapp:v1.0.0'
+        imageId: 'my-project/myapp:v1.0.0',
+        registry: 'gcr.io'
       }, createMockContext());
 
       expect(result.ok).toBe(true);
