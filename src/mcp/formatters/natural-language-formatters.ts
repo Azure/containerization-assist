@@ -788,7 +788,10 @@ export function formatPushImageNarrative(result: PushImageResult): string {
   parts.push(`**Digest:** ${shortDigest}`);
 
   // Full image reference
-  const fullImage = `${result.registry}/${result.pushedTag}@${result.digest}`;
+  // Check if pushedTag already includes the registry to avoid duplication
+  const fullImage = result.pushedTag.startsWith(result.registry)
+    ? `${result.pushedTag}@${result.digest}`
+    : `${result.registry}/${result.pushedTag}@${result.digest}`;
   parts.push(`\n**Full Reference:**`);
   parts.push(`  ${fullImage}`);
 
