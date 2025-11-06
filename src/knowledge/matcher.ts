@@ -91,7 +91,6 @@ const TAG_ALIASES: Record<string, string> = {
   // Vendor
   mcr: 'microsoft',
   msft: 'microsoft',
-  mariner: 'microsoft',
   gcp: 'google',
   gcr: 'google',
   eks: 'aws',
@@ -189,7 +188,7 @@ const evaluateTagMatch = (
 };
 
 /**
- * Extract version number from text (e.g., "openjdk:17" -> "17", "jdk:21-mariner" -> "21")
+ * Extract version number from text (e.g., "openjdk:17" -> "17", "jdk:21-azurelinux" -> "21")
  */
 const extractVersionFromText = (text: string): string | null => {
   // Match version patterns like :17, :21, :3.11, openjdk-17, java17, etc.
