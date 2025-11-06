@@ -37,7 +37,7 @@
     "category": "dockerfile",
     "pattern": "node|nodejs|javascript|typescript",
     "recommendation": "Use Microsoft Azure Linux 3.0 for Node.js in enterprise environments.",
-    "example": "FROM mcr.microsoft.com/azurelinux/base/nodejs:18 AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nRUN npm run build\n\nFROM mcr.microsoft.com/azurelinux/distroless/nodejs:18\nWORKDIR /app\nCOPY --from=builder /app/dist ./dist\nCOPY --from=builder /app/node_modules ./node_modules\nCMD [\"node\", \"dist/index.js\"]",
+    "example": "FROM mcr.microsoft.com/azurelinux/base/nodejs:18 AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM mcr.microsoft.com/azurelinux/distroless/nodejs:18\nWORKDIR /app\nCOPY package*.json ./\nCOPY --from=builder /app/dist ./dist\nRUN npm ci --only=production\nCMD [\"node\", \"dist/index.js\"]",
     "severity": "medium",
     "tags": [
       "enterprise",
@@ -54,7 +54,7 @@
     "category": "dockerfile",
     "pattern": "python|pip|django|flask",
     "recommendation": "Use Microsoft Azure Linux 3.0 for Python in enterprise environments. Provides enterprise support and security updates. Microsoft publishes both base and distroless variants.",
-    "example": "FROM mcr.microsoft.com/azurelinux/base/python:3.11 AS builder\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\n\nFROM mcr.microsoft.com/azurelinux/distroless/python:3.11\nWORKDIR /app\nCOPY --from=builder /app /app\nCOPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages\nCMD [\"python\", \"app.py\"]",
+    "example": "FROM mcr.microsoft.com/azurelinux/base/python:3.11 AS builder\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\n\nFROM mcr.microsoft.com/azurelinux/distroless/python:3.11\nWORKDIR /app\nCOPY --from=builder /app/app.py ./app.py\nCOPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages\nCMD [\"python\", \"app.py\"]",
     "severity": "medium",
     "tags": [
       "azure",
