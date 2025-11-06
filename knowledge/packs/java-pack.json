@@ -3,8 +3,8 @@
     "id": "java-25-microsoft-azurelinux",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk|FROM.*java",
-    "recommendation": "Use Microsoft Azure Linux (Mariner) with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance. Note this image does not have tar pre-installed, so install it for Maven builds.",
-    "example": "# Multi-stage build with Java 25 on Microsoft Azure Linux (Mariner)\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "recommendation": "Use Microsoft Azure Linux 3.0 with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance. Note this image does not have tar pre-installed, so install it for Maven builds. Images include a non-root 'app' user.",
+    "example": "# Multi-stage build with Java 25 on Microsoft Azure Linux 3.0\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nUSER app\nCMD [\"app.jar\"]",
     "severity": "high",
     "tags": [
       "azure",
@@ -14,21 +14,20 @@
       "generate-dockerfile",
       "java",
       "jdk",
-      "mariner",
       "azurelinux",
       "microsoft",
       "multistage",
       "official",
       "runtime-stage"
     ],
-    "description": "Microsoft Azure Linux (Mariner) with Java 25 for enterprise deployments"
+    "description": "Microsoft Azure Linux 3.0 with Java 25 for enterprise deployments"
   },
   {
     "id": "java-25-microsoft-maven",
     "category": "dockerfile",
     "pattern": "mvn|maven",
-    "recommendation": "Use Maven on Microsoft Azure Linux with Java 25 for reproducible enterprise builds. Note this image does not have tar pre-installed, so install it for Maven builds.",
-    "example": "# Maven build with Java 25 on Microsoft Azure Linux\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS build\nRUN tdnf install -y tar maven\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+    "recommendation": "Use Maven on Microsoft Azure Linux 3.0 with Java 25 for reproducible enterprise builds. Note this image does not have tar pre-installed, so install it for Maven builds.",
+    "example": "# Maven build with Java 25 on Microsoft Azure Linux 3.0\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS build\nRUN tdnf install -y tar maven\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=build /app/target/*.jar app.jar\nUSER app\nCMD [\"app.jar\"]",
     "severity": "high",
     "tags": [
       "azure",
@@ -36,7 +35,6 @@
       "fix-dockerfile",
       "generate-dockerfile",
       "java",
-      "mariner",
       "maven",
       "microsoft",
       "multistage",
@@ -88,8 +86,8 @@
     "id": "java-microsoft-azure-linux",
     "category": "security",
     "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
-    "recommendation": "For production Java deployments, prefer Microsoft Azure distroless images for runtime (minimal attack surface) and Azure Linux (Mariner) for build stages. Azure Linux images do not have tar pre-installed, so install it for Maven builds. Use groupadd and useradd for user management in Mariner.",
-    "example": "RUN tdnf install -y tar\nRUN groupadd -r appuser && useradd -r -g appuser appuser",
+    "recommendation": "For production Java deployments, prefer Microsoft Azure distroless images for runtime (minimal attack surface) and Azure Linux 3.0 for build stages. Azure Linux images do not have tar pre-installed, so install it for Maven builds. Images include a non-root 'app' user; use USER app directive for security.",
+    "example": "RUN tdnf install -y tar\nUSER app",
     "severity": "high",
     "tags": [
       "azure",
@@ -99,7 +97,7 @@
       "microsoft",
       "security"
     ],
-    "description": "Security best practice: use Microsoft Azure distroless for runtime and Azure Linux (Mariner) for build stages"
+    "description": "Security best practice: use Microsoft Azure distroless for runtime and Azure Linux 3.0 for build stages"
   },
   {
     "id": "java-jre-runtime",
@@ -277,7 +275,7 @@
     "category": "dockerfile",
     "pattern": "mvn |maven",
     "recommendation": "Use Maven wrapper (mvnw) when available, otherwise use standard Maven commands",
-    "example": "# Install tar if needed (for Azure Linux)\nRUN yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# If Maven wrapper exists: copy wrapper files first\n# COPY mvnw pom.xml ./\n# COPY .mvn .mvn\n# RUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# If no wrapper: copy pom.xml and use standard Maven\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\n\n# Copy source and build (adjust command based on wrapper availability)\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
+    "example": "# Install tar if needed (for Azure Linux 3.0)\nRUN tdnf install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# If Maven wrapper exists: copy wrapper files first\n# COPY mvnw pom.xml ./\n# COPY .mvn .mvn\n# RUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# If no wrapper: copy pom.xml and use standard Maven\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\n\n# Copy source and build (adjust command based on wrapper availability)\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
     "severity": "high",
     "tags": [
       "azure",
