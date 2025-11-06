@@ -11,8 +11,25 @@ import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
+
+/**
+ * Get the directory path of the current module
+ * Works for both ESM and CJS
+ */
+const getDirname = (): string => {
+  // ESM: use import.meta.url
+  // @ts-ignore - import.meta is available in ESM
+  if (typeof import.meta !== 'undefined' && import.meta.url) {
+    // @ts-ignore - import.meta is available in ESM
+    return path.dirname(fileURLToPath(import.meta.url));
+  }
+  // CJS: use __dirname
+  // @ts-ignore - __dirname is available in CJS
+  return __dirname;
+};
 
 interface KnowledgeState {
   entries: Map<string, LoadedEntry>;
@@ -163,15 +180,24 @@ export const loadKnowledgeBase = async (): Promise<void> => {
   };
 
   try {
+    // Get package root by resolving from this file's location
+    // This works for both ESM and CJS, and for globally installed packages
+    const currentDir = getDirname();
+    const packageRoot = path.resolve(currentDir, '../../..');
+
     // Find packs directory
     const possiblePacksDirs = [
       path.resolve(process.cwd(), 'knowledge/packs'),
       path.resolve(process.cwd(), 'dist/knowledge/packs'),
       path.resolve(process.cwd(), 'node_modules/containerization-assist-mcp/knowledge/packs'),
+      path.resolve(packageRoot, 'knowledge/packs'), // For globally installed packages
     ];
+
+    logger.debug({ possiblePacksDirs, currentDir, packageRoot }, 'Searching for knowledge packs');
 
     const packsDir = findExistingPath(possiblePacksDirs);
     if (!packsDir) {
+      logger.error({ possiblePacksDirs }, 'Could not find knowledge packs directory');
       throw new Error('Could not find knowledge packs directory');
     }
 
