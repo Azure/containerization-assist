@@ -28,7 +28,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: containerization-assist/package-lock.json
 
       - name: Install dependencies
@@ -62,8 +62,8 @@ jobs:
       - name: Setup Java for Spring PetClinic
         uses: actions/setup-java@7a6d8a8234af8eb26422e24e3006232cccaa061b # v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: "temurin"
+          java-version: "21"
 
       - name: Verify CLI is accessible
         run: |
@@ -95,25 +95,6 @@ jobs:
             spring-petclinic/analyze-result.json
             spring-petclinic/generate-dockerfile-result.json
           retention-days: 7
-
-      - name: Display test results
-        if: always()
-        working-directory: spring-petclinic
-        run: |
-          echo "=== ANALYZE-REPO RESULT ==="
-          if [ -f analyze-result.json ]; then
-            cat analyze-result.json | jq -r '.result.content[0].text' | jq '.modules[0] | {language, frameworks}' || echo "Failed to parse"
-          else
-            echo "❌ analyze-result.json not found"
-          fi
-
-          echo ""
-          echo "=== GENERATE-DOCKERFILE BASE IMAGES ==="
-          if [ -f generate-dockerfile-result.json ]; then
-            cat generate-dockerfile-result.json | jq -r '.result.content[0].text' | jq '.recommendations.baseImages[] | {image, category}' || echo "Failed to parse"
-          else
-            echo "❌ generate-dockerfile-result.json not found"
-          fi
 
       - name: Generate test summary
         if: always()
