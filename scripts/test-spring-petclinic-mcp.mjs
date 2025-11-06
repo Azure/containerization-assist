@@ -156,18 +156,38 @@ function parseToolResult(result) {
   try {
     return JSON.parse(content.text);
   } catch (e) {
-    // If not direct JSON, try to extract JSON from markdown code block
-    const jsonMatch = content.text.match(/```json\s*\n([\s\S]*?)\n```/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[1]);
-      } catch (parseError) {
-        throw new Error(`Failed to parse JSON from code block: ${parseError.message}`);
-      }
-    }
     // Return raw text if not JSON
     return { raw: content.text };
   }
+}
+
+function printNaturalLanguageResult(result) {
+  if (!result || !result.content || !result.content[0]) {
+    throw new Error('Invalid tool result format');
+  }
+
+  const content = result.content[0];
+  if (content.type !== 'text') {
+    throw new Error(`Unexpected content type: ${content.type}`);
+  }
+
+  console.error('\n--- Natural Language Result ---\n');
+  // pad result on left side with //result:// for better visibility
+  console.error(content.text.split('\n').map(line => `result text>     ${line}`).join('\n'));
+  console.error('\n--- End of Result ---\n');
+}
+
+function extractNaturalLanguageResultText(result) {
+  if (!result || !result.content || !result.content[0]) {
+    throw new Error('Invalid tool result format');
+  }
+
+  const content = result.content[0];
+  if (content.type !== 'text') {
+    throw new Error(`Unexpected content type: ${content.type}`);
+  }
+
+  return content.text;
 }
 
 // Run tests
@@ -180,74 +200,64 @@ async function runTests() {
     });
 
     const analyzeResult = analyzeResponse.result;
+    console.error(`  Received analyze-repo result.`);
+    printNaturalLanguageResult(analyzeResult);
+    const analyzeText = extractNaturalLanguageResultText(analyzeResult);
+
+    const analyzeExpectedPhrases = [
+      "**Modules Found:** 1",
+      "Build System: gradle (java 25)",
+      "Build System: maven (java 25)",
+      "Frameworks: spring-boot",
+    ];
+    const missingPhrases = [];
+    for (const phrase of analyzeExpectedPhrases) {
+      if (!analyzeText.includes(phrase)) {
+        missingPhrases.push(phrase);
+      }
+    }
+    if (missingPhrases.length > 0) {
+      throw new Error(`analyze-repo output is missing expected phrases:\n  - ${missingPhrases.join('\n  - ')}`);
+    }
+    console.error('✅ analyze-repo output contains all expected phrases.');
+
     const analyzeTime = analyzeResponse.executionTime;
 
-    const analyzeParsed = parseToolResult(analyzeResult);
-    const analyzeOutput = resolve(OUTPUT_DIR, 'analyze-result.json');
-    writeFileSync(analyzeOutput, JSON.stringify(analyzeResult, null, 2));
-    console.error(`  Saved to: ${analyzeOutput}`);
-
-    // Display summary
-    displayToolSummary('analyze-repo', analyzeParsed, analyzeTime);
-
-    // Extract module info for next step
-    const modules = analyzeParsed.modules || [];
-    const firstModule = modules[0] || {};
-    const detectedLanguage = firstModule.language || 'java';
-    const detectedFramework = firstModule.frameworks?.[0]?.name || 'spring-boot';
-
-    console.error(`\n  🔍 Detected: ${detectedLanguage} (${detectedFramework})`);
-    console.error(`  📦 Modules: ${modules.length}`);
 
     console.error('\n--- Test 2: generate-dockerfile ---');
 
     const dockerfileResponse = await callTool('generate-dockerfile', {
       repositoryPath: REPO_PATH,
-      language: detectedLanguage,
-      languageVersion: '21',
-      framework: detectedFramework,
+      language: 'java',
+      languageVersion: '25',
+      framework: 'spring-boot',
       environment: 'production',
       targetPlatform: 'linux/amd64'
     });
 
     const dockerfileResult = dockerfileResponse.result;
+    printNaturalLanguageResult(dockerfileResult);
+    const dockerfileText = extractNaturalLanguageResultText(dockerfileResult);
     const dockerfileTime = dockerfileResponse.executionTime;
 
-    const dockerfileParsed = parseToolResult(dockerfileResult);
-    const dockerfileOutput = resolve(OUTPUT_DIR, 'generate-dockerfile-result.json');
-    writeFileSync(dockerfileOutput, JSON.stringify(dockerfileResult, null, 2));
-    console.error(`  Saved to: ${dockerfileOutput}`);
-
-    // Display summary
-    displayToolSummary('generate-dockerfile', dockerfileParsed, dockerfileTime);
-
-    // Extract base image recommendations
-    const baseImages = dockerfileParsed.recommendations?.baseImages || [];
-    console.error(`\n  🐋 Base images recommended: ${baseImages.length}`);
-
     console.error('\n--- Test 3: Verify azurelinux images ---');
+    const jdkVersions = ['8', '11', '17', '21', '25'];
+    const distroLessImages = jdkVersions.map(v => `mcr.microsoft.com/openjdk/jdk:${v}-distroless`);
+    const azureLinuxImages = jdkVersions.map(v => `mcr.microsoft.com/openjdk/jdk:${v}-azurelinux`);
 
-    const azurelinuxVersions = ['25-azurelinux', '21-azurelinux', '17-azurelinux', '11-azurelinux', '8-azurelinux'];
-    const foundAzurelinux = baseImages.filter(img =>
-      azurelinuxVersions.some(v => img.image && img.image.includes(v))
-    );
-
-    if (foundAzurelinux.length === 0) {
-      console.error('\n✗ FAILURE: No azurelinux images found in recommendations');
-      console.error('\nAll recommended images:');
-      baseImages.forEach((img, idx) => {
-        console.error(`  ${idx + 1}. ${img.image || 'unknown'}`);
-        console.error(`     Category: ${img.category || 'unknown'}`);
-        console.error(`     Reason: ${img.reason ? img.reason.substring(0, 80) : 'N/A'}...`);
-      });
-      throw new Error('No azurelinux images in recommendations');
+    const mentionedAzureLinuxImages = azureLinuxImages.filter(img => dockerfileText.includes(img));
+    if (mentionedAzureLinuxImages.length === 0) {
+      throw new Error('No azurelinux images mentioned in generate-dockerfile output');
     }
+    console.error(`✅ Found ${mentionedAzureLinuxImages.length} azurelinux image(s) mentioned in output.`);
+    console.error(mentionedAzureLinuxImages.map(img => `  - ${img}`).join('\n'));
 
-    console.error(`✓ Found ${foundAzurelinux.length} azurelinux image(s):`);
-    foundAzurelinux.forEach((img, idx) => {
-      console.error(`  ${idx + 1}. ${img.image}`);
-      console.error(`     Category: ${img.category || 'unknown'}`);
-    });
+    const mentionedDistroLessImages = distroLessImages.filter(img => dockerfileText.includes(img));
+    if (mentionedDistroLessImages.length === 0) {
+      throw new Error('No distroless images mentioned in generate-dockerfile output');
+    }
+    console.error(`✅ Found ${mentionedDistroLessImages.length} distroless image(s) mentioned in output.`);
+    console.error(mentionedDistroLessImages.map(img => `  - ${img}`).join('\n'));
 
     console.error('\n=== ALL TESTS PASSED ===');
     console.error(`\n⏱️  Total execution time: ${analyzeTime + dockerfileTime}ms`);
