@@ -1,5 +1,8 @@
 # Change Log
 
+## [1.0.1-dev.6]
+
+- Dev Release with bug fixes, local registry validation, cross-platform docker build support, and .dockerignore file parsing
 
 ## [1.0.1-dev.5]
 
