@@ -45,7 +45,7 @@ function discoverBuiltInPolicies(logger: Logger): string[] {
 
     // Try CJS approach first (most common in Node.js)
     try {
-      // Using eval to bypass TypeScript's static analysis
+      // Using Function constructor to bypass TypeScript's static analysis
       // This is safe: the string is a compile-time constant with no user input
       const dirName = new Function('try { return __dirname; } catch { return undefined; }')();
       if (typeof dirName === 'string') {
@@ -70,7 +70,6 @@ function discoverBuiltInPolicies(logger: Logger): string[] {
           const __dirname = dirname(__filename);
           const moduleRelativePath = resolve(__dirname, '../../../policies');
           searchPaths.push(moduleRelativePath);
-          modulePathResolved = true;
         }
       } catch (error) {
         logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
