@@ -38,7 +38,14 @@ function readMCPConfig(): MCPConfig {
     console.error('❌ .vscode/mcp.json not found');
     process.exit(1);
   }
-  return JSON.parse(readFileSync(MCP_CONFIG_PATH, 'utf-8'));
+
+  try {
+    return JSON.parse(readFileSync(MCP_CONFIG_PATH, 'utf-8'));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('❌ Invalid JSON in .vscode/mcp.json:', message);
+    process.exit(1);
+  }
 }
 
 function writeMCPConfig(config: MCPConfig): void {
@@ -150,8 +157,9 @@ function switchToPackaged(): void {
 
   writeMCPConfig(config);
   console.log(`✅ Switched to PACKAGED mode`);
-  console.log(`📦 Tarball available: ${tarballPath}`);
-  console.log(`\nℹ️  Note: Using built dist/ directly (simulates installed package structure)`);
+  console.log(`\nℹ️  MCP config now points to built dist/ (simulates installed package structure)`);
+  console.log(`📦 Tarball created for reference: ${tarballPath}`);
+  console.log(`   (You can test actual npm install with: npm install ${tarballPath})`);
   showCurrentConfig(config);
 }
 
@@ -171,6 +179,13 @@ function showCurrentConfig(config: MCPConfig): void {
   const server = config.servers['containerization-assist-dev'];
 
   console.log('\n📋 Current Configuration:');
+
+  if (!server) {
+    console.log('  ⚠️  No configuration found for "containerization-assist-dev".');
+    console.log('  Please check your .vscode/mcp.json file.');
+    return;
+  }
+
   console.log(`  Command: ${server.command}`);
   console.log(`  Args: ${server.args.join(' ')}`);
 
