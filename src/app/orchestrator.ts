@@ -17,6 +17,7 @@ import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
 import { readdirSync, existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ===== Types =====
 
@@ -24,41 +25,79 @@ import { join, dirname, resolve } from 'node:path';
  * Discover built-in policy files from the policies directory
  * Returns paths to all .rego files (excluding test files)
  *
- * Searches upward from process.cwd() to find the policies directory.
- * Works in both ESM (dist/) and CJS (dist-cjs/) builds.
+ * Searches relative to the module's installation location first,
+ * then falls back to searching upward from process.cwd().
+ * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
 function discoverBuiltInPolicies(logger: Logger): string[] {
   try {
-    // Start from current working directory and search upward
+    const searchPaths: string[] = [];
+
+    // 1. First, try relative to the installed module location
+    // This ensures policies are found when the package is installed via npm
+    let moduleDir: string | undefined;
+
+    // In CJS: __dirname is a global variable
+    // In ESM: __dirname is not defined, we need to create it from import.meta.url
+    if (typeof __dirname !== 'undefined') {
+      // CommonJS environment
+      moduleDir = __dirname;
+    } else {
+      // ESM environment - try to use import.meta.url
+      try {
+        // Bypass TypeScript's static analysis using eval for cross-module compatibility
+        const metaUrl = new Function('return import.meta.url')();
+        if (metaUrl) {
+          const __filename = fileURLToPath(metaUrl);
+          moduleDir = dirname(__filename);
+        }
+      } catch {
+        // import.meta.url not available
+        logger.debug('import.meta.url not available, skipping module-relative path');
+      }
+    }
+
+    if (moduleDir) {
+      // From dist/src/app/orchestrator.js -> ../../../policies/
+      // From dist-cjs/src/app/orchestrator.js -> ../../../policies/
+      const moduleRelativePath = resolve(moduleDir, '../../../policies');
+      searchPaths.push(moduleRelativePath);
+    }
+
+    // 2. Then search upward from current working directory (for development)
     let currentDir = process.cwd();
-    let policiesDir = join(currentDir, 'policies');
+    searchPaths.push(join(currentDir, 'policies'));
+
     let attempts = 0;
     const maxAttempts = 5;
-
-    // Search upward for policies directory
-    while (!existsSync(policiesDir) && attempts < maxAttempts) {
+    while (attempts < maxAttempts) {
       const parentDir = dirname(currentDir);
       if (parentDir === currentDir) {
         // Reached filesystem root
         break;
       }
       currentDir = parentDir;
-      policiesDir = join(currentDir, 'policies');
+      searchPaths.push(join(currentDir, 'policies'));
       attempts++;
     }
 
-    if (!existsSync(policiesDir)) {
-      logger.warn({ cwd: process.cwd(), attempts }, 'Built-in policies directory not found');
-      return [];
+    // Try each search path until we find one that exists
+    for (const policiesDir of searchPaths) {
+      if (existsSync(policiesDir)) {
+        // Find all .rego files except test files
+        const files = readdirSync(policiesDir)
+          .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+          .map((file) => resolve(join(policiesDir, file)));
+
+        if (files.length > 0) {
+          logger.info({ policiesDir, count: files.length, searchPaths }, 'Discovered built-in policies');
+          return files;
+        }
+      }
     }
 
-    // Find all .rego files except test files
-    const files = readdirSync(policiesDir)
-      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
-      .map((file) => resolve(join(policiesDir, file)));
-
-    logger.info({ policiesDir, count: files.length }, 'Discovered built-in policies');
-    return files;
+    logger.warn({ searchPaths, cwd: process.cwd() }, 'Built-in policies directory not found in any search path');
+    return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in policies');
     return [];
