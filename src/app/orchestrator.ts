@@ -35,33 +35,35 @@ function discoverBuiltInPolicies(logger: Logger): string[] {
 
     // 1. First, try relative to the installed module location
     // This ensures policies are found when the package is installed via npm
-    let moduleDir: string | undefined;
 
-    // In CJS: __dirname is a global variable
-    // In ESM: __dirname is not defined, we need to create it from import.meta.url
+    // In CJS: __dirname is a global variable (available at runtime)
+    // In ESM: __dirname is not defined, but import.meta.url is available
+    // We check for __dirname first since it's simpler and covers CJS case
+
     if (typeof __dirname !== 'undefined') {
-      // CommonJS environment
-      moduleDir = __dirname;
-    } else {
-      // ESM environment - try to use import.meta.url
-      try {
-        // Bypass TypeScript's static analysis using eval for cross-module compatibility
-        const metaUrl = new Function('return import.meta.url')();
-        if (metaUrl) {
-          const __filename = fileURLToPath(metaUrl);
-          moduleDir = dirname(__filename);
-        }
-      } catch {
-        // import.meta.url not available
-        logger.debug('import.meta.url not available, skipping module-relative path');
-      }
-    }
-
-    if (moduleDir) {
-      // From dist/src/app/orchestrator.js -> ../../../policies/
-      // From dist-cjs/src/app/orchestrator.js -> ../../../policies/
-      const moduleRelativePath = resolve(moduleDir, '../../../policies');
+      // CommonJS environment - __dirname is globally available
+      const moduleRelativePath = resolve(__dirname, '../../../policies');
       searchPaths.push(moduleRelativePath);
+    } else {
+      // ESM environment - need to derive __dirname from import.meta.url
+      // Using indirect eval to avoid static analysis issues with import.meta
+      // Security note: This is safe because:
+      //   1. The string is a compile-time constant (not user input)
+      //   2. The function body is hardcoded and doesn't accept parameters
+      //   3. This only executes in ESM environments where import.meta is valid
+      //   4. No external data can influence what code is executed
+      try {
+        const getImportMetaUrl = new Function('return typeof import !== "undefined" && import.meta && import.meta.url');
+        const importMetaUrl = getImportMetaUrl();
+        if (typeof importMetaUrl === 'string') {
+          const __filename = fileURLToPath(importMetaUrl);
+          const __dirname = dirname(__filename);
+          const moduleRelativePath = resolve(__dirname, '../../../policies');
+          searchPaths.push(moduleRelativePath);
+        }
+      } catch (error) {
+        logger.debug({ error }, 'Failed to resolve module path from import.meta');
+      }
     }
 
     // 2. Then search upward from current working directory (for development)
