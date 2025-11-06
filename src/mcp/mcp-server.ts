@@ -455,7 +455,7 @@ export function formatOutput(output: unknown, format: OutputFormat, chainHintsMo
     case OUTPUTFORMAT.MARKDOWN:
       // Check if output has a summary field
       if (typeof output === 'object' && output !== null && 'summary' in output) {
-        const { summary, ...rest } = output as { summary: string;[key: string]: unknown };
+        const { summary, ...rest } = output as { summary: string; [key: string]: unknown };
 
         // Display summary prominently, with structured data collapsed
         return `${summary}\n\n<details>\n<summary>View detailed output</summary>\n\n\`\`\`json\n${JSON.stringify(rest, null, 2)}\n\`\`\`\n</details>`;
