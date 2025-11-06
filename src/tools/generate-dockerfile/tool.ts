@@ -308,17 +308,18 @@ interface DockerfileBuildRules {
 /**
  * Regular expression to match Docker image names with optional registry/repository prefix and tag.
  * Matches format: [registry/][repository/]image:tag
- * Examples: node:20-alpine, gcr.io/distroless/nodejs, mcr.microsoft.com/openjdk/jdk:21-mariner
+ * Examples: node:20-alpine, gcr.io/distroless/nodejs, mcr.microsoft.com/openjdk/jdk:21-azurelinux
  * Updated to capture full registry paths including mcr.microsoft.com/path/image:tag
  */
-const DOCKER_IMAGE_NAME_REGEX = /\b([a-z0-9.-]+\/)+[a-z0-9.-]+:[a-z0-9._-]+\b|[a-z0-9.-]+:[a-z0-9._-]+\b/;
+const DOCKER_IMAGE_NAME_REGEX =
+  /\b([a-z0-9.-]+\/)+[a-z0-9.-]+:[a-z0-9._-]+\b|[a-z0-9.-]+:[a-z0-9._-]+\b/;
 
 /**
  * Substitute version in image name based on target language version
  * Examples:
- *   openjdk/jdk:21-mariner + version 25 -> openjdk/jdk:25-mariner
+ *   openjdk/jdk:21-azurelinux + version 25 -> openjdk/jdk:25-azurelinux
  *   eclipse-temurin:17-jdk-alpine + version 25 -> eclipse-temurin:25-jdk-alpine
- *   mcr.microsoft.com/openjdk/jdk:21-mariner + version 25 -> mcr.microsoft.com/openjdk/jdk:25-mariner
+ *   mcr.microsoft.com/openjdk/jdk:21-azurelinux + version 25 -> mcr.microsoft.com/openjdk/jdk:25-azurelinux
  *   maven:3.9-openjdk-17 + version 25 -> maven:3.9-openjdk-25
  */
 function substituteImageVersion(image: string, targetVersion: string | undefined): string {
@@ -336,7 +337,7 @@ function substituteImageVersion(image: string, targetVersion: string | undefined
   }
 
   // For runtime images with format "runtime:version-variant"
-  // Match patterns like :17-jdk-alpine, :21-mariner, :3.11-slim
+  // Match patterns like :17-jdk-alpine, :21-azurelinux, :3.11-slim
   const runtimePattern = /:(\d+(?:\.\d+)?)([-.]|$)/;
   const match = image.match(runtimePattern);
 
@@ -432,18 +433,18 @@ const runPattern = createKnowledgeTool<
       baseImages: (s) =>
         Boolean(
           s.tags?.includes('base-image') ||
-          s.tags?.includes('registry') ||
-          s.tags?.includes('official') ||
-          s.tags?.includes('distroless') ||
-          (s.tags?.includes('build-stage') && s.tags?.includes('build-tool')) ||
-          s.text.toLowerCase().includes('base image'),
+            s.tags?.includes('registry') ||
+            s.tags?.includes('official') ||
+            s.tags?.includes('distroless') ||
+            (s.tags?.includes('build-stage') && s.tags?.includes('build-tool')) ||
+            s.text.toLowerCase().includes('base image'),
         ),
       security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
       optimization: (s) =>
         Boolean(
           s.tags?.includes('optimization') ||
-          s.tags?.includes('caching') ||
-          s.tags?.includes('size'),
+            s.tags?.includes('caching') ||
+            s.tags?.includes('size'),
         ),
       bestPractices: () => true, // Catch remaining snippets as best practices
     }),
@@ -505,9 +506,7 @@ const runPattern = createKnowledgeTool<
         .slice(0, 5); // Top 5 security recommendations
 
       // Limit optimization recommendations to top 5 most relevant
-      const optimizationMatches: DockerfileRequirement[] = (
-        knowledge.categories.optimization || []
-      )
+      const optimizationMatches: DockerfileRequirement[] = (knowledge.categories.optimization || [])
         .map((snippet) => ({
           id: snippet.id,
           category: snippet.category || 'optimization',
@@ -549,25 +548,25 @@ const runPattern = createKnowledgeTool<
       // Build nextAction directive
       const nextAction: ToolNextAction = existingDockerfile
         ? {
-          action: 'update-files',
-          instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
-          files: [
-            {
-              path: relativeDockerfilePath,
-              purpose: 'Container build configuration (enhancement)',
-            },
-          ],
-        }
+            action: 'update-files',
+            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
+            files: [
+              {
+                path: relativeDockerfilePath,
+                purpose: 'Container build configuration (enhancement)',
+              },
+            ],
+          }
         : {
-          action: 'create-files',
-          instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
-          files: [
-            {
-              path: relativeDockerfilePath,
-              purpose: 'Container build configuration',
-            },
-          ],
-        };
+            action: 'create-files',
+            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
+            files: [
+              {
+                path: relativeDockerfilePath,
+                purpose: 'Container build configuration',
+              },
+            ],
+          };
 
       // Build action-oriented summary
       const languageVersionStr = input.languageVersion ? ` ${input.languageVersion}` : '';
@@ -612,13 +611,13 @@ const runPattern = createKnowledgeTool<
           modulePath,
           ...(language &&
             language !== 'auto-detect' && {
-            language: language === 'java' || language === 'dotnet' ? language : 'other',
-          }),
+              language: language === 'java' || language === 'dotnet' ? language : 'other',
+            }),
           ...(input.languageVersion && { languageVersion: input.languageVersion }),
           ...(framework &&
             framework !== 'auto-detect' && {
-            frameworks: [{ name: framework }],
-          }),
+              frameworks: [{ name: framework }],
+            }),
         },
         recommendations: {
           buildStrategy: rules.buildStrategy,
@@ -760,11 +759,7 @@ async function isImageCompliant(
   const imageSpecificViolations = validation.violations.filter((v: PolicyViolation) => {
     const rule = v.ruleId.toLowerCase();
     // Ignore platform, tag, and label format rules - those are Dockerfile structure requirements
-    return !(
-      rule.includes('platform') ||
-      rule.includes('tag') ||
-      rule.includes('label')
-    );
+    return !(rule.includes('platform') || rule.includes('tag') || rule.includes('label'));
   });
 
   const isCompliant = imageSpecificViolations.length === 0;
@@ -797,12 +792,7 @@ async function validatePlanAgainstPolicy(
   logger.debug({ dockerfileText }, 'Generated Dockerfile text from plan for policy validation');
 
   // Use shared validation utility
-  return validateContentAgainstPolicy(
-    dockerfileText,
-    evaluator,
-    logger,
-    'Dockerfile plan',
-  );
+  return validateContentAgainstPolicy(dockerfileText, evaluator, logger, 'Dockerfile plan');
 }
 
 async function handleGenerateDockerfile(
@@ -832,11 +822,11 @@ async function handleGenerateDockerfile(
 
   let existingDockerfile:
     | {
-      path: string;
-      content: string;
-      analysis: DockerfileAnalysis;
-      guidance: EnhancementGuidance;
-    }
+        path: string;
+        content: string;
+        analysis: DockerfileAnalysis;
+        guidance: EnhancementGuidance;
+      }
     | undefined;
 
   try {
