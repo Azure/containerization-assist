@@ -34,6 +34,7 @@ import {
   type ToolInputMap,
   type ToolResultMap,
 } from 'containerization-assist';
+import { CHAINHINTSMODE } from 'containerization-assist-mcp/app/orchestrator-types';
 import {
   createSafeTelemetryEvent,
   type SafeTelemetryEvent,
@@ -79,7 +80,7 @@ const telemetry = new SafeTelemetryService();
 function registerWithSafeTelemetry(server: McpServer) {
   const app = createApp({
     outputFormat: 'natural-language',
-    chainHintsMode: 'enabled',
+    chainHintsMode: CHAINHINTSMODE.ENABLED,
   });
 
   // Example 1: Safe telemetry with build-image

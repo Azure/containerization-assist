@@ -18,7 +18,7 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import { extractErrorMessage } from '@/lib/errors';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
-import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
+import { type ExecuteRequest, type ExecuteMetadata, type ChainHintsMode, CHAINHINTSMODE } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
@@ -84,6 +84,7 @@ export interface ServerOptions {
   name?: string;
   version?: string;
   outputFormat?: OutputFormat;
+  chainHintsMode?: ChainHintsMode;
 }
 
 /**
@@ -114,6 +115,7 @@ export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
 
 export interface RegisterOptions<TTool extends Tool = Tool> {
   outputFormat: OutputFormat;
+  chainHintsMode?: ChainHintsMode;
   server: McpServer;
   tools: readonly TTool[];
   logger: Logger;
@@ -169,11 +171,13 @@ export function createMCPServer<TTool extends Tool>(
   const server = new McpServer(serverOptions);
   const transportType = options.transport ?? 'stdio';
   const outputFormat = options.outputFormat ?? OUTPUTFORMAT.NATURAL_LANGUAGE;
+  const chainHintsMode = options.chainHintsMode ?? CHAINHINTSMODE.ENABLED;
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
   registerToolsWithServer({
     outputFormat,
+    chainHintsMode,
     server,
     tools,
     logger,
@@ -262,7 +266,7 @@ export function createMCPServer<TTool extends Tool>(
  * @param options - Registration options including server, tools, and executor
  */
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
-  const { server, tools, logger, transport, execute, outputFormat } = options;
+  const { server, tools, logger, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
 
   for (const tool of tools) {
     server.tool(
@@ -297,7 +301,7 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
             content: [
               {
                 type: 'text' as const,
-                text: formatOutput(result.value, outputFormat),
+                text: formatOutput(result.value, outputFormat, chainHintsMode),
               },
             ],
           };
@@ -333,8 +337,8 @@ function createLoggerContext(
     ...(meta?.requestId && typeof meta.requestId === 'string' && { requestId: meta.requestId }),
     ...(meta?.invocationId &&
       typeof meta.invocationId === 'string' && {
-        invocationId: meta.invocationId,
-      }),
+      invocationId: meta.invocationId,
+    }),
   };
 }
 
@@ -425,6 +429,7 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
  *
  * @param output - The tool result to format (typically includes a summary field)
  * @param format - Output format (JSON, TEXT, MARKDOWN, or NATURAL_LANGUAGE)
+ * @param chainHintsMode - Whether to include "Next Steps" sections in natural language output (default: 'enabled')
  * @returns Formatted string representation of the output
  *
  * @description
@@ -438,14 +443,14 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
  * The NATURAL_LANGUAGE format uses type detection to provide tool-specific
  * rich narratives with sections, formatting, and next steps.
  */
-export function formatOutput(output: unknown, format: OutputFormat): string {
+export function formatOutput(output: unknown, format: OutputFormat, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   switch (format) {
     case OUTPUTFORMAT.JSON:
       return JSON.stringify(output, null, 2);
 
     case OUTPUTFORMAT.NATURAL_LANGUAGE:
       // Rich narrative formatting - delegates to tool-specific formatters
-      return formatAsNaturalLanguage(output);
+      return formatAsNaturalLanguage(output, chainHintsMode);
 
     case OUTPUTFORMAT.MARKDOWN:
       // Check if output has a summary field
@@ -481,13 +486,14 @@ export function formatOutput(output: unknown, format: OutputFormat): string {
  * Format output as natural language narrative
  *
  * @param output - Tool result to format as narrative
+ * @param chainHintsMode - Whether to include "Next Steps" sections (default: 'enabled')
  * @returns Rich narrative with formatting, or summary/JSON fallback
  *
  * @description
  * Delegates to tool-specific formatters for rich narratives with:
  * - Section headers and formatting
  * - Bullet points and structured lists
- * - Context-aware next steps
+ * - Context-aware next steps (when chainHintsMode is 'enabled')
  * - Proper handling of optional fields
  *
  * Supported tool types with dedicated formatters:
@@ -499,7 +505,7 @@ export function formatOutput(output: unknown, format: OutputFormat): string {
  *
  * Falls back to summary field or JSON for other tool types.
  */
-function formatAsNaturalLanguage(output: unknown): string {
+function formatAsNaturalLanguage(output: unknown, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
   if (!output || typeof output !== 'object') {
     return String(output);
   }
@@ -507,36 +513,36 @@ function formatAsNaturalLanguage(output: unknown): string {
   // Type detection and delegation
   // Each tool result type gets its own formatter
   if (isScanImageResult(output)) {
-    return formatScanImageNarrative(output);
+    return formatScanImageNarrative(output, chainHintsMode);
   }
   if (isDockerfilePlan(output)) {
-    return formatDockerfilePlanNarrative(output);
+    return formatDockerfilePlanNarrative(output, chainHintsMode);
   }
   if (isBuildImageResult(output)) {
-    return formatBuildImageNarrative(output);
+    return formatBuildImageNarrative(output, chainHintsMode);
   }
   if (isAnalyzeRepoResult(output)) {
-    return formatAnalyzeRepoNarrative(output);
+    return formatAnalyzeRepoNarrative(output, chainHintsMode);
   }
 
   // NEW FORMATTERS - Add in order of specificity (most specific first)
   if (isVerifyDeployResult(output)) {
-    return formatVerifyDeployNarrative(output);
+    return formatVerifyDeployNarrative(output, chainHintsMode);
   }
   if (isFixDockerfileResult(output)) {
-    return formatFixDockerfileNarrative(output);
+    return formatFixDockerfileNarrative(output, chainHintsMode);
   }
   if (isGenerateK8sManifestsResult(output)) {
-    return formatGenerateK8sManifestsNarrative(output);
+    return formatGenerateK8sManifestsNarrative(output, chainHintsMode);
   }
   if (isPushImageResult(output)) {
-    return formatPushImageNarrative(output);
+    return formatPushImageNarrative(output, chainHintsMode);
   }
   if (isTagImageResult(output)) {
-    return formatTagImageNarrative(output);
+    return formatTagImageNarrative(output, chainHintsMode);
   }
   if (isPrepareClusterResult(output)) {
-    return formatPrepareClusterNarrative(output);
+    return formatPrepareClusterNarrative(output, chainHintsMode);
   }
   // Check ops results (check status before ping due to field overlap)
   if (isServerStatusResult(output)) {

@@ -9,7 +9,7 @@ import { createLogger } from '@/lib/logger';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
-import type { ToolOrchestrator, OrchestratorConfig, ExecuteRequest } from './orchestrator-types';
+import { type ToolOrchestrator, type OrchestratorConfig, type ExecuteRequest, CHAINHINTSMODE } from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
@@ -17,6 +17,7 @@ import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
 import { readdirSync, existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ===== Types =====
 
@@ -24,41 +25,81 @@ import { join, dirname, resolve } from 'node:path';
  * Discover built-in policy files from the policies directory
  * Returns paths to all .rego files (excluding test files)
  *
- * Searches upward from process.cwd() to find the policies directory.
- * Works in both ESM (dist/) and CJS (dist-cjs/) builds.
+ * Searches relative to the module's installation location first,
+ * then falls back to searching upward from process.cwd().
+ * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
 function discoverBuiltInPolicies(logger: Logger): string[] {
   try {
-    // Start from current working directory and search upward
+    const searchPaths: string[] = [];
+
+    // 1. First, try relative to the installed module location
+    // This ensures policies are found when the package is installed via npm
+
+    // In CJS: __dirname is a global variable (available at runtime)
+    // In ESM: __dirname is not defined, but import.meta.url is available
+    // We check for __dirname first since it's simpler and covers CJS case
+
+    if (typeof __dirname !== 'undefined') {
+      // CommonJS environment - __dirname is globally available
+      const moduleRelativePath = resolve(__dirname, '../../../policies');
+      searchPaths.push(moduleRelativePath);
+    } else {
+      // ESM environment - need to derive __dirname from import.meta.url
+      // Using indirect eval to avoid static analysis issues with import.meta
+      // Security note: This is safe because:
+      //   1. The string is a compile-time constant (not user input)
+      //   2. The function body is hardcoded and doesn't accept parameters
+      //   3. This only executes in ESM environments where import.meta is valid
+      //   4. No external data can influence what code is executed
+      try {
+        const getImportMetaUrl = new Function('return typeof import !== "undefined" && import.meta && import.meta.url');
+        const importMetaUrl = getImportMetaUrl();
+        if (typeof importMetaUrl === 'string') {
+          const __filename = fileURLToPath(importMetaUrl);
+          const __dirname = dirname(__filename);
+          const moduleRelativePath = resolve(__dirname, '../../../policies');
+          searchPaths.push(moduleRelativePath);
+        }
+      } catch (error) {
+        logger.debug({ error }, 'Failed to resolve module path from import.meta');
+      }
+    }
+
+    // 2. Then search upward from current working directory (for development)
     let currentDir = process.cwd();
-    let policiesDir = join(currentDir, 'policies');
+    searchPaths.push(join(currentDir, 'policies'));
+
     let attempts = 0;
     const maxAttempts = 5;
-
-    // Search upward for policies directory
-    while (!existsSync(policiesDir) && attempts < maxAttempts) {
+    while (attempts < maxAttempts) {
       const parentDir = dirname(currentDir);
       if (parentDir === currentDir) {
         // Reached filesystem root
         break;
       }
       currentDir = parentDir;
-      policiesDir = join(currentDir, 'policies');
+      searchPaths.push(join(currentDir, 'policies'));
       attempts++;
     }
 
-    if (!existsSync(policiesDir)) {
-      logger.warn({ cwd: process.cwd(), attempts }, 'Built-in policies directory not found');
-      return [];
+    // Try each search path until we find one that exists
+    for (const policiesDir of searchPaths) {
+      if (existsSync(policiesDir)) {
+        // Find all .rego files except test files
+        const files = readdirSync(policiesDir)
+          .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+          .map((file) => resolve(join(policiesDir, file)));
+
+        if (files.length > 0) {
+          logger.info({ policiesDir, count: files.length, searchPaths }, 'Discovered built-in policies');
+          return files;
+        }
+      }
     }
 
-    // Find all .rego files except test files
-    const files = readdirSync(policiesDir)
-      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
-      .map((file) => resolve(join(policiesDir, file)));
-
-    logger.info({ policiesDir, count: files.length }, 'Discovered built-in policies');
-    return files;
+    logger.warn({ searchPaths, cwd: process.cwd() }, 'Built-in policies directory not found in any search path');
+    return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in policies');
     return [];
@@ -108,7 +149,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   logger?: Logger;
   config?: OrchestratorConfig;
 }): ToolOrchestrator {
-  const { registry, server, config = { chainHintsMode: 'enabled' } } = options;
+  const { registry, server, config = { chainHintsMode: CHAINHINTSMODE.ENABLED } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
   // Cache the loaded policy to avoid reloading on every execution
@@ -223,7 +264,7 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
     if (result.ok) {
       let valueWithMessages = result.value;
 
-      if (env.config.chainHintsMode === 'enabled' && tool.chainHints) {
+      if (env.config.chainHintsMode === CHAINHINTSMODE.ENABLED && tool.chainHints) {
         valueWithMessages = {
           ...valueWithMessages,
           nextSteps: tool.chainHints.success,

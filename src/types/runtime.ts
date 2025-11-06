@@ -12,6 +12,7 @@ import type { Result } from './core';
 import type { TransportConfig } from '@/app';
 import type { MCPServer, OutputFormat } from '@/mcp/mcp-server';
 import type { Tool, ToolName } from '@/tools';
+import type { ChainHintsMode } from '@/app/orchestrator-types';
 
 // Extract input/output types from tool registry
 type ExtractToolInput<T extends { schema: ZodTypeAny }> = T['schema'] extends ZodTypeAny
@@ -136,7 +137,7 @@ export interface AppRuntimeConfig {
   policyPath?: string;
 
   /** Enable hints that suggest other tools to call next in tool responses */
-  chainHintsMode?: 'enabled' | 'disabled';
+  chainHintsMode?: ChainHintsMode;
 
   /** Output format for tool responses */
   outputFormat?: OutputFormat;
