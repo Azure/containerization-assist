@@ -19,7 +19,7 @@ import type { Tool } from '@/types/tool';
 import type { ToolName } from '@/tools';
 import { extractErrorMessage } from './errors';
 import { formatOutput, OUTPUTFORMAT, type OutputFormat } from '@/mcp/mcp-server';
-import { ChainHintsMode } from '@/app/orchestrator-types';
+import { CHAINHINTSMODE, type ChainHintsMode } from '@/app/orchestrator-types';
 
 /**
  * Tool handler wrapper options with type-safe callbacks
@@ -119,7 +119,7 @@ export function createToolHandler<TName extends ToolName>(
   const {
     transport = 'external',
     outputFormat = OUTPUTFORMAT.NATURAL_LANGUAGE,
-    chainHintsMode = 'enabled',
+    chainHintsMode = CHAINHINTSMODE.ENABLED,
     onError,
     onSuccess,
   } = options;
