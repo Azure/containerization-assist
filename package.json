@@ -79,6 +79,9 @@
     "postpack": "node scripts/restore-package.cjs",
     "prepublishOnly": "npm run validate && npm run build",
     "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
+    "mcp:local": "tsx scripts/toggle-mcp-mode.ts local",
+    "mcp:packaged": "tsx scripts/toggle-mcp-mode.ts packaged",
+    "mcp:status": "tsx scripts/toggle-mcp-mode.ts status",
     "smoke:journey": "tsx scripts/smoke-journey.ts",
     "test:policies": "opa test policies/",
     "tag-migration": "tsx scripts/tag-migration.ts"
