@@ -36,7 +36,11 @@ export interface ToolOrchestrator {
   close(): void;
 }
 
-type ChainHintsMode = 'enabled' | 'disabled';
+export const CHAINHINTSMODE = {
+  ENABLED: 'enabled',
+  DISABLED: 'disabled',
+} as const;
+export type ChainHintsMode = (typeof CHAINHINTSMODE)[keyof typeof CHAINHINTSMODE];
 
 /**
  * Orchestrator configuration

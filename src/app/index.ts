@@ -16,6 +16,7 @@ import {
 } from '@/mcp/mcp-server';
 import { createOrchestrator } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
+import { CHAINHINTSMODE } from './orchestrator-types';
 import type { Result } from '@/types';
 import type {
   AppRuntime,
@@ -84,7 +85,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     toolsMap.set(tool.name, tool);
   }
 
-  const chainHintsMode = config.chainHintsMode || 'enabled';
+  const chainHintsMode = config.chainHintsMode || CHAINHINTSMODE.ENABLED;
   const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
   const orchestratorConfig: OrchestratorConfig = {
     chainHintsMode,
@@ -160,6 +161,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         name: 'containerization-assist',
         version: '1.0.0',
         outputFormat,
+        chainHintsMode,
       };
 
       const mcpServer = createMCPServer(toolList, serverOptions, orchestratedExecute);
@@ -187,6 +189,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
 
       registerToolsWithServer({
         outputFormat,
+        chainHintsMode,
         server,
         tools: toolList,
         logger,

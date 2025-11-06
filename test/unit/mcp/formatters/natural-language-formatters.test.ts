@@ -103,6 +103,31 @@ describe('natural-language-formatters', () => {
 
       expect(narrative).toContain('... and 3 more recommendations');
     });
+
+    it('should omit next steps when chainHintsMode is disabled', () => {
+      const result: ScanImageResult = {
+        success: true,
+        vulnerabilities: {
+          critical: 2,
+          high: 5,
+          medium: 12,
+          low: 34,
+          negligible: 89,
+          unknown: 0,
+          total: 142,
+        },
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: false,
+        remediationGuidance: [],
+      };
+
+      const narrative = formatScanImageNarrative(result, 'disabled');
+
+      expect(narrative).toContain('❌ Security Scan FAILED');
+      expect(narrative).toContain('🔴 Critical: 2');
+      expect(narrative).not.toContain('Next Steps:');
+      expect(narrative).not.toContain('Review and address critical/high vulnerabilities');
+    });
   });
 
   describe('formatDockerfilePlanNarrative', () => {
@@ -295,6 +320,54 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('Violations: 1');
       expect(narrative).toContain('Warnings: 1');
     });
+
+    it('should omit next steps when chainHintsMode is disabled', () => {
+      const plan: DockerfilePlan = {
+        nextAction: {
+          action: 'create-files',
+          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
+          files: [
+            {
+              path: './Dockerfile',
+              purpose: 'Container build configuration',
+            },
+          ],
+        },
+        repositoryInfo: {
+          name: 'my-app',
+          language: 'javascript',
+          languageVersion: '18.0.0',
+          frameworks: [{ name: 'Express', version: '4.18.0' }],
+        },
+        recommendations: {
+          baseImages: [
+            {
+              image: 'node:18-alpine',
+              reason: 'Lightweight Alpine-based image',
+              category: 'size',
+              matchScore: 95,
+              size: '50MB',
+            },
+          ],
+          buildStrategy: {
+            multistage: true,
+            reason: 'Optimized for production deployment',
+          },
+          securityConsiderations: [],
+          optimizations: [],
+          bestPractices: [],
+        },
+        confidence: 0.9,
+        summary: '🔨 ACTION REQUIRED: Create Dockerfile',
+      };
+
+      const narrative = formatDockerfilePlanNarrative(plan, 'disabled');
+
+      expect(narrative).toContain('✨ CREATE DOCKERFILE');
+      expect(narrative).toContain('node:18-alpine');
+      expect(narrative).not.toContain('Next Steps:');
+      expect(narrative).not.toContain('Build image with build-image tool');
+    });
   });
 
 
@@ -340,6 +413,25 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Image:** sha256:minimal');
       expect(narrative).not.toContain('**Tags Created:**');
       expect(narrative).not.toContain('**Layers:**');
+    });
+
+    it('should omit next steps when chainHintsMode is disabled', () => {
+      const result: BuildImageResult = {
+        success: true,
+        imageId: 'sha256:abc123def456',
+        tags: ['myapp:latest'],
+        size: 245000000,
+        buildTime: 45000,
+        layers: 12,
+        logs: [],
+      };
+
+      const narrative = formatBuildImageNarrative(result, 'disabled');
+
+      expect(narrative).toContain('✅ Image Built Successfully');
+      expect(narrative).toContain('**Image:** sha256:abc123def456');
+      expect(narrative).not.toContain('Next Steps:');
+      expect(narrative).not.toContain('Scan image for vulnerabilities');
     });
   });
 
@@ -412,6 +504,29 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('1. **frontend**');
       expect(narrative).toContain('2. **backend**');
       expect(narrative).toContain('Consider creating separate Dockerfiles for each module');
+    });
+
+    it('should omit next steps when chainHintsMode is disabled', () => {
+      const result: RepositoryAnalysis = {
+        modules: [
+          {
+            name: 'main',
+            modulePath: '/app',
+            language: 'python',
+            frameworks: [{ name: 'Django', version: '4.2.0' }],
+            ports: [8000],
+          },
+        ],
+        isMonorepo: false,
+        analyzedPath: '/app',
+      };
+
+      const narrative = formatAnalyzeRepoNarrative(result, 'disabled');
+
+      expect(narrative).toContain('✅ Repository Analysis Complete');
+      expect(narrative).toContain('**Path:** /app');
+      expect(narrative).not.toContain('Next Steps:');
+      expect(narrative).not.toContain('Use generate-dockerfile');
     });
 
     it('should handle empty modules list', () => {
