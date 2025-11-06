@@ -30,7 +30,6 @@ import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary-helpers';
 import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
-import { checkImageExists } from '@/infra/docker/registry';
 
 /**
  * Format scan-image result as natural language narrative
