@@ -405,6 +405,125 @@ describe('verify-deploy', () => {
     });
   });
 
+  describe('Endpoint Health Checks', () => {
+    beforeEach(() => {
+      // Mock global fetch
+      global.fetch = jest.fn() as any;
+    });
+
+    afterEach(() => {
+      delete (global as any).fetch;
+    });
+
+    it('should check health of external endpoints when health check is enabled', async () => {
+      config.checks = ['health'];
+
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.healthCheck).toBeDefined();
+        expect(result.value.healthCheck?.status).toBe('healthy');
+      }
+    });
+
+    it('should handle health check with healthy response (200)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+      });
+
+      config.checks = ['health'];
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+      }
+    });
+
+    it('should handle health check with redirect response (3xx)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 301,
+      });
+
+      config.checks = ['health'];
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle health check timeout with AbortError', async () => {
+      const abortError = new Error('Request aborted');
+      abortError.name = 'AbortError';
+      (global.fetch as jest.Mock).mockRejectedValue(abortError);
+
+      config.checks = ['health'];
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+      }
+    });
+
+    it('should handle health check network error', async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+
+      config.checks = ['health'];
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+      }
+    });
+
+    it('should handle health check with unhealthy response (4xx)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      config.checks = ['health'];
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle health check with server error (5xx)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+
+      config.checks = ['health'];
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle health check with unexpected error in try block', async () => {
+      (global.fetch as jest.Mock).mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      config.checks = ['health'];
+      const mockContext = createMockToolContext();
+      const result = await verifyDeploymentTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+    });
+  });
+
   describe('Status Conditions', () => {
     it('should include deployment conditions in status', async () => {
       const mockContext = createMockToolContext();

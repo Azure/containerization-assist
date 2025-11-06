@@ -2,42 +2,36 @@
   "name": "containerization-assist-mcp",
   "version": "1.0.1-dev.7",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
-  "type": "module",
   "engines": {
     "node": ">=22.0.0"
   },
-  "main": "./dist/src/index.js",
+  "main": "./dist-cjs/src/index.js",
   "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "import": "./dist/src/index.js",
+      "types": "./dist-cjs/src/index.d.ts",
       "require": "./dist-cjs/src/index.js",
-      "default": "./dist/src/index.js"
+      "default": "./dist-cjs/src/index.js"
     },
     "./server": {
-      "types": "./dist/src/mcp/mcp-server.d.ts",
-      "import": "./dist/src/mcp/mcp-server.js",
+      "types": "./dist-cjs/src/mcp/mcp-server.d.ts",
       "require": "./dist-cjs/src/mcp/mcp-server.js",
-      "default": "./dist/src/mcp/mcp-server.js"
+      "default": "./dist-cjs/src/mcp/mcp-server.js"
     },
     "./tools": {
-      "types": "./dist/src/tools/index.d.ts",
-      "import": "./dist/src/tools/index.js",
+      "types": "./dist-cjs/src/tools/index.d.ts",
       "require": "./dist-cjs/src/tools/index.js",
-      "default": "./dist/src/tools/index.js"
+      "default": "./dist-cjs/src/tools/index.js"
     },
     "./types": {
-      "types": "./dist/src/types/index.d.ts",
-      "import": "./dist/src/types/index.js",
+      "types": "./dist-cjs/src/types/index.d.ts",
       "require": "./dist-cjs/src/types/index.js",
-      "default": "./dist/src/types/index.js"
+      "default": "./dist-cjs/src/types/index.js"
     },
     "./config": {
-      "types": "./dist/src/config/index.d.ts",
-      "import": "./dist/src/config/index.js",
+      "types": "./dist-cjs/src/config/index.d.ts",
       "require": "./dist-cjs/src/config/index.js",
-      "default": "./dist/src/config/index.js"
+      "default": "./dist-cjs/src/config/index.js"
     }
   },
   "bin": {
