@@ -47,10 +47,10 @@ jest.mock('@/lib/validation-helpers', () => ({
   }),
 }));
 
-// Mock knowledge loader
-const mockGetKnowledgeForCategory = jest.fn();
-jest.mock('@/knowledge', () => ({
-  getKnowledgeForCategory: mockGetKnowledgeForCategory,
+// Mock knowledge matcher
+const mockGetKnowledgeSnippets = jest.fn();
+jest.mock('@/knowledge/matcher', () => ({
+  getKnowledgeSnippets: mockGetKnowledgeSnippets,
 }));
 
 // Mock logger
@@ -112,21 +112,23 @@ describe('generate-dockerfile', () => {
     mockFs.stat.mockResolvedValue({ isFile: () => false, isDirectory: () => true } as any);
     mockFs.readFile.mockRejectedValue(new Error('ENOENT: no such file'));
 
-    // Default knowledge matches
-    mockGetKnowledgeForCategory.mockReturnValue([
+    // Default knowledge snippets (matches getKnowledgeSnippets return type)
+    mockGetKnowledgeSnippets.mockResolvedValue([
       {
         id: 'base-image-1',
-        text: 'FROM node:18-alpine\nUse official Node.js image',
+        text: 'FROM node:18-alpine Use official Node.js image',
         category: 'base-image',
         tags: ['base-image', 'node', 'alpine'],
         weight: 0.9,
+        source: 'base-image-1',
       },
       {
         id: 'security-1',
-        text: 'Use non-root user for security\nUSER node',
+        text: 'Use non-root user for security USER node',
         category: 'security',
         tags: ['security', 'best-practice'],
         weight: 0.85,
+        source: 'security-1',
       },
     ]);
   });
@@ -311,9 +313,9 @@ CMD ["node", "index.js"]`;
     });
 
     it('should handle network errors when querying knowledge base', async () => {
-      mockGetKnowledgeForCategory.mockImplementation(() => {
-        throw new Error('Network error: Unable to fetch knowledge');
-      });
+      mockGetKnowledgeSnippets.mockRejectedValue(
+        new Error('Network error: Unable to fetch knowledge'),
+      );
 
       const result = await generateDockerfileTool.handler(config, mockContext);
 
@@ -323,7 +325,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should handle empty knowledge base results', async () => {
-      mockGetKnowledgeForCategory.mockReturnValue([]);
+      mockGetKnowledgeSnippets.mockResolvedValue([]);
 
       const result = await generateDockerfileTool.handler(config, mockContext);
 
@@ -480,6 +482,443 @@ CMD ["node", "index.js"]`;
     it('should have chain hints', () => {
       expect(generateDockerfileTool.chainHints.success).toContain('fix-dockerfile');
       expect(generateDockerfileTool.chainHints.failure).toContain('repository analysis');
+    });
+  });
+
+  describe('Base Image Recommendations', () => {
+    it('should categorize distroless images correctly', async () => {
+      // Mock knowledge with base-image tag to trigger categorization
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-distroless',
+          text: 'FROM gcr.io/distroless/nodejs18-debian11 Use distroless image for minimal attack surface',
+          category: 'base-image',
+          tags: ['base-image', 'distroless', 'node'], // base-image tag triggers baseImages categorization
+          weight: 0.95,
+          source: 'base-image-distroless',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendations.baseImages).toBeDefined();
+        const distrolessImage = result.value.recommendations.baseImages?.find(
+          (img) => img.category === 'distroless',
+        );
+        expect(distrolessImage).toBeDefined();
+      }
+    });
+
+    it('should categorize security images correctly (chainguard)', async () => {
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-chainguard',
+          text: 'FROM cgr.dev/chainguard/node:latest Use Chainguard hardened image for enhanced security',
+          category: 'base-image',
+          tags: ['base-image', 'security', 'node'],
+          weight: 0.92,
+          source: 'base-image-chainguard',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const securityImage = result.value.recommendations.baseImages?.find(
+          (img) => img.category === 'security',
+        );
+        expect(securityImage).toBeDefined();
+        expect(securityImage?.image).toContain('chainguard');
+      }
+    });
+
+    it('should categorize security images correctly (wolfi)', async () => {
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-wolfi',
+          text: 'FROM cgr.dev/chainguard/wolfi-base:latest Use Wolfi-based image for security',
+          category: 'base-image',
+          tags: ['base-image', 'security', 'wolfi'],
+          weight: 0.91,
+          source: 'base-image-wolfi',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const securityImage = result.value.recommendations.baseImages?.find(
+          (img) => img.category === 'security',
+        );
+        expect(securityImage).toBeDefined();
+      }
+    });
+
+    it('should categorize size-optimized images (alpine)', async () => {
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-alpine',
+          text: 'FROM node:18-alpine Use Alpine Linux for smaller image size (50MB)',
+          category: 'base-image',
+          tags: ['base-image', 'alpine', 'node'],
+          weight: 0.88,
+          source: 'base-image-alpine',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const alpineImage = result.value.recommendations.baseImages?.find(
+          (img) => img.category === 'size',
+        );
+        expect(alpineImage).toBeDefined();
+        expect(alpineImage?.size).toBe('50MB');
+      }
+    });
+
+    it('should categorize size-optimized images (slim)', async () => {
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-slim',
+          text: 'FROM node:18-slim Use slim variant for reduced size (200 MB)',
+          category: 'base-image',
+          tags: ['base-image', 'slim', 'node'],
+          weight: 0.87,
+          source: 'base-image-slim',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const slimImage = result.value.recommendations.baseImages?.find((img) =>
+          img.image.includes('slim'),
+        );
+        expect(slimImage?.category).toBe('size');
+        expect(slimImage?.size).toBe('200MB');
+      }
+    });
+
+    it('should substitute version in runtime images', async () => {
+      config.languageVersion = '20';
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-node',
+          text: 'FROM node:18-alpine Use Node.js Alpine image',
+          category: 'base-image',
+          tags: ['base-image', 'node', 'alpine'],
+          weight: 0.9,
+          source: 'base-image-node',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok && result.value.recommendations.baseImages?.[0]) {
+        expect(result.value.recommendations.baseImages[0].image).toBe('node:20-alpine');
+      }
+    });
+
+    it('should substitute version in maven/gradle images', async () => {
+      config.language = 'java';
+      config.languageVersion = '21';
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-maven',
+          text: 'FROM maven:3.9-openjdk-17 Use Maven with OpenJDK',
+          category: 'base-image',
+          tags: ['base-image', 'java', 'maven'],
+          weight: 0.9,
+          source: 'base-image-maven',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok && result.value.recommendations.baseImages?.[0]) {
+        expect(result.value.recommendations.baseImages[0].image).toBe('maven:3.9-openjdk-21');
+      }
+    });
+
+    it('should substitute version in gradle images', async () => {
+      config.language = 'java';
+      config.languageVersion = '21';
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-gradle',
+          text: 'FROM gradle:8.5-jdk-17-alpine Use Gradle with JDK',
+          category: 'base-image',
+          tags: ['base-image', 'java', 'gradle'],
+          weight: 0.89,
+          source: 'base-image-gradle',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok && result.value.recommendations.baseImages?.[0]) {
+        expect(result.value.recommendations.baseImages[0].image).toBe(
+          'gradle:8.5-jdk-21-alpine',
+        );
+      }
+    });
+
+    it('should handle images with no version to substitute', async () => {
+      config.languageVersion = '20';
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-image-custom',
+          text: 'FROM custom-node-image:latest Use custom image',
+          category: 'base-image',
+          tags: ['base-image', 'node'],
+          weight: 0.7,
+          source: 'base-image-custom',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok && result.value.recommendations.baseImages?.[0]) {
+        // Should remain unchanged if no version pattern found
+        expect(result.value.recommendations.baseImages[0].image).toBe('custom-node-image:latest');
+      }
+    });
+
+    it('should limit base images to top 2', async () => {
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-1',
+          text: 'FROM node:18-alpine',
+          category: 'base-image',
+          tags: ['base-image'],
+          weight: 0.95,
+          source: 'base-1',
+        },
+        {
+          id: 'base-2',
+          text: 'FROM node:18-slim',
+          category: 'base-image',
+          tags: ['base-image'],
+          weight: 0.9,
+          source: 'base-2',
+        },
+        {
+          id: 'base-3',
+          text: 'FROM node:18',
+          category: 'base-image',
+          tags: ['base-image'],
+          weight: 0.85,
+          source: 'base-3',
+        },
+        {
+          id: 'base-4',
+          text: 'FROM node:18-bullseye',
+          category: 'base-image',
+          tags: ['base-image'],
+          weight: 0.8,
+          source: 'base-4',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendations.baseImages?.length).toBeLessThanOrEqual(2);
+      }
+    });
+  });
+
+  describe('Knowledge Filtering and Limiting', () => {
+    it('should limit security recommendations to top 5', async () => {
+      const securitySnippets = Array.from({ length: 10 }, (_, i) => ({
+        id: `security-${i}`,
+        text: `Security recommendation ${i}`,
+        category: 'security',
+        tags: ['security'],
+        weight: 0.9 - i * 0.05,
+        source: `security-${i}`,
+      }));
+
+      mockGetKnowledgeSnippets.mockResolvedValue(securitySnippets);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(
+          result.value.recommendations.securityConsiderations?.length,
+        ).toBeLessThanOrEqual(5);
+      }
+    });
+
+    it('should limit optimizations to top 5', async () => {
+      const optimizationSnippets = Array.from({ length: 10 }, (_, i) => ({
+        id: `optimization-${i}`,
+        text: `Optimization ${i}`,
+        category: 'optimization',
+        tags: ['optimization'],
+        weight: 0.85 - i * 0.05,
+        source: `optimization-${i}`,
+      }));
+
+      mockGetKnowledgeSnippets.mockResolvedValue(optimizationSnippets);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendations.optimizations?.length).toBeLessThanOrEqual(5);
+      }
+    });
+
+    it('should limit best practices to top 5', async () => {
+      const bestPracticeSnippets = Array.from({ length: 10 }, (_, i) => ({
+        id: `best-practice-${i}`,
+        text: `Best practice ${i}`,
+        category: 'best-practice',
+        tags: ['best-practice'],
+        weight: 0.8 - i * 0.05,
+        source: `best-practice-${i}`,
+      }));
+
+      mockGetKnowledgeSnippets.mockResolvedValue(bestPracticeSnippets);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendations.bestPractices?.length).toBeLessThanOrEqual(5);
+      }
+    });
+  });
+
+  describe('Enhancement Guidance Strategy', () => {
+    it('should provide targeted guidance for Dockerfile with poor security', async () => {
+      const poorSecurityDockerfile = `FROM node:latest
+COPY . .
+RUN npm install
+EXPOSE 3000
+CMD ["npm", "start"]`;
+
+      mockFs.readFile.mockResolvedValue(poorSecurityDockerfile);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok && result.value.existingDockerfile) {
+        expect(result.value.existingDockerfile.analysis.securityPosture).toBe('poor');
+        expect(result.value.existingDockerfile.guidance).toBeDefined();
+        // Strategy should be 'major-overhaul' for poor security
+        expect(result.value.existingDockerfile.guidance?.strategy).toBe('major-overhaul');
+      }
+    });
+
+    it('should provide minimal guidance for well-structured Dockerfile', async () => {
+      const wellStructuredDockerfile = `FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+USER node
+HEALTHCHECK CMD node healthcheck.js
+EXPOSE 3000
+CMD ["node", "index.js"]`;
+
+      mockFs.readFile.mockResolvedValue(wellStructuredDockerfile);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok && result.value.existingDockerfile) {
+        expect(result.value.existingDockerfile.analysis.securityPosture).toBe('good');
+        // Strategy should be 'minor-tweaks' for well-structured Dockerfile
+        expect(result.value.existingDockerfile.guidance?.strategy).toBe('minor-tweaks');
+      }
+    });
+
+    it('should handle multi-stage Dockerfile with existing guidance', async () => {
+      const multistageWithIssues = `FROM node:18 AS builder
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build
+
+FROM node:18-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+CMD ["node", "dist/index.js"]`;
+
+      mockFs.readFile.mockResolvedValue(multistageWithIssues);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok && result.value.existingDockerfile) {
+        expect(result.value.existingDockerfile.analysis.isMultistage).toBe(true);
+        expect(result.value.existingDockerfile.analysis.hasNonRootUser).toBe(false);
+        expect(result.value.existingDockerfile.guidance).toBeDefined();
+      }
+    });
+  });
+
+  describe('NextAction Instructions', () => {
+    it('should provide create-files action when no Dockerfile exists', async () => {
+      mockFs.readFile.mockRejectedValue(new Error('ENOENT'));
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.nextAction.action).toBe('create-files');
+        expect(result.value.nextAction.instruction).toBeDefined();
+        expect(result.value.nextAction.instruction.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should provide update-files action when Dockerfile exists', async () => {
+      const existingDockerfile = 'FROM node:18\nCOPY . .\nCMD ["node", "index.js"]';
+      mockFs.readFile.mockResolvedValue(existingDockerfile);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.nextAction.action).toBe('update-files');
+        expect(result.value.nextAction.instruction).toBeDefined();
+      }
+    });
+
+    it('should include base image selection in instructions', async () => {
+      mockFs.readFile.mockRejectedValue(new Error('ENOENT'));
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'base-1',
+          text: 'FROM node:18-alpine',
+          category: 'base-image',
+          tags: ['base-image'],
+          weight: 0.9,
+          source: 'base-1',
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.nextAction.instruction).toContain('base image');
+      }
     });
   });
 });

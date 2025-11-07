@@ -326,14 +326,14 @@ function substituteImageVersion(image: string, targetVersion: string | undefined
   if (!targetVersion) return image;
 
   // For maven/gradle images with format "tool:version-runtime-jdkversion"
-  // Match patterns like maven:3.9-openjdk-17 or gradle:8.5-jdk21
-  const toolWithRuntimePattern = /^(maven|gradle):(\d+\.\d+)-(openjdk|eclipse-temurin|jdk)-(\d+)/;
+  // Match patterns like maven:3.9-openjdk-17 or gradle:8.5-jdk21-alpine
+  const toolWithRuntimePattern = /^(maven|gradle):(\d+\.\d+)-(openjdk|eclipse-temurin|jdk)-(\d+)(.*)/;
   const toolMatch = image.match(toolWithRuntimePattern);
 
   if (toolMatch) {
-    const [, tool, toolVersion, runtime] = toolMatch;
-    // Replace only the JDK version at the end
-    return `${tool}:${toolVersion}-${runtime}-${targetVersion}`;
+    const [, tool, toolVersion, runtime, , suffix] = toolMatch;
+    // Replace only the JDK version at the end, preserve suffix like -alpine
+    return `${tool}:${toolVersion}-${runtime}-${targetVersion}${suffix}`;
   }
 
   // For runtime images with format "runtime:version-variant"

@@ -3,6 +3,7 @@
 # Exit codes for better debugging
 readonly EXIT_LINT_STAGED_FAILED=1
 readonly EXIT_EXAMPLES_FAILED=2
+readonly EXIT_COVERAGE_FAILED=3
 
 # Enable strict error handling
 set -eu
@@ -23,6 +24,13 @@ main() {
     if ! node scripts/validate-examples.js; then
         echo "❌ Examples validation failed"
         exit $EXIT_EXAMPLES_FAILED
+    fi
+
+    # Run tests with coverage validation
+    echo "🧪 Running tests with coverage validation..."
+    if ! npm run test:coverage -- --passWithNoTests; then
+        echo "❌ Coverage thresholds not met"
+        exit $EXIT_COVERAGE_FAILED
     fi
 
     echo "✅ Pre-commit checks passed!"

@@ -16,13 +16,27 @@ import { fileURLToPath } from 'url';
 // Get current module directory (__dirname equivalent for ESM)
 // In CJS build, __dirname is available natively
 // In ESM build, we derive it from import.meta.url
+// In test environment, use process.cwd() fallback
 const getModuleDir = (): string => {
+  // CJS environment - __dirname is defined
   if (typeof __dirname !== 'undefined') {
     return __dirname;
   }
-  // ESM environment
-  // @ts-ignore - import.meta.url only exists in ESM, which is when we reach this line
-  return path.dirname(fileURLToPath(import.meta.url));
+
+  // ESM environment - import.meta.url is available
+  // Use indirect eval to prevent TypeScript from transpiling import.meta
+  try {
+    const metaUrl = new Function('return typeof import.meta !== "undefined" ? import.meta.url : null')();
+    if (metaUrl) {
+      return path.dirname(fileURLToPath(metaUrl));
+    }
+  } catch (error) {
+    // Fallthrough to process.cwd() fallback
+  }
+
+  // Test/fallback environment - use process.cwd() + path resolution
+  // This works in Jest test environment where import.meta may not be properly mocked
+  return path.resolve(process.cwd(), 'src/knowledge');
 };
 
 const moduleDir = getModuleDir();

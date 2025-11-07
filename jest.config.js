@@ -20,6 +20,7 @@ const commonTsConfig = {
   allowSyntheticDefaultImports: true,
   esModuleInterop: true,
   isolatedModules: true,
+  useDefineForClassFields: true,
 };
 
 const commonTransform = {
@@ -28,6 +29,9 @@ const commonTransform = {
     {
       useESM: true,
       tsconfig: commonTsConfig,
+      diagnostics: {
+        ignoreCodes: ['TS151001'],
+      },
     },
   ],
 };

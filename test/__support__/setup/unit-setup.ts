@@ -1,5 +1,18 @@
 import { jest } from '@jest/globals';
 import { createMockInfrastructure } from '../utilities/mock-infrastructure';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Mock import.meta for ES modules in test environment
+if (typeof globalThis.importMeta === 'undefined') {
+  Object.defineProperty(globalThis, 'importMeta', {
+    value: {
+      url: `file://${path.resolve(process.cwd(), 'test/__support__/setup/unit-setup.ts')}`,
+    },
+    writable: true,
+    configurable: true,
+  });
+}
 
 // Global test timeout for unit tests
 jest.setTimeout(10000);
