@@ -21,8 +21,6 @@
  */
 
 import { spawn } from 'child_process';
-import { writeFileSync } from 'fs';
-import { resolve } from 'path';
 
 const REPO_PATH = process.argv[2] || process.cwd();
 const OUTPUT_DIR = process.argv[3] || '.';

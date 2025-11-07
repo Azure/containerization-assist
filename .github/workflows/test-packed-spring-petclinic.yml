@@ -86,16 +86,6 @@ jobs:
           # Run the MCP stdio test
           node test-mcp.mjs "$(pwd)" "."
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: mcp-cli-test-results
-          path: |
-            spring-petclinic/analyze-result.json
-            spring-petclinic/generate-dockerfile-result.json
-          retention-days: 7
-
       - name: Generate test summary
         if: always()
         run: |
@@ -129,7 +119,3 @@ jobs:
           echo "4. Send JSON-RPC requests to stdin" >> $GITHUB_STEP_SUMMARY
           echo "5. Parse JSON-RPC responses from stdout" >> $GITHUB_STEP_SUMMARY
           echo "6. Verify azurelinux images in recommendations" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- \`analyze-result.json\` - analyze-repo MCP response" >> $GITHUB_STEP_SUMMARY
-          echo "- \`generate-dockerfile-result.json\` - generate-dockerfile MCP response with base images" >> $GITHUB_STEP_SUMMARY
