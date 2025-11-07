@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# Exit codes for better debugging
+readonly EXIT_BUILD_FAILED=1
+readonly EXIT_COVERAGE_FAILED=2
+
+# Enable strict error handling
+set -eu
+
+# Main execution
+main() {
+    echo "🚀 Running pre-push checks..."
+
+    # Run build to ensure code compiles
+    echo "🔨 Building project..."
+    if ! npm run build; then
+        echo "❌ Build failed"
+        exit $EXIT_BUILD_FAILED
+    fi
+
+    # Run tests with coverage validation
+    echo "🧪 Running tests with coverage validation..."
+    if ! npm run test:coverage -- --passWithNoTests; then
+        echo "❌ Coverage thresholds not met"
+        exit $EXIT_COVERAGE_FAILED
+    fi
+
+    echo "✅ Pre-push checks passed!"
+}
+
+# Run main function
+main "$@"

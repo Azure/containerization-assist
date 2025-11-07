@@ -3,7 +3,7 @@
 # Exit codes for better debugging
 readonly EXIT_LINT_STAGED_FAILED=1
 readonly EXIT_EXAMPLES_FAILED=2
-readonly EXIT_COVERAGE_FAILED=3
+readonly EXIT_UNIT_TESTS_FAILED=3
 
 # Enable strict error handling
 set -eu
@@ -26,11 +26,11 @@ main() {
         exit $EXIT_EXAMPLES_FAILED
     fi
 
-    # Run tests with coverage validation
-    echo "🧪 Running tests with coverage validation..."
-    if ! npm run test:coverage -- --passWithNoTests; then
-        echo "❌ Coverage thresholds not met"
-        exit $EXIT_COVERAGE_FAILED
+    # Run fast unit tests only
+    echo "🧪 Running unit tests..."
+    if ! npm run test:unit -- --passWithNoTests; then
+        echo "❌ Unit tests failed"
+        exit $EXIT_UNIT_TESTS_FAILED
     fi
 
     echo "✅ Pre-commit checks passed!"

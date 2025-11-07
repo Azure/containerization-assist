@@ -244,7 +244,7 @@ export function createKnowledgeTool<
       ...(hasDetectedDeps && { detectedDependencies: detectedDeps }),
     };
 
-    let knowledgeSnippets;
+    let knowledgeSnippets: KnowledgeSnippet[];
     try {
       knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
     } catch (error) {
