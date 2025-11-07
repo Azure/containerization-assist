@@ -42,8 +42,9 @@ const version = '2.0.0';
 type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPractices';
 
 /**
- * Extended input parameters that include optional existing Dockerfile data.
- * This is used internally to pass Dockerfile analysis results from the run function to buildPlan.
+ * Extended input parameters that include optional existing Dockerfile data and policy config.
+ * This is used internally to pass Dockerfile analysis results and policy configuration
+ * from the run function to buildPlan.
  */
 interface ExtendedDockerfileParams extends GenerateDockerfileParams {
   existingDockerfile?: {
@@ -52,6 +53,7 @@ interface ExtendedDockerfileParams extends GenerateDockerfileParams {
     analysis: DockerfileAnalysis;
     guidance: EnhancementGuidance;
   };
+  dockerfileConfig?: import('@/config/policy-generation-config').DockerfileGenerationConfig;
 }
 
 /**
@@ -454,6 +456,20 @@ const runPattern = createKnowledgeTool<
       const language = input.language || 'auto-detect';
       const buildSystemType = undefined;
 
+      // Check if policy config overrides build strategy
+      if (input.dockerfileConfig?.buildStrategy) {
+        const policyStrategy = input.dockerfileConfig.buildStrategy;
+        const multistage = policyStrategy === 'multi-stage' || policyStrategy === 'distroless';
+
+        return {
+          buildStrategy: {
+            multistage,
+            reason: `Policy-driven build strategy: ${policyStrategy}`,
+          },
+        };
+      }
+
+      // Default language-based logic
       const shouldUseMultistage =
         language === 'java' ||
         language === 'go' ||
@@ -489,8 +505,25 @@ const runPattern = createKnowledgeTool<
       // Extract base image recommendations from categorized knowledge
       // Pass languageVersion for dynamic version substitution
       // Limit to top 2 recommendations to provide clear, opinionated guidance
-      const baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
-        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion))
+      let baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
+        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion));
+
+      // Apply policy config base image category preference
+      if (input.dockerfileConfig?.baseImageCategory) {
+        const preferredCategory = input.dockerfileConfig.baseImageCategory;
+
+        // Boost match scores for images matching the preferred category
+        baseImageMatches = baseImageMatches.map((rec) => {
+          const matchesPreference = rec.category === preferredCategory;
+          return {
+            ...rec,
+            matchScore: matchesPreference ? rec.matchScore + 50 : rec.matchScore,
+          };
+        });
+      }
+
+      // Sort by match score and take top 2
+      baseImageMatches = baseImageMatches
         .sort((a, b) => b.matchScore - a.matchScore) // Sort by match score descending
         .slice(0, 2); // Take only top 2: primary recommendation + 1 alternative
 
@@ -868,10 +901,38 @@ async function handleGenerateDockerfile(
     );
   }
 
+  // Query policy for generation configuration (if policy is available)
+  let dockerfileConfig: import('@/config/policy-generation-config').DockerfileGenerationConfig | null = null;
+  if (ctx.policy) {
+    const configQuery = await ctx.queryConfig<{ dockerfile?: import('@/config/policy-generation-config').DockerfileGenerationConfig }>(
+      'containerization.generation_config',
+      {
+        language: input.language || 'auto-detect',
+        framework: input.framework,
+        environment: input.environment || 'production',
+        appName: input.repositoryPath?.split('/').pop() || 'app',
+      },
+    );
+
+    dockerfileConfig = configQuery?.dockerfile || null;
+
+    if (dockerfileConfig) {
+      ctx.logger.info(
+        {
+          buildStrategy: dockerfileConfig.buildStrategy,
+          baseImageCategory: dockerfileConfig.baseImageCategory,
+          optimizationPriority: dockerfileConfig.optimizationPriority,
+        },
+        'Loaded Dockerfile generation config from policy',
+      );
+    }
+  }
+
   // Add existing Dockerfile to input if found
   const extendedInput = {
     ...input,
     ...(existingDockerfile && { existingDockerfile }),
+    ...(dockerfileConfig && { dockerfileConfig }),
   };
 
   // Run the pattern to generate the plan
@@ -885,6 +946,78 @@ async function handleGenerateDockerfile(
   // targetPlatform is now required, ensuring consistent builds across environments
   plan.recommendations.platform = input.targetPlatform;
   plan.recommendations.defaultTag = 'v1';
+
+  // Query policy for template additions and dynamic defaults (Sprint 3)
+  if (ctx.policy) {
+    // Query for template additions
+    const templateQuery = await ctx.queryConfig<import('@/config/policy-generation-config').TemplateAdditions>(
+      'containerization.templates.templates',
+      {
+        language: input.language || 'auto-detect',
+        framework: input.framework,
+        environment: input.environment || 'production',
+        appName: input.repositoryPath?.split('/').pop() || 'app',
+      },
+    );
+
+    if (templateQuery) {
+      ctx.logger.info(
+        {
+          dockerfileTemplates: templateQuery.dockerfile?.length || 0,
+        },
+        'Loaded template additions from policy',
+      );
+
+      // Merge templates into plan using template merger
+      const { mergeTemplatesIntoPlan } = await import('@/lib/template-merger');
+      const updatedPlan = mergeTemplatesIntoPlan(
+        plan,
+        templateQuery,
+        {
+          language: input.language,
+          environment: input.environment,
+          framework: input.framework,
+        },
+      );
+      Object.assign(plan, updatedPlan);
+    }
+
+    // Query for dynamic defaults (health checks, etc.)
+    const dynamicDefaultsQuery = await ctx.queryConfig<import('@/config/policy-generation-config').DynamicDefaults>(
+      'containerization.dynamic_defaults.defaults',
+      {
+        language: input.language || 'auto-detect',
+        environment: input.environment || 'production',
+        trafficLevel: input.trafficLevel,
+        criticalityTier: input.criticalityTier,
+      },
+    );
+
+    if (dynamicDefaultsQuery) {
+      ctx.logger.info(
+        {
+          hasHealthChecks: !!dynamicDefaultsQuery.healthChecks,
+          hasReplicas: !!dynamicDefaultsQuery.replicas,
+          hasAutoscaling: !!dynamicDefaultsQuery.autoscaling,
+        },
+        'Loaded dynamic defaults from policy',
+      );
+
+      // Dynamic defaults can be used by the user when creating manifests
+      // For Dockerfile, health checks are particularly relevant
+      if (dynamicDefaultsQuery.healthChecks) {
+        const healthCheckInfo = {
+          id: 'policy-health-check-defaults',
+          category: 'health-check',
+          recommendation: `Health check timing (from policy): initialDelay=${dynamicDefaultsQuery.healthChecks.initialDelaySeconds}s, period=${dynamicDefaultsQuery.healthChecks.periodSeconds}s, timeout=${dynamicDefaultsQuery.healthChecks.timeoutSeconds}s`,
+          tags: ['policy-driven', 'health-check'],
+          matchScore: 95,
+          policyDriven: true,
+        };
+        plan.recommendations.bestPractices = [healthCheckInfo, ...plan.recommendations.bestPractices];
+      }
+    }
+  }
 
   // Filter base images based on policy if available
   if (ctx.policy && plan.recommendations.baseImages.length > 0) {

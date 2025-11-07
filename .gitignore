@@ -30,6 +30,16 @@ build/
 .tsbuildinfo*
 *.tgz
 
+# Policy build intermediates (keep *.wasm files - they ship with package)
+policies/compiled/*.tar.gz
+policies/compiled/temp/
+
+# User-customized policies (local overrides)
+policies.user/
+
+# User policy test files
+policies.user/**/*_test.rego
+
 # Test
 coverage/
 .nyc_output/

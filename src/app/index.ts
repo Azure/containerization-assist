@@ -92,7 +92,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     chainHints: DEFAULT_CHAIN_HINTS,
     aliasToOriginalMap,
   };
-  if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
 
   const toolList = Array.from(toolsMap.values());
 

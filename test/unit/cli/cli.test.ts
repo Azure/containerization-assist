@@ -35,7 +35,6 @@ describe('CLI Interface', () => {
       const content = readFileSync(cliPath, 'utf-8');
 
       // Check for required options
-      expect(content).toContain('--config');
       expect(content).toContain('--log-level');
       expect(content).toContain('--workspace');
       expect(content).toContain('--dev');
@@ -44,6 +43,7 @@ describe('CLI Interface', () => {
       expect(content).toContain('--health-check');
       expect(content).toContain('--docker-socket');
       expect(content).toContain('--k8s-namespace');
+      expect(content).toContain('--show-merged');
     });
   });
 

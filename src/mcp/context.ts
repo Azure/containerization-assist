@@ -52,6 +52,16 @@ export interface ToolContext {
    * Tools can use this to validate generated content against organizational policies
    */
   policy?: RegoEvaluator;
+
+  /**
+   * Query policy for configuration data
+   * Convenience method that wraps policy.queryConfig() with null-safety
+   *
+   * @param packageName - OPA package name to query (e.g., 'containerization.generation_config')
+   * @param input - Input data for the query
+   * @returns Configuration object from policy or null if no policy configured
+   */
+  queryConfig<T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null>;
 }
 
 // ===== PROGRESS HANDLING =====
@@ -103,5 +113,12 @@ export function createToolContext(logger: Logger, options: ContextOptions = {}):
     signal: options.signal,
     progress: progressReporter,
     ...(options.policy && { policy: options.policy }),
+    queryConfig: async <T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null> => {
+      if (!options.policy) {
+        logger.debug({ packageName }, 'No policy configured, returning null for config query');
+        return null;
+      }
+      return options.policy.queryConfig<T>(packageName, input);
+    },
   };
 }

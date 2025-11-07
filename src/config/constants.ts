@@ -8,6 +8,14 @@
 import { z } from 'zod';
 
 /**
+ * Environment variable names
+ */
+export const ENV_VARS = {
+  /** Custom policy directory path (highest priority) */
+  CUSTOM_POLICY_PATH: 'CUSTOM_POLICY_PATH',
+} as const;
+
+/**
  * Environment Schema
  * Zod schema for environment validation across the application.
  */
