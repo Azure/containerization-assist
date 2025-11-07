@@ -84,7 +84,8 @@
     "mcp:status": "tsx scripts/toggle-mcp-mode.ts status",
     "smoke:journey": "tsx scripts/smoke-journey.ts",
     "test:policies": "opa test policies/",
-    "tag-migration": "tsx scripts/tag-migration.ts"
+    "tag-migration": "tsx scripts/tag-migration.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",

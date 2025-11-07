@@ -243,7 +243,17 @@ export function createKnowledgeTool<
       ...(filters.framework && { framework: filters.framework }),
       ...(hasDetectedDeps && { detectedDependencies: detectedDeps }),
     };
-    const knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
+
+    let knowledgeSnippets;
+    try {
+      knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
+    } catch (error) {
+      ctx.logger.warn(
+        { error, topic, filters },
+        `${config.name}: Failed to query knowledge base, continuing with empty results`,
+      );
+      knowledgeSnippets = [];
+    }
 
     // 2. Categorize knowledge snippets
     // Initialize empty arrays for each category
