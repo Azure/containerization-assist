@@ -47,7 +47,7 @@ function discoverBuiltInPolicies(logger: Logger): string[] {
     try {
       // Using Function constructor to bypass TypeScript's static analysis
       // This is safe: the string is a compile-time constant with no user input
-      const dirName = new Function('try { return __dirname; } catch { return undefined; }')();
+      const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
       if (typeof dirName === 'string') {
         const moduleRelativePath = resolve(dirName, '../../../policies');
         searchPaths.push(moduleRelativePath);
@@ -62,7 +62,7 @@ function discoverBuiltInPolicies(logger: Logger): string[] {
       try {
         // Using Function constructor to access import.meta.url dynamically
         // This bypasses static analysis issues in Jest and CJS builds
-        // The returned value will be undefined in non-ESM environments
+        // The returned value will be undefined if import.meta.url is unavailable or throws
         const getMetaUrl = new Function('try { return import.meta.url; } catch { return undefined; }');
         const metaUrl = getMetaUrl();
         if (typeof metaUrl === 'string') {
