@@ -172,7 +172,7 @@ function printNaturalLanguageResult(result) {
   }
 
   console.error('\n--- Natural Language Result ---\n');
-  // pad result on left side with //result:// for better visibility
+  // pad result on left side with 'result text>     ' for better visibility
   console.error(content.text.split('\n').map(line => `result text>     ${line}`).join('\n'));
   console.error('\n--- End of Result ---\n');
 }
