@@ -11,6 +11,21 @@ import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get current module directory (__dirname equivalent for ESM)
+// In CJS build, __dirname is available natively
+// In ESM build, we derive it from import.meta.url
+const getModuleDir = (): string => {
+  if (typeof __dirname !== 'undefined') {
+    return __dirname;
+  }
+  // ESM environment
+  // @ts-ignore - import.meta.url only exists in ESM, which is when we reach this line
+  return path.dirname(fileURLToPath(import.meta.url));
+};
+
+const moduleDir = getModuleDir();
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
@@ -163,12 +178,17 @@ export const loadKnowledgeBase = async (): Promise<void> => {
   };
 
   try {
-    // Find packs directory
+    // Calculate package root from module location
+    // In built package: dist/src/knowledge/loader.js or dist-cjs/src/knowledge/loader.js
+    // Package root is 3 levels up: ../../../
+    const packageRoot = path.resolve(moduleDir, '../../../');
+
+    // Find packs directory - try package-relative path FIRST (works in all install scenarios)
     const possiblePacksDirs = [
-      path.resolve(process.cwd(), 'knowledge/packs'),
-      path.resolve(process.cwd(), 'dist/knowledge/packs'),
-      path.resolve(process.cwd(), 'node_modules/containerization-assist-mcp/knowledge/packs'),
-    ];
+      path.join(packageRoot, 'knowledge/packs'), // Primary: package-relative (always correct)
+      path.resolve(process.cwd(), 'knowledge/packs'), // Fallback: dev environment
+      path.resolve(process.cwd(), 'dist/knowledge/packs'), // Fallback: dev build
+    ] as const;
 
     const packsDir = findExistingPath(possiblePacksDirs);
     if (!packsDir) {
