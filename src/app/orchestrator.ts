@@ -36,33 +36,43 @@ function discoverBuiltInPolicies(logger: Logger): string[] {
     // 1. First, try relative to the installed module location
     // This ensures policies are found when the package is installed via npm
 
-    // In CJS: __dirname is a global variable (available at runtime)
-    // In ESM: __dirname is not defined, but import.meta.url is available
-    // We check for __dirname first since it's simpler and covers CJS case
+    // Strategy: Try CJS __dirname first, then fall back to ESM import.meta.url
+    // We use try-catch for both because:
+    //   - __dirname may throw ReferenceError in strict ESM modules
+    //   - import.meta.url may not be available in CJS or Jest
 
-    if (typeof __dirname !== 'undefined') {
-      // CommonJS environment - __dirname is globally available
-      const moduleRelativePath = resolve(__dirname, '../../../policies');
-      searchPaths.push(moduleRelativePath);
-    } else {
-      // ESM environment - need to derive __dirname from import.meta.url
-      // Using indirect eval to avoid static analysis issues with import.meta
-      // Security note: This is safe because:
-      //   1. The string is a compile-time constant (not user input)
-      //   2. The function body is hardcoded and doesn't accept parameters
-      //   3. This only executes in ESM environments where import.meta is valid
-      //   4. No external data can influence what code is executed
+    let modulePathResolved = false;
+
+    // Try CJS approach first (most common in Node.js)
+    try {
+      // Using Function constructor to bypass TypeScript's static analysis
+      // This is safe: the string is a compile-time constant with no user input
+      const dirName = new Function('try { return __dirname; } catch { return undefined; }')();
+      if (typeof dirName === 'string') {
+        const moduleRelativePath = resolve(dirName, '../../../policies');
+        searchPaths.push(moduleRelativePath);
+        modulePathResolved = true;
+      }
+    } catch (error) {
+      logger.debug({ error }, 'Failed to resolve module path from __dirname');
+    }
+
+    // If CJS failed, try ESM approach
+    if (!modulePathResolved) {
       try {
-        const getImportMetaUrl = new Function('return typeof import !== "undefined" && import.meta && import.meta.url');
-        const importMetaUrl = getImportMetaUrl();
-        if (typeof importMetaUrl === 'string') {
-          const __filename = fileURLToPath(importMetaUrl);
+        // Using Function constructor to access import.meta.url dynamically
+        // This bypasses static analysis issues in Jest and CJS builds
+        // The returned value will be undefined in non-ESM environments
+        const getMetaUrl = new Function('try { return import.meta.url; } catch { return undefined; }');
+        const metaUrl = getMetaUrl();
+        if (typeof metaUrl === 'string') {
+          const __filename = fileURLToPath(metaUrl);
           const __dirname = dirname(__filename);
           const moduleRelativePath = resolve(__dirname, '../../../policies');
           searchPaths.push(moduleRelativePath);
         }
       } catch (error) {
-        logger.debug({ error }, 'Failed to resolve module path from import.meta');
+        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
       }
     }
 
