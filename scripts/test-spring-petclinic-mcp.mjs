@@ -139,26 +139,6 @@ function callTool(name, args) {
   });
 }
 
-// Parse MCP tool result content
-function parseToolResult(result) {
-  if (!result || !result.content || !result.content[0]) {
-    throw new Error('Invalid tool result format');
-  }
-
-  const content = result.content[0];
-  if (content.type !== 'text') {
-    throw new Error(`Unexpected content type: ${content.type}`);
-  }
-
-  // Try to parse as JSON if possible
-  try {
-    return JSON.parse(content.text);
-  } catch (e) {
-    // Return raw text if not JSON
-    return { raw: content.text };
-  }
-}
-
 function printNaturalLanguageResult(result) {
   if (!result || !result.content || !result.content[0]) {
     throw new Error('Invalid tool result format');
