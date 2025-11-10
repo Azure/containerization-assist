@@ -309,46 +309,6 @@ function prettyPrint(label, obj, indent = 2) {
   }
 }
 
-/**
- * Display tool execution summary
- */
-function displayToolSummary(toolName, parsedResult, executionTimeMs) {
-  console.error(`\n📊 ${toolName} Summary:`);
-  console.error(`  ⏱️  Execution time: ${executionTimeMs}ms`);
-
-  // Tool-specific insights
-  if (toolName === 'analyze-repo') {
-    const modules = parsedResult.modules || [];
-    const summary = parsedResult.summary || '';
-    console.error(`  📦 Modules detected: ${modules.length}`);
-    if (modules.length > 0) {
-      modules.forEach((mod, idx) => {
-        const frameworks = mod.frameworks?.map(f => f.name).join(', ') || 'none';
-        console.error(`     ${idx + 1}. ${mod.language} (${frameworks})`);
-      });
-    }
-    if (summary) {
-      console.error(`  💬 ${summary}`);
-    }
-  } else if (toolName === 'generate-dockerfile') {
-    const baseImages = parsedResult.recommendations?.baseImages || [];
-    const dockerfile = parsedResult.dockerfile;
-    console.error(`  🐋 Base images recommended: ${baseImages.length}`);
-    if (baseImages.length > 0 && VERBOSE) {
-      baseImages.slice(0, 5).forEach((img, idx) => {
-        console.error(`     ${idx + 1}. ${img.image || 'unknown'} (${img.category || 'unknown'})`);
-        if (img.reason) {
-          console.error(`        ${img.reason.substring(0, 100)}${img.reason.length > 100 ? '...' : ''}`);
-        }
-      });
-    }
-    if (dockerfile && VERBOSE) {
-      const lines = dockerfile.split('\n').length;
-      console.error(`  📝 Dockerfile generated: ${lines} lines`);
-    }
-  }
-}
-
 // Handle process termination
 process.on('SIGINT', () => {
   console.error('\n\nInterrupted, cleaning up...');
