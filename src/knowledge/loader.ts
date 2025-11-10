@@ -11,6 +11,7 @@ import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
@@ -146,6 +147,48 @@ const getTopTags = (limit: number): Array<{ tag: string; count: number }> => {
 };
 
 /**
+ * Get the package root directory by resolving from this module's location
+ * Works in both ESM and CJS builds
+ *
+ * This function will be compiled differently for ESM and CJS:
+ * - In ESM: Can use import.meta.url directly (but TypeScript requires globalThis workaround)
+ * - In CJS: Will fall back to require.main or process.cwd()
+ */
+const getPackageRoot = (): string => {
+  // Strategy 1: For ESM, use eval to access import.meta.url without TypeScript compile errors in CJS
+  // When built to ESM: dist/src/knowledge/loader.js -> go up 3 levels to package root
+  // When in dev TSX: src/knowledge/loader.ts -> go up 2 levels to repo root
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    const getImportMetaUrl = new Function('return import.meta.url');
+    const importMetaUrl = getImportMetaUrl() as string;
+    if (importMetaUrl) {
+      const currentFile = fileURLToPath(importMetaUrl);
+      const moduleDir = path.dirname(currentFile);
+      const isBuilt = moduleDir.includes('/dist/src/');
+      const levelsUp = isBuilt ? 3 : 2;
+      return path.resolve(moduleDir, ...Array(levelsUp).fill('..'));
+    }
+  } catch {
+    // Fall through - this will fail in CJS, which is expected
+  }
+
+  // Strategy 2: CJS fallback - use require.main path
+  // In packaged mode, entry point is usually dist/src/cli/cli.js
+  try {
+    if (require?.main?.path) {
+      // Go up from entry point to package root
+      return path.resolve(require.main.path, '../..');
+    }
+  } catch {
+    // Fall through - require not available in ESM
+  }
+
+  // Strategy 3: Last resort - assume we're in repo/package root
+  return process.cwd();
+};
+
+/**
  * Load knowledge entries from all knowledge packs
  */
 export const loadKnowledgeBase = async (): Promise<void> => {
@@ -163,15 +206,28 @@ export const loadKnowledgeBase = async (): Promise<void> => {
   };
 
   try {
-    // Find packs directory
+    // Get package root and search for knowledge packs
+    const packageRoot = getPackageRoot();
+
+    // Find packs directory with multiple fallback strategies
     const possiblePacksDirs = [
+      // 1. Relative to package root (works for both dev and installed)
+      path.join(packageRoot, 'knowledge/packs'),
+      // 2. Development mode (from repo root)
       path.resolve(process.cwd(), 'knowledge/packs'),
-      path.resolve(process.cwd(), 'dist/knowledge/packs'),
+      // 3. Installed as dependency
       path.resolve(process.cwd(), 'node_modules/containerization-assist-mcp/knowledge/packs'),
     ];
 
     const packsDir = findExistingPath(possiblePacksDirs);
     if (!packsDir) {
+      logger.error(
+        {
+          packageRoot,
+          searchedPaths: possiblePacksDirs,
+        },
+        'Could not find knowledge packs directory',
+      );
       throw new Error('Could not find knowledge packs directory');
     }
 
