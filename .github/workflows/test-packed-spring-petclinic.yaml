@@ -1,0 +1,121 @@
+name: Test Packed Version - Spring PetClinic
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  test-packed-spring-petclinic:
+    name: Test Packed Version with Spring PetClinic
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout containerization-assist
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          path: containerization-assist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: containerization-assist/package-lock.json
+
+      - name: Install dependencies
+        working-directory: containerization-assist
+        run: npm ci
+
+      - name: Build project
+        working-directory: containerization-assist
+        run: npm run build
+
+      - name: Pack the project
+        working-directory: containerization-assist
+        run: |
+          npm pack
+          echo "PACKED_FILE=$(ls containerization-assist-mcp-*.tgz)" >> $GITHUB_ENV
+
+      - name: Install packed version globally
+        working-directory: containerization-assist
+        run: |
+          npm install -g ${{ env.PACKED_FILE }}
+          echo "Installed version:"
+          ca-mcp --version || true
+
+      - name: Clone Spring PetClinic repository
+        run: |
+          git clone --depth 1 https://github.com/spring-projects/spring-petclinic.git
+          cd spring-petclinic
+          echo "Spring PetClinic cloned successfully"
+          ls -la
+
+      - name: Setup Java for Spring PetClinic
+        uses: actions/setup-java@7a6d8a8234af8eb26422e24e3006232cccaa061b # v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Verify CLI is accessible
+        run: |
+          echo "Testing CLI availability..."
+          which ca-mcp
+          ca-mcp --version
+          ca-mcp --help | head -n 10
+
+      - name: Test tools via MCP CLI (stdio JSON-RPC)
+        id: test-mcp-cli
+        working-directory: spring-petclinic
+        run: |
+          echo "Testing tools via MCP CLI using stdio JSON-RPC protocol..."
+          echo "Repository path: $(pwd)"
+          echo ""
+
+          # Copy test script from containerization-assist
+          cp ../containerization-assist/scripts/test-spring-petclinic-mcp.mjs ./test-mcp.mjs
+
+          # Run the MCP stdio test
+          node test-mcp.mjs "$(pwd)" "."
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🧪 Packed Version Test - Spring PetClinic (MCP CLI)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Method" >> $GITHUB_STEP_SUMMARY
+          echo "Tests run via **MCP CLI** using **stdio JSON-RPC protocol**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.test-mcp-cli.outcome }}" = "success" ]; then
+            echo "✅ **MCP CLI Test**: Passed" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ analyze-repo via JSON-RPC" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ generate-dockerfile via JSON-RPC" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ azurelinux images verified" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **MCP CLI Test**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Repository" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: spring-projects/spring-petclinic" >> $GITHUB_STEP_SUMMARY
+          echo "- **Language**: Java" >> $GITHUB_STEP_SUMMARY
+          echo "- **Framework**: Spring Boot" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Testing Approach" >> $GITHUB_STEP_SUMMARY
+          echo "1. Pack project with \`npm pack\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install globally with \`npm install -g\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Start MCP server via \`ca-mcp start\` (stdio transport)" >> $GITHUB_STEP_SUMMARY
+          echo "4. Send JSON-RPC requests to stdin" >> $GITHUB_STEP_SUMMARY
+          echo "5. Parse JSON-RPC responses from stdout" >> $GITHUB_STEP_SUMMARY
+          echo "6. Verify azurelinux images in recommendations" >> $GITHUB_STEP_SUMMARY
