@@ -45,6 +45,14 @@ describe('CLI Interface', () => {
       expect(content).toContain('--k8s-namespace');
       expect(content).toContain('--show-merged');
     });
+
+    it('should NOT include --config option (removed as breaking change)', () => {
+      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
+      const content = readFileSync(cliPath, 'utf-8');
+
+      // Verify --config was removed
+      expect(content).not.toContain('--config');
+    });
   });
 
   describe('Option Validation', () => {

@@ -6,7 +6,7 @@
  * enable semantic analysis beyond simple pattern matching.
  */
 
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '@/types';
 
 /**
  * Parse CPU resource string to millicores.
@@ -249,7 +249,7 @@ export function extractManifestImages(manifest: unknown): Result<string[]> {
   const images: string[] = [];
 
   // Helper to extract images from container specs
-  const extractFromContainers = (containers: unknown) => {
+  const extractFromContainers = (containers: unknown): void => {
     if (!Array.isArray(containers)) return;
 
     for (const container of containers) {

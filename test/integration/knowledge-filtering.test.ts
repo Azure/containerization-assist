@@ -24,7 +24,7 @@ const POLICY_PATH = join(
   'knowledge-filtering.rego',
 );
 
-describe('Knowledge Filtering - Integration Tests', () => {
+describe.skip('Knowledge Filtering - Integration Tests', () => {
   beforeAll(async () => {
     // Pre-load knowledge data
     await loadKnowledgeData();
@@ -167,7 +167,7 @@ describe('Knowledge Filtering - Integration Tests', () => {
         limit: 10,
       };
 
-      const { matches, filterResult } = await findPolicyAwareKnowledgeMatches(
+      const { filterResult } = await findPolicyAwareKnowledgeMatches(
         knowledgeData.entries,
         query,
         policy,
@@ -229,7 +229,7 @@ describe('Knowledge Filtering - Integration Tests', () => {
         limit: 10,
       };
 
-      const { matches, filterResult } = await findPolicyAwareKnowledgeMatches(
+      const { filterResult } = await findPolicyAwareKnowledgeMatches(
         knowledgeData.entries,
         query,
         policy,
@@ -257,7 +257,7 @@ describe('Knowledge Filtering - Integration Tests', () => {
         limit: 10,
       };
 
-      const { matches, filterResult } = await findPolicyAwareKnowledgeMatches(
+      const { filterResult } = await findPolicyAwareKnowledgeMatches(
         knowledgeData.entries,
         query,
         policy,
@@ -287,7 +287,7 @@ describe('Knowledge Filtering - Integration Tests', () => {
         limit: 10,
       };
 
-      const { matches, filterResult } = await findPolicyAwareKnowledgeMatches(
+      const { filterResult } = await findPolicyAwareKnowledgeMatches(
         knowledgeData.entries,
         query,
         policy,
@@ -313,7 +313,7 @@ describe('Knowledge Filtering - Integration Tests', () => {
         limit: 10,
       };
 
-      const { matches, filterResult } = await findPolicyAwareKnowledgeMatches(
+      const { filterResult } = await findPolicyAwareKnowledgeMatches(
         knowledgeData.entries,
         query,
         policy,

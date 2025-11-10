@@ -96,11 +96,15 @@ function applyExclusionFilters(
       }
 
       // Check if the entry recommends an allowed registry
+      // Convert to lowercase once for performance
+      const recommendationLower = entry.recommendation.toLowerCase();
+      const exampleLower = entry.example?.toLowerCase();
       const allowedRegistries = filter.allowedRegistries ?? [];
-      const hasAllowedRegistry = allowedRegistries.some((registry) =>
-        entry.recommendation.toLowerCase().includes(registry.toLowerCase()) ||
-        entry.example?.toLowerCase().includes(registry.toLowerCase()),
-      );
+      const hasAllowedRegistry = allowedRegistries.some((registry) => {
+        const registryLower = registry.toLowerCase();
+        return recommendationLower.includes(registryLower) ||
+          exampleLower?.includes(registryLower);
+      });
 
       if (!hasAllowedRegistry) {
         excluded.push(entry.id);

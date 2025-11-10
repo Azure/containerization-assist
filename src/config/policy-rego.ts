@@ -100,6 +100,15 @@ export interface RegoPolicyResult {
 }
 
 /**
+ * Categorized policy violations for tool consumption
+ */
+export interface CategorizedViolations {
+  blocking: RegoPolicyViolation[];
+  warnings: RegoPolicyViolation[];
+  suggestions: RegoPolicyViolation[];
+}
+
+/**
  * OPA CLI JSON output structure
  */
 interface OpaEvalOutput {
@@ -148,7 +157,7 @@ export interface RegoEvaluator {
   evaluatePolicy<T>(
     result: Result<T>,
     packageName?: string,
-  ): Promise<Result<{ blocking: RegoPolicyViolation[]; warnings: RegoPolicyViolation[]; suggestions: RegoPolicyViolation[] }>>;
+  ): Promise<Result<CategorizedViolations>>;
 
   /**
    * Query policy for configuration data
@@ -179,7 +188,7 @@ function createEvaluatePolicyWrapper(
   return async <T>(
     result: Result<T>,
     _packageName?: string,
-  ): Promise<Result<{ blocking: RegoPolicyViolation[]; warnings: RegoPolicyViolation[]; suggestions: RegoPolicyViolation[] }>> => {
+  ): Promise<Result<CategorizedViolations>> => {
     if (!result.ok) {
       return result as Result<never>;
     }
@@ -214,6 +223,25 @@ function getOpaBinaryPath(): string {
 
   // Fall back to system OPA
   return opaBinaryName;
+}
+
+/**
+ * Create an error response for missing policy entrypoint mapping
+ */
+function createPolicyMappingError(policyFileName: string): RegoPolicyResult {
+  return {
+    allow: false,
+    violations: [
+      {
+        rule: 'policy-mapping-error',
+        category: 'system',
+        message: `No WASM entrypoint mapping for policy: ${policyFileName}`,
+        severity: 'block',
+      },
+    ],
+    warnings: [],
+    suggestions: [],
+  };
 }
 
 /**
@@ -359,19 +387,7 @@ export async function loadRegoPolicy(
             // but TypeScript can't verify this statically
             if (!entrypointName) {
               logger.error({ policyFileName }, 'No entrypoint mapping found for built-in policy');
-              return {
-                allow: false,
-                violations: [
-                  {
-                    rule: 'policy-mapping-error',
-                    category: 'system',
-                    message: `No WASM entrypoint mapping for policy: ${policyFileName}`,
-                    severity: 'block',
-                  },
-                ],
-                warnings: [],
-                suggestions: [],
-              };
+              return createPolicyMappingError(policyFileName);
             }
 
             return evaluateWasmPolicyModule(wasmPolicy, input, entrypointName, logger);
@@ -379,17 +395,7 @@ export async function loadRegoPolicy(
           evaluatePolicy: createEvaluatePolicyWrapper(async (input) => {
             const entrypointName = BUILT_IN_POLICY_MODULES[policyFileName];
             if (!entrypointName) {
-              return {
-                allow: false,
-                violations: [{
-                  rule: 'policy-mapping-error',
-                  category: 'system',
-                  message: `No WASM entrypoint mapping for policy: ${policyFileName}`,
-                  severity: 'block',
-                }],
-                warnings: [],
-                suggestions: [],
-              };
+              return createPolicyMappingError(policyFileName);
             }
             return evaluateWasmPolicyModule(wasmPolicy, input, entrypointName, logger);
           }),
@@ -836,7 +842,7 @@ export async function loadPolicies(
     policiesPath: string;
     filePattern?: string;
   },
-  logger?: Logger
+  logger?: Logger,
 ): Promise<Result<RegoPolicy>> {
   const log = logger || (await import('@/lib/logger')).createLogger({ name: 'policy-loader', level: 'info' });
 
