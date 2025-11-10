@@ -1,4 +1,8 @@
-[
+/**
+ * java-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "java-25-microsoft-azurelinux",
     "category": "dockerfile",
@@ -453,4 +457,4 @@
     ],
     "description": "Security scanning identifies vulnerabilities in dependencies and code"
   }
-]
+] as const;

@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-grpc-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "grpc-http2-configuration",
     "category": "dockerfile",
@@ -409,4 +413,4 @@
     ],
     "description": "Keep-alive configuration maintains connection health in container network environments"
   }
-]
+] as const;

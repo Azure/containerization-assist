@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-identity-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "dotnet-identity-icu-alpine",
     "category": "dockerfile",
@@ -418,4 +422,4 @@
       "security"
     ]
   }
-]
+] as const;

@@ -1,36 +1,36 @@
 /**
  * Built-in Knowledge Packs
- * All knowledge packs imported as JSON modules for reliable loading
+ * All knowledge packs imported as TypeScript modules for reliable loading
  */
 
-import azureContainerAppsPack from '../../knowledge/packs/azure-container-apps-pack.json';
-import baseImagesPack from '../../knowledge/packs/base-images-pack.json';
-import buildOptimization from '../../knowledge/packs/build-optimization.json';
-import databasePack from '../../knowledge/packs/database-pack.json';
-import dockerfileAdvanced from '../../knowledge/packs/dockerfile-advanced.json';
-import dotnetBackgroundJobsPack from '../../knowledge/packs/dotnet-background-jobs-pack.json';
-import dotnetBlazorPack from '../../knowledge/packs/dotnet-blazor-pack.json';
-import dotnetEfCorePack from '../../knowledge/packs/dotnet-ef-core-pack.json';
-import dotnetFramework48Pack from '../../knowledge/packs/dotnet-framework-48-pack.json';
-import dotnetFrameworkPack from '../../knowledge/packs/dotnet-framework-pack.json';
-import dotnetGrpcPack from '../../knowledge/packs/dotnet-grpc-pack.json';
-import dotnetIdentityPack from '../../knowledge/packs/dotnet-identity-pack.json';
-import dotnetMediatrPack from '../../knowledge/packs/dotnet-mediatr-pack.json';
-import dotnetPack from '../../knowledge/packs/dotnet-pack.json';
-import dotnetSignalrPack from '../../knowledge/packs/dotnet-signalr-pack.json';
-import dotnetWorkerPack from '../../knowledge/packs/dotnet-worker-pack.json';
-import goPack from '../../knowledge/packs/go-pack.json';
-import javaPack from '../../knowledge/packs/java-pack.json';
-import kubernetesDeployment from '../../knowledge/packs/kubernetes-deployment.json';
-import kubernetesPack from '../../knowledge/packs/kubernetes-pack.json';
-import nodejsPack from '../../knowledge/packs/nodejs-pack.json';
-import phpPack from '../../knowledge/packs/php-pack.json';
-import pythonPack from '../../knowledge/packs/python-pack.json';
-import rubyPack from '../../knowledge/packs/ruby-pack.json';
-import rustPack from '../../knowledge/packs/rust-pack.json';
-import securityPack from '../../knowledge/packs/security-pack.json';
-import securityRemediation from '../../knowledge/packs/security-remediation.json';
-import starterPack from '../../knowledge/packs/starter-pack.json';
+import azureContainerAppsPack from '../../knowledge/packs/azure-container-apps-pack';
+import baseImagesPack from '../../knowledge/packs/base-images-pack';
+import buildOptimization from '../../knowledge/packs/build-optimization';
+import databasePack from '../../knowledge/packs/database-pack';
+import dockerfileAdvanced from '../../knowledge/packs/dockerfile-advanced';
+import dotnetBackgroundJobsPack from '../../knowledge/packs/dotnet-background-jobs-pack';
+import dotnetBlazorPack from '../../knowledge/packs/dotnet-blazor-pack';
+import dotnetEfCorePack from '../../knowledge/packs/dotnet-ef-core-pack';
+import dotnetFramework48Pack from '../../knowledge/packs/dotnet-framework-48-pack';
+import dotnetFrameworkPack from '../../knowledge/packs/dotnet-framework-pack';
+import dotnetGrpcPack from '../../knowledge/packs/dotnet-grpc-pack';
+import dotnetIdentityPack from '../../knowledge/packs/dotnet-identity-pack';
+import dotnetMediatrPack from '../../knowledge/packs/dotnet-mediatr-pack';
+import dotnetPack from '../../knowledge/packs/dotnet-pack';
+import dotnetSignalrPack from '../../knowledge/packs/dotnet-signalr-pack';
+import dotnetWorkerPack from '../../knowledge/packs/dotnet-worker-pack';
+import goPack from '../../knowledge/packs/go-pack';
+import javaPack from '../../knowledge/packs/java-pack';
+import kubernetesDeployment from '../../knowledge/packs/kubernetes-deployment';
+import kubernetesPack from '../../knowledge/packs/kubernetes-pack';
+import nodejsPack from '../../knowledge/packs/nodejs-pack';
+import phpPack from '../../knowledge/packs/php-pack';
+import pythonPack from '../../knowledge/packs/python-pack';
+import rubyPack from '../../knowledge/packs/ruby-pack';
+import rustPack from '../../knowledge/packs/rust-pack';
+import securityPack from '../../knowledge/packs/security-pack';
+import securityRemediation from '../../knowledge/packs/security-remediation';
+import starterPack from '../../knowledge/packs/starter-pack';
 
 export interface BuiltInPack {
   name: string;
@@ -39,7 +39,7 @@ export interface BuiltInPack {
 
 /**
  * All built-in knowledge packs
- * These are loaded as JSON modules at import time
+ * These are loaded as TypeScript modules at build time
  */
 export const BUILTIN_PACKS: BuiltInPack[] = [
   { name: 'azure-container-apps-pack.json', data: azureContainerAppsPack },

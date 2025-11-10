@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-ef-core-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "ef-core-connection-pooling",
     "category": "dockerfile",
@@ -357,4 +361,4 @@
     ],
     "description": "Change tracking optimization reduces memory usage and improves performance"
   }
-]
+] as const;

@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-worker-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "worker-service-base-configuration",
     "category": "dockerfile",
@@ -342,4 +346,4 @@
     ],
     "description": "Batch processing improves throughput and reduces overhead in worker services"
   }
-]
+] as const;

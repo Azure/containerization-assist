@@ -1,4 +1,8 @@
-[
+/**
+ * azure-container-apps-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "aca-cpu-memory-combinations",
     "category": "kubernetes",
@@ -542,4 +546,4 @@
     ],
     "description": "Backup and DR strategies ensure business continuity and data protection"
   }
-]
+] as const;

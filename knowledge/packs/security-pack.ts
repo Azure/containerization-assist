@@ -1,4 +1,8 @@
-[
+/**
+ * security-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "container-root-user",
     "category": "security",
@@ -562,4 +566,4 @@
     ],
     "description": "Zero-trust networking assumes no implicit trust between services"
   }
-]
+] as const;

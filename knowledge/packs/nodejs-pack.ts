@@ -1,4 +1,8 @@
-[
+/**
+ * nodejs-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "node-package-cache",
     "category": "dockerfile",
@@ -571,4 +575,4 @@
     ],
     "description": "Worker threads require proper resource configuration for optimal performance"
   }
-]
+] as const;

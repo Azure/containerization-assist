@@ -1,4 +1,8 @@
-[
+/**
+ * kubernetes-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "k8s-resource-limits",
     "category": "kubernetes",
@@ -520,4 +524,4 @@
     ],
     "description": "Priority classes ensure critical workloads are scheduled before lower-priority ones"
   }
-]
+] as const;

@@ -141,14 +141,14 @@ describe('Build Output Validation', () => {
 
       it('should include all knowledge pack files', () => {
         const expectedPacks = [
-          'starter-pack.json',
-          'nodejs-pack.json',
-          'python-pack.json',
-          'java-pack.json',
-          'dotnet-pack.json',
-          'go-pack.json',
-          'kubernetes-pack.json',
-          'security-pack.json'
+          'starter-pack.ts',
+          'nodejs-pack.ts',
+          'python-pack.ts',
+          'java-pack.ts',
+          'dotnet-pack.ts',
+          'go-pack.ts',
+          'kubernetes-pack.ts',
+          'security-pack.ts'
         ];
 
         const files = readdirSync(knowledgeDataDir);
@@ -158,14 +158,15 @@ describe('Build Output Validation', () => {
         });
       });
 
-      it('should have valid JSON content in knowledge files', () => {
-        const files = readdirSync(knowledgeDataDir).filter(f => f.endsWith('.json'));
+      it('should have valid TypeScript content in knowledge files', () => {
+        const files = readdirSync(knowledgeDataDir).filter(f => f.endsWith('.ts'));
 
         files.forEach(file => {
           const filePath = join(knowledgeDataDir, file);
-          expect(() => {
-            require(filePath);
-          }).not.toThrow();
+          const content = readFileSync(filePath, 'utf-8');
+          // Should have export default and as const
+          expect(content).toMatch(/export default/);
+          expect(content).toMatch(/as const/);
         });
       });
     });
@@ -180,7 +181,7 @@ describe('Build Output Validation', () => {
     it('should have knowledge data files with reasonable sizes', () => {
       // Knowledge data is now in top-level knowledge/packs/ directory
       const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
-      const files = readdirSync(knowledgeDataDir).filter(f => f.endsWith('.json'));
+      const files = readdirSync(knowledgeDataDir).filter(f => f.endsWith('.ts'));
 
       files.forEach(file => {
         const filePath = join(knowledgeDataDir, file);
@@ -200,10 +201,10 @@ describe('Build Output Validation', () => {
 
       // Verify it contains knowledge pack files
       const files = readdirSync(knowledgeDataDir);
-      const jsonFiles = files.filter(f => f.endsWith('.json'));
+      const tsFiles = files.filter(f => f.endsWith('.ts'));
 
       // Should have knowledge pack files
-      expect(jsonFiles.length).toBeGreaterThan(0);
+      expect(tsFiles.length).toBeGreaterThan(0);
     });
   });
 });

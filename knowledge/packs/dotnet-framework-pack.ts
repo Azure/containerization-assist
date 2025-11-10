@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-framework-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "dotnet-framework-base-image",
     "category": "dockerfile",
@@ -262,4 +266,4 @@
     ],
     "description": "Machine keys should be consistent across container instances"
   }
-]
+] as const;

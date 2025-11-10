@@ -1,4 +1,8 @@
-[
+/**
+ * database-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "postgres-data-persistence",
     "category": "dockerfile",
@@ -773,4 +777,4 @@
     ],
     "description": "Compliance controls meet regulatory requirements"
   }
-]
+] as const;

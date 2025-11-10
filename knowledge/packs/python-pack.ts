@@ -1,4 +1,8 @@
-[
+/**
+ * python-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "python-requirements-cache",
     "category": "dockerfile",
@@ -583,4 +587,4 @@
     ],
     "description": "Continuous vulnerability monitoring ensures ongoing security"
   }
-]
+] as const;

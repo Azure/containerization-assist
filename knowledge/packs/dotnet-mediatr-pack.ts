@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-mediatr-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "mediatr-base-setup",
     "category": "dockerfile",
@@ -331,4 +335,4 @@
     ],
     "description": "Feature flag management for MediatR handler behavior"
   }
-]
+] as const;

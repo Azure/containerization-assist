@@ -1,4 +1,8 @@
-[
+/**
+ * starter-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "dockerfile-header-comment",
     "category": "dockerfile",
@@ -523,4 +527,4 @@
     ],
     "description": "Minimize file creation to only manifest yaml files. Keep manifests organized in separate files within manifests/ directory."
   }
-]
+] as const;

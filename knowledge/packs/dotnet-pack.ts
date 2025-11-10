@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "dotnet-runtime-optimization",
     "category": "dockerfile",
@@ -349,4 +353,4 @@
     ],
     "description": "Proper Kestrel configuration prevents resource exhaustion and improves security"
   }
-]
+] as const;

@@ -1,4 +1,8 @@
-[
+/**
+ * php-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "php-composer-cache",
     "category": "dockerfile",
@@ -561,4 +565,4 @@
     ],
     "description": "Security headers and settings reduce attack surface and information disclosure"
   }
-]
+] as const;

@@ -1,4 +1,8 @@
-[
+/**
+ * rust-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "rust-multi-stage-build",
     "category": "dockerfile",
@@ -284,4 +288,4 @@
     ],
     "description": "Minimal runtime images reduce attack surface"
   }
-]
+] as const;

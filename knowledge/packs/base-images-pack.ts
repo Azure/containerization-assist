@@ -1,4 +1,8 @@
-[
+/**
+ * base-images-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "java-official-temurin",
     "category": "dockerfile",
@@ -161,4 +165,4 @@
     ],
     "description": "Best practice guidance for base image selection based on organizational requirements"
   }
-]
+] as const;

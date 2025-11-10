@@ -1,4 +1,8 @@
-[
+/**
+ * go-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "go-multi-stage-build",
     "category": "dockerfile",
@@ -267,4 +271,4 @@
     ],
     "description": "Metrics enable better monitoring and observability"
   }
-]
+] as const;

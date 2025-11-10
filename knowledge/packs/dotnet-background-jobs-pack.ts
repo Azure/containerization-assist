@@ -1,4 +1,8 @@
-[
+/**
+ * dotnet-background-jobs-pack - Knowledge Pack
+ */
+
+export default [
   {
     "id": "dotnet-worker-runtime-image",
     "category": "dockerfile",
@@ -327,4 +331,4 @@
       "background-jobs"
     ]
   }
-]
+] as const;

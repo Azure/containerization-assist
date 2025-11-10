@@ -1,4 +1,8 @@
-[
+/**
+ * kubernetes-deployment - Knowledge Pack
+ */
+
+export default [
   {
     "id": "rolling-update-strategy-advanced",
     "category": "kubernetes",
@@ -335,4 +339,4 @@
     ],
     "description": "Concurrency policy prevents issues from overlapping scheduled job executions"
   }
-]
+] as const;

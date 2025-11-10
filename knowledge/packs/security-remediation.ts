@@ -1,4 +1,8 @@
-[
+/**
+ * security-remediation - Knowledge Pack
+ */
+
+export default [
   {
     "id": "cve-remediation-base-image-upgrade",
     "category": "security",
@@ -367,4 +371,4 @@
     ],
     "description": "Admission webhooks enforce organizational security policies at deployment time"
   }
-]
+] as const;
