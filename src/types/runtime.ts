@@ -133,9 +133,6 @@ export interface AppRuntimeConfig {
   /** Tool name aliases */
   toolAliases?: Record<string, string>;
 
-  /** Policy file path (static configuration) */
-  policyPath?: string;
-
   /** Enable hints that suggest other tools to call next in tool responses */
   chainHintsMode?: ChainHintsMode;
 

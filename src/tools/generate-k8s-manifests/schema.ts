@@ -72,6 +72,14 @@ export const generateK8sManifestsSchema = z
       .default(true)
       .describe('Add helpful comments in the output (primarily for ACA conversions)'),
     namespace: z.string().optional().describe('Target Kubernetes namespace'),
+    trafficLevel: z
+      .enum(['high', 'medium', 'low'])
+      .optional()
+      .describe('Expected traffic level for dynamic defaults calculation (affects replica counts and scaling).'),
+    criticalityTier: z
+      .enum(['tier-1', 'tier-2', 'tier-3'])
+      .optional()
+      .describe('Criticality tier for dynamic defaults calculation (tier-1=mission-critical, tier-3=low-priority).'),
   })
   .superRefine((data, ctx) => {
     const hasAcaManifest = !!data.acaManifest;
@@ -122,6 +130,8 @@ export interface ManifestRequirement {
   severity?: 'high' | 'medium' | 'low' | 'required';
   tags?: string[];
   matchScore: number;
+  /** Indicates if this recommendation was injected by policy template */
+  policyDriven?: boolean;
 }
 
 export interface RepositoryInfo {

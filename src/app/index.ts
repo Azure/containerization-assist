@@ -15,8 +15,7 @@ import {
   type MCPServer,
 } from '@/mcp/mcp-server';
 import { createOrchestrator } from './orchestrator';
-import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
-import { CHAINHINTSMODE } from './orchestrator-types';
+import { CHAINHINTSMODE, type OrchestratorConfig, type ExecuteRequest, type ToolOrchestrator } from './orchestrator-types';
 import type { Result } from '@/types';
 import type {
   AppRuntime,
@@ -92,7 +91,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     chainHints: DEFAULT_CHAIN_HINTS,
     aliasToOriginalMap,
   };
-  if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
 
   const toolList = Array.from(toolsMap.values());
 

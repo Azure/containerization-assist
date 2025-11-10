@@ -53,6 +53,22 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Test OPA Policies
+        run: |
+          echo "Testing built-in policies..."
+          npm run test:policies 2>&1 | tee policy-tests-builtin.txt
+
+          echo "Testing example policies (including generation-config)..."
+          npm run test:policies -- policies.user.examples/ 2>&1 | tee policy-tests-examples.txt
+
+          # Extract test counts
+          BUILTIN_COUNT=$(grep -oP '\d+(?=/\d+ PASS)' policy-tests-builtin.txt | tail -1 || echo "0")
+          EXAMPLES_COUNT=$(grep -oP '\d+(?=/\d+ PASS)' policy-tests-examples.txt | tail -1 || echo "0")
+          TOTAL_POLICY_TESTS=$((BUILTIN_COUNT + EXAMPLES_COUNT))
+
+          echo "POLICY_TESTS_PASSED=${TOTAL_POLICY_TESTS}" >> $GITHUB_ENV
+          echo "✅ All ${TOTAL_POLICY_TESTS} OPA policy tests passed"
+
       - name: Validate examples compile
         run: node scripts/validate-examples.js
 
@@ -119,6 +135,7 @@ jobs:
           echo "| Metric | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Quality Gates** | ${QUALITY_STATUS:-⚠️ Unknown} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **OPA Policy Tests** | ✅ ${POLICY_TESTS_PASSED:-0} passed |" >> $GITHUB_STEP_SUMMARY
           echo "| **Coverage (Statements)** | ${COVERAGE_OVERALL:-N/A}% |" >> $GITHUB_STEP_SUMMARY
           echo "| **Coverage (Branches)** | ${COVERAGE_BRANCHES:-N/A}% |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -148,6 +165,8 @@ jobs:
             dist-cjs/
             quality-gates.txt
             eslint-output.txt
+            policy-tests-builtin.txt
+            policy-tests-examples.txt
             coverage/
           retention-days: 7
 

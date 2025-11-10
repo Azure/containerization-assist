@@ -46,7 +46,6 @@ const GUIDANCE_MESSAGES = {
     steps: [
       'Copy .env.example to .env: cp .env.example .env',
       'Validate configuration: --validate',
-      'Check config file exists: --config <path>',
       'Review configuration docs: README.md (Configuration section)',
     ],
   },
