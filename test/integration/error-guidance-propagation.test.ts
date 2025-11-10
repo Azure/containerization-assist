@@ -15,7 +15,7 @@ describe('Error Guidance Propagation', () => {
 
   describe('build-image tool', () => {
     it('should propagate Docker guidance when build fails', async () => {
-      const runtime = createApp({ logger });
+      const runtime = await createApp({ logger });
 
       // Execute build-image with a valid path but likely no Docker daemon
       // This will trigger actual Docker client errors (not validation errors)
@@ -45,7 +45,7 @@ describe('Error Guidance Propagation', () => {
 
   describe('push-image tool', () => {
     it('should propagate Docker guidance when push fails with auth error', async () => {
-      const runtime = createApp({ logger });
+      const runtime = await createApp({ logger });
 
       // This will likely fail with guidance if Docker is available
       const result = await runtime.execute('push-image', {
@@ -71,7 +71,7 @@ describe('Error Guidance Propagation', () => {
 
   describe('tag-image tool', () => {
     it('should propagate Docker guidance when tagging fails', async () => {
-      const runtime = createApp({ logger });
+      const runtime = await createApp({ logger });
 
       const result = await runtime.execute('tag-image', {
         source: 'nonexistent-source-image',
@@ -96,7 +96,7 @@ describe('Error Guidance Propagation', () => {
 
   describe('deploy tool', () => {
     it('should propagate K8s guidance when all manifests fail', async () => {
-      const runtime = createApp({ logger });
+      const runtime = await createApp({ logger });
 
       // Create a session with invalid manifests
       const result = await runtime.execute('deploy', {

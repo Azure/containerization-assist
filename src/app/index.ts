@@ -15,8 +15,12 @@ import {
   type MCPServer,
 } from '@/mcp/mcp-server';
 import { createOrchestrator } from './orchestrator';
-import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
-import { CHAINHINTSMODE } from './orchestrator-types';
+import {
+  CHAINHINTSMODE,
+  type OrchestratorConfig,
+  type ExecuteRequest,
+  type ToolOrchestrator,
+} from './orchestrator-types';
 import type { Result } from '@/types';
 import type {
   AppRuntime,
@@ -28,6 +32,7 @@ import type {
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
 import { checkDockerHealth, checkKubernetesHealth } from '@/infra/health/checks';
 import { DEFAULT_CHAIN_HINTS } from './chain-hints';
+import { loadKnowledgeBase } from '@/knowledge/loader';
 
 /**
  * Apply tool aliases to create renamed versions of tools
@@ -73,6 +78,9 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
 
   // Initialize tool logging file at startup
   createToolLoggerFile(logger);
+
+  // Load knowledge base at startup - fail fast if it can't be loaded
+  loadKnowledgeBase();
 
   const tools = config.tools || ALL_TOOLS;
   const { aliasedTools, aliasToOriginalMap } = applyToolAliases(tools, config.toolAliases);

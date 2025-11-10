@@ -26,12 +26,15 @@ const getModuleDir = (): string => {
   // ESM environment - import.meta.url is available
   // Use indirect eval to prevent TypeScript from transpiling import.meta
   try {
-    const metaUrl = new Function('return typeof import.meta !== "undefined" ? import.meta.url : null')();
+    const metaUrl = new Function(
+      'return typeof import.meta !== "undefined" ? import.meta.url : null',
+    )();
     if (metaUrl) {
       return path.dirname(fileURLToPath(metaUrl));
     }
   } catch (error) {
     // Fallthrough to process.cwd() fallback
+    logger.warn({ error }, 'Could not determine module directory from import.meta.url');
   }
 
   // Test/fallback environment - use process.cwd() + path resolution
@@ -177,7 +180,7 @@ const getTopTags = (limit: number): Array<{ tag: string; count: number }> => {
 /**
  * Load knowledge entries from all knowledge packs
  */
-export const loadKnowledgeBase = async (): Promise<void> => {
+export const loadKnowledgeBase = (): void => {
   if (knowledgeState.loaded) {
     return;
   }
@@ -289,6 +292,7 @@ export const loadKnowledgeBase = async (): Promise<void> => {
     );
   } catch (error) {
     logger.error({ error }, 'Failed to load knowledge base');
+    throw error;
   }
 };
 

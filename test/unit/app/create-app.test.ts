@@ -11,6 +11,7 @@ import * as MCPServerModule from '@/mcp/mcp-server';
 import { registerToolsWithServer, OUTPUTFORMAT } from '@/mcp/mcp-server';
 import { CHAINHINTSMODE } from '@/app/orchestrator-types';
 import { createApp } from '@/app';
+import * as KnowledgeLoader from '@/knowledge/loader';
 
 const { createOrchestrator } = OrchestratorModule;
 const { createMCPServer, registerToolsWithServer } = MCPServerModule;
@@ -20,6 +21,7 @@ let orchestratorClose: jest.Mock;
 let createOrchestratorSpy: jest.SpiedFunction<typeof createOrchestrator>;
 let createMCPServerSpy: jest.SpiedFunction<typeof createMCPServer>;
 let registerToolsSpy: jest.SpiedFunction<typeof registerToolsWithServer>;
+let loadKnowledgeBaseSpy: jest.SpiedFunction<typeof KnowledgeLoader.loadKnowledgeBase>;
 
 function createTool(name: string): Tool<ReturnType<typeof z.object>, unknown> {
   return {
@@ -65,6 +67,10 @@ beforeEach(() => {
   registerToolsSpy = jest
     .spyOn(MCPServerModule, 'registerToolsWithServer')
     .mockImplementation(() => undefined);
+
+  loadKnowledgeBaseSpy = jest
+    .spyOn(KnowledgeLoader, 'loadKnowledgeBase')
+    .mockReturnValue(undefined);
 });
 
 afterEach(() => {
@@ -133,6 +139,24 @@ describe('createApp AppRuntime interface', () => {
     } finally {
       process.stdout.write = originalStdout;
     }
+  });
+
+  it('should load knowledge base at startup', () => {
+    const tool = createTool('knowledge-test');
+    createApp({ tools: [tool], logger: createLoggerStub() });
+
+    expect(loadKnowledgeBaseSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should fail if knowledge base fails to load', () => {
+    const tool = createTool('fail-test');
+    loadKnowledgeBaseSpy.mockImplementationOnce(() => {
+      throw new Error('Knowledge pack directory not found');
+    });
+
+    expect(() => createApp({ tools: [tool], logger: createLoggerStub() })).toThrow(
+      'Knowledge pack directory not found'
+    );
   });
 });
 
