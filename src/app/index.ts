@@ -15,7 +15,12 @@ import {
   type MCPServer,
 } from '@/mcp/mcp-server';
 import { createOrchestrator } from './orchestrator';
-import { CHAINHINTSMODE, type OrchestratorConfig, type ExecuteRequest, type ToolOrchestrator } from './orchestrator-types';
+import {
+  CHAINHINTSMODE,
+  type OrchestratorConfig,
+  type ExecuteRequest,
+  type ToolOrchestrator,
+} from './orchestrator-types';
 import type { Result } from '@/types';
 import type {
   AppRuntime,
@@ -27,6 +32,7 @@ import type {
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
 import { checkDockerHealth, checkKubernetesHealth } from '@/infra/health/checks';
 import { DEFAULT_CHAIN_HINTS } from './chain-hints';
+import { loadKnowledgeBase } from '@/knowledge/loader';
 
 /**
  * Apply tool aliases to create renamed versions of tools
@@ -149,6 +155,17 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     startServer: async (transport: TransportConfig) => {
       if (activeMcpServer) {
         throw new Error('MCP server is already running');
+      }
+
+      // Load knowledge base before starting server
+      // This will throw if any built-in packs fail to load
+      try {
+        loadKnowledgeBase();
+      } catch (error) {
+        logger.error({ error }, 'Failed to load knowledge base during server startup');
+        throw new Error(
+          `Server startup failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       ensureOrchestrator();

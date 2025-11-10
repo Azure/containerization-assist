@@ -9,8 +9,7 @@ import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
-import { readFileSync, existsSync, readdirSync } from 'fs';
-import path from 'path';
+import { BUILTIN_PACKS } from './built-in-packs';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
@@ -26,15 +25,6 @@ const knowledgeState: KnowledgeState = {
   byCategory: new Map(),
   byTag: new Map(),
   loaded: false,
-};
-
-const findExistingPath = (paths: readonly string[]): string | null => {
-  for (const path of paths) {
-    if (existsSync(path)) {
-      return path;
-    }
-  }
-  return null;
 };
 
 /**
@@ -146,9 +136,10 @@ const getTopTags = (limit: number): Array<{ tag: string; count: number }> => {
 };
 
 /**
- * Load knowledge entries from all knowledge packs
+ * Load knowledge entries from built-in knowledge packs
+ * Throws an error if any built-in pack fails to load
  */
-export const loadKnowledgeBase = async (): Promise<void> => {
+export const loadKnowledgeBase = (): void => {
   if (knowledgeState.loaded) {
     return;
   }
@@ -163,53 +154,30 @@ export const loadKnowledgeBase = async (): Promise<void> => {
   };
 
   try {
-    // Find packs directory
-    const possiblePacksDirs = [
-      path.resolve(process.cwd(), 'knowledge/packs'),
-      path.resolve(process.cwd(), 'dist/knowledge/packs'),
-      path.resolve(process.cwd(), 'node_modules/containerization-assist-mcp/knowledge/packs'),
-    ];
+    stats.packsAttempted = BUILTIN_PACKS.length;
 
-    const packsDir = findExistingPath(possiblePacksDirs);
-    if (!packsDir) {
-      throw new Error('Could not find knowledge packs directory');
-    }
+    logger.info({ totalPacks: BUILTIN_PACKS.length }, 'Loading built-in knowledge packs');
 
-    // Discover all .json files in packs directory
-    const packFiles = readdirSync(packsDir)
-      .filter((file) => file.endsWith('.json'))
-      .sort();
-    stats.packsAttempted = packFiles.length;
-
-    logger.info({ packsDir, totalPacks: packFiles.length }, 'Discovered knowledge packs');
-
-    // Load each pack
-    for (const packFile of packFiles) {
+    // Load each built-in pack
+    for (const pack of BUILTIN_PACKS) {
       try {
-        const packPath = path.join(packsDir, packFile);
-        const content = readFileSync(packPath, 'utf-8');
-
-        // Parse JSON
-        let data: unknown;
-        try {
-          data = JSON.parse(content);
-        } catch (parseError) {
-          throw new Error(`Invalid JSON: ${parseError}`);
-        }
+        const data = pack.data;
 
         // Validate and normalize pack structure
-        const result = validateAndNormalizePack(packFile, data);
+        const result = validateAndNormalizePack(pack.name, data);
         if (!result.valid || !result.entries) {
+          const error = 'Pack validation failed (see previous log)';
           stats.packsFailed++;
           stats.failures.push({
-            file: packFile,
-            error: 'Pack validation failed (see previous log)',
+            file: pack.name,
+            error,
           });
-          continue;
+          // Throw error for built-in packs - they must all load successfully
+          throw new Error(`Failed to load built-in knowledge pack ${pack.name}: ${error}`);
         }
 
         const entries = result.entries;
-        logger.debug({ pack: packFile, count: entries.length }, 'Loading knowledge pack');
+        logger.debug({ pack: pack.name, count: entries.length }, 'Loading knowledge pack');
 
         // Validate and add individual entries
         for (const entry of entries) {
@@ -224,21 +192,19 @@ export const loadKnowledgeBase = async (): Promise<void> => {
         stats.packsLoaded++;
       } catch (packError) {
         stats.packsFailed++;
+        const errorMessage = String(packError);
         stats.failures.push({
-          file: packFile,
-          error: String(packError),
+          file: pack.name,
+          error: errorMessage,
         });
-        logger.warn({ pack: packFile, error: packError }, 'Failed to load knowledge pack');
+        logger.error({ pack: pack.name, error: packError }, 'Failed to load knowledge pack');
+        // Re-throw the error to ensure server startup fails
+        throw new Error(`Failed to load built-in knowledge pack ${pack.name}: ${errorMessage}`);
       }
     }
 
     buildIndices();
     knowledgeState.loaded = true;
-
-    // Log summary
-    if (stats.failures.length > 0) {
-      logger.warn({ failures: stats.failures }, `Failed to load ${stats.packsFailed} packs`);
-    }
 
     logger.info(
       {
@@ -255,6 +221,8 @@ export const loadKnowledgeBase = async (): Promise<void> => {
     );
   } catch (error) {
     logger.error({ error }, 'Failed to load knowledge base');
+    // Re-throw to ensure server startup fails
+    throw error;
   }
 };
 
@@ -276,9 +244,9 @@ export const isKnowledgeLoaded = (): boolean => {
  * Load knowledge data and return entries.
  * Used by prompt engine for knowledge selection.
  */
-export const loadKnowledgeData = async (): Promise<{ entries: LoadedEntry[] }> => {
+export const loadKnowledgeData = (): { entries: LoadedEntry[] } => {
   if (!isKnowledgeLoaded()) {
-    await loadKnowledgeBase();
+    loadKnowledgeBase();
   }
   return {
     entries: getAllEntries(),
