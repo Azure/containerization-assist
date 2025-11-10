@@ -11,6 +11,8 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 
 ## Features
 
+### Core Capabilities
+
 - 🐳 **Docker Integration**: Build, scan, and deploy container images
 - ☸️ **Kubernetes Support**: Generate manifests and deploy applications
 - 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization
@@ -19,6 +21,29 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 - 📊 **Progress Tracking**: Real-time progress updates via MCP notifications
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with AI-powered suggestions
 - ✨ **Smart Analysis**: Context-aware recommendations
+- **Policy-Driven System (v3.0)** 🆕
+  - Pre-generation configuration
+  - Knowledge filtering and weighting
+  - Template injection
+  - Semantic validation
+  - Cross-tool consistency
+
+### Policy System (v3.0) 🆕
+
+Full control over containerization through Rego policies:
+
+- **Configure Before Generation**: Set defaults for resources, base images, build strategy
+- **Guide During Generation**: Filter knowledge base, inject templates automatically
+- **Validate After Generation**: Semantic checks, security scoring, cross-tool consistency
+
+**Example Policies Included**:
+- Environment-based strategy (dev/staging/prod)
+- Cost control by team tier
+- Security-first organization
+- Multi-cloud registry governance
+- Speed-optimized development
+
+See [Policy Authoring Guide](docs/guides/policy-authoring.md) for details.
 
 ## System Requirements
 
@@ -213,7 +238,7 @@ The following environment variables control server behavior:
 | `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
 | `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
-| `CONTAINERIZATION_ASSIST_POLICY_PATH` | Path to your custom Rego policy file (overridden by --config flag) | Not set (policies disabled) | No |
+| `CUSTOM_POLICY_PATH` | Directory path for custom policies (highest priority) | Not set | No |
 
 **Progress Notifications:**
 Long-running operations (build, deploy, scan-image) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
@@ -252,84 +277,135 @@ The logging directory is validated at startup to ensure it's writable.
 
 ### Policy System
 
-The policy system enables enforcement of security, quality, and compliance rules through YAML-based policies. Policies use a rule-based system with regex and function matchers to validate Dockerfiles and container configurations.
+The policy system uses **OPA Rego** for security, quality, and compliance enforcement. Rego is the industry-standard policy language from Open Policy Agent, providing expressive rules with rich built-in functions.
 
 **Default Behavior (No Configuration Needed):**
-By default, **all policies** in the `policies/` directory are automatically discovered and merged:
-- `policies/base-images.yaml` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions, size optimization)
-- `policies/container-best-practices.yaml` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
-- `policies/security-baseline.yaml` - Essential security rules (root user prevention, registry restrictions, vulnerability scanning)
+By default, all policies in the `policies/` directory are automatically discovered and merged:
+- `policies/security-baseline.rego` - Essential security rules (root user prevention, secrets detection, privileged containers)
+- `policies/base-images.rego` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions)
+- `policies/container-best-practices.rego` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
 
-This provides comprehensive coverage out-of-the-box.
+This provides comprehensive out-of-the-box security and quality enforcement.
 
-**Policy File Format:**
+### Policy Customization
 
-```yaml
-version: '2.0'
-metadata:
-  name: Production Security Policy
-  description: Security and quality rules for production
-  category: security
+The policy system supports three priority-ordered search paths for easy customization:
 
-defaults:
-  enforcement: strict  # Options: strict, advisory, lenient
-  security:
-    nonRootUser: true
-    scanners:
-      required: true
-      tools: ['trivy']
-  registries:
-    allowed:
-      - docker.io
-      - gcr.io
-      - mcr.microsoft.com
-    blocked:
-      - '*localhost*'
+**Priority Order (highest to lowest):**
+1. **Custom directory** via `CUSTOM_POLICY_PATH` environment variable (NPM users)
+2. **`policies.user/` directory** in your repository (source installation users)
+3. **Built-in `policies/`** (baseline policies)
 
-rules:
-  - id: block-latest-tag
-    category: quality
-    priority: 80
-    description: Prevent :latest for reproducibility
-    conditions:
-      - kind: regex
-        pattern: 'FROM\s+[^:]+:latest'
-        flags: im
-    actions:
-      block: true
-      message: 'Using :latest tag is not allowed. Specify explicit version tags.'
+Later policies override earlier policies during merging by package namespace.
 
-  - id: block-root-user
-    category: security
-    priority: 95
-    description: Enforce non-root user
-    conditions:
-      - kind: regex
-        pattern: '^USER\s+(root|0)\s*$'
-        flags: m
-    actions:
-      block: true
-      message: 'Running as root user is not allowed.'
+#### Quick Start: Source Installation (10 seconds)
+
+```bash
+# Copy example policy to policies.user/
+mkdir -p policies.user
+cp policies.user.examples/allow-all-registries.rego policies.user/
+
+# Restart your MCP client (VS Code, Claude Desktop, etc.)
 ```
 
-**Rule Components:**
+#### Quick Start: NPM Installation (30 seconds)
 
-**Conditions:**
-- `kind: regex` - Match patterns in Dockerfile content
-  - `pattern`: Regular expression to match
-  - `flags`: Regex flags (i=case-insensitive, m=multiline)
-  - `count_threshold`: Minimum matches required (optional)
-- `kind: function` - Built-in function matchers
-  - `hasPattern` - Check if pattern exists in content
-  - `fileExists` - Check if file exists in context
-  - `largerThan` - Check if content/file exceeds size threshold
-  - `hasVulnerabilities` - Check vulnerability scan results
+```bash
+# 1. Create custom policy directory
+mkdir -p ~/.config/containerization-assist/policies
 
-**Actions:**
-- `block: true` - Prevents build/deployment, operation fails
-- `warn: true` - Logs warning, operation continues
-- `suggest: true` - Provides recommendation, informational only
-- `message`: User-facing explanation of the rule violation
+# 2. Copy example policy
+cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
+   ~/.config/containerization-assist/policies/
+
+# 3. Configure environment variable in .vscode/mcp.json
+{
+  "servers": {
+    "containerization-assist": {
+      "env": {
+        "CUSTOM_POLICY_PATH": "${env:HOME}/.config/containerization-assist/policies"
+      }
+    }
+  }
+}
+
+# 4. Restart VS Code
+```
+
+#### Pre-Built Example Policies
+
+The `policies.user.examples/` directory includes three ready-to-use examples:
+
+| Example | Purpose | Use Case |
+|---------|---------|----------|
+| `allow-all-registries.rego` | Override MCR preference | Docker Hub, GCR, ECR, private registries |
+| `warn-only-mode.rego` | Advisory-only enforcement | Testing, gradual adoption, dev environments |
+| `custom-organization-template.rego` | Organization template | Custom labels, registries, compliance |
+
+See [policies.user.examples/README.md](policies.user.examples/README.md) for detailed usage.
+
+#### Built-In Policies
+
+Three production-ready Rego policies are included by default:
+
+- **`policies/security-baseline.rego`** - Essential security rules (root user prevention, secrets detection, privileged containers)
+- **`policies/base-images.rego`** - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions)
+- **`policies/container-best-practices.rego`** - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
+
+User policies override built-in policies by package namespace.
+
+**Policy File Format (Rego):**
+
+```rego
+package containerization.custom_policy
+
+# Blocking violations
+violations contains result if {
+  input_type == "dockerfile"
+  regex.match(`FROM\s+[^:]+:latest`, input.content)
+
+  result := {
+    "rule": "block-latest-tag",
+    "category": "quality",
+    "priority": 80,
+    "severity": "block",
+    "message": "Using :latest tag is not allowed. Specify explicit version tags.",
+    "description": "Prevent :latest for reproducibility",
+  }
+}
+
+# Non-blocking warnings
+warnings contains result if {
+  input_type == "dockerfile"
+  not regex.match(`HEALTHCHECK`, input.content)
+
+  result := {
+    "rule": "suggest-healthcheck",
+    "category": "quality",
+    "priority": 70,
+    "severity": "warn",
+    "message": "Consider adding HEALTHCHECK instruction for container monitoring",
+    "description": "HEALTHCHECK improves container lifecycle management",
+  }
+}
+
+# Policy decision
+default allow := false
+allow if count(violations) == 0
+
+# Result structure
+result := {
+  "allow": allow,
+  "violations": violations,
+  "warnings": warnings,
+  "suggestions": [],
+  "summary": {
+    "total_violations": count(violations),
+    "total_warnings": count(warnings),
+    "total_suggestions": 0,
+  },
+}
+```
 
 **Priority Levels:**
 - **90-100**: Security rules (highest priority)
@@ -337,50 +413,35 @@ rules:
 - **50-69**: Performance rules
 - **30-49**: Compliance rules
 
-**Enforcement Modes:**
-- **strict**: All rules enforced, violations block operations
-- **advisory**: Rules evaluated, violations logged but not blocking
-- **lenient**: Minimal enforcement, warnings only
-
-**Example Policies:**
-
-The repository includes three production-ready policies:
-- `policies/base-images.yaml` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions)
-- `policies/security-baseline.yaml` - Essential security rules (root user prevention, secrets detection, privileged containers)
-- `policies/container-best-practices.yaml` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
-
-For detailed examples and guidance, see [Policy Configuration Guide](docs/guides/policy-configuration.md).
-
 **Using Policies:**
 
 ```bash
-# Validate Dockerfile with built-in validation + organizational policies
-npx containerization-assist fix-dockerfile --path ./Dockerfile
+# List discovered policies
+npx containerization-assist-mcp list-policies
 
-# Use specific policy file for organizational validation
-npx containerization-assist fix-dockerfile \
-  --path ./Dockerfile \
-  --policy-path ./policies/production.yaml
+# List policies and show merged result
+npx containerization-assist-mcp list-policies --show-merged
 
-# The fix-dockerfile tool will automatically detect and load policies from the policies/ directory
-# It combines:
-# - Built-in best practices validation (security, performance, compliance)
-# - Custom organizational policy validation (if policies are provided)
+# Validate Dockerfile with policies (automatic discovery)
+npx containerization-assist-mcp fix-dockerfile --path ./Dockerfile
 ```
 
 **Creating Custom Policies:**
 
-See existing policies in `policies/` for examples.
+See [Policy Customization Guide](docs/guides/policy-getting-started.md) and existing policies in `policies/` for examples.
 
-**Policy Discovery and Merging:**
+**Testing Policies:**
 
-The server automatically discovers and loads all `.yaml` files in the `policies/` directory:
-- **Automatic Discovery**: All policies in `policies/` are loaded and merged automatically
-- **Rule Merging**: Rules with the same ID are overridden by later policies (alphabetically sorted)
-- **Default Merging**: Later policies override earlier policies' default settings
-- **Priority Sorting**: All rules are sorted by priority (highest first) after merging
+```bash
+# Validate policy syntax
+opa check policies.user/my-policy.rego
 
-This allows you to organize policies by concern (security, quality, performance) in separate files while maintaining a unified policy enforcement system.
+# Run policy tests
+opa test policies.user/
+
+# Test with MCP Inspector
+npx @modelcontextprotocol/inspector containerization-assist-mcp start
+```
 
 ### MCP Inspector (Testing)
 

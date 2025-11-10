@@ -10,7 +10,7 @@ import { config, logConfigSummaryIfDev } from '@/config/index';
 import { createLogger } from '@/lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkDockerHealth, checkKubernetesHealth } from '@/infra/health/checks';
 import { validateDockerSocket } from '@/infra/docker/socket-validation';
@@ -24,6 +24,8 @@ import {
   installShutdownHandlers,
   logStartupFailure,
 } from '@/lib/runtime-logging';
+import { discoverPolicies } from '@/app/orchestrator';
+import { loadAndMergeRegoPolicies } from '@/config/policy-rego';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,8 +47,7 @@ program
   .name('containerization-assist-mcp')
   .description('MCP server for AI-powered containerization workflows')
   .version(packageJson.version)
-  .argument('[command]', 'command to run (start, inspect-tools)', 'start')
-  .option('--config <path>', 'path to configuration file (.env)')
+  .argument('[command]', 'command to run (start, inspect-tools, list-policies)', 'start')
   .option('--log-level <level>', 'logging level: debug, info, warn, error (default: info)', 'info')
   .option('--workspace <path>', 'workspace directory path (default: current directory)', cwd())
   .option('--dev', 'enable development mode with debug logging')
@@ -59,6 +60,7 @@ program
     'default Kubernetes namespace (default: default)',
     'default',
   )
+  .option('--show-merged', 'display merged policy result (used with list-policies command)')
   .addHelpText(
     'after',
     `
@@ -69,6 +71,8 @@ Examples:
   $ containerization-assist-mcp --list-tools             Show all available MCP tools
   $ containerization-assist-mcp --health-check           Check system dependencies
   $ containerization-assist-mcp --validate               Validate configuration
+  $ containerization-assist-mcp list-policies            List discovered policies
+  $ containerization-assist-mcp list-policies --show-merged  Show merged policy result
 
 MCP Tools Available (13 total):
   • Analysis: analyze-repo
@@ -85,7 +89,7 @@ Environment Variables:
   WORKSPACE_DIR                                Working directory for operations
   DOCKER_SOCKET                                Docker daemon socket path
   K8S_NAMESPACE                                Default Kubernetes namespace
-  CONTAINERIZATION_ASSIST_POLICY_PATH          Policy file path (overridden by --config)
+  CUSTOM_POLICY_PATH                           Custom policy directory path (highest priority)
   NODE_ENV                                     Environment (development, production)
 `,
   );
@@ -96,20 +100,67 @@ const options = program.opts();
 const command = program.args[0] ?? 'start';
 
 /**
- * Resolve policy configuration with priority:
- * 1. CLI flag (highest priority)
- * 2. Environment variable
- * 3. Default value (undefined = auto-discover)
+ * Handle the list-policies command
  */
-function resolvePolicyConfig(options: { config?: string }): { policyPath?: string } {
-  // Policy path: --config flag > env var > undefined (use defaults)
-  const policyPath = options.config || process.env.CONTAINERIZATION_ASSIST_POLICY_PATH;
+async function handleListPoliciesCommand(opts: { showMerged?: boolean }): Promise<void> {
+  const logger = getLogger();
 
-  // Only include policyPath if it has a value (for exactOptionalPropertyTypes)
-  if (policyPath) {
-    return { policyPath };
+  // Discover all policies
+  const policies = discoverPolicies(logger);
+
+  console.error('\n📋 Discovered Policies:\n');
+
+  if (policies.length === 0) {
+    console.error('  No policies found.');
+    console.error('\n💡 To add custom policies:');
+    console.error('  1. Source installation: Copy to policies.user/');
+    console.error('  2. NPM installation: Set CUSTOM_POLICY_PATH environment variable');
+    console.error('\nSee policies.user.examples/ for example policies.\n');
+    exit(0);
   }
-  return {};
+
+  // Group by source
+  const builtIn = policies.filter(
+    (p) => p.includes('/policies/') && !p.includes('/policies.user'),
+  );
+  const user = policies.filter((p) => p.includes('/policies.user/'));
+  const custom = policies.filter((p) => !p.includes('/policies/') && !p.includes('/policies.user/'));
+
+  if (builtIn.length > 0) {
+    console.error('  Built-in (Priority: Low):');
+    builtIn.forEach((p) => console.error(`    - ${basename(p)}`));
+  }
+
+  if (user.length > 0) {
+    console.error('\n  User (Priority: Medium):');
+    user.forEach((p) => console.error(`    - ${basename(p)}`));
+  }
+
+  if (custom.length > 0) {
+    console.error('\n  Custom via CUSTOM_POLICY_PATH (Priority: High):');
+    custom.forEach((p) => console.error(`    - ${basename(p)}`));
+  }
+
+  console.error(`\n  Total: ${policies.length} policy file(s)\n`);
+
+  // Show merged result if requested
+  if (opts.showMerged) {
+    console.error('🔀 Merged Policy Result:\n');
+    try {
+      const mergedPolicy = await loadAndMergeRegoPolicies(policies, logger);
+      if (mergedPolicy.ok) {
+        console.error('  ✅ Policies merged successfully');
+        console.error(`  📦 Loaded ${policies.length} policy file(s)`);
+      } else {
+        console.error('  ❌ Failed to merge policies:', mergedPolicy.error);
+      }
+    } catch (error) {
+      console.error('  ❌ Error loading policies:', error);
+    }
+    console.error('');
+  }
+
+  exit(0);
 }
 
 async function main(): Promise<void> {
@@ -123,10 +174,16 @@ async function main(): Promise<void> {
       return;
     }
 
+    // Handle the 'list-policies' command
+    if (command === 'list-policies') {
+      await handleListPoliciesCommand(options);
+      return;
+    }
+
     // Handle the 'start' command (default behavior)
     if (command !== 'start') {
       console.error(`❌ Unknown command: ${command}`);
-      console.error('Available commands: start, inspect-tools');
+      console.error('Available commands: start, inspect-tools, list-policies');
       console.error('\nUse --help for usage information');
       exit(1);
     }
@@ -159,10 +216,7 @@ async function main(): Promise<void> {
       console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET ?? '/var/run/docker.sock'}`);
       console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE ?? 'default'}`);
       console.error(`  • Environment: ${process.env.NODE_ENV ?? 'production'}`);
-
-      // Display policy configuration
-      const policyConfig = resolvePolicyConfig(options);
-      console.error(`  • Policy Path: ${policyConfig.policyPath ?? 'auto-discover'}`);
+      console.error(`  • Policy Discovery: auto-discover (priority-ordered)`);
 
       // Test Docker and Kubernetes connections
       console.error('\n🔍 Checking dependencies...');
@@ -193,13 +247,9 @@ async function main(): Promise<void> {
     // Set MCP mode to redirect logs to stderr
     process.env.MCP_MODE = 'true';
 
-    // Resolve policy configuration from CLI flags and environment variables
-    const policyConfig = resolvePolicyConfig(options);
-
-    // Create the application
+    // Create the application (policies are auto-discovered in priority order)
     const app = createApp({
       logger: getLogger(),
-      ...policyConfig,
       outputFormat: OUTPUTFORMAT.NATURAL_LANGUAGE,
     });
 

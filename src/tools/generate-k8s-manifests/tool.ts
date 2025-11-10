@@ -44,6 +44,14 @@ const description =
   'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation. Supports repository analysis or ACA manifest conversion.';
 const version = '2.0.0';
 
+/**
+ * Extended input parameters that include optional policy configuration.
+ * This is used internally to pass policy configuration from the handler to buildPlan.
+ */
+interface ExtendedK8sManifestParams extends GenerateK8sManifestsParams {
+  k8sConfig?: import('@/config/policy-generation-config').K8sGenerationConfig;
+}
+
 // Manifest type to topic mapping
 const MANIFEST_TYPE_TO_TOPIC = {
   kubernetes: TOPICS.KUBERNETES,
@@ -235,7 +243,7 @@ type ManifestCategory = 'fieldMappings' | 'security' | 'resourceManagement' | 'b
 
 // Create the tool runner using the shared pattern
 const runPattern = createKnowledgeTool<
-  GenerateK8sManifestsParams,
+  ExtendedK8sManifestParams,
   ManifestPlan,
   ManifestCategory,
   Record<string, never> // No additional rules for manifest plan
@@ -431,9 +439,26 @@ const runPattern = createKnowledgeTool<
         manifestFiles.push({ path: './k8s/configmap.yaml', purpose: 'Configuration management' });
       }
 
+      // Build policy config instruction if available
+      const policyInstruction = input.k8sConfig
+        ? ` Apply policy-driven configuration: ${
+            input.k8sConfig.resourceDefaults
+              ? `resource limits (CPU: ${input.k8sConfig.resourceDefaults.cpuLimit}, Memory: ${input.k8sConfig.resourceDefaults.memoryLimit}), `
+              : ''
+          }${input.k8sConfig.replicas ? `replicas: ${input.k8sConfig.replicas}, ` : ''}${
+            input.k8sConfig.orgStandards?.namespace
+              ? `namespace: ${input.k8sConfig.orgStandards.namespace}, `
+              : ''
+          }${
+            input.k8sConfig.orgStandards?.requiredLabels
+              ? `labels: ${Object.keys(input.k8sConfig.orgStandards.requiredLabels).join(', ')}.`
+              : ''
+          }`
+        : '';
+
       const nextAction: ToolNextAction = {
         action: 'create-files',
-        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, ports, and dependencies.`,
+        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, ports, and dependencies.${policyInstruction}`,
         files: manifestFiles,
       };
 
@@ -442,11 +467,18 @@ const runPattern = createKnowledgeTool<
           ? ` (${input.frameworks.map((f) => f.name).join(', ')})`
           : '';
 
+      const policyConfigInfo = input.k8sConfig
+        ? `Policy Config: ${input.k8sConfig.replicas || 1} replicas, ${
+            input.k8sConfig.orgStandards?.namespace || 'default'
+          } namespace\n`
+        : '';
+
       const summary =
         `🔨 ACTION REQUIRED: Create ${input.manifestType} manifests\n` +
         `Application: ${input.name || input.language || 'application'}${frameworksStr}\n` +
-        `Manifests: ${manifestFiles.map((f) => f.path.split('/').pop()).join(', ')}\n` +
-        `Recommendations: ${knowledgeMatches.length} total (${securityMatches.length} security, ${resourceMatches.length} resources, ${bestPracticeMatches.length} best practices)\n\n` +
+        `Manifests: ${manifestFiles.map((f) => f.path.split('/').pop()).join(', ')}\n${
+        policyConfigInfo
+        }Recommendations: ${knowledgeMatches.length} total (${securityMatches.length} security, ${resourceMatches.length} resources, ${bestPracticeMatches.length} best practices)\n\n` +
         `✅ Ready to create manifests in ./k8s directory.`;
 
       return {
@@ -497,12 +529,141 @@ async function handleGenerateK8sManifests(
     }
   }
 
+  // Query policy for generation configuration (if policy is available)
+  let k8sConfig: import('@/config/policy-generation-config').K8sGenerationConfig | null = null;
+  if (ctx.policy) {
+    const configQuery = await ctx.queryConfig<{ kubernetes?: import('@/config/policy-generation-config').K8sGenerationConfig }>(
+      'containerization.generation_config',
+      {
+        language: input.language || 'auto-detect',
+        framework: input.frameworks?.[0]?.name,
+        environment: input.environment || 'production',
+        appName: input.name || 'app',
+      },
+    );
+
+    k8sConfig = configQuery?.kubernetes || null;
+
+    if (k8sConfig) {
+      logger.info(
+        {
+          resourceDefaults: k8sConfig.resourceDefaults,
+          replicas: k8sConfig.replicas,
+          features: k8sConfig.features,
+          orgStandards: k8sConfig.orgStandards,
+        },
+        'Loaded Kubernetes generation config from policy',
+      );
+    }
+  }
+
+  // Add K8s config to input
+  const extendedInput = {
+    ...input,
+    ...(k8sConfig && { k8sConfig }),
+  };
+
   // Run the knowledge-based plan generation
-  const result = await runPattern(input, ctx);
+  const result = await runPattern(extendedInput, ctx);
 
   if (!result.ok) return result;
 
   const plan = result.value;
+
+  // Query policy for template additions and dynamic defaults (Sprint 3)
+  if (ctx.policy) {
+    // Query for template additions
+    const templateQuery = await ctx.queryConfig<import('@/config/policy-generation-config').TemplateAdditions>(
+      'containerization.templates.templates',
+      {
+        language: input.language || 'auto-detect',
+        framework: input.frameworks?.[0]?.name,
+        environment: input.environment || 'production',
+        appName: input.name || 'app',
+      },
+    );
+
+    if (templateQuery) {
+      logger.info(
+        {
+          k8sTemplates: templateQuery.kubernetes?.length || 0,
+        },
+        'Loaded template additions from policy',
+      );
+
+      // Merge templates into plan using template merger
+      const { mergeTemplatesIntoPlan } = await import('@/lib/template-merger');
+      const updatedPlan = mergeTemplatesIntoPlan(
+        plan,
+        templateQuery,
+        {
+          language: input.language,
+          environment: input.environment,
+          framework: input.frameworks?.[0]?.name,
+        },
+      );
+      Object.assign(plan, updatedPlan);
+    }
+
+    // Query for dynamic defaults (replicas, health checks, HPA)
+    const dynamicDefaultsQuery = await ctx.queryConfig<import('@/config/policy-generation-config').DynamicDefaults>(
+      'containerization.dynamic_defaults.defaults',
+      {
+        language: input.language || 'auto-detect',
+        environment: input.environment || 'production',
+        trafficLevel: input.trafficLevel,
+        criticalityTier: input.criticalityTier,
+      },
+    );
+
+    if (dynamicDefaultsQuery) {
+      logger.info(
+        {
+          replicas: dynamicDefaultsQuery.replicas,
+          hasHealthChecks: !!dynamicDefaultsQuery.healthChecks,
+          hasAutoscaling: !!dynamicDefaultsQuery.autoscaling,
+        },
+        'Loaded dynamic defaults from policy',
+      );
+
+      // Add dynamic defaults as policy-driven recommendations
+      if (dynamicDefaultsQuery.replicas) {
+        const replicaInfo = {
+          id: 'policy-replica-count',
+          category: 'resource-management',
+          recommendation: `Replica count (from policy): ${dynamicDefaultsQuery.replicas}`,
+          tags: ['policy-driven', 'replicas'],
+          matchScore: 100,
+          policyDriven: true,
+        };
+        plan.recommendations.resourceManagement = [replicaInfo, ...(plan.recommendations.resourceManagement || [])];
+      }
+
+      if (dynamicDefaultsQuery.healthChecks) {
+        const healthCheckInfo = {
+          id: 'policy-health-check-config',
+          category: 'best-practice',
+          recommendation: `Health check configuration (from policy): initialDelay=${dynamicDefaultsQuery.healthChecks.initialDelaySeconds}s, period=${dynamicDefaultsQuery.healthChecks.periodSeconds}s, timeout=${dynamicDefaultsQuery.healthChecks.timeoutSeconds}s, failureThreshold=${dynamicDefaultsQuery.healthChecks.failureThreshold}`,
+          tags: ['policy-driven', 'health-check'],
+          matchScore: 100,
+          policyDriven: true,
+        };
+        plan.recommendations.bestPractices = [healthCheckInfo, ...plan.recommendations.bestPractices];
+      }
+
+      if (dynamicDefaultsQuery.autoscaling) {
+        const hpaInfo = {
+          id: 'policy-hpa-config',
+          category: 'resource-management',
+          recommendation: `HPA configuration (from policy): min=${dynamicDefaultsQuery.autoscaling.minReplicas}, max=${dynamicDefaultsQuery.autoscaling.maxReplicas}, targetCPU=${dynamicDefaultsQuery.autoscaling.targetCPUUtilization || 'N/A'}%, targetMemory=${dynamicDefaultsQuery.autoscaling.targetMemoryUtilization || 'N/A'}%`,
+          tags: ['policy-driven', 'autoscaling', 'hpa'],
+          matchScore: 100,
+          policyDriven: true,
+        };
+        plan.recommendations.resourceManagement = [...(plan.recommendations.resourceManagement || []), hpaInfo];
+      }
+    }
+  }
 
   // Validate against policy if available
   if (ctx.policy) {

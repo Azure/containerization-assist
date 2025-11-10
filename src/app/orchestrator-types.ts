@@ -46,7 +46,6 @@ export type ChainHintsMode = (typeof CHAINHINTSMODE)[keyof typeof CHAINHINTSMODE
  * Orchestrator configuration
  */
 export interface OrchestratorConfig {
-  policyPath?: string;
   chainHintsMode: ChainHintsMode;
   chainHints?: ChainHintsRegistry;
   /** Reverse mapping from alias to original tool name (alias -> original) */
