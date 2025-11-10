@@ -178,7 +178,7 @@ describe('Knowledge Tool Pattern', () => {
 
     it('should create a working tool runner', async () => {
       const mockSnippets = createMockSnippets();
-      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockResolvedValue(
+      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockReturnValue(
         mockSnippets,
       );
 
@@ -279,7 +279,7 @@ describe('Knowledge Tool Pattern', () => {
 
     it('should use default filters when not provided in input', async () => {
       const mockSnippets: KnowledgeSnippet[] = [];
-      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockResolvedValue(
+      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockReturnValue(
         mockSnippets,
       );
 
@@ -332,7 +332,7 @@ describe('Knowledge Tool Pattern', () => {
 
     it('should support dynamic topic selection', async () => {
       const mockSnippets: KnowledgeSnippet[] = [];
-      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockResolvedValue(
+      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockReturnValue(
         mockSnippets,
       );
 
@@ -384,7 +384,7 @@ describe('Knowledge Tool Pattern', () => {
 
     it('should support async rules', async () => {
       const mockSnippets: KnowledgeSnippet[] = [];
-      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockResolvedValue(
+      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockReturnValue(
         mockSnippets,
       );
 
@@ -436,7 +436,7 @@ describe('Knowledge Tool Pattern', () => {
 
     it('should support async plan building', async () => {
       const mockSnippets: KnowledgeSnippet[] = [];
-      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockResolvedValue(
+      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockReturnValue(
         mockSnippets,
       );
 
@@ -485,7 +485,7 @@ describe('Knowledge Tool Pattern', () => {
 
     it('should use custom confidence calculation when provided', async () => {
       const mockSnippets = createMockSnippets();
-      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockResolvedValue(
+      (knowledgeMatcher.getKnowledgeSnippets as jest.MockedFunction<typeof knowledgeMatcher.getKnowledgeSnippets>).mockReturnValue(
         mockSnippets,
       );
 

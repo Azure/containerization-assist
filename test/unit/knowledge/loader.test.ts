@@ -12,9 +12,9 @@ import { KnowledgeEntrySchema, KnowledgePackSchema } from '@/knowledge/schemas';
 
 describe('Knowledge Loader', () => {
   describe('loadKnowledgeBase integration', () => {
-    beforeAll(async () => {
+    beforeAll(() => {
       // Load knowledge base before running tests
-      await loadKnowledgeBase();
+      loadKnowledgeBase();
     });
 
     it('should load knowledge base successfully', () => {
@@ -81,12 +81,12 @@ describe('Knowledge Loader', () => {
       }
     });
 
-    it('should not reload if already loaded', async () => {
+    it('should not reload if already loaded', () => {
       const entriesBefore = getAllEntries();
       const countBefore = entriesBefore.length;
 
       // Try loading again
-      await loadKnowledgeBase();
+      loadKnowledgeBase();
 
       const entriesAfter = getAllEntries();
       const countAfter = entriesAfter.length;
@@ -95,8 +95,8 @@ describe('Knowledge Loader', () => {
       expect(countAfter).toBe(countBefore);
     });
 
-    it('should load knowledge data for prompt engine', async () => {
-      const data = await loadKnowledgeData();
+    it('should load knowledge data for prompt engine', () => {
+      const data = loadKnowledgeData();
 
       expect(data).toHaveProperty('entries');
       expect(Array.isArray(data.entries)).toBe(true);
@@ -198,7 +198,7 @@ describe('Knowledge Loader', () => {
   });
 
   describe('knowledge pack statistics', () => {
-    it('should log pack loading statistics', async () => {
+    it('should log pack loading statistics', () => {
       const entries = getAllEntries();
       const packsDir = path.join(process.cwd(), 'knowledge/packs');
       const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.json'));

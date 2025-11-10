@@ -37,6 +37,13 @@ export const config = {
       return this.dirPath.trim().length > 0;
     },
   },
+
+  knowledge: {
+    customPacksDir: parseStringEnv('CUSTOM_KNOWLEDGE_PACKS_DIR', ''),
+    get hasCustomPacks() {
+      return this.customPacksDir.trim().length > 0;
+    },
+  },
 } as const;
 
 // Export the type for use throughout the application
@@ -60,6 +67,10 @@ export function logConfigSummaryIfDev(logger?: {
       toolLogging: {
         enabled: config.toolLogging.enabled,
         dirPath: config.toolLogging.dirPath || 'not configured',
+      },
+      knowledge: {
+        hasCustomPacks: config.knowledge.hasCustomPacks,
+        customPacksDir: config.knowledge.customPacksDir || 'not configured',
       },
     };
 

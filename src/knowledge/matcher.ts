@@ -555,14 +555,14 @@ export interface KnowledgeSnippetOptions {
  *
  * @param topic - Topic to search for
  * @param options - Options for snippet selection
- * @returns Promise resolving to weighted snippets
+ * @returns Weighted snippets
  */
-export async function getKnowledgeSnippets(
+export function getKnowledgeSnippets(
   topic: Topic,
   options: KnowledgeSnippetOptions,
-): Promise<KnowledgeSnippet[]> {
+): KnowledgeSnippet[] {
   try {
-    const knowledgeData = await loadKnowledgeData();
+    const knowledgeData = loadKnowledgeData();
 
     const queryTextParts: string[] = [topic];
     if (options.detectedDependencies && options.detectedDependencies.length > 0) {

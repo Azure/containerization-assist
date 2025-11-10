@@ -246,7 +246,7 @@ export function createKnowledgeTool<
 
     let knowledgeSnippets: KnowledgeSnippet[];
     try {
-      knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
+      knowledgeSnippets = getKnowledgeSnippets(topic, knowledgeOptions);
     } catch (error) {
       ctx.logger.warn(
         { error, topic, filters },

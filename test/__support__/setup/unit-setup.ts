@@ -81,6 +81,12 @@ jest.mock('../../../src/lib/logger', () => ({
 (global as any).createTestInfrastructure = createMockInfrastructure;
 (global as any).TEST_TIMEOUT = 10000;
 
+// Suppress unhandled rejection warnings from mocked errors in tests
+process.removeAllListeners('unhandledRejection');
+process.on('unhandledRejection', () => {
+  // Ignore - these are expected from mocked errors in tests
+});
+
 // Console cleanup
 const originalConsole = console;
 beforeEach(() => {

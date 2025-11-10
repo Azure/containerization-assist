@@ -49,6 +49,9 @@ temp/
 # TypeScript
 *.tsbuildinfo
 
+# Generated files
+src/knowledge/generated-packs.ts
+
 # NPM
 npm-debug.log*
 yarn-debug.log*

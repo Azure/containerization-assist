@@ -2,47 +2,21 @@
  * Knowledge Pack Loader
  * Loads and manages static knowledge packs for AI enhancement
  *
+ * Hybrid loading strategy:
+ * 1. Built-in packs: Pre-loaded at build time (instant, zero I/O)
+ * 2. Custom packs: Optionally loaded from CUSTOM_KNOWLEDGE_PACKS_DIR env var
+ *
  * @see {@link ../../docs/adr/003-knowledge-enhancement.md ADR-003: Knowledge Enhancement System}
  */
 
 import { createLogger } from '@/lib/logger';
+import { config } from '@/config';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Get current module directory (__dirname equivalent for ESM)
-// In CJS build, __dirname is available natively
-// In ESM build, we derive it from import.meta.url
-// In test environment, use process.cwd() fallback
-const getModuleDir = (): string => {
-  // CJS environment - __dirname is defined
-  if (typeof __dirname !== 'undefined') {
-    return __dirname;
-  }
-
-  // ESM environment - import.meta.url is available
-  // Use indirect eval to prevent TypeScript from transpiling import.meta
-  try {
-    const metaUrl = new Function(
-      'return typeof import.meta !== "undefined" ? import.meta.url : null',
-    )();
-    if (metaUrl) {
-      return path.dirname(fileURLToPath(metaUrl));
-    }
-  } catch (error) {
-    // Fallthrough to process.cwd() fallback
-    logger.warn({ error }, 'Could not determine module directory from import.meta.url');
-  }
-
-  // Test/fallback environment - use process.cwd() + path resolution
-  // This works in Jest test environment where import.meta may not be properly mocked
-  return path.resolve(process.cwd(), 'src/knowledge');
-};
-
-const moduleDir = getModuleDir();
+import { BUILT_IN_PACKS } from './generated-packs';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
@@ -58,15 +32,6 @@ const knowledgeState: KnowledgeState = {
   byCategory: new Map(),
   byTag: new Map(),
   loaded: false,
-};
-
-const findExistingPath = (paths: readonly string[]): string | null => {
-  for (const path of paths) {
-    if (existsSync(path)) {
-      return path;
-    }
-  }
-  return null;
 };
 
 /**
@@ -178,13 +143,9 @@ const getTopTags = (limit: number): Array<{ tag: string; count: number }> => {
 };
 
 /**
- * Load knowledge entries from all knowledge packs
+ * Load custom knowledge packs from a directory
  */
-export const loadKnowledgeBase = (): void => {
-  if (knowledgeState.loaded) {
-    return;
-  }
-
+const loadCustomPacks = (customDir: string): void => {
   const stats = {
     packsAttempted: 0,
     packsLoaded: 0,
@@ -195,35 +156,23 @@ export const loadKnowledgeBase = (): void => {
   };
 
   try {
-    // Calculate package root from module location
-    // In built package: dist/src/knowledge/loader.js or dist-cjs/src/knowledge/loader.js
-    // Package root is 3 levels up: ../../../
-    const packageRoot = path.resolve(moduleDir, '../../../');
-
-    // Find packs directory - try package-relative path FIRST (works in all install scenarios)
-    const possiblePacksDirs = [
-      path.join(packageRoot, 'knowledge/packs'), // Primary: package-relative (always correct)
-      path.resolve(process.cwd(), 'knowledge/packs'), // Fallback: dev environment
-      path.resolve(process.cwd(), 'dist/knowledge/packs'), // Fallback: dev build
-    ] as const;
-
-    const packsDir = findExistingPath(possiblePacksDirs);
-    if (!packsDir) {
-      throw new Error('Could not find knowledge packs directory');
+    if (!existsSync(customDir)) {
+      logger.warn({ customDir }, 'Custom knowledge packs directory does not exist');
+      return;
     }
 
-    // Discover all .json files in packs directory
-    const packFiles = readdirSync(packsDir)
+    // Discover all .json files in custom packs directory
+    const packFiles = readdirSync(customDir)
       .filter((file) => file.endsWith('.json'))
       .sort();
     stats.packsAttempted = packFiles.length;
 
-    logger.info({ packsDir, totalPacks: packFiles.length }, 'Discovered knowledge packs');
+    logger.info({ customDir, totalPacks: packFiles.length }, 'Loading custom knowledge packs');
 
     // Load each pack
     for (const packFile of packFiles) {
       try {
-        const packPath = path.join(packsDir, packFile);
+        const packPath = path.join(customDir, packFile);
         const content = readFileSync(packPath, 'utf-8');
 
         // Parse JSON
@@ -246,7 +195,7 @@ export const loadKnowledgeBase = (): void => {
         }
 
         const entries = result.entries;
-        logger.debug({ pack: packFile, count: entries.length }, 'Loading knowledge pack');
+        logger.debug({ pack: packFile, count: entries.length }, 'Loading custom pack');
 
         // Validate and add individual entries
         for (const entry of entries) {
@@ -265,16 +214,13 @@ export const loadKnowledgeBase = (): void => {
           file: packFile,
           error: String(packError),
         });
-        logger.warn({ pack: packFile, error: packError }, 'Failed to load knowledge pack');
+        logger.warn({ pack: packFile, error: packError }, 'Failed to load custom pack');
       }
     }
 
-    buildIndices();
-    knowledgeState.loaded = true;
-
     // Log summary
     if (stats.failures.length > 0) {
-      logger.warn({ failures: stats.failures }, `Failed to load ${stats.packsFailed} packs`);
+      logger.warn({ failures: stats.failures }, `Failed to load ${stats.packsFailed} custom packs`);
     }
 
     logger.info(
@@ -284,11 +230,63 @@ export const loadKnowledgeBase = (): void => {
         packsFailed: stats.packsFailed,
         entriesValid: stats.entriesValid,
         entriesInvalid: stats.entriesInvalid,
+      },
+      'Custom knowledge packs loaded',
+    );
+  } catch (error) {
+    logger.warn({ error, customDir }, 'Failed to load custom knowledge packs (non-fatal)');
+  }
+};
+
+/**
+ * Load knowledge entries from built-in and custom packs
+ *
+ * Hybrid loading strategy:
+ * 1. Load pre-validated built-in packs (instant, zero I/O)
+ * 2. Optionally load custom packs from CUSTOM_KNOWLEDGE_PACKS_DIR
+ */
+export const loadKnowledgeBase = (): void => {
+  if (knowledgeState.loaded) {
+    return;
+  }
+
+  logger.info('Loading knowledge base');
+
+  try {
+    // 1. Load built-in packs (pre-validated at build time)
+    logger.debug(
+      { builtInEntries: BUILT_IN_PACKS.length },
+      'Loading pre-validated built-in knowledge packs',
+    );
+
+    for (const entry of BUILT_IN_PACKS) {
+      addEntry(entry);
+    }
+
+    const builtInCount = knowledgeState.entries.size;
+    logger.info({ entries: builtInCount }, 'Built-in knowledge packs loaded');
+
+    // 2. Load custom packs if configured
+    const customDir = config.knowledge.customPacksDir;
+    if (customDir) {
+      logger.info({ customDir }, 'Loading custom knowledge packs');
+      loadCustomPacks(customDir);
+    }
+
+    // 3. Build indices for fast lookups
+    buildIndices();
+    knowledgeState.loaded = true;
+
+    // Log final summary
+    logger.info(
+      {
+        builtInEntries: builtInCount,
+        customEntries: knowledgeState.entries.size - builtInCount,
         totalEntries: knowledgeState.entries.size,
         categories: Array.from(knowledgeState.byCategory.keys()),
         topTags: getTopTags(5),
       },
-      'Knowledge base loaded',
+      'Knowledge base loaded successfully',
     );
   } catch (error) {
     logger.error({ error }, 'Failed to load knowledge base');
@@ -314,9 +312,9 @@ export const isKnowledgeLoaded = (): boolean => {
  * Load knowledge data and return entries.
  * Used by prompt engine for knowledge selection.
  */
-export const loadKnowledgeData = async (): Promise<{ entries: LoadedEntry[] }> => {
+export const loadKnowledgeData = (): { entries: LoadedEntry[] } => {
   if (!isKnowledgeLoaded()) {
-    await loadKnowledgeBase();
+    loadKnowledgeBase();
   }
   return {
     entries: getAllEntries(),

@@ -75,6 +75,11 @@ jest.mock('../../../src/validation/dockerfile-validator', () => ({
   validateDockerfileContent: mockValidateDockerfileContent,
 }));
 
+// Mock knowledge matcher
+jest.mock('../../../src/knowledge/matcher', () => ({
+  getKnowledgeSnippets: jest.fn(),
+}));
+
 // Mock knowledge loader
 const mockGetKnowledgeForCategory = jest.fn();
 jest.mock('../../../src/knowledge', () => ({
@@ -97,9 +102,13 @@ function createMockToolContext() {
 }
 
 // Import these after mocks are set up
+import * as knowledgeMatcher from '../../../src/knowledge/matcher';
 import { default as fixDockerfileTool } from '../../../src/tools/fix-dockerfile/tool';
 import type { FixDockerfileParams } from '../../../src/tools/fix-dockerfile/schema';
 import { ValidationSeverity, ValidationCategory } from '../../../src/validation/core-types';
+
+// Spy on getKnowledgeSnippets
+const mockGetKnowledgeSnippets = jest.spyOn(knowledgeMatcher, 'getKnowledgeSnippets').mockImplementation(jest.fn());
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -134,6 +143,9 @@ describe('fix-dockerfile', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
+
+    // Setup default knowledge mock implementation with empty array
+    mockGetKnowledgeSnippets.mockReturnValue([]);
 
     // Default mock implementations for file system operations
     mockFs.access.mockResolvedValue(undefined);

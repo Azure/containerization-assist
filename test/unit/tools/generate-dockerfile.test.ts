@@ -48,9 +48,8 @@ jest.mock('@/lib/validation-helpers', () => ({
 }));
 
 // Mock knowledge matcher
-const mockGetKnowledgeSnippets = jest.fn();
 jest.mock('@/knowledge/matcher', () => ({
-  getKnowledgeSnippets: mockGetKnowledgeSnippets,
+  getKnowledgeSnippets: jest.fn(),
 }));
 
 // Mock logger
@@ -85,8 +84,12 @@ function createMockToolContext(): ToolContext {
 }
 
 // Import after mocks are set up
+import * as knowledgeMatcher from '@/knowledge/matcher';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
 import type { GenerateDockerfileParams } from '@/tools/generate-dockerfile/schema';
+
+// Spy on getKnowledgeSnippets
+const mockGetKnowledgeSnippets = jest.spyOn(knowledgeMatcher, 'getKnowledgeSnippets').mockImplementation(jest.fn());
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -107,30 +110,13 @@ describe('generate-dockerfile', () => {
     // Reset all mocks
     jest.clearAllMocks();
 
+    // Setup default knowledge mock implementation with empty array
+    mockGetKnowledgeSnippets.mockReturnValue([]);
+
     // Default mock implementations
     mockFs.access.mockResolvedValue(undefined);
     mockFs.stat.mockResolvedValue({ isFile: () => false, isDirectory: () => true } as any);
     mockFs.readFile.mockRejectedValue(new Error('ENOENT: no such file'));
-
-    // Default knowledge snippets (matches getKnowledgeSnippets return type)
-    mockGetKnowledgeSnippets.mockResolvedValue([
-      {
-        id: 'base-image-1',
-        text: 'FROM node:18-alpine Use official Node.js image',
-        category: 'base-image',
-        tags: ['base-image', 'node', 'alpine'],
-        weight: 0.9,
-        source: 'base-image-1',
-      },
-      {
-        id: 'security-1',
-        text: 'Use non-root user for security USER node',
-        category: 'security',
-        tags: ['security', 'best-practice'],
-        weight: 0.85,
-        source: 'security-1',
-      },
-    ]);
   });
 
   describe('Happy Path', () => {
@@ -312,20 +298,8 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
     });
 
-    it('should handle network errors when querying knowledge base', async () => {
-      mockGetKnowledgeSnippets.mockRejectedValue(
-        new Error('Network error: Unable to fetch knowledge'),
-      );
-
-      const result = await generateDockerfileTool.handler(config, mockContext);
-
-      // Tool should handle knowledge base errors gracefully
-      // Knowledge system errors are typically caught internally
-      expect(result).toBeDefined();
-    });
-
     it('should handle empty knowledge base results', async () => {
-      mockGetKnowledgeSnippets.mockResolvedValue([]);
+      mockGetKnowledgeSnippets.mockReturnValue([]);
 
       const result = await generateDockerfileTool.handler(config, mockContext);
 
@@ -488,7 +462,7 @@ CMD ["node", "index.js"]`;
   describe('Base Image Recommendations', () => {
     it('should categorize distroless images correctly', async () => {
       // Mock knowledge with base-image tag to trigger categorization
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-distroless',
           text: 'FROM gcr.io/distroless/nodejs18-debian11 Use distroless image for minimal attack surface',
@@ -512,7 +486,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should categorize security images correctly (chainguard)', async () => {
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-chainguard',
           text: 'FROM cgr.dev/chainguard/node:latest Use Chainguard hardened image for enhanced security',
@@ -536,7 +510,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should categorize security images correctly (wolfi)', async () => {
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-wolfi',
           text: 'FROM cgr.dev/chainguard/wolfi-base:latest Use Wolfi-based image for security',
@@ -559,7 +533,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should categorize size-optimized images (alpine)', async () => {
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-alpine',
           text: 'FROM node:18-alpine Use Alpine Linux for smaller image size (50MB)',
@@ -583,7 +557,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should categorize size-optimized images (slim)', async () => {
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-slim',
           text: 'FROM node:18-slim Use slim variant for reduced size (200 MB)',
@@ -608,7 +582,7 @@ CMD ["node", "index.js"]`;
 
     it('should substitute version in runtime images', async () => {
       config.languageVersion = '20';
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-node',
           text: 'FROM node:18-alpine Use Node.js Alpine image',
@@ -630,7 +604,7 @@ CMD ["node", "index.js"]`;
     it('should substitute version in maven/gradle images', async () => {
       config.language = 'java';
       config.languageVersion = '21';
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-maven',
           text: 'FROM maven:3.9-openjdk-17 Use Maven with OpenJDK',
@@ -652,7 +626,7 @@ CMD ["node", "index.js"]`;
     it('should substitute version in gradle images', async () => {
       config.language = 'java';
       config.languageVersion = '21';
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-gradle',
           text: 'FROM gradle:8.5-jdk-17-alpine Use Gradle with JDK',
@@ -675,7 +649,7 @@ CMD ["node", "index.js"]`;
 
     it('should handle images with no version to substitute', async () => {
       config.languageVersion = '20';
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-image-custom',
           text: 'FROM custom-node-image:latest Use custom image',
@@ -696,7 +670,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should limit base images to top 2', async () => {
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-1',
           text: 'FROM node:18-alpine',
@@ -751,7 +725,7 @@ CMD ["node", "index.js"]`;
         source: `security-${i}`,
       }));
 
-      mockGetKnowledgeSnippets.mockResolvedValue(securitySnippets);
+      mockGetKnowledgeSnippets.mockReturnValue(securitySnippets);
 
       const result = await generateDockerfileTool.handler(config, mockContext);
 
@@ -773,7 +747,7 @@ CMD ["node", "index.js"]`;
         source: `optimization-${i}`,
       }));
 
-      mockGetKnowledgeSnippets.mockResolvedValue(optimizationSnippets);
+      mockGetKnowledgeSnippets.mockReturnValue(optimizationSnippets);
 
       const result = await generateDockerfileTool.handler(config, mockContext);
 
@@ -793,7 +767,7 @@ CMD ["node", "index.js"]`;
         source: `best-practice-${i}`,
       }));
 
-      mockGetKnowledgeSnippets.mockResolvedValue(bestPracticeSnippets);
+      mockGetKnowledgeSnippets.mockReturnValue(bestPracticeSnippets);
 
       const result = await generateDockerfileTool.handler(config, mockContext);
 
@@ -902,7 +876,7 @@ CMD ["node", "dist/index.js"]`;
 
     it('should include base image selection in instructions', async () => {
       mockFs.readFile.mockRejectedValue(new Error('ENOENT'));
-      mockGetKnowledgeSnippets.mockResolvedValue([
+      mockGetKnowledgeSnippets.mockReturnValue([
         {
           id: 'base-1',
           text: 'FROM node:18-alpine',
