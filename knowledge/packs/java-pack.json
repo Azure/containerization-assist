@@ -33,6 +33,7 @@
     "tags": [
       "azure",
       "azurelinux",
+      "base-image",
       "build-stage",
       "fix-dockerfile",
       "generate-dockerfile",
