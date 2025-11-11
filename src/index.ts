@@ -252,7 +252,7 @@ export { tool } from './types/tool.js';
  *
  * Tools are organized by workflow stage:
  * 1. Analysis: `analyzeRepoTool` - Detect language, framework, and dependencies
- * 2. Dockerfile: `generateDockerfileTool`, `fixDockerfileTool`, `validateDockerfileTool`
+ * 2. Dockerfile: `generateDockerfileTool`, `fixDockerfileTool`
  * 3. Build: `buildImageTool`, `scanImageTool`, `tagImageTool`, `pushImageTool`
  * 4. Deploy: `generateK8sManifestsTool`, `prepareClusterTool`, `verifyDeployTool`
  * 5. Operations: `opsTool` - Operational utilities
