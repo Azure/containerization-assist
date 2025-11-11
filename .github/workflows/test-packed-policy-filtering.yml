@@ -1,0 +1,148 @@
+name: Test Packed Version - Policy Filtering
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  test-packed-policy-filtering:
+    name: Test Packed Version with Policy Filtering
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout containerization-assist
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          path: containerization-assist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: containerization-assist/package-lock.json
+
+      - name: Install dependencies
+        working-directory: containerization-assist
+        run: npm ci
+
+      - name: Build project
+        working-directory: containerization-assist
+        run: npm run build
+
+      - name: Pack the project
+        working-directory: containerization-assist
+        run: |
+          npm pack
+          echo "PACKED_FILE=$(ls containerization-assist-mcp-*.tgz)" >> $GITHUB_ENV
+
+      - name: Install packed version globally
+        working-directory: containerization-assist
+        run: |
+          npm install -g ${{ env.PACKED_FILE }}
+          echo "Installed version:"
+          ca-mcp --version || true
+
+      - name: Clone Spring PetClinic repository
+        run: |
+          git clone --depth 1 https://github.com/spring-projects/spring-petclinic.git
+          cd spring-petclinic
+          echo "Spring PetClinic cloned successfully"
+          ls -la
+
+      - name: Setup Java for Spring PetClinic
+        uses: actions/setup-java@7a6d8a8234af8eb26422e24e3006232cccaa061b # v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Verify CLI is accessible
+        run: |
+          echo "Testing CLI availability..."
+          which ca-mcp
+          ca-mcp --version
+          ca-mcp --help | head -n 10
+
+      - name: Verify base-images policy exists
+        working-directory: containerization-assist
+        run: |
+          echo "Checking for base-images.rego policy..."
+          ls -la policies/base-images.rego
+          echo ""
+          echo "Policy content preview:"
+          head -n 30 policies/base-images.rego
+
+      - name: Test policy filtering via MCP CLI (stdio JSON-RPC)
+        id: test-mcp-policy
+        working-directory: spring-petclinic
+        run: |
+          echo "Testing policy filtering via MCP CLI using stdio JSON-RPC protocol..."
+          echo "Repository path: $(pwd)"
+          echo "Policy path: $(pwd)/../containerization-assist/policies/base-images.rego"
+          echo ""
+
+          # Copy test script from containerization-assist
+          cp ../containerization-assist/scripts/test-spring-petclinic-policy-filtering.mjs ./test-policy-filtering.mjs
+
+          # Run the MCP stdio test with base-images policy
+          node test-policy-filtering.mjs "$(pwd)" "$(pwd)/../containerization-assist/policies/base-images.rego"
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🧪 Packed Version Test - Policy Filtering (MCP CLI)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Method" >> $GITHUB_STEP_SUMMARY
+          echo "Tests run via **MCP CLI** using **stdio JSON-RPC protocol** with **base-images.rego policy**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.test-mcp-policy.outcome }}" = "success" ]; then
+            echo "✅ **MCP CLI Policy Filtering Test**: Passed" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ Policy loaded via CONTAINERIZATION_ASSIST_POLICY_PATH" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ analyze-repo via JSON-RPC" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ generate-dockerfile via JSON-RPC (with policy)" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ Only Microsoft Container Registry images recommended" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ Knowledge pack filtering respected policy constraints" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **MCP CLI Policy Filtering Test**: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Failure indicates:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Policy may not be loading correctly in packed version" >> $GITHUB_STEP_SUMMARY
+            echo "- Knowledge pack filtering may not respect policy" >> $GITHUB_STEP_SUMMARY
+            echo "- Non-Microsoft images may be recommended despite policy" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: spring-projects/spring-petclinic" >> $GITHUB_STEP_SUMMARY
+          echo "- **Language**: Java (Spring Boot)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Policy**: policies/base-images.rego" >> $GITHUB_STEP_SUMMARY
+          echo "- **Policy Requirement**: Only Microsoft Container Registry images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Testing Approach" >> $GITHUB_STEP_SUMMARY
+          echo "1. Pack project with \`npm pack\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install globally with \`npm install -g\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Set \`CONTAINERIZATION_ASSIST_POLICY_PATH\` to base-images.rego" >> $GITHUB_STEP_SUMMARY
+          echo "4. Start MCP server via \`ca-mcp start\` (stdio transport)" >> $GITHUB_STEP_SUMMARY
+          echo "5. Send JSON-RPC requests to stdin" >> $GITHUB_STEP_SUMMARY
+          echo "6. Parse JSON-RPC responses from stdout" >> $GITHUB_STEP_SUMMARY
+          echo "7. Verify ONLY Microsoft images in recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "8. Verify non-Microsoft images are filtered out" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## What This Tests" >> $GITHUB_STEP_SUMMARY
+          echo "This test validates that the **packed/deployed version** correctly:" >> $GITHUB_STEP_SUMMARY
+          echo "- Loads policies from \`CONTAINERIZATION_ASSIST_POLICY_PATH\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Filters knowledge pack recommendations based on policy rules" >> $GITHUB_STEP_SUMMARY
+          echo "- Only recommends policy-compliant base images (Microsoft images)" >> $GITHUB_STEP_SUMMARY
+          echo "- Blocks non-compliant recommendations (Eclipse Temurin, Alpine, etc.)" >> $GITHUB_STEP_SUMMARY

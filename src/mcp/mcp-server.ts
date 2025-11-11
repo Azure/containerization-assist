@@ -228,6 +228,7 @@ export function createMCPServer<TTool extends Tool>(
       isRunning = true;
       logger.info(
         {
+          version: serverOptions.version,
           transport: transportType,
           toolCount: tools.length,
         },
