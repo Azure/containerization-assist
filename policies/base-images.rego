@@ -51,7 +51,7 @@ violations contains result if {
 		"category": "quality",
 		"priority": 95,
 		"severity": "block",
-		"message": "Only Microsoft Container Registry images are allowed. Use mcr.microsoft.com/openjdk/jdk for Java, mcr.microsoft.com/dotnet for .NET, mcr.microsoft.com/cbl-mariner for base images.",
+		"message": "Only Microsoft Container Registry images are allowed. Use mcr.microsoft.com/openjdk/jdk with -azurelinux tags for Java, mcr.microsoft.com/dotnet for .NET, mcr.microsoft.com/azurelinux/base for language runtimes.",
 		"description": "Require Microsoft Container Registry images for all deployments",
 	}
 }
@@ -60,14 +60,14 @@ violations contains result if {
 # Recommend Microsoft Azure Linux images for enterprise deployments
 suggestions contains result if {
 	is_dockerfile
-	regex.match(`(?im)FROM\s+mcr\.microsoft\.com/(openjdk|dotnet|cbl-mariner):`, input.content)
+	regex.match(`(?im)FROM\s+mcr\.microsoft\.com/(openjdk|dotnet|azurelinux)`, input.content)
 
 	result := {
 		"rule": "recommend-microsoft-images",
 		"category": "quality",
 		"priority": 85,
 		"severity": "suggest",
-		"message": "Good choice using Microsoft Azure Linux (Mariner) base images for enterprise deployments. Provides enterprise support and security.",
+		"message": "Good choice using Microsoft Azure Linux 3.0 base images for enterprise deployments. Provides enterprise support and security.",
 		"description": "Recommend Microsoft Azure Linux images for enterprise deployments",
 	}
 }

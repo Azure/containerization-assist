@@ -14,9 +14,11 @@
 import { type Result, Success } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Topic } from '@/types/topics';
-import type { KnowledgeCategory } from '@/knowledge/types';
+import type { KnowledgeCategory, KnowledgeQuery } from '@/knowledge/types';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
+import { getPolicyAwareKnowledgeSnippets } from '@/knowledge/policy-aware-matcher';
+import { loadKnowledgeData } from '@/knowledge/loader';
 
 /**
  * Configuration for knowledge query construction.
@@ -243,7 +245,54 @@ export function createKnowledgeTool<
       ...(filters.framework && { framework: filters.framework }),
       ...(hasDetectedDeps && { detectedDependencies: detectedDeps }),
     };
-    const knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
+
+    // Use policy-aware knowledge matching if policy is available
+    let knowledgeSnippets: KnowledgeSnippet[];
+    if (ctx.policy) {
+      // Load knowledge data for policy-aware matching
+      const knowledgeData = await loadKnowledgeData();
+
+      // Build query for policy-aware matcher
+      const query: KnowledgeQuery = {
+        text: topic,
+        category: knowledgeOptions.category,
+        environment: knowledgeOptions.environment,
+        tool: knowledgeOptions.tool,
+        ...(knowledgeOptions.language && { language: knowledgeOptions.language }),
+        ...(knowledgeOptions.framework && { framework: knowledgeOptions.framework }),
+        tags: [
+          knowledgeOptions.tool,
+          ...(knowledgeOptions.language ? [knowledgeOptions.language] : []),
+          ...(knowledgeOptions.framework ? [knowledgeOptions.framework] : []),
+          ...(hasDetectedDeps ? detectedDeps : []),
+        ],
+        limit: knowledgeOptions.maxSnippets,
+      };
+
+      const { snippets, filterResult } = await getPolicyAwareKnowledgeSnippets(
+        knowledgeData.entries,
+        query,
+        ctx.policy,
+      );
+
+      // Log policy filtering results
+      if (filterResult.policyApplied) {
+        ctx.logger.info(
+          {
+            excluded: filterResult.excluded.length,
+            boosted: filterResult.boosted.length,
+            reduced: filterResult.reduced.length,
+            returned: filterResult.totalReturned,
+          },
+          `${config.name}: Policy-aware knowledge filtering applied`,
+        );
+      }
+
+      knowledgeSnippets = snippets;
+    } else {
+      // Fall back to standard knowledge matching
+      knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
+    }
 
     // 2. Categorize knowledge snippets
     // Initialize empty arrays for each category

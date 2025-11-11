@@ -6,6 +6,24 @@
 import { z } from 'zod';
 import { environmentSchema } from '@/config/constants';
 
+/**
+ * Supported Docker platforms for multi-architecture builds
+ * See: https://docs.docker.com/build/building/multi-platform/
+ */
+export const DOCKER_PLATFORMS = [
+  'linux/amd64',
+  'linux/arm64',
+  'linux/arm/v7',
+  'linux/arm/v6',
+  'linux/386',
+  'linux/ppc64le',
+  'linux/s390x',
+  'linux/riscv64',
+  'windows/amd64',
+] as const;
+
+export type DockerPlatform = (typeof DOCKER_PLATFORMS)[number];
+
 // Paths
 export const repositoryPath = z
   .string()
@@ -44,8 +62,13 @@ export const analysisOptions = {
   performanceFocus: z.boolean().optional().describe('Focus on performance aspects'),
 };
 
-// Platform
-export const platform = z.string().optional().describe('Target platform (e.g., linux/amd64)');
+// Platform - Required for consistent builds across environments
+export const platform = z
+  .enum(DOCKER_PLATFORMS)
+  .default('linux/amd64')
+  .describe(
+    'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). Defaults to linux/amd64 for maximum compatibility. Required to ensure consistent builds across environments and cross-platform scenarios (e.g., ARM Mac targeting AMD64 servers).',
+  );
 
 // Multi-module/monorepo support
 
