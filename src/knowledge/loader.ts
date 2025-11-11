@@ -15,6 +15,18 @@ import { fileURLToPath } from 'url';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
+// Capture import.meta.url at module load time (ESM only)
+// This will be undefined in CJS builds, which is expected
+// Using eval to avoid TypeScript compilation errors in CJS target
+let moduleUrl: string | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-eval
+  moduleUrl = eval('import.meta.url');
+} catch {
+  // CJS build or import.meta not available
+  moduleUrl = undefined;
+}
+
 interface KnowledgeState {
   entries: Map<string, LoadedEntry>;
   byCategory: Map<string, LoadedEntry[]>;
@@ -150,41 +162,42 @@ const getTopTags = (limit: number): Array<{ tag: string; count: number }> => {
  * Get the package root directory by resolving from this module's location
  * Works in both ESM and CJS builds
  *
- * This function will be compiled differently for ESM and CJS:
- * - In ESM: Can use import.meta.url directly (but TypeScript requires globalThis workaround)
- * - In CJS: Will fall back to require.main or process.cwd()
+ * Strategy priority:
+ * 1. Use import.meta.url (captured at module load) in ESM builds
+ * 2. Use require.main.path in CJS builds
+ * 3. Fall back to process.cwd()
  */
 const getPackageRoot = (): string => {
-  // Strategy 1: For ESM, use eval to access import.meta.url without TypeScript compile errors in CJS
+  // Strategy 1: ESM - use captured import.meta.url
   // When built to ESM: dist/src/knowledge/loader.js -> go up 3 levels to package root
   // When in dev TSX: src/knowledge/loader.ts -> go up 2 levels to repo root
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-    const getImportMetaUrl = new Function('return import.meta.url');
-    const importMetaUrl = getImportMetaUrl() as string;
-    if (importMetaUrl) {
-      const currentFile = fileURLToPath(importMetaUrl);
+  if (moduleUrl) {
+    try {
+      const currentFile = fileURLToPath(moduleUrl);
       const moduleDir = path.dirname(currentFile);
       const isBuilt = moduleDir.includes('/dist/src/');
       const levelsUp = isBuilt ? 3 : 2;
       return path.resolve(moduleDir, ...Array(levelsUp).fill('..'));
+    } catch (err) {
+      logger.debug({ moduleUrl, error: err }, 'Failed to resolve from import.meta.url');
     }
-  } catch {
-    // Fall through - this will fail in CJS, which is expected
   }
 
-  // Strategy 2: CJS fallback - use require.main path
+  // Strategy 2: CJS - use require.main path
   // In packaged mode, entry point is usually dist/src/cli/cli.js
   try {
-    if (require?.main?.path) {
+    // Use globalThis to avoid TypeScript errors
+    const req = (globalThis as { require?: NodeRequire }).require;
+    if (req?.main?.path) {
       // Go up from entry point to package root
-      return path.resolve(require.main.path, '../..');
+      return path.resolve(req.main.path, '../..');
     }
-  } catch {
-    // Fall through - require not available in ESM
+  } catch (err) {
+    logger.debug({ error: err }, 'Failed to resolve from require.main');
   }
 
   // Strategy 3: Last resort - assume we're in repo/package root
+  logger.debug({ cwd: process.cwd() }, 'Using process.cwd() as package root');
   return process.cwd();
 };
 
