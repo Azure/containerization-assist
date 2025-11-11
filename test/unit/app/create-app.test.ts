@@ -9,6 +9,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as OrchestratorModule from '@/app/orchestrator';
 import * as MCPServerModule from '@/mcp/mcp-server';
 import { registerToolsWithServer, OUTPUTFORMAT } from '@/mcp/mcp-server';
+import { CHAINHINTSMODE } from '@/app/orchestrator-types';
 import { createApp } from '@/app';
 
 const { createOrchestrator } = OrchestratorModule;
@@ -212,6 +213,7 @@ describe('createApp orchestration integration', () => {
 
     expect(registerToolsSpy).toHaveBeenCalledWith({
       outputFormat: OUTPUTFORMAT.MARKDOWN,
+      chainHintsMode: CHAINHINTSMODE.ENABLED,
       server: fakeServer,
       tools: expect.any(Array),
       logger: expect.any(Object),

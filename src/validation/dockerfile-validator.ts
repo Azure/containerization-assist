@@ -31,6 +31,7 @@ import {
   SECRET_PATTERN,
   TOKEN_PATTERN,
 } from '@/lib/regex-patterns';
+import type { DockerPlatform } from '@/tools/shared/schemas';
 
 type DockerCommand = CommandEntry;
 
@@ -536,10 +537,17 @@ function validateBuildKitDockerfile(content: string): ValidationReport {
  */
 export const validateDockerfileContent = async (
   dockerfileContent: string,
-  options?: { enableExternalLinter?: boolean },
+  options?: {
+    enableExternalLinter?: boolean;
+    targetPlatform?: DockerPlatform;
+    strictPlatformValidation?: boolean;
+  },
 ): Promise<ValidationReport> => {
   // Detect BuildKit features first
   const buildKit = detectBuildKitFeatures(dockerfileContent);
+
+  // Prepare validation rules
+  const validationRules = [...DOCKERFILE_RULES];
 
   if (buildKit.syntax || buildKit.hasHeredocs || buildKit.hasMounts) {
     // Log BuildKit features detected
@@ -555,7 +563,7 @@ export const validateDockerfileContent = async (
       // Run all validation rules directly
       const results: ValidationResult[] = [];
 
-      for (const rule of DOCKERFILE_RULES) {
+      for (const rule of validationRules) {
         const passed = rule.check(commands);
 
         // Special handling for no-secrets rule to include the specific secret name
@@ -691,7 +699,7 @@ export const validateDockerfileContent = async (
   // Run all validation rules directly
   const results: ValidationResult[] = [];
 
-  for (const rule of DOCKERFILE_RULES) {
+  for (const rule of validationRules) {
     const passed = rule.check(commands);
 
     // Special handling for no-secrets rule to include the specific secret name

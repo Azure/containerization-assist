@@ -37,7 +37,7 @@ Identify vendor/provider-specific recommendations. Use these for cloud platform-
 - `canonical` - Canonical / Ubuntu
 
 **Vendor Tag Aliases:**
-- `mcr`, `msft`, `mariner` → `microsoft`
+- `mcr`, `msft` → `microsoft`
 - `gcp`, `gcr` → `google`
 - `eks`, `ecr` → `aws`
 - `aks`, `acr` → `azure`

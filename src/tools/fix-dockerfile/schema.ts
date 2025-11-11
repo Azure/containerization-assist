@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { environment } from '../shared/schemas';
+import { environment, platform } from '../shared/schemas';
 import type { ValidationResult } from '@/validation/core-types';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
@@ -12,6 +12,14 @@ export const fixDockerfileSchema = z
     dockerfile: z.string().optional().describe('Dockerfile content to analyze for fixes'),
     path: z.string().optional().describe('Path to Dockerfile file to analyze for fixes'),
     environment: environment.describe('Target environment (production, development, etc.)'),
+    targetPlatform: platform.describe(
+      'Target platform for deployment (e.g., linux/amd64, linux/arm64). Used for context in recommendations.',
+    ),
+    strictPlatformValidation: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Deprecated: No longer enforces platform flags. Reserved for future use.'),
     policyPath: z
       .string()
       .optional()

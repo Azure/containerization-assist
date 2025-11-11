@@ -280,7 +280,7 @@ export async function getRegistryCredentials(
         message: 'Registry hostname exceeds maximum length',
         hint: 'Hostname must be 255 characters or less',
         resolution: 'Provide a valid registry hostname',
-        details: { registry: registry.substring(0, 100) + '...' },
+        details: { registry: `${registry.substring(0, 100)}...` },
       });
     }
 

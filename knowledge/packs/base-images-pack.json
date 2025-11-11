@@ -33,28 +33,28 @@
     "description": "Azure Linux optimized for .NET workloads with Microsoft support"
   },
   {
-    "id": "node-microsoft-mariner",
+    "id": "node-microsoft-azurelinux",
     "category": "dockerfile",
     "pattern": "node|nodejs|javascript|typescript",
-    "recommendation": "Use Microsoft CBL-Mariner for Node.js in enterprise environments",
-    "example": "FROM mcr.microsoft.com/cbl-mariner/base/nodejs:18 AS builder\n# Install additional tools if needed\nRUN tdnf install -y tar",
+    "recommendation": "Use Microsoft Azure Linux 3.0 for Node.js in enterprise environments.",
+    "example": "FROM mcr.microsoft.com/azurelinux/base/nodejs:18 AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM mcr.microsoft.com/azurelinux/distroless/nodejs:18\nWORKDIR /app\nCOPY package*.json ./\nCOPY --from=builder /app/dist ./dist\nRUN npm ci --only=production\nCMD [\"node\", \"dist/index.js\"]",
     "severity": "medium",
     "tags": [
       "enterprise",
       "fix-dockerfile",
       "generate-dockerfile",
-      "mariner",
       "microsoft",
-      "node"
+      "node",
+      "distroless"
     ],
-    "description": "CBL-Mariner provides a secure base for Node.js applications"
+    "description": "Azure Linux 3.0 provides a secure, enterprise-supported base for Node.js applications"
   },
   {
-    "id": "python-microsoft-azure",
+    "id": "python-microsoft-azurelinux",
     "category": "dockerfile",
     "pattern": "python|pip|django|flask",
-    "recommendation": "Use Microsoft Azure Linux for Python applications",
-    "example": "FROM mcr.microsoft.com/cbl-mariner/base/python:3.11",
+    "recommendation": "Use Microsoft Azure Linux 3.0 for Python in enterprise environments. Provides enterprise support and security updates. Microsoft publishes both base and distroless variants.",
+    "example": "FROM mcr.microsoft.com/azurelinux/base/python:3.11 AS builder\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\n\nFROM mcr.microsoft.com/azurelinux/distroless/python:3.11\nWORKDIR /app\nCOPY --from=builder /app/app.py ./app.py\nCOPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages\nCMD [\"python\", \"app.py\"]",
     "severity": "medium",
     "tags": [
       "azure",
@@ -63,7 +63,7 @@
       "microsoft",
       "python"
     ],
-    "description": "Azure Linux with Python runtime for enterprise deployments"
+    "description": "Azure Linux 3.0 provides a secure, enterprise-supported base for Python applications"
   },
   {
     "id": "distroless-security",
@@ -88,7 +88,7 @@
     "category": "dockerfile",
     "pattern": "maven|mvn|pom.xml",
     "recommendation": "Use Maven wrapper for reproducible builds",
-    "example": "# Install tar if needed (Azure Linux/Mariner)\nRUN tdnf install -y tar || yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# Copy wrapper files first\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\n\n# Make wrapper executable and download dependencies\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# Then copy source\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B",
+    "example": "# Install tar if needed (Azure Linux 3.0)\nRUN tdnf install -y tar || yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# Copy wrapper files first\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\n\n# Make wrapper executable and download dependencies\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# Then copy source\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B",
     "severity": "high",
     "tags": [
       "azure",
@@ -128,7 +128,7 @@
     "category": "dockerfile",
     "pattern": "RUN.*install",
     "recommendation": "Use correct package manager for base image",
-    "example": "# Azure Linux/Mariner: tdnf\nRUN tdnf install -y tar curl\n\n# Alpine: apk\nRUN apk add --no-cache tar curl\n\n# Debian/Ubuntu: apt\nRUN apt-get update && apt-get install -y tar curl\n\n# RHEL/CentOS: yum/dnf\nRUN yum install -y tar curl",
+    "example": "# Azure Linux 3.0: tdnf\nRUN tdnf install -y tar curl\n\n# Alpine: apk\nRUN apk add --no-cache tar curl\n\n# Debian/Ubuntu: apt\nRUN apt-get update && apt-get install -y tar curl\n\n# RHEL/CentOS: yum/dnf\nRUN yum install -y tar curl",
     "severity": "high",
     "tags": [
       "azure",
@@ -146,8 +146,8 @@
     "id": "base-image-preference-order",
     "category": "dockerfile",
     "pattern": "FROM",
-    "recommendation": "When selecting base images, follow this preference order: (1) Microsoft Azure Linux/Mariner for enterprise support, (2) Google distroless for security-focused deployments, (3) Official language images for general purpose, (4) Alpine for size optimization, (5) Ubuntu/Debian for maximum compatibility",
-    "example": "# Selection criteria:\n# - Enterprise + Microsoft ecosystem → Azure Linux/Mariner\n# - Security-focused + minimal attack surface → Distroless\n# - General purpose + broad compatibility → Official images\n# - Size-constrained environments → Alpine\n# - Legacy compatibility needs → Ubuntu/Debian",
+    "recommendation": "When selecting base images, follow this preference order: (1) Microsoft Azure Linux 3.0 for enterprise support, (2) Google distroless for security-focused deployments, (3) Official language images for general purpose, (4) Alpine for size optimization, (5) Ubuntu/Debian for maximum compatibility.",
+    "example": "# Selection criteria:\n# - Enterprise + Microsoft ecosystem → Azure Linux 3.0\n# - Security-focused + minimal attack surface → Distroless\n# - General purpose + broad compatibility → Official images\n# - Size-constrained environments → Alpine\n# - Legacy compatibility needs → Ubuntu/Debian",
     "severity": "low",
     "tags": [
       "azure",

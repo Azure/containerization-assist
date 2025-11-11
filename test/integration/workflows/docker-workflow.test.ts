@@ -98,6 +98,7 @@ describe('Docker Workflow Integration', () => {
           repositoryPath: testRepo,
           analysis: JSON.stringify(analysis),
           outputPath: dockerfilePath,
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );
@@ -164,7 +165,6 @@ describe('Docker Workflow Integration', () => {
 
       expect(tagResult.ok).toBe(true);
       if (tagResult.ok) {
-        testCleaner.trackImage(newTag);
         expect(tagResult.value).toBeDefined();
       }
     }, testTimeout);
@@ -236,9 +236,10 @@ CMD ["python", "app.py"]`
           },
           toolContext
         );
-
-        if (tagResult.ok) {
-          testCleaner.trackImage('docker-workflow-python:latest');
+        
+        if (!tagResult.ok) {
+          console.log('Tagging failed:', tagResult.error);
+          return;
         }
       }
     }, testTimeout);
@@ -342,8 +343,9 @@ CMD ["python", "app.py"]`
           toolContext
         );
 
-        if (tagResult.ok) {
-          testCleaner.trackImage('partial-workflow-test:latest');
+        if (!tagResult.ok) {
+          console.log('Tagging failed:', tagResult.error);
+          return;
         }
       }
     }, testTimeout);

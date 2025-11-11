@@ -8,6 +8,14 @@
 import { z } from 'zod';
 
 /**
+ * Environment variable names
+ */
+export const ENV_VARS = {
+  /** Custom policy directory path (highest priority) */
+  CUSTOM_POLICY_PATH: 'CUSTOM_POLICY_PATH',
+} as const;
+
+/**
  * Environment Schema
  * Zod schema for environment validation across the application.
  */
@@ -115,10 +123,18 @@ export const DOCKER = {
   DEFAULT_CONTEXT: '.',
   /** Default registry */
   DEFAULT_REGISTRY: 'docker.io',
-  /** Local registry port for kind */
-  LOCAL_REGISTRY_PORT: 5001,
-  /** Internal registry port */
-  INTERNAL_REGISTRY_PORT: 5000,
+  /** Standard registry port for both external and internal access (default starting point, actual port may vary) */
+  REGISTRY_PORT: 6000,
+  /** Registry port search range start */
+  REGISTRY_PORT_START: 6000,
+  /** Registry port search range end */
+  REGISTRY_PORT_END: 6100,
+  /** Registry container name */
+  REGISTRY_CONTAINER_NAME: 'ca-registry',
+  /** Registry host for external access */
+  REGISTRY_HOST: 'localhost',
+  /** Registry internal port (inside container) */
+  REGISTRY_INTERNAL_PORT: 5000,
 } as const;
 
 /**
@@ -139,8 +155,10 @@ export const KUBERNETES = {
   DEFAULT_ENVIRONMENT: 'development' as const,
   /** Default cluster */
   DEFAULT_CLUSTER: 'default',
-  /** Default port */
-  DEFAULT_PORT: 80,
+  /** Default HTTP port */
+  DEFAULT_HTTP_PORT: 80,
+  /** Default HTTPS port */
+  DEFAULT_HTTPS_PORT: 443,
   /** Pending LoadBalancer URL placeholder */
   PENDING_LB_URL: 'http://pending-loadbalancer',
   /** Default ingress host */

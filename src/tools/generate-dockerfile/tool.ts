@@ -19,8 +19,6 @@ import {
   type GenerateDockerfileParams,
   type DockerfileAnalysis,
   type EnhancementGuidance,
-  type DockerPlatform,
-  DOCKER_PLATFORMS,
 } from './schema';
 import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
@@ -35,49 +33,18 @@ import {
 } from '@/lib/policy-helpers';
 import type { RegoEvaluator } from '@/config/policy-rego';
 import type { Logger } from 'pino';
-import { arch } from 'node:process';
 
 const name = 'generate-dockerfile';
 const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation or enhancement. Automatically detects existing Dockerfiles and provides detailed analysis and guidance.';
 const version = '2.0.0';
 
-/**
- * Detect the current system's Docker platform
- * Maps Node.js platform/arch to Docker platform format (e.g., linux/amd64, linux/arm64)
- *
- * @returns The detected Docker platform, defaults to 'linux/amd64' if detection fails
- */
-function detectSystemPlatform(): DockerPlatform {
-  // Map Node.js arch to Docker arch
-  const archMap: Record<string, string> = {
-    x64: 'amd64',
-    arm64: 'arm64',
-    arm: 'arm/v7',
-    ia32: '386',
-    ppc64: 'ppc64le',
-    s390x: 's390x',
-  };
-
-  // Docker containers typically run Linux regardless of host OS
-  // For Windows/Mac, we still use linux/* for the container platform
-  const dockerArch = archMap[arch] || arch;
-  const platform = `linux/${dockerArch}`;
-
-  // Validate against known platforms, default to linux/amd64 if unknown
-  if (DOCKER_PLATFORMS.includes(platform as DockerPlatform)) {
-    return platform as DockerPlatform;
-  }
-
-  // Fallback to most common platform
-  return 'linux/amd64';
-}
-
 type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPractices';
 
 /**
- * Extended input parameters that include optional existing Dockerfile data.
- * This is used internally to pass Dockerfile analysis results from the run function to buildPlan.
+ * Extended input parameters that include optional existing Dockerfile data and policy config.
+ * This is used internally to pass Dockerfile analysis results and policy configuration
+ * from the run function to buildPlan.
  */
 interface ExtendedDockerfileParams extends GenerateDockerfileParams {
   existingDockerfile?: {
@@ -86,6 +53,7 @@ interface ExtendedDockerfileParams extends GenerateDockerfileParams {
     analysis: DockerfileAnalysis;
     guidance: EnhancementGuidance;
   };
+  dockerfileConfig?: import('@/config/policy-generation-config').DockerfileGenerationConfig;
 }
 
 /**
@@ -342,17 +310,18 @@ interface DockerfileBuildRules {
 /**
  * Regular expression to match Docker image names with optional registry/repository prefix and tag.
  * Matches format: [registry/][repository/]image:tag
- * Examples: node:20-alpine, gcr.io/distroless/nodejs, mcr.microsoft.com/openjdk/jdk:21-mariner
+ * Examples: node:20-alpine, gcr.io/distroless/nodejs, mcr.microsoft.com/openjdk/jdk:21-azurelinux
  * Updated to capture full registry paths including mcr.microsoft.com/path/image:tag
  */
-const DOCKER_IMAGE_NAME_REGEX = /\b([a-z0-9.-]+\/)+[a-z0-9.-]+:[a-z0-9._-]+\b|[a-z0-9.-]+:[a-z0-9._-]+\b/;
+const DOCKER_IMAGE_NAME_REGEX =
+  /\b([a-z0-9.-]+\/)+[a-z0-9.-]+:[a-z0-9._-]+\b|[a-z0-9.-]+:[a-z0-9._-]+\b/;
 
 /**
  * Substitute version in image name based on target language version
  * Examples:
- *   openjdk/jdk:21-mariner + version 25 -> openjdk/jdk:25-mariner
+ *   openjdk/jdk:21-azurelinux + version 25 -> openjdk/jdk:25-azurelinux
  *   eclipse-temurin:17-jdk-alpine + version 25 -> eclipse-temurin:25-jdk-alpine
- *   mcr.microsoft.com/openjdk/jdk:21-mariner + version 25 -> mcr.microsoft.com/openjdk/jdk:25-mariner
+ *   mcr.microsoft.com/openjdk/jdk:21-azurelinux + version 25 -> mcr.microsoft.com/openjdk/jdk:25-azurelinux
  *   maven:3.9-openjdk-17 + version 25 -> maven:3.9-openjdk-25
  */
 function substituteImageVersion(image: string, targetVersion: string | undefined): string {
@@ -364,13 +333,13 @@ function substituteImageVersion(image: string, targetVersion: string | undefined
   const toolMatch = image.match(toolWithRuntimePattern);
 
   if (toolMatch) {
-    const [, tool, toolVersion, runtime ] = toolMatch;
+    const [, tool, toolVersion, runtime] = toolMatch;
     // Replace only the JDK version at the end
     return `${tool}:${toolVersion}-${runtime}-${targetVersion}`;
   }
 
   // For runtime images with format "runtime:version-variant"
-  // Match patterns like :17-jdk-alpine, :21-mariner, :3.11-slim
+  // Match patterns like :17-jdk-alpine, :21-azurelinux, :3.11-slim
   const runtimePattern = /:(\d+(?:\.\d+)?)([-.]|$)/;
   const match = image.match(runtimePattern);
 
@@ -487,6 +456,20 @@ const runPattern = createKnowledgeTool<
       const language = input.language || 'auto-detect';
       const buildSystemType = undefined;
 
+      // Check if policy config overrides build strategy
+      if (input.dockerfileConfig?.buildStrategy) {
+        const policyStrategy = input.dockerfileConfig.buildStrategy;
+        const multistage = policyStrategy === 'multi-stage' || policyStrategy === 'distroless';
+
+        return {
+          buildStrategy: {
+            multistage,
+            reason: `Policy-driven build strategy: ${policyStrategy}`,
+          },
+        };
+      }
+
+      // Default language-based logic
       const shouldUseMultistage =
         language === 'java' ||
         language === 'go' ||
@@ -522,8 +505,25 @@ const runPattern = createKnowledgeTool<
       // Extract base image recommendations from categorized knowledge
       // Pass languageVersion for dynamic version substitution
       // Limit to top 2 recommendations to provide clear, opinionated guidance
-      const baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
-        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion))
+      let baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
+        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion));
+
+      // Apply policy config base image category preference
+      if (input.dockerfileConfig?.baseImageCategory) {
+        const preferredCategory = input.dockerfileConfig.baseImageCategory;
+
+        // Boost match scores for images matching the preferred category
+        baseImageMatches = baseImageMatches.map((rec) => {
+          const matchesPreference = rec.category === preferredCategory;
+          return {
+            ...rec,
+            matchScore: matchesPreference ? rec.matchScore + 50 : rec.matchScore,
+          };
+        });
+      }
+
+      // Sort by match score and take top 2
+      baseImageMatches = baseImageMatches
         .sort((a, b) => b.matchScore - a.matchScore) // Sort by match score descending
         .slice(0, 2); // Take only top 2: primary recommendation + 1 alternative
 
@@ -539,9 +539,7 @@ const runPattern = createKnowledgeTool<
         .slice(0, 5); // Top 5 security recommendations
 
       // Limit optimization recommendations to top 5 most relevant
-      const optimizationMatches: DockerfileRequirement[] = (
-        knowledge.categories.optimization || []
-      )
+      const optimizationMatches: DockerfileRequirement[] = (knowledge.categories.optimization || [])
         .map((snippet) => ({
           id: snippet.id,
           category: snippet.category || 'optimization',
@@ -620,21 +618,23 @@ const runPattern = createKnowledgeTool<
           `Path: ${relativeDockerfilePath}\n` +
           `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
           `Environment: ${input.environment || 'production'}\n` +
+          `Target Platform: ${input.targetPlatform}\n` +
           `Current State: ${analysis.complexity}, ${analysis.securityPosture} security, ${analysis.instructionCount} instructions\n` +
           `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
           `Enhancement: ${guidance.strategy}\n` +
           `Changes: Preserve ${guidance.preserve.length} items, Improve ${guidance.improve.length} items, Add ${guidance.addMissing.length} missing items\n` +
           `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
-          `✅ Ready to update Dockerfile with enhancements.`;
+          `✅ Ready to update Dockerfile. Use 'docker buildx build --platform=${input.targetPlatform}' to build for target platform.`;
       } else {
         summary =
           `🔨 ACTION REQUIRED: Create Dockerfile\n` +
           `Path: ${relativeDockerfilePath}\n` +
           `Language: ${language}${languageVersionStr}${frameworkStr}\n` +
           `Environment: ${input.environment || 'production'}\n` +
+          `Target Platform: ${input.targetPlatform}\n` +
           `Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'} build\n` +
           `Recommendations: ${totalRecommendations} total (${baseImageMatches.length} base images, ${securityMatches.length} security, ${optimizationMatches.length} optimizations, ${bestPracticeMatches.length} best practices)\n\n` +
-          `✅ Ready to create Dockerfile based on recommendations.`;
+          `✅ Ready to create Dockerfile. Use 'docker buildx build --platform=${input.targetPlatform}' to build for target platform.`;
       }
 
       return {
@@ -681,27 +681,23 @@ const runPattern = createKnowledgeTool<
 function planToDockerfileText(plan: DockerfilePlan): string {
   const lines: string[] = [];
 
-  // Use platform from plan (policy-driven) or detect system platform as fallback
-  const defaultPlatform = plan.recommendations.platform || detectSystemPlatform();
-
-  // Add base image recommendations as FROM directives with detected platform
+  // Add base image recommendations as FROM directives without platform flags
   const baseImages = plan.recommendations.baseImages || [];
   if (baseImages.length > 0) {
     const primaryImage = baseImages[0];
     if (primaryImage) {
       if (plan.recommendations.buildStrategy.multistage) {
         lines.push('# Multi-stage build');
-        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image} AS builder`);
+        lines.push(`FROM ${primaryImage.image} AS builder`);
         lines.push('# ... build steps ...');
-        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image}`);
+        lines.push(`FROM ${primaryImage.image}`);
       } else {
-        lines.push(`FROM --platform=${defaultPlatform} ${primaryImage.image}`);
+        lines.push(`FROM ${primaryImage.image}`);
       }
     }
   } else {
     // If no base images available (filtered out), use placeholder for policy validation
-    // This ensures platform/tag policies can still validate against defaults
-    lines.push(`FROM --platform=${defaultPlatform} unknown`);
+    lines.push(`FROM unknown`);
   }
 
   // Add default tag label for policy validation (use tag from plan or default to v1)
@@ -777,10 +773,8 @@ async function isImageCompliant(
   evaluator: RegoEvaluator,
   logger: Logger,
 ): Promise<boolean> {
-  // Create a test Dockerfile using system defaults (not policy-specific values)
-  // We use the actual default values that will be used in the final plan
-  const defaultPlatform = detectSystemPlatform();
-  const dockerfileText = `FROM --platform=${defaultPlatform} ${image}\nLABEL tag="v1"\nUSER appuser`;
+  // Create a test Dockerfile without platform flags
+  const dockerfileText = `FROM ${image}\nLABEL tag="v1"\nUSER appuser`;
 
   logger.debug({ image, dockerfileText }, 'Validating base image against policy');
 
@@ -798,11 +792,7 @@ async function isImageCompliant(
   const imageSpecificViolations = validation.violations.filter((v: PolicyViolation) => {
     const rule = v.ruleId.toLowerCase();
     // Ignore platform, tag, and label format rules - those are Dockerfile structure requirements
-    return !(
-      rule.includes('platform') ||
-      rule.includes('tag') ||
-      rule.includes('label')
-    );
+    return !(rule.includes('platform') || rule.includes('tag') || rule.includes('label'));
   });
 
   const isCompliant = imageSpecificViolations.length === 0;
@@ -835,12 +825,7 @@ async function validatePlanAgainstPolicy(
   logger.debug({ dockerfileText }, 'Generated Dockerfile text from plan for policy validation');
 
   // Use shared validation utility
-  return validateContentAgainstPolicy(
-    dockerfileText,
-    evaluator,
-    logger,
-    'Dockerfile plan',
-  );
+  return validateContentAgainstPolicy(dockerfileText, evaluator, logger, 'Dockerfile plan');
 }
 
 async function handleGenerateDockerfile(
@@ -916,10 +901,38 @@ async function handleGenerateDockerfile(
     );
   }
 
+  // Query policy for generation configuration (if policy is available)
+  let dockerfileConfig: import('@/config/policy-generation-config').DockerfileGenerationConfig | null = null;
+  if (ctx.policy) {
+    const configQuery = await ctx.queryConfig<{ dockerfile?: import('@/config/policy-generation-config').DockerfileGenerationConfig }>(
+      'containerization.generation_config',
+      {
+        language: input.language || 'auto-detect',
+        framework: input.framework,
+        environment: input.environment || 'production',
+        appName: input.repositoryPath?.split('/').pop() || 'app',
+      },
+    );
+
+    dockerfileConfig = configQuery?.dockerfile || null;
+
+    if (dockerfileConfig) {
+      ctx.logger.info(
+        {
+          buildStrategy: dockerfileConfig.buildStrategy,
+          baseImageCategory: dockerfileConfig.baseImageCategory,
+          optimizationPriority: dockerfileConfig.optimizationPriority,
+        },
+        'Loaded Dockerfile generation config from policy',
+      );
+    }
+  }
+
   // Add existing Dockerfile to input if found
   const extendedInput = {
     ...input,
     ...(existingDockerfile && { existingDockerfile }),
+    ...(dockerfileConfig && { dockerfileConfig }),
   };
 
   // Run the pattern to generate the plan
@@ -930,10 +943,81 @@ async function handleGenerateDockerfile(
   const plan = result.value;
 
   // Add platform and default tag to recommendations
-  // Use targetPlatform from input if provided (allows cross-compilation, e.g., ARM Mac -> AMD64 server)
-  // Otherwise auto-detect from system
-  plan.recommendations.platform = input.targetPlatform || detectSystemPlatform();
+  // targetPlatform is now required, ensuring consistent builds across environments
+  plan.recommendations.platform = input.targetPlatform;
   plan.recommendations.defaultTag = 'v1';
+
+  // Query policy for template additions and dynamic defaults (Sprint 3)
+  if (ctx.policy) {
+    // Query for template additions
+    const templateQuery = await ctx.queryConfig<import('@/config/policy-generation-config').TemplateAdditions>(
+      'containerization.templates.templates',
+      {
+        language: input.language || 'auto-detect',
+        framework: input.framework,
+        environment: input.environment || 'production',
+        appName: input.repositoryPath?.split('/').pop() || 'app',
+      },
+    );
+
+    if (templateQuery) {
+      ctx.logger.info(
+        {
+          dockerfileTemplates: templateQuery.dockerfile?.length || 0,
+        },
+        'Loaded template additions from policy',
+      );
+
+      // Merge templates into plan using template merger
+      const { mergeTemplatesIntoPlan } = await import('@/lib/template-merger');
+      const updatedPlan = mergeTemplatesIntoPlan(
+        plan,
+        templateQuery,
+        {
+          language: input.language,
+          environment: input.environment,
+          framework: input.framework,
+        },
+      );
+      Object.assign(plan, updatedPlan);
+    }
+
+    // Query for dynamic defaults (health checks, etc.)
+    const dynamicDefaultsQuery = await ctx.queryConfig<import('@/config/policy-generation-config').DynamicDefaults>(
+      'containerization.dynamic_defaults.defaults',
+      {
+        language: input.language || 'auto-detect',
+        environment: input.environment || 'production',
+        trafficLevel: input.trafficLevel,
+        criticalityTier: input.criticalityTier,
+      },
+    );
+
+    if (dynamicDefaultsQuery) {
+      ctx.logger.info(
+        {
+          hasHealthChecks: !!dynamicDefaultsQuery.healthChecks,
+          hasReplicas: !!dynamicDefaultsQuery.replicas,
+          hasAutoscaling: !!dynamicDefaultsQuery.autoscaling,
+        },
+        'Loaded dynamic defaults from policy',
+      );
+
+      // Dynamic defaults can be used by the user when creating manifests
+      // For Dockerfile, health checks are particularly relevant
+      if (dynamicDefaultsQuery.healthChecks) {
+        const healthCheckInfo = {
+          id: 'policy-health-check-defaults',
+          category: 'health-check',
+          recommendation: `Health check timing (from policy): initialDelay=${dynamicDefaultsQuery.healthChecks.initialDelaySeconds}s, period=${dynamicDefaultsQuery.healthChecks.periodSeconds}s, timeout=${dynamicDefaultsQuery.healthChecks.timeoutSeconds}s`,
+          tags: ['policy-driven', 'health-check'],
+          matchScore: 95,
+          policyDriven: true,
+        };
+        plan.recommendations.bestPractices = [healthCheckInfo, ...plan.recommendations.bestPractices];
+      }
+    }
+  }
 
   // Filter base images based on policy if available
   if (ctx.policy && plan.recommendations.baseImages.length > 0) {

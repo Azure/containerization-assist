@@ -15,7 +15,7 @@ import {
   type MCPServer,
 } from '@/mcp/mcp-server';
 import { createOrchestrator } from './orchestrator';
-import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
+import { CHAINHINTSMODE, type OrchestratorConfig, type ExecuteRequest, type ToolOrchestrator } from './orchestrator-types';
 import type { Result } from '@/types';
 import type {
   AppRuntime,
@@ -50,7 +50,8 @@ function applyToolAliases(
     aliasToOriginalMap[alias] = tool.name;
 
     // Create a new tool object with the alias name
-    return { ...tool, name: alias };
+    // Type assertion: aliases are treated as valid ToolNames for registration
+    return { ...tool, name: alias as ToolName };
   });
 
   return { aliasedTools, aliasToOriginalMap };
@@ -83,14 +84,13 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     toolsMap.set(tool.name, tool);
   }
 
-  const chainHintsMode = config.chainHintsMode || 'enabled';
+  const chainHintsMode = config.chainHintsMode || CHAINHINTSMODE.ENABLED;
   const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
   const orchestratorConfig: OrchestratorConfig = {
     chainHintsMode,
     chainHints: DEFAULT_CHAIN_HINTS,
     aliasToOriginalMap,
   };
-  if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
 
   const toolList = Array.from(toolsMap.values());
 
@@ -159,6 +159,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         name: 'containerization-assist',
         version: '1.0.0',
         outputFormat,
+        chainHintsMode,
       };
 
       const mcpServer = createMCPServer(toolList, serverOptions, orchestratedExecute);
@@ -186,6 +187,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
 
       registerToolsWithServer({
         outputFormat,
+        chainHintsMode,
         server,
         tools: toolList,
         logger,
@@ -199,7 +201,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
      */
     listTools: () =>
       toolList.map((t) => ({
-        name: t.name as ToolName,
+        name: t.name,
         description: t.description,
         ...(t.version && { version: t.version }),
         ...(t.category && { category: t.category }),

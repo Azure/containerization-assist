@@ -52,7 +52,7 @@ export type Tool = (
   | typeof scanImageTool
   | typeof tagImageTool
   | typeof verifyDeployTool
-) & { name: string };
+) & { name: ToolName };
 
 // Type-safe tool array using the union type
 // All tools are now deterministic plan-based or operational tools
