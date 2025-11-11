@@ -16,31 +16,19 @@ import { fileURLToPath } from 'url';
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
 // Get current file's directory
-// In ESM, __dirname is not available, so we need to derive it
-// In the built code, this will be dist/src/knowledge/loader.js
-const getCurrentFileDir = (): string | undefined => {
-  try {
-    // Try ESM approach with import.meta.url
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-eval
-    const url = eval('import.meta.url');
-    if (url) {
-      return path.dirname(fileURLToPath(url));
-    }
-  } catch {
-    // Fallthrough to next strategy
+// Works in both ESM (import.meta.url) and CJS (__dirname global)
+const getCurrentDir = (): string => {
+  // @ts-expect-error - __dirname exists in CJS but not ESM
+  if (typeof __dirname !== 'undefined') {
+    // CJS build
+    // @ts-expect-error - __dirname exists in CJS
+    return __dirname;
   }
-
-  try {
-    // CJS approach - __dirname exists in CJS
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-eval
-    return eval('__dirname');
-  } catch {
-    // Neither worked
-    return undefined;
-  }
+  // ESM build
+  return path.dirname(fileURLToPath(import.meta.url));
 };
 
-const currentFileDir = getCurrentFileDir();
+const currentDir = getCurrentDir();
 
 interface KnowledgeState {
   entries: Map<string, LoadedEntry>;
@@ -175,43 +163,14 @@ const getTopTags = (limit: number): Array<{ tag: string; count: number }> => {
 
 /**
  * Get the package root directory by resolving from this module's location
- * Works in both ESM and CJS builds
- *
- * Strategy priority:
- * 1. Use current file directory (from import.meta.url or __dirname)
- * 2. Use require.main.path in CJS builds
- * 3. Fall back to process.cwd()
+ * When built: dist/src/knowledge/loader.js -> go up 3 levels to package root
+ * When in dev: src/knowledge/loader.ts -> go up 2 levels to repo root
  */
 const getPackageRoot = (): string => {
-  // Strategy 1: Use current file directory
-  // When built: dist/src/knowledge/loader.js -> go up 3 levels to package root
-  // When in dev: src/knowledge/loader.ts -> go up 2 levels to repo root
-  if (currentFileDir) {
-    const isBuilt = currentFileDir.includes('/dist/src/') || currentFileDir.includes('\\dist\\src\\');
-    const levelsUp = isBuilt ? 3 : 2;
-    const packageRoot = path.resolve(currentFileDir, ...Array(levelsUp).fill('..'));
-    logger.debug({ currentFileDir, isBuilt, levelsUp, packageRoot }, 'Resolved package root from current file');
-    return packageRoot;
-  }
-
-  // Strategy 2: CJS - use require.main.path
-  // In packaged mode, entry point is usually dist/src/cli/cli.js
-  try {
-    // Use globalThis to avoid TypeScript errors
-    const req = (globalThis as { require?: NodeRequire }).require;
-    if (req?.main?.path) {
-      // Go up from entry point to package root
-      const packageRoot = path.resolve(req.main.path, '../..');
-      logger.debug({ mainPath: req.main.path, packageRoot }, 'Resolved package root from require.main');
-      return packageRoot;
-    }
-  } catch (err) {
-    logger.debug({ error: err }, 'Failed to resolve from require.main');
-  }
-
-  // Strategy 3: Last resort - assume we're in repo/package root
-  logger.warn({ cwd: process.cwd() }, 'Using process.cwd() as package root (fallback)');
-  return process.cwd();
+  const isBuilt = currentDir.includes('/dist/src/') || currentDir.includes('\\dist\\src\\');
+  const levelsUp = isBuilt ? 3 : 2;
+  const packageRoot = path.resolve(currentDir, ...Array(levelsUp).fill('..'));
+  return packageRoot;
 };
 
 /**
@@ -250,7 +209,7 @@ export const loadKnowledgeBase = async (): Promise<void> => {
       const errorDetails = {
         packageRoot,
         searchedPaths: possiblePacksDirs,
-        currentFileDir,
+        currentDir,
         cwd: process.cwd(),
       };
       logger.error(errorDetails, 'Could not find knowledge packs directory');
@@ -322,19 +281,23 @@ export const loadKnowledgeBase = async (): Promise<void> => {
       logger.warn({ failures: stats.failures }, `Failed to load ${stats.packsFailed} packs`);
     }
 
-    logger.info(
-      {
-        packsAttempted: stats.packsAttempted,
-        packsLoaded: stats.packsLoaded,
-        packsFailed: stats.packsFailed,
-        entriesValid: stats.entriesValid,
-        entriesInvalid: stats.entriesInvalid,
-        totalEntries: knowledgeState.entries.size,
-        categories: Array.from(knowledgeState.byCategory.keys()),
-        topTags: getTopTags(5),
-      },
-      'Knowledge base loaded',
-    );
+    const summary = {
+      packsAttempted: stats.packsAttempted,
+      packsLoaded: stats.packsLoaded,
+      packsFailed: stats.packsFailed,
+      entriesValid: stats.entriesValid,
+      entriesInvalid: stats.entriesInvalid,
+      totalEntries: knowledgeState.entries.size,
+      categories: Array.from(knowledgeState.byCategory.keys()),
+      topTags: getTopTags(5),
+    };
+
+    // Log as error if no entries loaded (will show even with logLevel=error)
+    if (knowledgeState.entries.size === 0) {
+      logger.error(summary, 'Knowledge base loaded but NO ENTRIES FOUND!');
+    } else {
+      logger.info(summary, 'Knowledge base loaded');
+    }
   } catch (error) {
     logger.error({ error }, 'Failed to load knowledge base');
   }
