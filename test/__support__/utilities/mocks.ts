@@ -27,7 +27,6 @@ export function createMockContext(overrides: any = {}) {
       scanImage: jest.fn()
     },
     kubernetesService: {
-      deployApplication: jest.fn(),
       getClusterInfo: jest.fn()
     },
     ...overrides

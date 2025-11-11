@@ -278,9 +278,7 @@ export const VALID_TOOL_INPUTS = {
     cluster_name: 'test-cluster',
     namespace: 'default',
   },
-  deploy_application: {
-  },
-  verify_deployment: {
+  verify_deploy: {
   },
 };
 

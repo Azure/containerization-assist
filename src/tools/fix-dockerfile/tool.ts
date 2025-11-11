@@ -320,6 +320,8 @@ async function handleFixDockerfile(
 
   const validationReport = await validateDockerfileContent(content, {
     enableExternalLinter: true,
+    targetPlatform: input.targetPlatform,
+    strictPlatformValidation: input.strictPlatformValidation,
   });
 
   const validationIssues: ValidationIssue[] = validationReport.results

@@ -98,7 +98,7 @@ describe('Error Scenario Coverage', () => {
 
     it('should reject generate-dockerfile with empty repository path', async () => {
       const result = await generateDockerfileTool.handler(
-        { repositoryPath: '' },
+        { repositoryPath: '', environment: 'production', targetPlatform: 'linux/amd64' },
         toolContext
       );
 
@@ -225,6 +225,7 @@ describe('Error Scenario Coverage', () => {
         {
           repositoryPath: '/tmp',
           analysis: '{invalid json[}',
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );
@@ -358,6 +359,7 @@ describe('Error Scenario Coverage', () => {
           {
             repositoryPath: dir.name,
             outputPath: join(readOnlyDir, 'Dockerfile'),
+            targetPlatform: 'linux/amd64',
           },
           toolContext
         );

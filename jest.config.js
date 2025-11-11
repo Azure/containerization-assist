@@ -3,6 +3,7 @@ import { createRequire } from 'module';
 const commonModuleNameMapper = {
   // Path aliases from tsconfig
   '^@/(.*)$': '<rootDir>/src/$1',
+  '^@types$': '<rootDir>/src/types/index.ts',
 
   // Handle .js imports and map them to .ts
   '^(\\.{1,2}/.*)\\.js$': '$1',

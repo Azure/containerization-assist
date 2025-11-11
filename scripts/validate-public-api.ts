@@ -48,7 +48,6 @@ const PUBLIC_EXPORTS: PublicExport[] = [
   { file: 'src/index.ts', exportName: 'pushImageTool', exportType: 'value', critical: false },
   { file: 'src/index.ts', exportName: 'scanImageTool', exportType: 'value', critical: false },
   { file: 'src/index.ts', exportName: 'tagImageTool', exportType: 'value', critical: false },
-  { file: 'src/index.ts', exportName: 'validateDockerfileTool', exportType: 'value', critical: false },
   { file: 'src/index.ts', exportName: 'verifyDeployTool', exportType: 'value', critical: false },
 
   // Utility exports - Public API

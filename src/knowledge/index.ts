@@ -2,10 +2,22 @@
  * Knowledge Base – minimal public API
  */
 export type { KnowledgeEntry, KnowledgeQuery, KnowledgeMatch, LoadedEntry } from './types';
+export type {
+  KnowledgeFilter,
+  KnowledgeFilterContext,
+  FilteredKnowledgeResult,
+} from './policy-types';
 
 import { findKnowledgeMatches } from './matcher';
 import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded } from './loader';
 import type { KnowledgeQuery, KnowledgeMatch } from './types';
+import {
+  findPolicyAwareKnowledgeMatches,
+  getPolicyAwareKnowledgeSnippets,
+} from './policy-aware-matcher';
+
+// Export policy-aware functions
+export { findPolicyAwareKnowledgeMatches, getPolicyAwareKnowledgeSnippets };
 
 // Internal helper - only used by getKnowledgeForCategory
 async function getKnowledgeRecommendations(query: KnowledgeQuery): Promise<KnowledgeMatch[]> {

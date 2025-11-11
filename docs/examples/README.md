@@ -133,9 +133,11 @@ const app = createApp({
     'generate-dockerfile': 'my-generate-dockerfile'
   },
 
-  // Configure behavior
-  chainHintsMode: "disabled",
+  // Configure output format
   outputFormat: "natural-language"
+
+  // Note: chainHintsMode defaults to 'enabled' for automatic next-step suggestions
+  // Set chainHintsMode: 'disabled' only if you want to suppress these suggestions
 });
 
 // Bind tools to your MCP server

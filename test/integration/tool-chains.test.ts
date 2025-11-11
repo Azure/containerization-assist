@@ -106,6 +106,7 @@ app.listen(3000, () => console.log('Server running'));`
           repositoryPath: appPath,
           analysis: JSON.stringify(analysis),
           outputPath: join(appPath, 'Dockerfile'),
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );
@@ -174,6 +175,7 @@ if __name__ == '__main__':
           repositoryPath: appPath,
           analysis: JSON.stringify(analysis),
           outputPath: join(appPath, 'Dockerfile'),
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );
@@ -298,6 +300,7 @@ CMD npm start`;
         {
           repositoryPath: testDir.name,
           analysis: 'invalid json',
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );

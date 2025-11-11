@@ -101,6 +101,7 @@ describe('generate-dockerfile', () => {
       language: 'node',
       framework: 'express',
       environment: 'production',
+      targetPlatform: 'linux/amd64',
     };
 
     // Reset all mocks

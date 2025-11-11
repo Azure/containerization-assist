@@ -54,6 +54,7 @@ describe('Boundary Condition Tests', () => {
         {
           repositoryPath: dir.name,
           analysis: '',
+          targetPlatform: 'linux/amd64',
         } as any,
         toolContext
       );
@@ -76,6 +77,7 @@ describe('Boundary Condition Tests', () => {
         {
           repositoryPath: dir.name,
           analysis: emptyAnalysis,
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );
@@ -172,6 +174,7 @@ describe('Boundary Condition Tests', () => {
         {
           repositoryPath: dir.name,
           analysis: largeAnalysis,
+          targetPlatform: 'linux/amd64',
         },
         toolContext
       );

@@ -9,14 +9,16 @@ import { createLogger } from '@/lib/logger';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
-import type { ToolOrchestrator, OrchestratorConfig, ExecuteRequest } from './orchestrator-types';
+import { type ToolOrchestrator, type OrchestratorConfig, type ExecuteRequest, CHAINHINTSMODE } from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ENV_VARS } from '@/config/constants';
 
 // ===== Types =====
 
@@ -24,45 +26,209 @@ import { join, dirname, resolve } from 'node:path';
  * Discover built-in policy files from the policies directory
  * Returns paths to all .rego files (excluding test files)
  *
- * Searches upward from process.cwd() to find the policies directory.
- * Works in both ESM (dist/) and CJS (dist-cjs/) builds.
+ * Searches relative to the module's installation location first,
+ * then falls back to searching upward from process.cwd().
+ * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
-function discoverBuiltInPolicies(logger: Logger): string[] {
+export function discoverBuiltInPolicies(logger: Logger): string[] {
   try {
-    // Start from current working directory and search upward
+    const searchPaths: string[] = [];
+
+    // 1. First, try relative to the installed module location
+    // This ensures policies are found when the package is installed via npm
+
+    // Strategy: Try CJS __dirname first, then fall back to ESM import.meta.url
+    // We use try-catch for both because:
+    //   - __dirname may throw ReferenceError in strict ESM modules
+    //   - import.meta.url may not be available in CJS or Jest
+
+    let modulePathResolved = false;
+
+    // Try CJS approach first (most common in Node.js)
+    try {
+      // Using Function constructor to bypass TypeScript's static analysis
+      // This is safe: the string is a compile-time constant with no user input
+      const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
+      if (typeof dirName === 'string') {
+        const moduleRelativePath = resolve(dirName, '../../../policies');
+        searchPaths.push(moduleRelativePath);
+        modulePathResolved = true;
+      }
+    } catch (error) {
+      logger.debug({ error }, 'Failed to resolve module path from __dirname');
+    }
+
+    // If CJS failed, try ESM approach
+    if (!modulePathResolved) {
+      try {
+        // Using Function constructor to access import.meta.url dynamically
+        // This bypasses static analysis issues in Jest and CJS builds
+        // The returned value will be undefined if import.meta.url is unavailable or throws
+        const getMetaUrl = new Function('try { return import.meta.url; } catch { return undefined; }');
+        const metaUrl = getMetaUrl();
+        if (typeof metaUrl === 'string') {
+          const __filename = fileURLToPath(metaUrl);
+          const __dirname = dirname(__filename);
+          const moduleRelativePath = resolve(__dirname, '../../../policies');
+          searchPaths.push(moduleRelativePath);
+        }
+      } catch (error) {
+        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
+      }
+    }
+
+    // 2. Then search upward from current working directory (for development)
     let currentDir = process.cwd();
-    let policiesDir = join(currentDir, 'policies');
+    searchPaths.push(join(currentDir, 'policies'));
+
     let attempts = 0;
     const maxAttempts = 5;
-
-    // Search upward for policies directory
-    while (!existsSync(policiesDir) && attempts < maxAttempts) {
+    while (attempts < maxAttempts) {
       const parentDir = dirname(currentDir);
       if (parentDir === currentDir) {
         // Reached filesystem root
         break;
       }
       currentDir = parentDir;
-      policiesDir = join(currentDir, 'policies');
+      searchPaths.push(join(currentDir, 'policies'));
       attempts++;
     }
 
-    if (!existsSync(policiesDir)) {
-      logger.warn({ cwd: process.cwd(), attempts }, 'Built-in policies directory not found');
-      return [];
+    // Try each search path until we find one that exists
+    for (const policiesDir of searchPaths) {
+      if (existsSync(policiesDir)) {
+        // Find all .rego files except test files
+        const files = readdirSync(policiesDir)
+          .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+          .map((file) => resolve(join(policiesDir, file)));
+
+        if (files.length > 0) {
+          logger.info({ policiesDir, count: files.length, searchPaths }, 'Discovered built-in policies');
+          return files;
+        }
+      }
     }
 
-    // Find all .rego files except test files
-    const files = readdirSync(policiesDir)
-      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
-      .map((file) => resolve(join(policiesDir, file)));
-
-    logger.info({ policiesDir, count: files.length }, 'Discovered built-in policies');
-    return files;
+    logger.warn({ searchPaths, cwd: process.cwd() }, 'Built-in policies directory not found in any search path');
+    return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in policies');
     return [];
   }
+}
+
+/**
+ * Discover policies in policies.user/ directory (source installation)
+ * Returns paths to all .rego files (excluding test files)
+ */
+export function discoverUserPolicies(logger: Logger): string[] {
+  try {
+    // Search upward for policies.user directory (similar to built-in search)
+    let currentDir = process.cwd();
+    let policiesUserDir = join(currentDir, 'policies.user');
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (!existsSync(policiesUserDir) && attempts < maxAttempts) {
+      const parentDir = dirname(currentDir);
+      if (parentDir === currentDir) break;
+      currentDir = parentDir;
+      policiesUserDir = join(currentDir, 'policies.user');
+      attempts++;
+    }
+
+    if (!existsSync(policiesUserDir)) {
+      return [];
+    }
+
+    const files = readdirSync(policiesUserDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(policiesUserDir, file)));
+
+    if (files.length > 0) {
+      logger.info({ policiesUserDir, count: files.length }, 'Discovered user policies from policies.user/');
+    }
+
+    return files;
+  } catch (error) {
+    logger.warn({ error }, 'Failed to discover policies.user/ policies');
+    return [];
+  }
+}
+
+/**
+ * Discover policies in custom directory (NPM installation)
+ * Returns paths to all .rego files (excluding test files)
+ */
+export function discoverCustomPolicies(customPath: string, logger: Logger): string[] {
+  try {
+    const resolvedPath = resolve(customPath);
+
+    if (!existsSync(resolvedPath)) {
+      logger.warn({ path: resolvedPath }, 'Custom policy path does not exist');
+      return [];
+    }
+
+    const stats = statSync(resolvedPath);
+
+    // If it's a file, return it directly
+    if (stats.isFile()) {
+      if (resolvedPath.endsWith('.rego')) {
+        return [resolvedPath];
+      }
+      logger.warn({ path: resolvedPath }, 'Custom policy path is not a .rego file');
+      return [];
+    }
+
+    // If it's a directory, discover all .rego files
+    if (stats.isDirectory()) {
+      const files = readdirSync(resolvedPath)
+        .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+        .map((file) => resolve(join(resolvedPath, file)));
+      return files;
+    }
+
+    return [];
+  } catch (error) {
+    logger.warn({ error, path: customPath }, 'Failed to discover custom policies');
+    return [];
+  }
+}
+
+/**
+ * Discover policy files with priority-ordered search paths:
+ * 1. Built-in policies/ directory (lowest priority)
+ * 2. policies.user/ directory (middle priority - source installation users)
+ * 3. Custom directory via CUSTOM_POLICY_PATH (highest priority - NPM users)
+ *
+ * Returns array of policy paths, with higher priority policies later
+ * (later policies override earlier ones during merging)
+ */
+export function discoverPolicies(logger: Logger): string[] {
+  const allPolicies: string[] = [];
+
+  // Priority 3 (lowest): Built-in policies
+  const builtInPolicies = discoverBuiltInPolicies(logger);
+  allPolicies.push(...builtInPolicies);
+
+  // Priority 2: policies.user/ directory (source installation)
+  const userPolicies = discoverUserPolicies(logger);
+  allPolicies.push(...userPolicies);
+
+  // Priority 1 (highest): Custom directory via env var
+  const customPath = process.env[ENV_VARS.CUSTOM_POLICY_PATH];
+  if (customPath) {
+    const customPolicies = discoverCustomPolicies(customPath, logger);
+    if (customPolicies.length > 0) {
+      logger.info(
+        { path: customPath, count: customPolicies.length },
+        'Discovered custom policies from CUSTOM_POLICY_PATH',
+      );
+      allPolicies.push(...customPolicies);
+    }
+  }
+
+  return allPolicies;
 }
 
 /**
@@ -108,7 +274,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   logger?: Logger;
   config?: OrchestratorConfig;
 }): ToolOrchestrator {
-  const { registry, server, config = { chainHintsMode: 'enabled' } } = options;
+  const { registry, server, config = { chainHintsMode: CHAINHINTSMODE.ENABLED } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
   // Cache the loaded policy to avoid reloading on every execution
@@ -131,27 +297,23 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
     // Load policies once (with Promise-based guard to prevent race conditions)
     if (!policyLoadPromise) {
       policyLoadPromise = (async () => {
-        // Always load built-in policies
-        const builtInPolicies = discoverBuiltInPolicies(logger);
-
-        // Optionally add user-provided custom policy
-        const policyPaths = config.policyPath
-          ? [...builtInPolicies, config.policyPath]
-          : builtInPolicies;
+        // Use new priority-ordered discovery (includes built-in, user, and custom policies)
+        const policyPaths = discoverPolicies(logger);
 
         if (policyPaths.length === 0) {
-          logger.warn('No policies found (built-in or custom)');
+          logger.warn('No policies discovered');
           return;
         }
 
         const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
         if (policyResult.ok) {
           policyCache = policyResult.value;
-          logger.info({
-            builtIn: builtInPolicies.length,
-            custom: config.policyPath ? 1 : 0,
-            total: policyPaths.length,
-          }, 'Policies loaded for orchestrator');
+          logger.info(
+            {
+              total: policyPaths.length,
+            },
+            'Policies loaded for orchestrator',
+          );
         } else {
           logger.warn({ error: policyResult.error }, 'Failed to load policies, continuing without them');
         }
@@ -223,7 +385,7 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
     if (result.ok) {
       let valueWithMessages = result.value;
 
-      if (env.config.chainHintsMode === 'enabled' && tool.chainHints) {
+      if (env.config.chainHintsMode === CHAINHINTSMODE.ENABLED && tool.chainHints) {
         valueWithMessages = {
           ...valueWithMessages,
           nextSteps: tool.chainHints.success,

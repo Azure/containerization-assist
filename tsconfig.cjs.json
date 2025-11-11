@@ -73,6 +73,7 @@
     "test",
     "**/*.test.ts",
     "src/cli/cli.ts",
-    "src/cli/server.ts"
+    "src/cli/server.ts",
+    "src/cli/policy-simulate.ts"
   ]
 }
