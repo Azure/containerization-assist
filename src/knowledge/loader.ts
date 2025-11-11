@@ -11,22 +11,42 @@ import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
 // Get current file's directory
-// Works in both ESM (import.meta.url) and CJS (__dirname global)
-const getCurrentDir = (): string => {
-  // @ts-expect-error - __dirname exists in CJS but not ESM
-  if (typeof __dirname !== 'undefined') {
-    // CJS build
-    // @ts-expect-error - __dirname exists in CJS
-    return __dirname;
+// Must work in both ESM (dist/) and CJS (dist-cjs/) builds
+// Strategy: Try __dirname first (CJS), then fall back to filesystem-based detection (ESM)
+
+function getCurrentDir(): string {
+  // Try CJS __dirname
+  try {
+    const dir = eval('typeof __dirname !== "undefined" ? __dirname : null');
+    if (dir) return dir;
+  } catch {
+    // Not CJS
   }
-  // ESM build
-  return path.dirname(fileURLToPath(import.meta.url));
-};
+
+  // ESM fallback: Derive from known project structure
+  // When running from built code, we're either in dist/src/knowledge/ or dist-cjs/src/knowledge/
+  // Look for the knowledge/packs directory relative to common locations
+  const cwd = process.cwd();
+  const possibleDirs = [
+    // Built ESM (dist/src/knowledge/)
+    path.join(cwd, 'dist', 'src', 'knowledge'),
+    // Source (src/knowledge/)
+    path.join(cwd, 'src', 'knowledge'),
+  ];
+
+  for (const dir of possibleDirs) {
+    if (existsSync(dir)) {
+      return dir;
+    }
+  }
+
+  // Last resort: use cwd + src/knowledge
+  return path.join(cwd, 'src', 'knowledge');
+}
 
 const currentDir = getCurrentDir();
 
