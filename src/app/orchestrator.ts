@@ -58,6 +58,7 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
         const moduleRelativePath = resolve(dirName, '../../../policies');
         searchPaths.push(moduleRelativePath);
         modulePathResolved = true;
+        logger.info({ moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path for policy discovery');
       }
     } catch (error) {
       logger.debug({ error }, 'Failed to resolve module path from __dirname');
@@ -70,11 +71,15 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
         const __dirname = dirname(__filename);
         const moduleRelativePath = resolve(__dirname, '../../../policies');
         searchPaths.push(moduleRelativePath);
-        logger.debug({ moduleRelativePath }, 'Resolved module path from import.meta.url');
+        logger.info({ moduleRelativePath, MODULE_URL, method: 'ESM import.meta.url' }, 'Resolved module path for policy discovery');
         modulePathResolved = true;
       } catch (error) {
-        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
+        logger.warn({ error, MODULE_URL }, 'Failed to resolve module path from import.meta.url');
       }
+    }
+
+    if (!modulePathResolved) {
+      logger.warn({ MODULE_URL: !!MODULE_URL }, 'Could not resolve module path for built-in policies - will search from cwd');
     }
 
     // 2. Then search upward from current working directory (for development)
