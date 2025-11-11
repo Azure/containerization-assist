@@ -20,6 +20,11 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_VARS } from '@/config/constants';
 
+// Capture import.meta.url at module scope (only available in ESM builds)
+// This will be undefined in CJS builds, which is expected
+// @ts-ignore - import.meta is not available in CJS builds
+const MODULE_URL = typeof import.meta !== 'undefined' && import.meta.url ? import.meta.url : undefined;
+
 // ===== Types =====
 
 /**
@@ -58,20 +63,15 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
       logger.debug({ error }, 'Failed to resolve module path from __dirname');
     }
 
-    // If CJS failed, try ESM approach
-    if (!modulePathResolved) {
+    // If CJS failed, try ESM approach using MODULE_URL captured at module scope
+    if (!modulePathResolved && MODULE_URL) {
       try {
-        // Using Function constructor to access import.meta.url dynamically
-        // This bypasses static analysis issues in Jest and CJS builds
-        // The returned value will be undefined if import.meta.url is unavailable or throws
-        const getMetaUrl = new Function('try { return import.meta.url; } catch { return undefined; }');
-        const metaUrl = getMetaUrl();
-        if (typeof metaUrl === 'string') {
-          const __filename = fileURLToPath(metaUrl);
-          const __dirname = dirname(__filename);
-          const moduleRelativePath = resolve(__dirname, '../../../policies');
-          searchPaths.push(moduleRelativePath);
-        }
+        const __filename = fileURLToPath(MODULE_URL);
+        const __dirname = dirname(__filename);
+        const moduleRelativePath = resolve(__dirname, '../../../policies');
+        searchPaths.push(moduleRelativePath);
+        logger.debug({ moduleRelativePath }, 'Resolved module path from import.meta.url');
+        modulePathResolved = true;
       } catch (error) {
         logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
       }
@@ -250,6 +250,14 @@ function createContextForTool(
 ): ToolContext {
   const metadata = request.metadata;
 
+  logger.debug(
+    {
+      hasPolicy: !!policy,
+      toolName: request.toolName,
+    },
+    'Creating tool context',
+  );
+
   return createToolContext(logger, {
     ...(metadata?.signal && { signal: metadata.signal }),
     ...(metadata?.progress !== undefined && { progress: metadata.progress }),
@@ -301,9 +309,17 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
         const policyPaths = discoverPolicies(logger);
 
         if (policyPaths.length === 0) {
-          logger.warn('No policies discovered');
+          logger.warn({ cwd: process.cwd() }, 'No policies discovered - tools will run without policy constraints');
           return;
         }
+
+        logger.info(
+          {
+            policyPaths,
+            count: policyPaths.length,
+          },
+          'Discovered policies, loading...',
+        );
 
         const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
         if (policyResult.ok) {
@@ -311,8 +327,9 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
           logger.info(
             {
               total: policyPaths.length,
+              policyPaths,
             },
-            'Policies loaded for orchestrator',
+            'Policies loaded successfully for orchestrator',
           );
         } else {
           logger.warn({ error: policyResult.error }, 'Failed to load policies, continuing without them');

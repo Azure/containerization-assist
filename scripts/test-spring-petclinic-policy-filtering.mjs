@@ -1,50 +1,44 @@
 #!/usr/bin/env node
 /**
- * Test Spring PetClinic with Base Images Policy via MCP CLI (stdio JSON-RPC)
+ * Test Spring PetClinic with Built-in Base Images Policy via MCP CLI (stdio JSON-RPC)
  *
- * This script tests that the packed CLI correctly applies base image policy filtering.
- * It uses the base-images.rego policy to ensure only Microsoft images are recommended.
+ * This script tests that the packed CLI correctly applies the built-in base-images.rego policy.
+ * The built-in policy should be auto-discovered and applied without any configuration.
  *
  * Usage:
- *   node test-spring-petclinic-policy-filtering.mjs [repo-path] [policy-path]
+ *   node test-spring-petclinic-policy-filtering.mjs [repo-path]
  *
  * Environment Variables:
  *   VERBOSE_TOOL_OUTPUT=true    Enable verbose logging with full tool inputs/outputs
  *
  * Examples:
- *   # Test with base-images policy
- *   node test-spring-petclinic-policy-filtering.mjs /path/to/spring-petclinic /path/to/base-images.rego
+ *   # Test with built-in policies (auto-discovered)
+ *   node test-spring-petclinic-policy-filtering.mjs /path/to/spring-petclinic
  *
  *   # Verbose mode
- *   VERBOSE_TOOL_OUTPUT=true node test-spring-petclinic-policy-filtering.mjs /path/to/spring-petclinic /path/to/base-images.rego
+ *   VERBOSE_TOOL_OUTPUT=true node test-spring-petclinic-policy-filtering.mjs /path/to/spring-petclinic
  */
 
 import { spawn } from 'child_process';
 
 const REPO_PATH = process.argv[2] || process.cwd();
-const POLICY_PATH = process.argv[3];
 const VERBOSE = process.env.VERBOSE_TOOL_OUTPUT === 'true';
 
-if (!POLICY_PATH) {
-  console.error('❌ ERROR: Policy path is required');
-  console.error('Usage: node test-spring-petclinic-policy-filtering.mjs <repo-path> <policy-path>');
-  process.exit(1);
-}
-
-console.error('=== MCP CLI Policy Filtering Test for Spring PetClinic ===');
+console.error('=== MCP CLI Built-in Policy Test for Spring PetClinic ===');
 console.error(`Repository: ${REPO_PATH}`);
-console.error(`Policy: ${POLICY_PATH}`);
+console.error(`Policy Mode: Auto-discover built-in policies (policies/base-images.rego)`);
 console.error(`Verbose mode: ${VERBOSE ? 'ON' : 'OFF'}`);
 console.error('');
 
-// Start MCP server via stdio with policy
+// Start MCP server via stdio
+// Built-in policies should be auto-discovered - no environment variables needed
 const server = spawn('ca-mcp', ['start'], {
   stdio: ['pipe', 'pipe', 'pipe'],
   env: {
     ...process.env,
     MCP_QUIET: 'true',
-    LOG_LEVEL: 'error',
-    CONTAINERIZATION_ASSIST_POLICY_PATH: POLICY_PATH
+    LOG_LEVEL: 'info'  // Use info to see policy discovery logs
+    // NO CUSTOM_POLICY_PATH - use built-in policies
   }
 });
 
@@ -92,12 +86,8 @@ server.stdout.on('data', (data) => {
 // Handle stderr - logs
 server.stderr.on('data', (data) => {
   const output = data.toString();
-  // Only show errors and policy loading messages
-  if (output.toLowerCase().includes('error') ||
-      output.toLowerCase().includes('fail') ||
-      output.toLowerCase().includes('policy')) {
-    console.error('[server]:', output.trim());
-  }
+  // Show all logs to debug policy discovery
+  console.error('[server]:', output.trim());
 });
 
 // Handle server exit
@@ -214,7 +204,7 @@ async function runTests() {
     const analyzeTime = analyzeResponse.executionTime;
 
 
-    console.error('\n--- Test 2: generate-dockerfile (with policy) ---');
+    console.error('\n--- Test 2: generate-dockerfile (with built-in policy) ---');
 
     const dockerfileResponse = await callTool('generate-dockerfile', {
       repositoryPath: REPO_PATH,
@@ -230,9 +220,9 @@ async function runTests() {
     const dockerfileText = extractNaturalLanguageResultText(dockerfileResult);
     const dockerfileTime = dockerfileResponse.executionTime;
 
-    console.error('\n--- Test 3: Verify base-images policy filtering ---');
+    console.error('\n--- Test 3: Verify built-in base-images.rego policy filtering ---');
 
-    // With base-images.rego policy, we should ONLY see Microsoft Container Registry images
+    // With built-in base-images.rego policy, we should ONLY see Microsoft Container Registry images
     const microsoftImages = [
       'mcr.microsoft.com/openjdk/jdk:25-azurelinux',
       'mcr.microsoft.com/openjdk/jdk:25-distroless',
@@ -247,8 +237,8 @@ async function runTests() {
     if (mentionedMicrosoftImages.length === 0) {
       console.error('❌ ERROR: No Microsoft Container Registry images found in output');
       console.error('Expected to find images like: mcr.microsoft.com/openjdk/jdk:25-azurelinux');
-      console.error('This indicates policy filtering is NOT working!');
-      throw new Error('Policy filtering failed: No Microsoft images in output when base-images.rego policy is active');
+      console.error('This indicates the built-in base-images.rego policy is NOT being applied!');
+      throw new Error('Built-in policy filtering failed: No Microsoft images in output when base-images.rego should be auto-discovered and applied');
     }
     console.error(`✅ Found ${mentionedMicrosoftImages.length} Microsoft Container Registry image(s) in output.`);
     console.error(mentionedMicrosoftImages.map(img => `  - ${img}`).join('\n'));
@@ -267,12 +257,19 @@ async function runTests() {
     );
 
     if (mentionedNonMicrosoftImages.length > 0) {
-      console.error('⚠️  WARNING: Found non-Microsoft images in output (policy should have filtered these):');
+      console.error('❌ ERROR: Found non-Microsoft images in output!');
+      console.error('Built-in base-images.rego policy should have filtered these out:');
       console.error(mentionedNonMicrosoftImages.map(img => `  - ${img}`).join('\n'));
-      console.error('This may indicate policy filtering is not working correctly.');
-      // Don't fail the test, but warn
+      console.error('');
+      console.error('This indicates the built-in policy is NOT being applied correctly.');
+      console.error('Possible causes:');
+      console.error('  1. Built-in policies not packaged correctly (check package.json files field)');
+      console.error('  2. Policy discovery not finding policies/ directory in installed package');
+      console.error('  3. Policy not being loaded/merged properly');
+      console.error('  4. Knowledge pack filtering not respecting policy constraints');
+      throw new Error('Built-in policy filtering failed: Non-Microsoft images found when base-images.rego should block them');
     } else {
-      console.error('✅ No non-Microsoft images found (policy correctly filtered them out).');
+      console.error('✅ No non-Microsoft images found (built-in policy correctly filtered them out).');
     }
 
     // Verify both azurelinux and distroless variants are mentioned
@@ -289,10 +286,11 @@ async function runTests() {
     }
     console.error('✅ distroless images found in output');
 
-    console.error('\n=== ALL POLICY FILTERING TESTS PASSED ===');
-    console.error('✅ Policy was loaded and applied correctly');
+    console.error('\n=== ALL BUILT-IN POLICY TESTS PASSED ===');
+    console.error('✅ Built-in policies were auto-discovered from packaged policies/ directory');
+    console.error('✅ base-images.rego policy was loaded and applied correctly');
     console.error('✅ Only Microsoft Container Registry images recommended');
-    console.error('✅ Knowledge pack filtering worked as expected');
+    console.error('✅ Knowledge pack filtering respected built-in policy constraints');
     console.error(`\n⏱️  Total execution time: ${analyzeTime + dockerfileTime}ms`);
     console.error(`   - analyze-repo: ${analyzeTime}ms`);
     console.error(`   - generate-dockerfile: ${dockerfileTime}ms`);
