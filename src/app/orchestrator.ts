@@ -36,10 +36,10 @@ const MODULE_URL = typeof import.meta !== 'undefined' && import.meta.url ? impor
  * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
 export function discoverBuiltInPolicies(logger: Logger): string[] {
-  logger.info('🔍 discoverBuiltInPolicies CALLED');
+  console.error(`🟣🟣🟣 discoverBuiltInPolicies CALLED 🟣🟣🟣`);
   try {
     const searchPaths: string[] = [];
-    logger.info({ cwd: process.cwd() }, '🔍 Starting policy discovery');
+    console.error(`🟣 Starting policy discovery from cwd: ${process.cwd()}`);
 
     // 1. First, try relative to the installed module location
     // This ensures policies are found when the package is installed via npm
@@ -108,21 +108,24 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
     }
 
     // Try each search path until we find one that exists
+    console.error(`🟣 Checking ${searchPaths.length} search paths: ${JSON.stringify(searchPaths)}`);
     for (const policiesDir of searchPaths) {
+      console.error(`🟣 Checking path: ${policiesDir}, exists: ${existsSync(policiesDir)}`);
       if (existsSync(policiesDir)) {
         // Find all .rego files except test files
         const files = readdirSync(policiesDir)
           .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
           .map((file) => resolve(join(policiesDir, file)));
 
+        console.error(`🟣 Found ${files.length} .rego files in ${policiesDir}`);
         if (files.length > 0) {
-          logger.info({ policiesDir, count: files.length, searchPaths }, 'Discovered built-in policies');
+          console.error(`🟣🟣🟣 RETURNING ${files.length} policy files: ${JSON.stringify(files)}`);
           return files;
         }
       }
     }
 
-    logger.warn({ searchPaths, cwd: process.cwd() }, 'Built-in policies directory not found in any search path');
+    console.error(`🟣 NO POLICIES FOUND in any search path!`);
     return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in policies');
@@ -334,12 +337,12 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
     // Load policies once (with Promise-based guard to prevent race conditions)
     if (!policyLoadPromise) {
-      logger.info({ toolName, policyLoadPromiseExists: !!policyLoadPromise }, '🔍 POLICY LOADING STARTING');
+      console.error(`🟣 POLICY LOAD PROMISE IS UNDEFINED, starting policy discovery`);
       policyLoadPromise = (async () => {
-        logger.info('🔍 INSIDE POLICY LOAD PROMISE - about to call discoverPolicies');
+        console.error(`🟣 INSIDE POLICY LOAD PROMISE - about to call discoverPolicies`);
         // Use new priority-ordered discovery (includes built-in, user, and custom policies)
         const policyPaths = discoverPolicies(logger);
-        logger.info({ policyPathsCount: policyPaths.length }, '🔍 discoverPolicies returned');
+        console.error(`🟣 discoverPolicies returned ${policyPaths.length} paths: ${JSON.stringify(policyPaths)}`);
 
         if (policyPaths.length === 0) {
           logger.warn({ cwd: process.cwd() }, 'No policies discovered - tools will run without policy constraints');
