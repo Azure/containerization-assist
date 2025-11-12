@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "multistage-build-advanced",
     "category": "dockerfile",
@@ -396,4 +396,4 @@ export default [
     ],
     "description": "Alpine images don't include timezone data by default, causing issues with time-sensitive applications"
   }
-] as const;
+]

@@ -5,11 +5,25 @@
  * @see {@link ../../docs/adr/003-knowledge-enhancement.md ADR-003: Knowledge Enhancement System}
  */
 
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
-import { BUILTIN_PACKS } from './built-in-packs';
+
+// Capture import.meta.url at module scope (only available in ESM builds)
+// This will be undefined in CJS builds, which is expected
+// Using Function constructor to bypass Jest's parser (same as __dirname approach)
+const MODULE_URL = (() => {
+  try {
+    // @ts-ignore - import.meta is not available in CJS builds
+    return new Function('return typeof import.meta !== "undefined" && import.meta.url ? import.meta.url : undefined')();
+  } catch {
+    return undefined;
+  }
+})();
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
@@ -26,6 +40,105 @@ const knowledgeState: KnowledgeState = {
   byTag: new Map(),
   loaded: false,
 };
+
+/**
+ * Discover built-in knowledge pack files from the knowledge/packs directory
+ * Returns paths to all .json files
+ *
+ * Searches relative to the module's installation location first,
+ * then falls back to searching upward from process.cwd().
+ * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
+ */
+function discoverBuiltInKnowledgePacks(): string[] {
+  try {
+    const searchPaths: string[] = [];
+
+    // 1. First, try relative to the installed module location
+    // This ensures knowledge packs are found when the package is installed via npm
+
+    // Strategy: Try CJS __dirname first, then fall back to ESM import.meta.url
+    // We use try-catch for both because:
+    //   - __dirname may throw ReferenceError in strict ESM modules
+    //   - import.meta.url may not be available in CJS or Jest
+
+    let modulePathResolved = false;
+
+    // Try CJS approach first (most common in Node.js)
+    try {
+      // Using Function constructor to bypass TypeScript's static analysis
+      // This is safe: the string is a compile-time constant with no user input
+      const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
+      if (typeof dirName === 'string') {
+        // From dist/src/knowledge/ or dist-cjs/src/knowledge/, go up 3 levels to package root
+        // dist-cjs/src/knowledge/ -> dist-cjs/src/ -> dist-cjs/ -> package-root/knowledge/packs/
+        const moduleRelativePath = resolve(dirName, '../../../knowledge/packs');
+        searchPaths.push(moduleRelativePath);
+        modulePathResolved = true;
+        logger.debug({ moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path for knowledge pack discovery');
+      }
+    } catch (error) {
+      logger.debug({ error }, 'Failed to resolve module path from __dirname');
+    }
+
+    // If CJS failed, try ESM approach using MODULE_URL captured at module scope
+    if (!modulePathResolved && MODULE_URL) {
+      try {
+        const __filename = fileURLToPath(MODULE_URL);
+        const __dirname = dirname(__filename);
+        // From dist/src/knowledge/ or dist-cjs/src/knowledge/, go up 3 levels to package root
+        // dist/src/knowledge/ -> dist/src/ -> dist/ -> package-root/knowledge/packs/
+        const moduleRelativePath = resolve(__dirname, '../../../knowledge/packs');
+        searchPaths.push(moduleRelativePath);
+        logger.debug({ moduleRelativePath, method: 'ESM import.meta.url' }, 'Resolved module path for knowledge pack discovery');
+        modulePathResolved = true;
+      } catch (error) {
+        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
+      }
+    }
+
+    if (!modulePathResolved) {
+      logger.debug('Could not resolve module path for built-in knowledge packs - will search from cwd');
+    }
+
+    // 2. Then search upward from current working directory (for development)
+    let currentDir = process.cwd();
+    searchPaths.push(join(currentDir, 'knowledge/packs'));
+
+    let attempts = 0;
+    const maxAttempts = 5;
+    while (attempts < maxAttempts) {
+      const parentDir = dirname(currentDir);
+      if (parentDir === currentDir) {
+        // Reached filesystem root
+        break;
+      }
+      currentDir = parentDir;
+      searchPaths.push(join(currentDir, 'knowledge/packs'));
+      attempts++;
+    }
+
+    // Try each search path until we find one that exists
+    for (const packsDir of searchPaths) {
+      if (existsSync(packsDir)) {
+        // Find all .json files
+        const files = readdirSync(packsDir)
+          .filter((file) => file.endsWith('.json'))
+          .map((file) => resolve(join(packsDir, file)));
+
+        if (files.length > 0) {
+          logger.debug({ count: files.length, dir: packsDir }, 'Discovered built-in knowledge packs');
+          return files;
+        }
+      }
+    }
+
+    logger.warn({ searchPaths }, 'No knowledge packs found in any search path');
+    return [];
+  } catch (error) {
+    logger.warn({ error }, 'Failed to discover built-in knowledge packs');
+    return [];
+  }
+}
 
 /**
  * Validate and normalize pack structure
@@ -154,30 +267,38 @@ export const loadKnowledgeBase = (): void => {
   };
 
   try {
-    stats.packsAttempted = BUILTIN_PACKS.length;
+    // Discover built-in knowledge packs at runtime
+    const packPaths = discoverBuiltInKnowledgePacks();
+    stats.packsAttempted = packPaths.length;
 
-    logger.info({ totalPacks: BUILTIN_PACKS.length }, 'Loading built-in knowledge packs');
+    if (packPaths.length === 0) {
+      throw new Error('No knowledge packs discovered - server cannot start without knowledge base');
+    }
 
-    // Load each built-in pack
-    for (const pack of BUILTIN_PACKS) {
+    logger.info({ totalPacks: packPaths.length }, 'Loading built-in knowledge packs');
+
+    // Load each discovered pack
+    for (const packPath of packPaths) {
       try {
-        const data = pack.data;
+        // Read and parse JSON file
+        const fileContent = readFileSync(packPath, 'utf-8');
+        const data = JSON.parse(fileContent);
 
         // Validate and normalize pack structure
-        const result = validateAndNormalizePack(pack.name, data);
+        const result = validateAndNormalizePack(packPath, data);
         if (!result.valid || !result.entries) {
           const error = 'Pack validation failed (see previous log)';
           stats.packsFailed++;
           stats.failures.push({
-            file: pack.name,
+            file: packPath,
             error,
           });
           // Throw error for built-in packs - they must all load successfully
-          throw new Error(`Failed to load built-in knowledge pack ${pack.name}: ${error}`);
+          throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${error}`);
         }
 
         const entries = result.entries;
-        logger.debug({ pack: pack.name, count: entries.length }, 'Loading knowledge pack');
+        logger.debug({ pack: packPath, count: entries.length }, 'Loading knowledge pack');
 
         // Validate and add individual entries
         for (const entry of entries) {
@@ -194,12 +315,12 @@ export const loadKnowledgeBase = (): void => {
         stats.packsFailed++;
         const errorMessage = String(packError);
         stats.failures.push({
-          file: pack.name,
+          file: packPath,
           error: errorMessage,
         });
-        logger.error({ pack: pack.name, error: packError }, 'Failed to load knowledge pack');
+        logger.error({ pack: packPath, error: packError }, 'Failed to load knowledge pack');
         // Re-throw the error to ensure server startup fails
-        throw new Error(`Failed to load built-in knowledge pack ${pack.name}: ${errorMessage}`);
+        throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${errorMessage}`);
       }
     }
 

@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "php-composer-cache",
     "category": "dockerfile",
@@ -561,4 +561,4 @@ export default [
     ],
     "description": "Security headers and settings reduce attack surface and information disclosure"
   }
-] as const;
+]

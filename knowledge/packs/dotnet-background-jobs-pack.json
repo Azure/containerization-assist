@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "dotnet-worker-runtime-image",
     "category": "dockerfile",
@@ -327,4 +327,4 @@ export default [
       "background-jobs"
     ]
   }
-] as const;
+]

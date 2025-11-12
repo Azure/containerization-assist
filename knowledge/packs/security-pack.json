@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "container-root-user",
     "category": "security",
@@ -562,4 +562,4 @@ export default [
     ],
     "description": "Zero-trust networking assumes no implicit trust between services"
   }
-] as const;
+]

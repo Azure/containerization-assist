@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "java-official-temurin",
     "category": "dockerfile",
@@ -161,4 +161,4 @@ export default [
     ],
     "description": "Best practice guidance for base image selection based on organizational requirements"
   }
-] as const;
+]

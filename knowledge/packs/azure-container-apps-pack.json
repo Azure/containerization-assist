@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "aca-cpu-memory-combinations",
     "category": "kubernetes",
@@ -542,4 +542,4 @@ export default [
     ],
     "description": "Backup and DR strategies ensure business continuity and data protection"
   }
-] as const;
+]

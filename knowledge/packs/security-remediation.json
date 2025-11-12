@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "cve-remediation-base-image-upgrade",
     "category": "security",
@@ -367,4 +367,4 @@ export default [
     ],
     "description": "Admission webhooks enforce organizational security policies at deployment time"
   }
-] as const;
+]

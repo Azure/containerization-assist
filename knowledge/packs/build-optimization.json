@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "buildkit-enable-optimizations",
     "category": "build",
@@ -364,4 +364,4 @@ export default [
     ],
     "description": "Separate dependency download creates cacheable layer, avoiding re-download on code changes"
   }
-] as const;
+]

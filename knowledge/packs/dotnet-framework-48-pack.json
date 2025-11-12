@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "dotnet-framework-48-optimal-base",
     "category": "dockerfile",
@@ -544,4 +544,4 @@ export default [
     ],
     "description": "Assembly loading should be verified during container build to catch deployment issues early"
   }
-] as const;
+]

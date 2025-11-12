@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "python-requirements-cache",
     "category": "dockerfile",
@@ -583,4 +583,4 @@ export default [
     ],
     "description": "Continuous vulnerability monitoring ensures ongoing security"
   }
-] as const;
+]

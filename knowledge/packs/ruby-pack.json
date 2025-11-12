@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "ruby-bundler-cache",
     "category": "dockerfile",
@@ -257,4 +257,4 @@ export default [
     ],
     "description": "Matching Bundler versions prevents compatibility issues"
   }
-] as const;
+]

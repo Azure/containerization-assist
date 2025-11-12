@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "go-multi-stage-build",
     "category": "dockerfile",
@@ -267,4 +267,4 @@ export default [
     ],
     "description": "Metrics enable better monitoring and observability"
   }
-] as const;
+]

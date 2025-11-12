@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "dotnet-framework-base-image",
     "category": "dockerfile",
@@ -262,4 +262,4 @@ export default [
     ],
     "description": "Machine keys should be consistent across container instances"
   }
-] as const;
+]

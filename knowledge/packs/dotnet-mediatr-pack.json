@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "mediatr-base-setup",
     "category": "dockerfile",
@@ -331,4 +331,4 @@ export default [
     ],
     "description": "Feature flag management for MediatR handler behavior"
   }
-] as const;
+]

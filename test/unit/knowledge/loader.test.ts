@@ -99,38 +99,38 @@ describe('Knowledge Loader', () => {
   describe('knowledge pack file validation', () => {
     it('should have all expected knowledge packs in directory', () => {
       const packsDir = path.join(process.cwd(), 'knowledge/packs');
-      const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.ts')).sort();
+      const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.json')).sort();
 
       // Expected packs based on actual directory listing
       const expectedPacks = [
-        'azure-container-apps-pack.ts',
-        'base-images-pack.ts',
-        'build-optimization.ts',
-        'database-pack.ts',
-        'dockerfile-advanced.ts',
-        'dotnet-background-jobs-pack.ts',
-        'dotnet-blazor-pack.ts',
-        'dotnet-ef-core-pack.ts',
-        'dotnet-framework-48-pack.ts',
-        'dotnet-framework-pack.ts',
-        'dotnet-grpc-pack.ts',
-        'dotnet-identity-pack.ts',
-        'dotnet-mediatr-pack.ts',
-        'dotnet-pack.ts',
-        'dotnet-signalr-pack.ts',
-        'dotnet-worker-pack.ts',
-        'go-pack.ts',
-        'java-pack.ts',
-        'kubernetes-deployment.ts',
-        'kubernetes-pack.ts',
-        'nodejs-pack.ts',
-        'php-pack.ts',
-        'python-pack.ts',
-        'ruby-pack.ts',
-        'rust-pack.ts',
-        'security-pack.ts',
-        'security-remediation.ts',
-        'starter-pack.ts',
+        'azure-container-apps-pack.json',
+        'base-images-pack.json',
+        'build-optimization.json',
+        'database-pack.json',
+        'dockerfile-advanced.json',
+        'dotnet-background-jobs-pack.json',
+        'dotnet-blazor-pack.json',
+        'dotnet-ef-core-pack.json',
+        'dotnet-framework-48-pack.json',
+        'dotnet-framework-pack.json',
+        'dotnet-grpc-pack.json',
+        'dotnet-identity-pack.json',
+        'dotnet-mediatr-pack.json',
+        'dotnet-pack.json',
+        'dotnet-signalr-pack.json',
+        'dotnet-worker-pack.json',
+        'go-pack.json',
+        'java-pack.json',
+        'kubernetes-deployment.json',
+        'kubernetes-pack.json',
+        'nodejs-pack.json',
+        'php-pack.json',
+        'python-pack.json',
+        'ruby-pack.json',
+        'rust-pack.json',
+        'security-pack.json',
+        'security-remediation.json',
+        'starter-pack.json',
       ];
 
       expect(packFiles).toEqual(expectedPacks);
@@ -344,7 +344,7 @@ describe('Knowledge Loader', () => {
 
     it('should validate all actual knowledge packs', () => {
       const packsDir = path.join(process.cwd(), 'knowledge/packs');
-      const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.ts'));
+      const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.json'));
 
       let validCount = 0;
       let invalidCount = 0;
@@ -353,15 +353,8 @@ describe('Knowledge Loader', () => {
         const packPath = path.join(packsDir, packFile);
         const content = readFileSync(packPath, 'utf-8');
 
-        // Extract the JSON data from the TypeScript file
-        // Format: export default [...] as const;
-        const match = content.match(/export default ([\s\S]+) as const;/);
-        if (!match) {
-          invalidCount++;
-          continue;
-        }
-
-        const data = JSON.parse(match[1]);
+        // Parse JSON directly
+        const data = JSON.parse(content);
 
         const result = KnowledgePackSchema.safeParse(data);
         if (result.success) {
