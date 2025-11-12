@@ -22,8 +22,15 @@ import { ENV_VARS } from '@/config/constants';
 
 // Capture import.meta.url at module scope (only available in ESM builds)
 // This will be undefined in CJS builds, which is expected
-// @ts-ignore - import.meta is not available in CJS builds
-const MODULE_URL = typeof import.meta !== 'undefined' && import.meta.url ? import.meta.url : undefined;
+// Using Function constructor to bypass Jest's parser (same as __dirname approach)
+const MODULE_URL = (() => {
+  try {
+    // @ts-ignore - import.meta is not available in CJS builds
+    return new Function('return typeof import.meta !== "undefined" && import.meta.url ? import.meta.url : undefined')();
+  } catch {
+    return undefined;
+  }
+})();
 
 // ===== Types =====
 
