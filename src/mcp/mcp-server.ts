@@ -276,6 +276,8 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
       tool.description,
       tool.inputSchema,
       async (rawParams: Record<string, unknown> | undefined, extra) => {
+        // CRITICAL: Bypass logger entirely to prove handler is called
+        console.error(`\n\n🔴🔴🔴 HANDLER CALLED FOR: ${tool.name} 🔴🔴🔴\n\n`);
         logger.info({ toolName: tool.name, rawParamsKeys: Object.keys(rawParams || {}) }, `🎯 TOOL HANDLER CALLED: ${tool.name}`);
         const params = rawParams ?? {};
         logger.info({ tool: tool.name, transport }, 'Executing tool');
