@@ -75,9 +75,9 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
       try {
         const __filename = fileURLToPath(MODULE_URL);
         const __dirname = dirname(__filename);
-        // From dist/src/app/ or dist-cjs/src/app/, go up 4 levels to package root
-        // dist/src/app/ -> dist/src/ -> dist/ -> package-root/ -> policies/
-        const moduleRelativePath = resolve(__dirname, '../../../../policies');
+        // From dist/src/app/ or dist-cjs/src/app/, go up 3 levels to package root
+        // dist/src/app/ -> dist/src/ -> dist/ -> package-root/policies/
+        const moduleRelativePath = resolve(__dirname, '../../../policies');
         searchPaths.push(moduleRelativePath);
         logger.info({ moduleRelativePath, __dirname, MODULE_URL, method: 'ESM import.meta.url' }, 'Resolved module path for policy discovery');
         modulePathResolved = true;
