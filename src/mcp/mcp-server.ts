@@ -267,33 +267,17 @@ export function createMCPServer<TTool extends Tool>(
  * @param options - Registration options including server, tools, and executor
  */
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
-  const { server, tools, logger, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
-
-  console.error(`\n🔵 registerToolsWithServer called with execute function: ${execute.name || 'anonymous'}, type: ${typeof execute}\n`);
-
-  // Wrap execute to log when it's called
-  const wrappedExecute = async (request: ExecuteRequest) => {
-    console.error(`\n🔵🔵🔵 WRAPPED execute callback invoked for ${request.toolName} 🔵🔵🔵\n`);
-    const result = await execute(request);
-    console.error(`\n🔵 WRAPPED execute callback returning for ${request.toolName}, ok=${result.ok}\n`);
-    return result;
-  };
+  const { server, tools, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
 
   for (const tool of tools) {
-    logger.info({ toolName: tool.name }, `🔧 REGISTERING TOOL: ${tool.name}`);
     server.tool(
       tool.name,
       tool.description,
       tool.inputSchema,
       async (rawParams: Record<string, unknown> | undefined, extra) => {
-        // CRITICAL: Bypass logger entirely to prove handler is called
-        console.error(`\n\n🔴 HANDLER CALLED FOR: ${tool.name}\n\n`);
-        console.error(`🔴 About to create params`);
         const params = rawParams ?? {};
-        console.error(`🔴 About to enter try block`);
 
         try {
-          console.error(`🔴 Inside try block, calling prepareExecutionPayload`);
           const { sanitizedParams, metadata } = prepareExecutionPayload(
             tool.name,
             params,
@@ -301,14 +285,11 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
             extra,
           );
 
-          console.error(`🔴 prepareExecutionPayload returned, about to call execute callback`);
-          console.error(`🔴 execute function type: ${typeof wrappedExecute}, exists: ${!!wrappedExecute}`);
-          const result = await wrappedExecute({
+          const result = await execute({
             toolName: tool.name,
             params: sanitizedParams,
             metadata,
           });
-          console.error(`🔴 execute() returned, result.ok = ${result.ok}`);
 
           if (!result.ok) {
             // Format error with guidance if available
@@ -325,8 +306,6 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
             ],
           };
         } catch (error) {
-          console.error(`🔴🔴🔴 HANDLER CAUGHT ERROR: ${error instanceof Error ? error.message : String(error)}`);
-          console.error(`🔴 Error stack:`, error instanceof Error ? error.stack : 'no stack');
           throw error instanceof McpError
             ? error
             : new McpError(ErrorCode.InternalError, extractErrorMessage(error));

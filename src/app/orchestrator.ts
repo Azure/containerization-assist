@@ -36,10 +36,8 @@ const MODULE_URL = typeof import.meta !== 'undefined' && import.meta.url ? impor
  * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
 export function discoverBuiltInPolicies(logger: Logger): string[] {
-  console.error(`🟣🟣🟣 discoverBuiltInPolicies CALLED 🟣🟣🟣`);
   try {
     const searchPaths: string[] = [];
-    console.error(`🟣 Starting policy discovery from cwd: ${process.cwd()}`);
 
     // 1. First, try relative to the installed module location
     // This ensures policies are found when the package is installed via npm
@@ -50,21 +48,19 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
     //   - import.meta.url may not be available in CJS or Jest
 
     let modulePathResolved = false;
-    logger.info({ MODULE_URL_DEFINED: !!MODULE_URL, MODULE_URL }, '🔍 Module URL state');
 
     // Try CJS approach first (most common in Node.js)
     try {
       // Using Function constructor to bypass TypeScript's static analysis
       // This is safe: the string is a compile-time constant with no user input
       const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
-      logger.info({ dirName, dirNameType: typeof dirName }, '🔍 CJS __dirname check');
       if (typeof dirName === 'string') {
         // From dist/src/app/ or dist-cjs/src/app/, go up 3 levels to package root
         // dist-cjs/src/app/ -> dist-cjs/src/ -> dist-cjs/ -> package-root/
         const moduleRelativePath = resolve(dirName, '../../../policies');
         searchPaths.push(moduleRelativePath);
         modulePathResolved = true;
-        logger.info({ moduleRelativePath, __dirname: dirName, method: 'CJS __dirname' }, 'Resolved module path for policy discovery');
+        logger.debug({ moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path for policy discovery');
       }
     } catch (error) {
       logger.debug({ error }, 'Failed to resolve module path from __dirname');
@@ -79,15 +75,15 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
         // dist/src/app/ -> dist/src/ -> dist/ -> package-root/policies/
         const moduleRelativePath = resolve(__dirname, '../../../policies');
         searchPaths.push(moduleRelativePath);
-        logger.info({ moduleRelativePath, __dirname, MODULE_URL, method: 'ESM import.meta.url' }, 'Resolved module path for policy discovery');
+        logger.debug({ moduleRelativePath, method: 'ESM import.meta.url' }, 'Resolved module path for policy discovery');
         modulePathResolved = true;
       } catch (error) {
-        logger.warn({ error, MODULE_URL }, 'Failed to resolve module path from import.meta.url');
+        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
       }
     }
 
     if (!modulePathResolved) {
-      logger.warn({ MODULE_URL: !!MODULE_URL }, 'Could not resolve module path for built-in policies - will search from cwd');
+      logger.debug('Could not resolve module path for built-in policies - will search from cwd');
     }
 
     // 2. Then search upward from current working directory (for development)
@@ -108,24 +104,20 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
     }
 
     // Try each search path until we find one that exists
-    console.error(`🟣 Checking ${searchPaths.length} search paths: ${JSON.stringify(searchPaths)}`);
     for (const policiesDir of searchPaths) {
-      console.error(`🟣 Checking path: ${policiesDir}, exists: ${existsSync(policiesDir)}`);
       if (existsSync(policiesDir)) {
         // Find all .rego files except test files
         const files = readdirSync(policiesDir)
           .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
           .map((file) => resolve(join(policiesDir, file)));
 
-        console.error(`🟣 Found ${files.length} .rego files in ${policiesDir}`);
         if (files.length > 0) {
-          console.error(`🟣🟣🟣 RETURNING ${files.length} policy files: ${JSON.stringify(files)}`);
+          logger.debug({ count: files.length, dir: policiesDir }, 'Discovered built-in policies');
           return files;
         }
       }
     }
 
-    console.error(`🟣 NO POLICIES FOUND in any search path!`);
     return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in policies');
@@ -301,57 +293,36 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   const { registry, server, config = { chainHintsMode: CHAINHINTSMODE.ENABLED } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
-  // CRITICAL DEBUG: Confirm orchestrator is created
-  logger.info({
-    toolCount: registry.size,
-    hasServer: !!server,
-    chainHintsMode: config.chainHintsMode,
-    loggerName: (logger as any).bindings?.()?.name || 'unknown'
-  }, '🏗️ ORCHESTRATOR CREATED');
-
   // Cache the loaded policy to avoid reloading on every execution
   let policyCache: RegoEvaluator | undefined;
   let policyLoadPromise: Promise<void> | undefined;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
-    // CRITICAL DEBUG: Log at the VERY start of execute to confirm it's called
-    console.error(`\n🟡🟡🟡 ORCHESTRATOR.execute() CALLED for ${request.toolName} 🟡🟡🟡\n`);
-    logger.info({ toolName: request.toolName, hasPolicyCache: !!policyCache, hasPolicyPromise: !!policyLoadPromise }, '🚀 ORCHESTRATOR EXECUTE CALLED');
-
     const { toolName } = request;
     const tool = registry.get(toolName);
 
     if (!tool) {
-      logger.error({ toolName }, '🚀 TOOL NOT FOUND');
       return Failure(ERROR_MESSAGES.TOOL_NOT_FOUND(toolName));
     }
-
-    logger.info({ toolName }, '🚀 TOOL FOUND, creating contextual logger');
 
     const contextualLogger = childLogger(logger, {
       tool: tool.name,
       ...(request.metadata?.loggerContext ?? {}),
     });
 
-    logger.info({ toolName, policyLoadPromiseExists: !!policyLoadPromise }, '🚀 ABOUT TO CHECK POLICY LOAD PROMISE');
-
     // Load policies once (with Promise-based guard to prevent race conditions)
     if (!policyLoadPromise) {
-      console.error(`🟣 POLICY LOAD PROMISE IS UNDEFINED, starting policy discovery`);
       policyLoadPromise = (async () => {
-        console.error(`🟣 INSIDE POLICY LOAD PROMISE - about to call discoverPolicies`);
         // Use new priority-ordered discovery (includes built-in, user, and custom policies)
         const policyPaths = discoverPolicies(logger);
-        console.error(`🟣 discoverPolicies returned ${policyPaths.length} paths: ${JSON.stringify(policyPaths)}`);
 
         if (policyPaths.length === 0) {
           logger.warn({ cwd: process.cwd() }, 'No policies discovered - tools will run without policy constraints');
           return;
         }
 
-        logger.info(
+        logger.debug(
           {
-            policyPaths,
             count: policyPaths.length,
           },
           'Discovered policies, loading...',
