@@ -312,6 +312,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     // CRITICAL DEBUG: Log at the VERY start of execute to confirm it's called
+    console.error(`\n🟡🟡🟡 ORCHESTRATOR.execute() CALLED for ${request.toolName} 🟡🟡🟡\n`);
     logger.info({ toolName: request.toolName, hasPolicyCache: !!policyCache, hasPolicyPromise: !!policyLoadPromise }, '🚀 ORCHESTRATOR EXECUTE CALLED');
 
     const { toolName } = request;

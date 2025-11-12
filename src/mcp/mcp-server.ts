@@ -269,6 +269,16 @@ export function createMCPServer<TTool extends Tool>(
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
   const { server, tools, logger, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
 
+  console.error(`\n🔵 registerToolsWithServer called with execute function: ${execute.name || 'anonymous'}, type: ${typeof execute}\n`);
+
+  // Wrap execute to log when it's called
+  const wrappedExecute = async (request: ExecuteRequest) => {
+    console.error(`\n🔵🔵🔵 WRAPPED execute callback invoked for ${request.toolName} 🔵🔵🔵\n`);
+    const result = await execute(request);
+    console.error(`\n🔵 WRAPPED execute callback returning for ${request.toolName}, ok=${result.ok}\n`);
+    return result;
+  };
+
   for (const tool of tools) {
     logger.info({ toolName: tool.name }, `🔧 REGISTERING TOOL: ${tool.name}`);
     server.tool(
@@ -292,8 +302,8 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
           );
 
           console.error(`🔴 prepareExecutionPayload returned, about to call execute callback`);
-          console.error(`🔴 execute function type: ${typeof execute}, exists: ${!!execute}`);
-          const result = await execute({
+          console.error(`🔴 execute function type: ${typeof wrappedExecute}, exists: ${!!wrappedExecute}`);
+          const result = await wrappedExecute({
             toolName: tool.name,
             params: sanitizedParams,
             metadata,

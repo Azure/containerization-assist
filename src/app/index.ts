@@ -123,10 +123,13 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   }
 
   const orchestratedExecute = (request: ExecuteRequest): Promise<Result<unknown>> => {
+    console.error(`\n🟢🟢🟢 orchestratedExecute CALLED for ${request.toolName} 🟢🟢🟢\n`);
     logger.info({ toolName: request.toolName, hasMetadata: !!request.metadata }, '⚡ orchestratedExecute CALLED (wrapper function)');
     const orch = ensureOrchestrator();
     logger.info({ orchestratorExists: !!orch, toolName: request.toolName }, '⚡ ensureOrchestrator returned, about to call orch.execute');
-    return orch.execute(request);
+    const result = orch.execute(request);
+    console.error(`🟢 orchestratedExecute returning promise`);
+    return result;
   };
 
   return {
