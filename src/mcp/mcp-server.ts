@@ -277,12 +277,13 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
       tool.inputSchema,
       async (rawParams: Record<string, unknown> | undefined, extra) => {
         // CRITICAL: Bypass logger entirely to prove handler is called
-        console.error(`\n\n🔴🔴🔴 HANDLER CALLED FOR: ${tool.name} 🔴🔴🔴\n\n`);
-        logger.info({ toolName: tool.name, rawParamsKeys: Object.keys(rawParams || {}) }, `🎯 TOOL HANDLER CALLED: ${tool.name}`);
+        console.error(`\n\n🔴 HANDLER CALLED FOR: ${tool.name}\n\n`);
+        console.error(`🔴 About to create params`);
         const params = rawParams ?? {};
-        logger.info({ tool: tool.name, transport }, 'Executing tool');
+        console.error(`🔴 About to enter try block`);
 
         try {
+          console.error(`🔴 Inside try block, calling prepareExecutionPayload`);
           const { sanitizedParams, metadata } = prepareExecutionPayload(
             tool.name,
             params,
@@ -290,13 +291,14 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
             extra,
           );
 
-          logger.info({ toolName: tool.name, hasExecuteFunction: !!execute, executeType: typeof execute }, '💫 MCP: About to call execute function');
+          console.error(`🔴 prepareExecutionPayload returned, about to call execute callback`);
+          console.error(`🔴 execute function type: ${typeof execute}, exists: ${!!execute}`);
           const result = await execute({
             toolName: tool.name,
             params: sanitizedParams,
             metadata,
           });
-          logger.info({ toolName: tool.name, resultOk: result.ok }, '💫 MCP: execute returned');
+          console.error(`🔴 execute() returned, result.ok = ${result.ok}`);
 
           if (!result.ok) {
             // Format error with guidance if available
@@ -313,10 +315,8 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
             ],
           };
         } catch (error) {
-          logger.error(
-            { error: extractErrorMessage(error), tool: tool.name, transport },
-            'Tool execution error',
-          );
+          console.error(`🔴🔴🔴 HANDLER CAUGHT ERROR: ${error instanceof Error ? error.message : String(error)}`);
+          console.error(`🔴 Error stack:`, error instanceof Error ? error.stack : 'no stack');
           throw error instanceof McpError
             ? error
             : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
