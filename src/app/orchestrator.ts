@@ -36,8 +36,10 @@ const MODULE_URL = typeof import.meta !== 'undefined' && import.meta.url ? impor
  * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
 export function discoverBuiltInPolicies(logger: Logger): string[] {
+  logger.info('🔍 discoverBuiltInPolicies CALLED');
   try {
     const searchPaths: string[] = [];
+    logger.info({ cwd: process.cwd() }, '🔍 Starting policy discovery');
 
     // 1. First, try relative to the installed module location
     // This ensures policies are found when the package is installed via npm
@@ -48,12 +50,14 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
     //   - import.meta.url may not be available in CJS or Jest
 
     let modulePathResolved = false;
+    logger.info({ MODULE_URL_DEFINED: !!MODULE_URL, MODULE_URL }, '🔍 Module URL state');
 
     // Try CJS approach first (most common in Node.js)
     try {
       // Using Function constructor to bypass TypeScript's static analysis
       // This is safe: the string is a compile-time constant with no user input
       const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
+      logger.info({ dirName, dirNameType: typeof dirName }, '🔍 CJS __dirname check');
       if (typeof dirName === 'string') {
         // From dist/src/app/ or dist-cjs/src/app/, go up 4 levels to package root
         // dist/src/app/ -> dist/src/ -> dist/ -> package-root/ -> policies/
@@ -313,9 +317,12 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
     // Load policies once (with Promise-based guard to prevent race conditions)
     if (!policyLoadPromise) {
+      logger.info({ toolName, policyLoadPromiseExists: !!policyLoadPromise }, '🔍 POLICY LOADING STARTING');
       policyLoadPromise = (async () => {
+        logger.info('🔍 INSIDE POLICY LOAD PROMISE - about to call discoverPolicies');
         // Use new priority-ordered discovery (includes built-in, user, and custom policies)
         const policyPaths = discoverPolicies(logger);
+        logger.info({ policyPathsCount: policyPaths.length }, '🔍 discoverPolicies returned');
 
         if (policyPaths.length === 0) {
           logger.warn({ cwd: process.cwd() }, 'No policies discovered - tools will run without policy constraints');
