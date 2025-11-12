@@ -19,16 +19,30 @@ Built-in policies (specifically `policies/base-images.rego`) are **not being app
 // Line 26
 const MODULE_URL = typeof import.meta !== 'undefined' && import.meta.url ? import.meta.url : undefined;
 
-// Line 68-79
+// Line 70-79
 if (!modulePathResolved && MODULE_URL) {
   const __filename = fileURLToPath(MODULE_URL);
   const __dirname = dirname(__filename);
-  const moduleRelativePath = resolve(__dirname, '../../../policies');
+  const moduleRelativePath = resolve(__dirname, '../../../../policies');  // 4 levels up
   searchPaths.push(moduleRelativePath);
 }
 ```
 
-### 2. Enhanced Logging
+### 2. Fixed Path Resolution Depth
+
+**Problem:** The path `../../../policies` only goes up 3 directory levels from `dist/src/app/orchestrator.js`, which resolves to `dist/policies` instead of the package root's `policies/` directory.
+
+**Fix:** Changed to `../../../../policies` to navigate 4 levels up:
+```typescript
+// Lines 58-63 (CJS approach)
+const moduleRelativePath = resolve(dirName, '../../../../policies');
+// From dist/src/app/ -> dist/src/ -> dist/ -> package-root/ -> policies/
+
+// Lines 74-79 (ESM approach)
+const moduleRelativePath = resolve(__dirname, '../../../../policies');
+```
+
+### 3. Enhanced Logging
 
 Added comprehensive logging to track:
 - Policy discovery attempts (CJS vs ESM)
@@ -38,11 +52,11 @@ Added comprehensive logging to track:
 - Whether policy is passed to tool context
 
 **Log locations:**
-- `discoverBuiltInPolicies()` - Lines 61, 74, 82
-- `discoverPolicies()` - Lines 308-314, 320-327
-- `createContextForTool()` - Lines 253-259
+- `discoverBuiltInPolicies()` - Lines 61, 78, 86
+- `discoverPolicies()` - Lines 318-332, 336-342
+- `createContextForTool()` - Lines 262-268
 
-### 3. Created Test Infrastructure
+### 4. Created Test Infrastructure
 
 **Test script:** `scripts/test-spring-petclinic-policy-filtering.mjs`
 - Tests the **actual packed/installed version** (via `npm pack` + `npm install -g`)
