@@ -59,9 +59,9 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
       const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
       logger.info({ dirName, dirNameType: typeof dirName }, '🔍 CJS __dirname check');
       if (typeof dirName === 'string') {
-        // From dist/src/app/ or dist-cjs/src/app/, go up 4 levels to package root
-        // dist/src/app/ -> dist/src/ -> dist/ -> package-root/ -> policies/
-        const moduleRelativePath = resolve(dirName, '../../../../policies');
+        // From dist/src/app/ or dist-cjs/src/app/, go up 3 levels to package root
+        // dist-cjs/src/app/ -> dist-cjs/src/ -> dist-cjs/ -> package-root/
+        const moduleRelativePath = resolve(dirName, '../../../policies');
         searchPaths.push(moduleRelativePath);
         modulePathResolved = true;
         logger.info({ moduleRelativePath, __dirname: dirName, method: 'CJS __dirname' }, 'Resolved module path for policy discovery');
