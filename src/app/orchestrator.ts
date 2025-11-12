@@ -298,22 +298,38 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   const { registry, server, config = { chainHintsMode: CHAINHINTSMODE.ENABLED } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
+  // CRITICAL DEBUG: Confirm orchestrator is created
+  logger.info({
+    toolCount: registry.size,
+    hasServer: !!server,
+    chainHintsMode: config.chainHintsMode,
+    loggerName: (logger as any).bindings?.()?.name || 'unknown'
+  }, '🏗️ ORCHESTRATOR CREATED');
+
   // Cache the loaded policy to avoid reloading on every execution
   let policyCache: RegoEvaluator | undefined;
   let policyLoadPromise: Promise<void> | undefined;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
+    // CRITICAL DEBUG: Log at the VERY start of execute to confirm it's called
+    logger.info({ toolName: request.toolName, hasPolicyCache: !!policyCache, hasPolicyPromise: !!policyLoadPromise }, '🚀 ORCHESTRATOR EXECUTE CALLED');
+
     const { toolName } = request;
     const tool = registry.get(toolName);
 
     if (!tool) {
+      logger.error({ toolName }, '🚀 TOOL NOT FOUND');
       return Failure(ERROR_MESSAGES.TOOL_NOT_FOUND(toolName));
     }
+
+    logger.info({ toolName }, '🚀 TOOL FOUND, creating contextual logger');
 
     const contextualLogger = childLogger(logger, {
       tool: tool.name,
       ...(request.metadata?.loggerContext ?? {}),
     });
+
+    logger.info({ toolName, policyLoadPromiseExists: !!policyLoadPromise }, '🚀 ABOUT TO CHECK POLICY LOAD PROMISE');
 
     // Load policies once (with Promise-based guard to prevent race conditions)
     if (!policyLoadPromise) {
