@@ -270,11 +270,13 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
   const { server, tools, logger, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
 
   for (const tool of tools) {
+    logger.info({ toolName: tool.name }, `🔧 REGISTERING TOOL: ${tool.name}`);
     server.tool(
       tool.name,
       tool.description,
       tool.inputSchema,
       async (rawParams: Record<string, unknown> | undefined, extra) => {
+        logger.info({ toolName: tool.name, rawParamsKeys: Object.keys(rawParams || {}) }, `🎯 TOOL HANDLER CALLED: ${tool.name}`);
         const params = rawParams ?? {};
         logger.info({ tool: tool.name, transport }, 'Executing tool');
 
