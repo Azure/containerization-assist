@@ -122,8 +122,12 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     return orchestrator;
   }
 
-  const orchestratedExecute = (request: ExecuteRequest): Promise<Result<unknown>> =>
-    ensureOrchestrator().execute(request);
+  const orchestratedExecute = (request: ExecuteRequest): Promise<Result<unknown>> => {
+    logger.info({ toolName: request.toolName, hasMetadata: !!request.metadata }, '⚡ orchestratedExecute CALLED (wrapper function)');
+    const orch = ensureOrchestrator();
+    logger.info({ orchestratorExists: !!orch, toolName: request.toolName }, '⚡ ensureOrchestrator returned, about to call orch.execute');
+    return orch.execute(request);
+  };
 
   return {
     /**

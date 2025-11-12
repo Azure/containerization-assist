@@ -286,11 +286,13 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
             extra,
           );
 
+          logger.info({ toolName: tool.name, hasExecuteFunction: !!execute, executeType: typeof execute }, '💫 MCP: About to call execute function');
           const result = await execute({
             toolName: tool.name,
             params: sanitizedParams,
             metadata,
           });
+          logger.info({ toolName: tool.name, resultOk: result.ok }, '💫 MCP: execute returned');
 
           if (!result.ok) {
             // Format error with guidance if available
