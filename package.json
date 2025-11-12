@@ -54,6 +54,7 @@
     "!policies.user.examples/**/*_test.rego",
     "policies.user.examples/**/*.md",
     "!policies.user/**",
+    "knowledge/packs/**/*.json",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
