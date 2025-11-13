@@ -6,6 +6,7 @@
 import { z, type ZodTypeAny } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
+import { resolveModulePaths } from '@/lib/module-path-resolver';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
@@ -17,7 +18,6 @@ import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { ENV_VARS } from '@/config/constants';
 
 // Capture import.meta.url at module scope (only available in ESM builds)
@@ -38,77 +38,17 @@ const MODULE_URL = (() => {
  * Discover built-in policy files from the policies directory
  * Returns paths to all .rego files (excluding test files)
  *
- * Searches relative to the module's installation location first,
- * then falls back to searching upward from process.cwd().
+ * Uses shared module path resolver with symlink support.
  * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
 export function discoverBuiltInPolicies(logger: Logger): string[] {
   try {
-    const searchPaths: string[] = [];
-
-    // 1. First, try relative to the installed module location
-    // This ensures policies are found when the package is installed via npm
-
-    // Strategy: Try CJS __dirname first, then fall back to ESM import.meta.url
-    // We use try-catch for both because:
-    //   - __dirname may throw ReferenceError in strict ESM modules
-    //   - import.meta.url may not be available in CJS or Jest
-
-    let modulePathResolved = false;
-
-    // Try CJS approach first (most common in Node.js)
-    try {
-      // Using Function constructor to bypass TypeScript's static analysis
-      // This is safe: the string is a compile-time constant with no user input
-      const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
-      if (typeof dirName === 'string') {
-        // From dist/src/app/ or dist-cjs/src/app/, go up 3 levels to package root
-        // dist-cjs/src/app/ -> dist-cjs/src/ -> dist-cjs/ -> package-root/
-        const moduleRelativePath = resolve(dirName, '../../../policies');
-        searchPaths.push(moduleRelativePath);
-        modulePathResolved = true;
-        logger.debug({ moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path for policy discovery');
-      }
-    } catch (error) {
-      logger.debug({ error }, 'Failed to resolve module path from __dirname');
-    }
-
-    // If CJS failed, try ESM approach using MODULE_URL captured at module scope
-    if (!modulePathResolved && MODULE_URL) {
-      try {
-        const __filename = fileURLToPath(MODULE_URL);
-        const __dirname = dirname(__filename);
-        // From dist/src/app/ or dist-cjs/src/app/, go up 3 levels to package root
-        // dist/src/app/ -> dist/src/ -> dist/ -> package-root/policies/
-        const moduleRelativePath = resolve(__dirname, '../../../policies');
-        searchPaths.push(moduleRelativePath);
-        logger.debug({ moduleRelativePath, method: 'ESM import.meta.url' }, 'Resolved module path for policy discovery');
-        modulePathResolved = true;
-      } catch (error) {
-        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
-      }
-    }
-
-    if (!modulePathResolved) {
-      logger.debug('Could not resolve module path for built-in policies - will search from cwd');
-    }
-
-    // 2. Then search upward from current working directory (for development)
-    let currentDir = process.cwd();
-    searchPaths.push(join(currentDir, 'policies'));
-
-    let attempts = 0;
-    const maxAttempts = 5;
-    while (attempts < maxAttempts) {
-      const parentDir = dirname(currentDir);
-      if (parentDir === currentDir) {
-        // Reached filesystem root
-        break;
-      }
-      currentDir = parentDir;
-      searchPaths.push(join(currentDir, 'policies'));
-      attempts++;
-    }
+    // Use shared path resolver utility
+    const searchPaths = resolveModulePaths({
+      relativePath: 'policies',
+      logger,
+      ...(MODULE_URL && { moduleUrl: MODULE_URL }),
+    });
 
     // Try each search path until we find one that exists
     for (const policiesDir of searchPaths) {

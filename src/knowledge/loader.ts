@@ -5,19 +5,16 @@
  * @see {@link ../../docs/adr/003-knowledge-enhancement.md ADR-003: Knowledge Enhancement System}
  */
 
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
-import { resolve, join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { createLogger } from '@/lib/logger';
+import { resolveModulePaths } from '@/lib/module-path-resolver';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
 
 // ===== Constants =====
 
-const KNOWLEDGE_PACKS_RELATIVE_PATH = '../../../knowledge/packs';
-const DIST_SRC_MARKER = '/dist/src/';
-const MAX_PARENT_DIR_TRAVERSALS = 5;
 const JSON_FILE_EXTENSION = '.json';
 
 const logger = createLogger({ name: 'knowledge-loader' });
@@ -56,18 +53,6 @@ interface PackValidationError {
 
 type ValidationResult = PackValidationResult | PackValidationError;
 
-interface PathResolutionResult {
-  resolved: true;
-  path: string;
-  method: string;
-}
-
-interface PathResolutionFailure {
-  resolved: false;
-}
-
-type PathResolution = PathResolutionResult | PathResolutionFailure;
-
 // ===== State =====
 
 const knowledgeState: KnowledgeState = {
@@ -77,123 +62,8 @@ const knowledgeState: KnowledgeState = {
   loaded: false,
 };
 
-// ===== Path Resolution Strategies =====
-
-/**
- * Attempt to resolve module path using CJS __dirname
- */
-function tryResolveCJSPath(): PathResolution {
-  try {
-    const dirName = new Function(
-      'return typeof __dirname !== "undefined" ? __dirname : undefined',
-    )() as string | undefined;
-
-    if (typeof dirName === 'string') {
-      const moduleRelativePath = resolve(dirName, KNOWLEDGE_PACKS_RELATIVE_PATH);
-      logger.debug(
-        { moduleRelativePath, method: 'CJS __dirname' },
-        'Resolved module path for knowledge pack discovery',
-      );
-      return { resolved: true, path: moduleRelativePath, method: 'CJS __dirname' };
-    }
-  } catch (error) {
-    logger.debug({ error }, 'Failed to resolve module path from __dirname');
-  }
-
-  return { resolved: false };
-}
-
-/**
- * Attempt to resolve module path using ESM import.meta.url
- */
-function tryResolveESMPath(): PathResolution {
-  if (!MODULE_URL) {
-    return { resolved: false };
-  }
-
-  try {
-    const __filename = fileURLToPath(MODULE_URL as string);
-    const __dirname = dirname(__filename);
-    const moduleRelativePath = resolve(__dirname, KNOWLEDGE_PACKS_RELATIVE_PATH);
-
-    logger.debug(
-      { moduleRelativePath, method: 'ESM import.meta.url' },
-      'Resolved module path for knowledge pack discovery',
-    );
-    return { resolved: true, path: moduleRelativePath, method: 'ESM import.meta.url' };
-  } catch (error) {
-    logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
-  }
-
-  return { resolved: false };
-}
-
-/**
- * Resolve symlinks to get the actual file path (important for npm bin wrappers)
- */
-function resolveSymlink(path: string): string {
-  try {
-    return realpathSync(path);
-  } catch (error) {
-    logger.debug({ path, error }, 'Could not resolve symlink, using original path');
-    return path;
-  }
-}
-
-/**
- * Attempt to resolve module path from process.argv[1] (CLI entrypoint)
- */
-function tryResolveFromArgv(): PathResolution {
-  if (!process.argv[1]) {
-    return { resolved: false };
-  }
-
-  try {
-    const scriptPath = resolveSymlink(resolve(process.argv[1]));
-    const distIndex = scriptPath.indexOf(DIST_SRC_MARKER);
-
-    if (distIndex !== -1) {
-      const packageRoot = scriptPath.substring(0, distIndex);
-      const moduleRelativePath = join(packageRoot, 'knowledge/packs');
-
-      logger.info(
-        { scriptPath, packageRoot, moduleRelativePath, method: 'process.argv[1]' },
-        'Resolved module path for knowledge pack discovery',
-      );
-      return { resolved: true, path: moduleRelativePath, method: 'process.argv[1]' };
-    }
-
-    logger.warn(
-      { scriptPath, searched: DIST_SRC_MARKER },
-      'Could not find marker in script path for knowledge packs',
-    );
-  } catch (error) {
-    logger.warn({ error }, 'Failed to resolve module path from process.argv[1]');
-  }
-
-  return { resolved: false };
-}
-
-/**
- * Generate search paths by walking up from current working directory
- */
-function generateCwdSearchPaths(): string[] {
-  const paths: string[] = [];
-  let currentDir = process.cwd();
-  paths.push(join(currentDir, 'knowledge/packs'));
-
-  for (let i = 0; i < MAX_PARENT_DIR_TRAVERSALS; i++) {
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      // Reached filesystem root
-      break;
-    }
-    currentDir = parentDir;
-    paths.push(join(currentDir, 'knowledge/packs'));
-  }
-
-  return paths;
-}
+// ===== Path Resolution =====
+// Uses shared module path resolver utility
 
 /**
  * Find JSON files in the given directory
@@ -214,35 +84,17 @@ function findJsonFiles(directory: string): string[] {
  * Search priority:
  *  1. Relative to the installed module location (CJS __dirname)
  *  2. Relative to the installed module location (ESM import.meta.url)
- *  3. Heuristic based on process.argv[1] (CLI entrypoint)
+ *  3. Heuristic based on process.argv[1] (CLI entrypoint with symlink resolution)
  *  4. Walk upward from process.cwd() (dev / repo root)
  */
 export function discoverBuiltInKnowledgePacks(): string[] {
   try {
-    const searchPaths: string[] = [];
-
-    // Try resolution strategies in priority order
-    const strategies = [tryResolveCJSPath, tryResolveESMPath, tryResolveFromArgv];
-
-    for (const strategy of strategies) {
-      const result = strategy();
-      if (result.resolved) {
-        searchPaths.push(result.path);
-        break;
-      }
-    }
-
-    if (searchPaths.length === 0) {
-      logger.debug('Could not resolve module path - will search from cwd');
-    }
-
-    // Add fallback paths from cwd
-    searchPaths.push(...generateCwdSearchPaths());
-
-    logger.debug(
-      { searchPaths, totalPaths: searchPaths.length },
-      'Searching for knowledge packs in paths',
-    );
+    // Use shared path resolver utility
+    const searchPaths = resolveModulePaths({
+      relativePath: 'knowledge/packs',
+      logger,
+      ...(MODULE_URL && { moduleUrl: MODULE_URL }),
+    });
 
     // Try each search path until we find one with JSON files
     for (const packsDir of searchPaths) {
