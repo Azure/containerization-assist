@@ -7,23 +7,10 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
-
-// Capture import.meta.url at module scope (only available in ESM builds)
-// This will be undefined in CJS builds, which is expected
-// Using Function constructor to bypass Jest's parser (same as __dirname approach)
-const MODULE_URL = (() => {
-  try {
-    // @ts-ignore - import.meta is not available in CJS builds
-    return new Function('return typeof import.meta !== "undefined" && import.meta.url ? import.meta.url : undefined')();
-  } catch {
-    return undefined;
-  }
-})();
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
