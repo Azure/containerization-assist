@@ -56,48 +56,47 @@ function discoverBuiltInKnowledgePacks(): string[] {
     // 1. First, try relative to the installed module location
     // This ensures knowledge packs are found when the package is installed via npm
 
-    // Strategy: Try CJS __dirname first, then fall back to ESM import.meta.url
-    // We use try-catch for both because:
-    //   - __dirname may throw ReferenceError in strict ESM modules
-    //   - import.meta.url may not be available in CJS or Jest
-
     let modulePathResolved = false;
 
-    // Try CJS approach first (most common in Node.js)
+    // Try CJS approach first (for when imported via require())
     try {
-      // Using Function constructor to bypass TypeScript's static analysis
-      // This is safe: the string is a compile-time constant with no user input
       const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
       if (typeof dirName === 'string') {
-        // From dist/src/knowledge/ or dist-cjs/src/knowledge/, go up 3 levels to package root
-        // dist-cjs/src/knowledge/ -> dist-cjs/src/ -> dist-cjs/ -> package-root/knowledge/packs/
         const moduleRelativePath = resolve(dirName, '../../../knowledge/packs');
         searchPaths.push(moduleRelativePath);
         modulePathResolved = true;
-        logger.debug({ moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path for knowledge pack discovery');
+        logger.debug({ dirName, moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path for knowledge pack discovery');
       }
     } catch (error) {
-      logger.debug({ error }, 'Failed to resolve module path from __dirname');
+      logger.debug({ error }, 'CJS __dirname not available');
     }
 
-    // If CJS failed, try ESM approach using MODULE_URL captured at module scope
-    if (!modulePathResolved && MODULE_URL) {
+    // ESM approach: try to infer from process.argv[1] (the script being executed)
+    // When running the CLI, process.argv[1] points to the cli.js file
+    if (!modulePathResolved && process.argv && process.argv[1]) {
       try {
-        const __filename = fileURLToPath(MODULE_URL);
-        const __dirname = dirname(__filename);
-        // From dist/src/knowledge/ or dist-cjs/src/knowledge/, go up 3 levels to package root
-        // dist/src/knowledge/ -> dist/src/ -> dist/ -> package-root/knowledge/packs/
-        const moduleRelativePath = resolve(__dirname, '../../../knowledge/packs');
-        searchPaths.push(moduleRelativePath);
-        logger.debug({ moduleRelativePath, method: 'ESM import.meta.url' }, 'Resolved module path for knowledge pack discovery');
-        modulePathResolved = true;
+        // If argv[1] is something like /path/to/node_modules/package/dist/src/cli/cli.js
+        // We can infer the package root
+        const scriptPath = process.argv[1];
+        logger.info({ scriptPath, argv: process.argv }, 'Attempting to resolve package root from process.argv');
+
+        const distIndex = scriptPath.indexOf('/dist/src/');
+        if (distIndex !== -1) {
+          const packageRoot = scriptPath.substring(0, distIndex);
+          const moduleRelativePath = join(packageRoot, 'knowledge/packs');
+          searchPaths.push(moduleRelativePath);
+          modulePathResolved = true;
+          logger.info({ scriptPath, packageRoot, moduleRelativePath, method: 'process.argv[1]' }, 'Resolved module path for knowledge pack discovery');
+        } else {
+          logger.warn({ scriptPath, searched: '/dist/src/' }, 'Could not find /dist/src/ in script path');
+        }
       } catch (error) {
-        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
+        logger.warn({ error }, 'Failed to resolve module path from process.argv[1]');
       }
     }
 
     if (!modulePathResolved) {
-      logger.debug('Could not resolve module path for built-in knowledge packs - will search from cwd');
+      logger.warn('Could not resolve module path for built-in knowledge packs - will search from cwd');
     }
 
     // 2. Then search upward from current working directory (for development)
@@ -118,21 +117,27 @@ function discoverBuiltInKnowledgePacks(): string[] {
     }
 
     // Try each search path until we find one that exists
+    logger.debug({ searchPaths, totalPaths: searchPaths.length }, 'Searching for knowledge packs in paths');
+
     for (const packsDir of searchPaths) {
+      logger.debug({ path: packsDir, exists: existsSync(packsDir) }, 'Checking knowledge pack path');
+
       if (existsSync(packsDir)) {
         // Find all .json files
         const files = readdirSync(packsDir)
           .filter((file) => file.endsWith('.json'))
           .map((file) => resolve(join(packsDir, file)));
 
+        logger.debug({ count: files.length, dir: packsDir, files: files.slice(0, 3) }, 'Found files in knowledge pack directory');
+
         if (files.length > 0) {
-          logger.debug({ count: files.length, dir: packsDir }, 'Discovered built-in knowledge packs');
+          logger.info({ count: files.length, dir: packsDir }, 'Discovered built-in knowledge packs');
           return files;
         }
       }
     }
 
-    logger.warn({ searchPaths }, 'No knowledge packs found in any search path');
+    logger.error({ searchPaths, cwd: process.cwd() }, 'FATAL: No knowledge packs found in any search path');
     return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in knowledge packs');
