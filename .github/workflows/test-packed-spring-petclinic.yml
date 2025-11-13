@@ -75,6 +75,7 @@ jobs:
       - name: Install packed version globally
         run: |
           PACKED_FILE=$(realpath artifacts/containerization-assist-mcp-*.tgz)
+          echo "PackedFile=$PACKED_FILE"
           npm install -g "$PACKED_FILE"
           echo "Installed version:"
           ca-mcp --version || true
@@ -102,8 +103,14 @@ jobs:
           echo ""
 
           # Copy test script from artifacts
+          echo " "
+          echo ">pwd:"
           pwd
+          echo " "
+          echo ">ls"
           ls
+          echo " "
+          echo ">ls .."
           ls ../
           cp ../artifacts/test-spring-petclinic-mcp.mjs ./test-mcp.mjs
 
