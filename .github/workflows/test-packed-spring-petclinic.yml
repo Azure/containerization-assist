@@ -61,6 +61,12 @@ jobs:
       contents: read
 
     steps:
+      - name: Initial Info
+        run: |
+          echo ">pwd"
+          pwd
+          echo ">ls"
+          ls
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -112,7 +118,7 @@ jobs:
           echo " "
           echo ">ls .."
           ls ../
-          cp ../artifacts/test-spring-petclinic-mcp.mjs ./test-mcp.mjs
+          cp ../artifacts/scripts/test-spring-petclinic-mcp.mjs ./test-mcp.mjs
 
           # Run the MCP stdio test
           node test-mcp.mjs "$(pwd)" "."
