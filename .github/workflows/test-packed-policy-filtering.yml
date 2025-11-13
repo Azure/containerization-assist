@@ -74,7 +74,7 @@ jobs:
 
       - name: Install packed version globally
         run: |
-          PACKED_FILE=$(ls artifacts/containerization-assist-mcp-*.tgz)
+          PACKED_FILE=$(realpath artifacts/containerization-assist-mcp-*.tgz)
           npm install -g "$PACKED_FILE"
           echo "Installed version:"
           ca-mcp --version || true
