@@ -86,12 +86,6 @@ jobs:
           echo "Spring PetClinic cloned successfully"
           ls -la
 
-      - name: Setup Java for Spring PetClinic
-        uses: actions/setup-java@7a6d8a8234af8eb26422e24e3006232cccaa061b # v4
-        with:
-          distribution: "temurin"
-          java-version: "21"
-
       - name: Verify CLI is accessible
         run: |
           echo "Testing CLI availability..."
@@ -108,6 +102,9 @@ jobs:
           echo ""
 
           # Copy test script from artifacts
+          pwd
+          ls
+          ls ../
           cp ../artifacts/test-spring-petclinic-mcp.mjs ./test-mcp.mjs
 
           # Run the MCP stdio test
