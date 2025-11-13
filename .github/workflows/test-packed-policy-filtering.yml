@@ -128,7 +128,7 @@ jobs:
           echo ""
 
           # Copy test script from artifacts
-          cp ../artifacts/test-spring-petclinic-policy-filtering.mjs ./test-policy-filtering.mjs
+          cp ../artifacts/scripts/test-spring-petclinic-policy-filtering.mjs ./test-policy-filtering.mjs
 
           # Run the MCP stdio test WITHOUT custom policy - built-in should be auto-discovered
           node test-policy-filtering.mjs "$(pwd)"
