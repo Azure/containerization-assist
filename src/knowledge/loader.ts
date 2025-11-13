@@ -5,14 +5,37 @@
  * @see {@link ../../docs/adr/003-knowledge-enhancement.md ADR-003: Knowledge Enhancement System}
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
 import { z } from 'zod';
 
-const logger = createLogger().child({ module: 'knowledge-loader' });
+// ===== Constants =====
+
+const KNOWLEDGE_PACKS_RELATIVE_PATH = '../../../knowledge/packs';
+const DIST_SRC_MARKER = '/dist/src/';
+const MAX_PARENT_DIR_TRAVERSALS = 5;
+const JSON_FILE_EXTENSION = '.json';
+
+const logger = createLogger({ name: 'knowledge-loader' });
+
+// Capture import.meta.url at module scope (ESM builds only).
+// This is the same pattern used in src/app/orchestrator.ts.
+const MODULE_URL = (() => {
+  try {
+    // @ts-ignore - import.meta is not available in CJS builds
+    return new Function(
+      'return typeof import.meta !== "undefined" && import.meta.url ? import.meta.url : undefined',
+    )();
+  } catch {
+    return undefined;
+  }
+})();
+
+// ===== Types =====
 
 interface KnowledgeState {
   entries: Map<string, LoadedEntry>;
@@ -21,6 +44,32 @@ interface KnowledgeState {
   loaded: boolean;
 }
 
+interface PackValidationResult {
+  success: true;
+  entries: KnowledgeEntry[];
+}
+
+interface PackValidationError {
+  success: false;
+  error: string;
+}
+
+type ValidationResult = PackValidationResult | PackValidationError;
+
+interface PathResolutionResult {
+  resolved: true;
+  path: string;
+  method: string;
+}
+
+interface PathResolutionFailure {
+  resolved: false;
+}
+
+type PathResolution = PathResolutionResult | PathResolutionFailure;
+
+// ===== State =====
+
 const knowledgeState: KnowledgeState = {
   entries: new Map(),
   byCategory: new Map(),
@@ -28,103 +77,192 @@ const knowledgeState: KnowledgeState = {
   loaded: false,
 };
 
+// ===== Path Resolution Strategies =====
+
 /**
- * Discover built-in knowledge pack files from the knowledge/packs directory
- * Returns paths to all .json files
- *
- * Searches relative to the module's installation location first,
- * then falls back to searching upward from process.cwd().
- * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
+ * Attempt to resolve module path using CJS __dirname
  */
-function discoverBuiltInKnowledgePacks(): string[] {
+function tryResolveCJSPath(): PathResolution {
+  try {
+    const dirName = new Function(
+      'return typeof __dirname !== "undefined" ? __dirname : undefined',
+    )() as string | undefined;
+
+    if (typeof dirName === 'string') {
+      const moduleRelativePath = resolve(dirName, KNOWLEDGE_PACKS_RELATIVE_PATH);
+      logger.debug(
+        { moduleRelativePath, method: 'CJS __dirname' },
+        'Resolved module path for knowledge pack discovery',
+      );
+      return { resolved: true, path: moduleRelativePath, method: 'CJS __dirname' };
+    }
+  } catch (error) {
+    logger.debug({ error }, 'Failed to resolve module path from __dirname');
+  }
+
+  return { resolved: false };
+}
+
+/**
+ * Attempt to resolve module path using ESM import.meta.url
+ */
+function tryResolveESMPath(): PathResolution {
+  if (!MODULE_URL) {
+    return { resolved: false };
+  }
+
+  try {
+    const __filename = fileURLToPath(MODULE_URL as string);
+    const __dirname = dirname(__filename);
+    const moduleRelativePath = resolve(__dirname, KNOWLEDGE_PACKS_RELATIVE_PATH);
+
+    logger.debug(
+      { moduleRelativePath, method: 'ESM import.meta.url' },
+      'Resolved module path for knowledge pack discovery',
+    );
+    return { resolved: true, path: moduleRelativePath, method: 'ESM import.meta.url' };
+  } catch (error) {
+    logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
+  }
+
+  return { resolved: false };
+}
+
+/**
+ * Resolve symlinks to get the actual file path (important for npm bin wrappers)
+ */
+function resolveSymlink(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch (error) {
+    logger.debug({ path, error }, 'Could not resolve symlink, using original path');
+    return path;
+  }
+}
+
+/**
+ * Attempt to resolve module path from process.argv[1] (CLI entrypoint)
+ */
+function tryResolveFromArgv(): PathResolution {
+  if (!process.argv[1]) {
+    return { resolved: false };
+  }
+
+  try {
+    const scriptPath = resolveSymlink(resolve(process.argv[1]));
+    const distIndex = scriptPath.indexOf(DIST_SRC_MARKER);
+
+    if (distIndex !== -1) {
+      const packageRoot = scriptPath.substring(0, distIndex);
+      const moduleRelativePath = join(packageRoot, 'knowledge/packs');
+
+      logger.info(
+        { scriptPath, packageRoot, moduleRelativePath, method: 'process.argv[1]' },
+        'Resolved module path for knowledge pack discovery',
+      );
+      return { resolved: true, path: moduleRelativePath, method: 'process.argv[1]' };
+    }
+
+    logger.warn(
+      { scriptPath, searched: DIST_SRC_MARKER },
+      'Could not find marker in script path for knowledge packs',
+    );
+  } catch (error) {
+    logger.warn({ error }, 'Failed to resolve module path from process.argv[1]');
+  }
+
+  return { resolved: false };
+}
+
+/**
+ * Generate search paths by walking up from current working directory
+ */
+function generateCwdSearchPaths(): string[] {
+  const paths: string[] = [];
+  let currentDir = process.cwd();
+  paths.push(join(currentDir, 'knowledge/packs'));
+
+  for (let i = 0; i < MAX_PARENT_DIR_TRAVERSALS; i++) {
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      // Reached filesystem root
+      break;
+    }
+    currentDir = parentDir;
+    paths.push(join(currentDir, 'knowledge/packs'));
+  }
+
+  return paths;
+}
+
+/**
+ * Find JSON files in the given directory
+ */
+function findJsonFiles(directory: string): string[] {
+  if (!existsSync(directory)) {
+    return [];
+  }
+
+  return readdirSync(directory)
+    .filter((file) => file.endsWith(JSON_FILE_EXTENSION))
+    .map((file) => resolve(join(directory, file)));
+}
+
+/**
+ * Discover built-in knowledge pack JSON files using a chain of resolution strategies.
+ *
+ * Search priority:
+ *  1. Relative to the installed module location (CJS __dirname)
+ *  2. Relative to the installed module location (ESM import.meta.url)
+ *  3. Heuristic based on process.argv[1] (CLI entrypoint)
+ *  4. Walk upward from process.cwd() (dev / repo root)
+ */
+export function discoverBuiltInKnowledgePacks(): string[] {
   try {
     const searchPaths: string[] = [];
 
-    // 1. First, try relative to the installed module location
-    // This ensures knowledge packs are found when the package is installed via npm
+    // Try resolution strategies in priority order
+    const strategies = [tryResolveCJSPath, tryResolveESMPath, tryResolveFromArgv];
 
-    let modulePathResolved = false;
-
-    // Try CJS approach first (for when imported via require())
-    try {
-      const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
-      if (typeof dirName === 'string') {
-        const moduleRelativePath = resolve(dirName, '../../../knowledge/packs');
-        searchPaths.push(moduleRelativePath);
-        modulePathResolved = true;
-        logger.debug({ dirName, moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path for knowledge pack discovery');
-      }
-    } catch (error) {
-      logger.debug({ error }, 'CJS __dirname not available');
-    }
-
-    // ESM approach: try to infer from process.argv[1] (the script being executed)
-    // When running the CLI, process.argv[1] points to the cli.js file
-    if (!modulePathResolved && process.argv && process.argv[1]) {
-      try {
-        // If argv[1] is something like /path/to/node_modules/package/dist/src/cli/cli.js
-        // We can infer the package root
-        const scriptPath = process.argv[1];
-        logger.info({ scriptPath, argv: process.argv }, 'Attempting to resolve package root from process.argv');
-
-        const distIndex = scriptPath.indexOf('/dist/src/');
-        if (distIndex !== -1) {
-          const packageRoot = scriptPath.substring(0, distIndex);
-          const moduleRelativePath = join(packageRoot, 'knowledge/packs');
-          searchPaths.push(moduleRelativePath);
-          modulePathResolved = true;
-          logger.info({ scriptPath, packageRoot, moduleRelativePath, method: 'process.argv[1]' }, 'Resolved module path for knowledge pack discovery');
-        } else {
-          logger.warn({ scriptPath, searched: '/dist/src/' }, 'Could not find /dist/src/ in script path');
-        }
-      } catch (error) {
-        logger.warn({ error }, 'Failed to resolve module path from process.argv[1]');
-      }
-    }
-
-    if (!modulePathResolved) {
-      logger.warn('Could not resolve module path for built-in knowledge packs - will search from cwd');
-    }
-
-    // 2. Then search upward from current working directory (for development)
-    let currentDir = process.cwd();
-    searchPaths.push(join(currentDir, 'knowledge/packs'));
-
-    let attempts = 0;
-    const maxAttempts = 5;
-    while (attempts < maxAttempts) {
-      const parentDir = dirname(currentDir);
-      if (parentDir === currentDir) {
-        // Reached filesystem root
+    for (const strategy of strategies) {
+      const result = strategy();
+      if (result.resolved) {
+        searchPaths.push(result.path);
         break;
       }
-      currentDir = parentDir;
-      searchPaths.push(join(currentDir, 'knowledge/packs'));
-      attempts++;
     }
 
-    // Try each search path until we find one that exists
-    logger.debug({ searchPaths, totalPaths: searchPaths.length }, 'Searching for knowledge packs in paths');
+    if (searchPaths.length === 0) {
+      logger.debug('Could not resolve module path - will search from cwd');
+    }
 
+    // Add fallback paths from cwd
+    searchPaths.push(...generateCwdSearchPaths());
+
+    logger.debug(
+      { searchPaths, totalPaths: searchPaths.length },
+      'Searching for knowledge packs in paths',
+    );
+
+    // Try each search path until we find one with JSON files
     for (const packsDir of searchPaths) {
       logger.debug({ path: packsDir, exists: existsSync(packsDir) }, 'Checking knowledge pack path');
 
-      if (existsSync(packsDir)) {
-        // Find all .json files
-        const files = readdirSync(packsDir)
-          .filter((file) => file.endsWith('.json'))
-          .map((file) => resolve(join(packsDir, file)));
-
-        logger.debug({ count: files.length, dir: packsDir, files: files.slice(0, 3) }, 'Found files in knowledge pack directory');
-
-        if (files.length > 0) {
-          logger.info({ count: files.length, dir: packsDir }, 'Discovered built-in knowledge packs');
-          return files;
-        }
+      const files = findJsonFiles(packsDir);
+      if (files.length > 0) {
+        logger.debug(
+          { count: files.length, dir: packsDir, files: files.slice(0, 3) },
+          'Found files in knowledge pack directory',
+        );
+        logger.info({ count: files.length, dir: packsDir }, 'Discovered built-in knowledge packs');
+        return files;
       }
     }
 
-    logger.error({ searchPaths, cwd: process.cwd() }, 'FATAL: No knowledge packs found in any search path');
+    logger.error(
+      { searchPaths, cwd: process.cwd() },
+      'FATAL: No knowledge packs found in any search path',
+    );
     return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in knowledge packs');
@@ -132,48 +270,51 @@ function discoverBuiltInKnowledgePacks(): string[] {
   }
 }
 
+// ===== Validation =====
+
+/**
+ * Format Zod errors for logging
+ */
+function formatZodErrors(errors: z.ZodIssue[]): Array<{ path: string; message: string }> {
+  return errors.map((e) => ({
+    path: e.path.join('.'),
+    message: e.message,
+  }));
+}
+
 /**
  * Validate and normalize pack structure
  * Handles both array and object-wrapped pack formats
  */
-const validateAndNormalizePack = (
-  packFile: string,
-  data: unknown,
-): { valid: boolean; entries?: KnowledgeEntry[] } => {
+function validateAndNormalizePack(packFile: string, data: unknown): ValidationResult {
   try {
     const validated = KnowledgePackSchema.parse(data);
 
     // Extract entries based on format
-    // Cast to KnowledgeEntry[] since Zod validation ensures compatibility
-    let entries: KnowledgeEntry[];
-    if (Array.isArray(validated)) {
-      // Format 1: Flat array of entries
-      entries = validated as KnowledgeEntry[];
-    } else {
-      // Format 2: Object with metadata and rules array
-      entries = validated.rules as KnowledgeEntry[];
-    }
+    const entries: KnowledgeEntry[] = Array.isArray(validated)
+      ? (validated as KnowledgeEntry[]) // Format 1: Flat array
+      : (validated.rules as KnowledgeEntry[]); // Format 2: Object with rules
 
-    return { valid: true, entries };
+    return { success: true, entries };
   } catch (error) {
     if (error instanceof z.ZodError) {
       logger.warn(
         {
           pack: packFile,
-          errors: error.issues.slice(0, 5).map((e: z.ZodIssue) => ({
-            path: e.path.join('.'),
-            message: e.message,
-          })),
+          errors: formatZodErrors(error.issues.slice(0, 5)),
           totalErrors: error.issues.length,
         },
         'Pack validation failed',
       );
     }
-    return { valid: false };
+    return { success: false, error: String(error) };
   }
-};
+}
 
-const validateEntry = (entry: unknown): entry is KnowledgeEntry => {
+/**
+ * Validate a single knowledge entry
+ */
+function validateEntry(entry: unknown): entry is KnowledgeEntry {
   try {
     KnowledgeEntrySchema.parse(entry);
     return true;
@@ -182,84 +323,147 @@ const validateEntry = (entry: unknown): entry is KnowledgeEntry => {
       logger.warn(
         {
           entryId: (entry as { id?: string })?.id || 'unknown',
-          errors: error.issues.map((e: z.ZodIssue) => ({
-            path: e.path.join('.'),
-            message: e.message,
-          })),
+          errors: formatZodErrors(error.issues),
         },
         'Entry validation failed',
       );
     }
     return false;
   }
-};
+}
 
-const addEntry = (entry: KnowledgeEntry): void => {
-  // No pattern compilation - patterns are compiled on-demand during matching
+// ===== State Management =====
+
+/**
+ * Add an entry to the knowledge state
+ */
+function addEntry(entry: KnowledgeEntry): void {
   knowledgeState.entries.set(entry.id, entry);
-};
+}
 
-const buildIndices = (): void => {
-  // Clear existing indices
+/**
+ * Helper to add entry to a map with array values
+ */
+function addToMapArray<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const existing = map.get(key);
+  if (existing) {
+    existing.push(value);
+  } else {
+    map.set(key, [value]);
+  }
+}
+
+/**
+ * Build category and tag indices for fast lookup
+ */
+function buildIndices(): void {
   knowledgeState.byCategory.clear();
   knowledgeState.byTag.clear();
 
   for (const entry of knowledgeState.entries.values()) {
     // Index by category
-    if (!knowledgeState.byCategory.has(entry.category)) {
-      knowledgeState.byCategory.set(entry.category, []);
-    }
-    knowledgeState.byCategory.get(entry.category)?.push(entry);
+    addToMapArray(knowledgeState.byCategory, entry.category, entry);
 
     // Index by tags
     if (entry.tags) {
       for (const tag of entry.tags) {
-        if (!knowledgeState.byTag.has(tag)) {
-          knowledgeState.byTag.set(tag, []);
-        }
-        knowledgeState.byTag.get(tag)?.push(entry);
+        addToMapArray(knowledgeState.byTag, tag, entry);
       }
     }
   }
-};
+}
 
-const getTopTags = (limit: number): Array<{ tag: string; count: number }> => {
-  const tagCounts: Record<string, number> = {};
+/**
+ * Get top N most common tags with their counts
+ */
+function getTopTags(limit: number): Array<{ tag: string; count: number }> {
+  const tagCounts = new Map<string, number>();
 
   for (const entry of knowledgeState.entries.values()) {
     if (entry.tags) {
       for (const tag of entry.tags) {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
       }
     }
   }
 
-  return Object.entries(tagCounts)
-    .sort(([, a], [, b]) => b - a)
+  return Array.from(tagCounts.entries())
+    .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([tag, count]) => ({ tag, count }));
-};
+}
+
+// ===== Pack Loading =====
+
+interface LoadStats {
+  packsAttempted: number;
+  packsLoaded: number;
+  packsFailed: number;
+  entriesValid: number;
+  entriesInvalid: number;
+  failures: Array<{ file: string; error: string }>;
+}
+
+/**
+ * Load a single knowledge pack file
+ */
+function loadPackFile(packPath: string, stats: LoadStats): void {
+  try {
+    // Read and parse JSON file
+    const fileContent = readFileSync(packPath, 'utf-8');
+    const data = JSON.parse(fileContent);
+
+    // Validate and normalize pack structure
+    const result = validateAndNormalizePack(packPath, data);
+
+    if (!result.success) {
+      const error = 'Pack validation failed (see previous log)';
+      stats.packsFailed++;
+      stats.failures.push({ file: packPath, error });
+      throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${error}`);
+    }
+
+    logger.debug({ pack: packPath, count: result.entries.length }, 'Loading knowledge pack');
+
+    // Validate and add individual entries
+    for (const entry of result.entries) {
+      if (validateEntry(entry)) {
+        addEntry(entry);
+        stats.entriesValid++;
+      } else {
+        stats.entriesInvalid++;
+      }
+    }
+
+    stats.packsLoaded++;
+  } catch (error) {
+    stats.packsFailed++;
+    const errorMessage = String(error);
+    stats.failures.push({ file: packPath, error: errorMessage });
+    logger.error({ pack: packPath, error }, 'Failed to load knowledge pack');
+    throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${errorMessage}`);
+  }
+}
 
 /**
  * Load knowledge entries from built-in knowledge packs
  * Throws an error if any built-in pack fails to load
  */
-export const loadKnowledgeBase = (): void => {
+export function loadKnowledgeBase(): void {
   if (knowledgeState.loaded) {
     return;
   }
 
-  const stats = {
+  const stats: LoadStats = {
     packsAttempted: 0,
     packsLoaded: 0,
     packsFailed: 0,
     entriesValid: 0,
     entriesInvalid: 0,
-    failures: [] as Array<{ file: string; error: string }>,
+    failures: [],
   };
 
   try {
-    // Discover built-in knowledge packs at runtime
     const packPaths = discoverBuiltInKnowledgePacks();
     stats.packsAttempted = packPaths.length;
 
@@ -271,49 +475,7 @@ export const loadKnowledgeBase = (): void => {
 
     // Load each discovered pack
     for (const packPath of packPaths) {
-      try {
-        // Read and parse JSON file
-        const fileContent = readFileSync(packPath, 'utf-8');
-        const data = JSON.parse(fileContent);
-
-        // Validate and normalize pack structure
-        const result = validateAndNormalizePack(packPath, data);
-        if (!result.valid || !result.entries) {
-          const error = 'Pack validation failed (see previous log)';
-          stats.packsFailed++;
-          stats.failures.push({
-            file: packPath,
-            error,
-          });
-          // Throw error for built-in packs - they must all load successfully
-          throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${error}`);
-        }
-
-        const entries = result.entries;
-        logger.debug({ pack: packPath, count: entries.length }, 'Loading knowledge pack');
-
-        // Validate and add individual entries
-        for (const entry of entries) {
-          if (validateEntry(entry)) {
-            addEntry(entry);
-            stats.entriesValid++;
-          } else {
-            stats.entriesInvalid++;
-          }
-        }
-
-        stats.packsLoaded++;
-      } catch (packError) {
-        stats.packsFailed++;
-        const errorMessage = String(packError);
-        stats.failures.push({
-          file: packPath,
-          error: errorMessage,
-        });
-        logger.error({ pack: packPath, error: packError }, 'Failed to load knowledge pack');
-        // Re-throw the error to ensure server startup fails
-        throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${errorMessage}`);
-      }
+      loadPackFile(packPath, stats);
     }
 
     buildIndices();
@@ -334,34 +496,35 @@ export const loadKnowledgeBase = (): void => {
     );
   } catch (error) {
     logger.error({ error }, 'Failed to load knowledge base');
-    // Re-throw to ensure server startup fails
     throw error;
   }
-};
+}
+
+// ===== Public API =====
 
 /**
- * Get all entries
+ * Get all loaded knowledge entries
  */
-export const getAllEntries = (): LoadedEntry[] => {
+export function getAllEntries(): LoadedEntry[] {
   return Array.from(knowledgeState.entries.values());
-};
+}
 
 /**
  * Check if knowledge base is loaded
  */
-export const isKnowledgeLoaded = (): boolean => {
+export function isKnowledgeLoaded(): boolean {
   return knowledgeState.loaded;
-};
+}
 
 /**
  * Load knowledge data and return entries.
  * Used by prompt engine for knowledge selection.
  */
-export const loadKnowledgeData = (): { entries: LoadedEntry[] } => {
+export function loadKnowledgeData(): { entries: LoadedEntry[] } {
   if (!isKnowledgeLoaded()) {
     loadKnowledgeBase();
   }
   return {
     entries: getAllEntries(),
   };
-};
+}
