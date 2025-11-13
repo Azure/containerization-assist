@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "dotnet-identity-icu-alpine",
     "category": "dockerfile",
@@ -418,4 +418,4 @@ export default [
       "security"
     ]
   }
-] as const;
+]

@@ -228,6 +228,7 @@ export function createMCPServer<TTool extends Tool>(
       isRunning = true;
       logger.info(
         {
+          version: serverOptions.version,
           transport: transportType,
           toolCount: tools.length,
         },
@@ -266,7 +267,7 @@ export function createMCPServer<TTool extends Tool>(
  * @param options - Registration options including server, tools, and executor
  */
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
-  const { server, tools, logger, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
+  const { server, tools, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
 
   for (const tool of tools) {
     server.tool(
@@ -275,7 +276,6 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
       tool.inputSchema,
       async (rawParams: Record<string, unknown> | undefined, extra) => {
         const params = rawParams ?? {};
-        logger.info({ tool: tool.name, transport }, 'Executing tool');
 
         try {
           const { sanitizedParams, metadata } = prepareExecutionPayload(
@@ -306,10 +306,6 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
             ],
           };
         } catch (error) {
-          logger.error(
-            { error: extractErrorMessage(error), tool: tool.name, transport },
-            'Tool execution error',
-          );
           throw error instanceof McpError
             ? error
             : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
@@ -443,7 +439,11 @@ function sanitizeParams(params: Record<string, unknown>): Record<string, unknown
  * The NATURAL_LANGUAGE format uses type detection to provide tool-specific
  * rich narratives with sections, formatting, and next steps.
  */
-export function formatOutput(output: unknown, format: OutputFormat, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatOutput(
+  output: unknown,
+  format: OutputFormat,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   switch (format) {
     case OUTPUTFORMAT.JSON:
       return JSON.stringify(output, null, 2);

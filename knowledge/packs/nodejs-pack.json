@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "node-package-cache",
     "category": "dockerfile",
@@ -571,4 +571,4 @@ export default [
     ],
     "description": "Worker threads require proper resource configuration for optimal performance"
   }
-] as const;
+]

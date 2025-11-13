@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "dockerfile-header-comment",
     "category": "dockerfile",
@@ -523,4 +523,4 @@ export default [
     ],
     "description": "Minimize file creation to only manifest yaml files. Keep manifests organized in separate files within manifests/ directory."
   }
-] as const;
+]

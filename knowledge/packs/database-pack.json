@@ -1,4 +1,4 @@
-export default [
+[
   {
     "id": "postgres-data-persistence",
     "category": "dockerfile",
@@ -773,4 +773,4 @@ export default [
     ],
     "description": "Compliance controls meet regulatory requirements"
   }
-] as const;
+]
