@@ -61,10 +61,6 @@ jobs:
       contents: read
 
     steps:
-      - name: Initial Info
-        run: |
-          echo ">pwd"
-          pwd
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -104,18 +100,8 @@ jobs:
         run: |
           echo "Testing tools via MCP CLI using stdio JSON-RPC protocol..."
           echo "Repository path: $(pwd)"
-          echo ""
 
           # Copy test script from artifacts
-          echo " "
-          echo ">pwd:"
-          pwd
-          echo " "
-          echo ">ls"
-          ls
-          echo " "
-          echo ">ls .."
-          ls ../
           cp ../artifacts/scripts/test-spring-petclinic-mcp.mjs ./test-mcp.mjs
 
           # Run the MCP stdio test
