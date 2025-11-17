@@ -1,0 +1,186 @@
+# Production-Ready Container Policy using CEL
+#
+# This example combines multiple validation rules to ensure containers
+# are production-ready with security, performance, and reliability checks.
+#
+# Usage:
+#   export CUSTOM_POLICY_PATH=/path/to/production-ready.yaml
+#   ca-mcp start
+#
+# Or place in policies.user/ directory for automatic discovery.
+
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: production-ready
+  version: "1.0.0"
+  description: Comprehensive production readiness checks for containers
+
+spec:
+  rules:
+    # === BLOCKING RULES (Severity: block) ===
+
+    # Security: No root user
+    - name: no-root-user
+      category: security
+      severity: block
+      priority: 100
+      condition: |
+        input.content.contains("FROM") &&
+        (!input.content.contains("USER") || input.content.contains("USER root"))
+      message: "Production containers must run as non-root user"
+      description: "Running as root violates security best practices for production"
+
+    # Security: No latest tags
+    - name: no-latest-tags
+      category: security
+      severity: block
+      priority: 99
+      condition: 'input.content.contains(":latest")'
+      message: "Production images must use specific version tags, not ':latest'"
+      description: "Using :latest is not reproducible and can cause production incidents"
+
+    # Security: No hardcoded secrets
+    - name: no-hardcoded-secrets
+      category: security
+      severity: block
+      priority: 98
+      condition: |
+        input.content.contains("PASSWORD=") ||
+        input.content.contains("SECRET=") ||
+        input.content.contains("API_KEY=") ||
+        input.content.contains("TOKEN=")
+      message: "Hardcoded secrets detected - use runtime secrets management"
+      description: "Secrets must be injected at runtime, never baked into images"
+
+    # === WARNING RULES (Severity: warn) ===
+
+    # Health: Require health checks
+    - name: require-healthcheck
+      category: health
+      severity: warn
+      priority: 90
+      condition: |
+        input.content.contains("FROM") &&
+        !input.content.contains("HEALTHCHECK")
+      message: "Production containers should include HEALTHCHECK directive"
+      description: |
+        Health checks enable container orchestrators to detect and restart
+        unhealthy containers automatically.
+
+    # Performance: Multi-stage builds for efficiency
+    - name: recommend-multi-stage
+      category: optimization
+      severity: warn
+      priority: 85
+      condition: |
+        input.content.contains("FROM") &&
+        !input.content.contains(" AS ") &&
+        (input.content.contains("npm install") ||
+         input.content.contains("mvn") ||
+         input.content.contains("gradle"))
+      message: "Use multi-stage builds to exclude build tools from production images"
+      description: "Multi-stage builds significantly reduce production image size"
+
+    # Security: Minimal base images
+    - name: prefer-minimal-base-images
+      category: security
+      severity: warn
+      priority: 88
+      condition: |
+        !input.content.contains("alpine") &&
+        !input.content.contains("distroless") &&
+        !input.content.contains("scratch")
+      message: "Consider using minimal base images (alpine, distroless) for production"
+      description: "Minimal images reduce attack surface and image size"
+
+    # Observability: Structured logging
+    - name: recommend-json-logging
+      category: observability
+      severity: warn
+      priority: 75
+      condition: |
+        input.content.contains("ENV NODE_ENV production") &&
+        !input.content.contains("LOG_FORMAT")
+      message: "Set LOG_FORMAT=json for structured logging in production"
+      description: "Structured logs enable better aggregation and analysis"
+
+    # === SUGGESTION RULES (Severity: suggest) ===
+
+    # Documentation: Image labels
+    - name: recommend-labels
+      category: documentation
+      severity: suggest
+      priority: 70
+      condition: |
+        !input.content.contains("LABEL maintainer") &&
+        !input.content.contains("LABEL version")
+      message: "Add LABEL directives for maintainer, version, and description"
+      description: |
+        Labels improve image discoverability and maintenance.
+        Example:
+          LABEL maintainer="platform-team@company.com"
+          LABEL version="1.0.0"
+          LABEL description="Production API service"
+
+    # Performance: Layer optimization
+    - name: optimize-layers
+      category: optimization
+      severity: suggest
+      priority: 65
+      condition: |
+        input.content.contains("RUN apt-get update") &&
+        !input.content.contains("apt-get clean")
+      message: "Clean package cache in the same RUN command to reduce layer size"
+      description: |
+        Combine apt-get update, install, and clean in one RUN command:
+        RUN apt-get update && apt-get install -y package && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+    # Security: Verify signatures
+    - name: suggest-signature-verification
+      category: security
+      severity: suggest
+      priority: 60
+      condition: |
+        input.content.contains("ADD http") ||
+        input.content.contains("curl")
+      message: "Verify signatures/checksums when downloading external resources"
+      description: "Always verify integrity of downloaded files with checksums or GPG signatures"
+
+    # Resilience: Signal handling
+    - name: recommend-signal-handling
+      category: reliability
+      severity: suggest
+      priority: 55
+      condition: |
+        input.content.contains("CMD") &&
+        !input.content.contains("STOPSIGNAL")
+      message: "Consider setting STOPSIGNAL for graceful shutdown"
+      description: |
+        Proper signal handling enables graceful shutdown.
+        Example: STOPSIGNAL SIGTERM
+
+    # Performance: Build cache optimization
+    - name: optimize-build-cache
+      category: optimization
+      severity: suggest
+      priority: 50
+      condition: |
+        input.content.contains("COPY . .") &&
+        (input.content.contains("package.json") || input.content.contains("pom.xml"))
+      message: "Copy dependency files before application code to leverage build cache"
+      description: |
+        Copy dependency manifests first, install dependencies, then copy app code.
+        This leverages Docker's layer caching for faster rebuilds.
+
+    # Observability: Expose metrics
+    - name: recommend-metrics-endpoint
+      category: observability
+      severity: suggest
+      priority: 45
+      condition: |
+        input.content.contains("EXPOSE 80") ||
+        input.content.contains("EXPOSE 443") ||
+        input.content.contains("EXPOSE 8080")
+      message: "Consider exposing a /metrics endpoint for monitoring"
+      description: "Metrics endpoints enable proactive monitoring and alerting"

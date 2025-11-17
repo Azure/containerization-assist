@@ -31,6 +31,9 @@ const MODULE_URL = getModuleUrl();
  * Discover built-in policy files from the policies directory
  * Returns paths to all .rego files (excluding test files)
  *
+ * Note: Built-in policies are Rego-only. CEL policies (.yaml/.yml) are only
+ * supported for user and custom policies.
+ *
  * Uses shared module path resolver with symlink support.
  * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
@@ -67,7 +70,9 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
 
 /**
  * Discover policies in policies.user/ directory (source installation)
- * Returns paths to all .rego files (excluding test files)
+ * Returns paths to all .rego, .yaml, and .yml files (excluding test files)
+ *
+ * Supports both Rego (.rego) and CEL (.yaml/.yml) policy formats.
  */
 export function discoverUserPolicies(logger: Logger): string[] {
   try {
@@ -90,7 +95,12 @@ export function discoverUserPolicies(logger: Logger): string[] {
     }
 
     const files = readdirSync(policiesUserDir)
-      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .filter((file) =>
+        // Include .rego, .yaml, and .yml files
+        (file.endsWith('.rego') || file.endsWith('.yaml') || file.endsWith('.yml')) &&
+        // Exclude test files
+        !file.endsWith('_test.rego')
+      )
       .map((file) => resolve(join(policiesUserDir, file)));
 
     if (files.length > 0) {
@@ -106,7 +116,9 @@ export function discoverUserPolicies(logger: Logger): string[] {
 
 /**
  * Discover policies in custom directory (NPM installation)
- * Returns paths to all .rego files (excluding test files)
+ * Returns paths to all .rego, .yaml, and .yml files (excluding test files)
+ *
+ * Supports both Rego (.rego) and CEL (.yaml/.yml) policy formats.
  */
 export function discoverCustomPolicies(customPath: string, logger: Logger): string[] {
   try {
@@ -119,19 +131,24 @@ export function discoverCustomPolicies(customPath: string, logger: Logger): stri
 
     const stats = statSync(resolvedPath);
 
-    // If it's a file, return it directly
+    // If it's a file, return it directly if it's a valid policy file
     if (stats.isFile()) {
-      if (resolvedPath.endsWith('.rego')) {
+      if (resolvedPath.endsWith('.rego') || resolvedPath.endsWith('.yaml') || resolvedPath.endsWith('.yml')) {
         return [resolvedPath];
       }
-      logger.warn({ path: resolvedPath }, 'Custom policy path is not a .rego file');
+      logger.warn({ path: resolvedPath }, 'Custom policy path is not a .rego, .yaml, or .yml file');
       return [];
     }
 
-    // If it's a directory, discover all .rego files
+    // If it's a directory, discover all policy files
     if (stats.isDirectory()) {
       const files = readdirSync(resolvedPath)
-        .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+        .filter((file) =>
+          // Include .rego, .yaml, and .yml files
+          (file.endsWith('.rego') || file.endsWith('.yaml') || file.endsWith('.yml')) &&
+          // Exclude test files
+          !file.endsWith('_test.rego')
+        )
         .map((file) => resolve(join(resolvedPath, file)));
       return files;
     }
@@ -145,9 +162,13 @@ export function discoverCustomPolicies(customPath: string, logger: Logger): stri
 
 /**
  * Discover policy files with priority-ordered search paths:
- * 1. Built-in policies/ directory (lowest priority)
- * 2. policies.user/ directory (middle priority - source installation users)
- * 3. Custom directory via CUSTOM_POLICY_PATH (highest priority - NPM users)
+ * 1. Built-in policies/ directory (lowest priority) - Rego only
+ * 2. policies.user/ directory (middle priority - source installation users) - Rego + CEL
+ * 3. Custom directory via CUSTOM_POLICY_PATH (highest priority - NPM users) - Rego + CEL
+ *
+ * Supports both Rego (.rego) and CEL (.yaml/.yml) policy formats.
+ * Built-in policies are Rego-only for performance (WASM compilation).
+ * User and custom policies support both formats.
  *
  * Returns array of policy paths, with higher priority policies later
  * (later policies override earlier ones during merging)

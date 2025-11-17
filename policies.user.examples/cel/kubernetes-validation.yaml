@@ -1,0 +1,186 @@
+# Kubernetes Manifest Validation using CEL
+#
+# This example demonstrates validation rules for Kubernetes manifests using CEL.
+# These rules enforce production readiness and best practices for K8s deployments.
+#
+# Usage:
+#   export CUSTOM_POLICY_PATH=/path/to/kubernetes-validation.yaml
+#   ca-mcp start
+#
+# Or place in policies.user/ directory for automatic discovery.
+
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: kubernetes-validation
+  version: "1.0.0"
+  description: Production readiness checks for Kubernetes manifests
+
+spec:
+  rules:
+    # Resources: Require CPU and memory limits
+    - name: require-resource-limits
+      category: resources
+      severity: block
+      priority: 100
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("limits:")
+      message: "Deployments must specify resource limits (CPU and memory)"
+      description: |
+        Resource limits prevent pods from consuming excessive cluster resources.
+        Example:
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+    # Resources: Require resource requests
+    - name: require-resource-requests
+      category: resources
+      severity: block
+      priority: 99
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("requests:")
+      message: "Deployments must specify resource requests (CPU and memory)"
+      description: |
+        Resource requests help Kubernetes scheduler make informed placement decisions.
+
+    # Health: Require liveness probe
+    - name: require-liveness-probe
+      category: health
+      severity: warn
+      priority: 90
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("livenessProbe:")
+      message: "Deployments should include a liveness probe"
+      description: |
+        Liveness probes detect and restart unhealthy containers.
+        Example:
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+    # Health: Require readiness probe
+    - name: require-readiness-probe
+      category: health
+      severity: warn
+      priority: 89
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("readinessProbe:")
+      message: "Deployments should include a readiness probe"
+      description: |
+        Readiness probes prevent traffic from being sent to pods that aren't ready.
+        Example:
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+    # Security: Recommend running as non-root
+    - name: recommend-non-root-user
+      category: security
+      severity: warn
+      priority: 95
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("runAsNonRoot:")
+      message: "Deployments should explicitly set runAsNonRoot: true"
+      description: |
+        Running as non-root reduces security risks.
+        Example:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+
+    # Security: Recommend read-only root filesystem
+    - name: recommend-readonly-root-filesystem
+      category: security
+      severity: suggest
+      priority: 85
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("readOnlyRootFilesystem:")
+      message: "Consider setting readOnlyRootFilesystem: true for enhanced security"
+      description: |
+        Read-only root filesystems prevent runtime modifications.
+        Example:
+          securityContext:
+            readOnlyRootFilesystem: true
+
+    # High Availability: Warn about single replica
+    - name: warn-single-replica
+      category: availability
+      severity: warn
+      priority: 80
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        input.content.contains("replicas: 1")
+      message: "Single replica deployments have no redundancy - consider using 2+ replicas"
+      description: |
+        Production deployments should have at least 2 replicas for high availability.
+
+    # Best Practices: Require image pull policy
+    - name: require-image-pull-policy
+      category: best-practices
+      severity: suggest
+      priority: 75
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("imagePullPolicy:")
+      message: "Specify imagePullPolicy explicitly (Always, IfNotPresent, or Never)"
+      description: |
+        Explicit imagePullPolicy prevents unexpected behavior.
+        Use 'Always' for production, 'IfNotPresent' for development.
+
+    # Service: Require service for deployments
+    - name: recommend-service
+      category: networking
+      severity: suggest
+      priority: 70
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("kind: Service")
+      message: "Deployments typically need a Service for network access"
+      description: |
+        Services provide stable network endpoints for deployments.
+
+    # Best Practices: Recommend pod disruption budget
+    - name: recommend-pdb
+      category: availability
+      severity: suggest
+      priority: 65
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("PodDisruptionBudget")
+      message: "Consider adding a PodDisruptionBudget for production deployments"
+      description: |
+        PodDisruptionBudgets ensure minimum availability during voluntary disruptions
+        (node drains, cluster upgrades).
+
+    # Monitoring: Recommend prometheus annotations
+    - name: recommend-prometheus-annotations
+      category: observability
+      severity: suggest
+      priority: 60
+      condition: |
+        input.content.contains("kind: Deployment") &&
+        !input.content.contains("prometheus.io/scrape")
+      message: "Add Prometheus scraping annotations for observability"
+      description: |
+        Enable Prometheus scraping with annotations:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8080"
+            prometheus.io/path: "/metrics"

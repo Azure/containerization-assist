@@ -1,0 +1,11 @@
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: simple-perf
+spec:
+  rules:
+    - name: require-user
+      category: security
+      severity: block
+      condition: '!input.content.contains("USER")'
+      message: "Must specify USER directive"

@@ -48,7 +48,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
-      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node|@marcbachmann/cel-js)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -71,7 +71,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
-      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node|@marcbachmann/cel-js)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
@@ -94,7 +94,7 @@ export default {
       testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
       transform: commonTransform,
-      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
+      transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node|@marcbachmann/cel-js)/)'],
       collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',

@@ -1,23 +1,26 @@
 # Policy Authoring Guide
 
-**Version:** 3.0.0
-**Last Updated:** Sprint 5
+**Version:** 4.0.0
+**Last Updated:** Sprint 6 (CEL Support Added)
 **Audience:** Platform engineers, DevOps teams, policy authors
 
-This guide provides comprehensive documentation on writing custom policies for containerization-assist using OPA Rego.
+This guide provides comprehensive documentation on writing custom policies for containerization-assist using **OPA Rego** or **CEL (Common Expression Language)**.
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Template Injection (Sprint 3)](#template-injection-sprint-3-)
-3. [Policy Architecture](#policy-architecture)
-4. [Phase-by-Phase Guide](#phase-by-phase-guide)
-5. [Schema Reference](#schema-reference)
-6. [Best Practices](#best-practices)
-7. [Debugging](#debugging)
-8. [Common Pitfalls](#common-pitfalls)
+2. [Policy Formats: Rego vs CEL](#policy-formats-rego-vs-cel)
+3. [CEL Quick Start](#cel-quick-start)
+4. [Template Injection (Sprint 3)](#template-injection-sprint-3-)
+5. [Policy Architecture](#policy-architecture)
+6. [Phase-by-Phase Guide](#phase-by-phase-guide)
+7. [Schema Reference](#schema-reference)
+8. [Best Practices](#best-practices)
+9. [Debugging](#debugging)
+10. [Common Pitfalls](#common-pitfalls)
+11. [Migration Guide: Rego → CEL](#migration-guide-rego--cel)
 
 ---
 
@@ -68,10 +71,173 @@ Policies in containerization-assist are OPA Rego modules that control and custom
 
 ### File Structure
 
+**Rego Policies:**
 ```
-my-policy.rego          # Policy implementation
+my-policy.rego          # Rego policy implementation
 my-policy_test.rego     # OPA test suite (required)
 ```
+
+**CEL Policies:**
+```
+my-policy.yaml          # CEL policy (YAML format)
+# or
+my-policy.yml           # CEL policy (YML format)
+```
+
+---
+
+## Policy Formats: Rego vs CEL
+
+containerization-assist supports two policy formats: **Rego** and **CEL**. Both formats can be used interchangeably, and you can even mix them in the same deployment.
+
+### Comparison Table
+
+| Feature | Rego | CEL |
+|---------|------|-----|
+| **Language** | OPA Rego (domain-specific) | CEL (Google's expression language) |
+| **File Format** | `.rego` files | `.yaml` or `.yml` files |
+| **Complexity** | High (full programming language) | Low (simple expressions) |
+| **Learning Curve** | Steep | Gentle |
+| **Use Case** | Complex logic, computations, transformations | Simple validation rules |
+| **Performance** | Fast (WASM compilation) | Very fast (native evaluation) |
+| **Configuration Generation** | ✅ Supported (`generation_config`) | ❌ Not supported |
+| **Template Injection** | ✅ Supported (`templates`) | ❌ Not supported |
+| **Knowledge Filtering** | ✅ Supported (`knowledge_filtering`) | ❌ Not supported |
+| **Validation Rules** | ✅ Supported (`violations`, `warnings`, `suggestions`) | ✅ Supported |
+| **Testing** | `opa test` (built-in) | Manual testing |
+| **Debugging** | `opa eval` with tracing | Expression evaluation |
+
+### When to Use Each Format
+
+**Use Rego when you need:**
+- Complex logic and computations
+- Configuration generation (`generation_config`)
+- Template injection
+- Knowledge filtering
+- Advanced rule composition
+- Built-in testing framework
+
+**Use CEL when you need:**
+- Simple validation rules
+- Quick policy prototyping
+- Easy-to-read policies for non-developers
+- Fast evaluation performance
+- No external dependencies (OPA binary not required)
+
+### Hybrid Approach
+
+You can combine both formats in a single deployment:
+- **Built-in policies**: Rego only (optimized with WASM)
+- **User policies** (`policies.user/`): Mix of Rego and CEL
+- **Custom policies** (`CUSTOM_POLICY_PATH`): Mix of Rego and CEL
+
+The system automatically detects the format based on file extension and merges results.
+
+---
+
+## CEL Quick Start
+
+### Basic CEL Policy Structure
+
+CEL policies are defined in YAML format with a specific schema:
+
+```yaml
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: my-policy
+  description: Human-readable policy description
+spec:
+  rules:
+    - name: rule-name
+      category: security|best-practices|optimization|health
+      severity: block|warn|suggest
+      condition: 'CEL expression that returns true for violations'
+      message: "User-facing error message"
+      description: "Detailed explanation (optional)"
+      priority: 50  # Optional: 0-100, higher = more important
+```
+
+### Example: Require Non-Root User
+
+```yaml
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: security-baseline
+  description: Basic security requirements
+spec:
+  rules:
+    - name: require-non-root-user
+      category: security
+      severity: block
+      condition: '!input.content.contains("USER") || input.content.contains("USER root")'
+      message: "Dockerfile must specify a non-root USER directive"
+      description: "Running containers as root is a security risk"
+      priority: 90
+```
+
+### Example: Multiple Rules with Different Severities
+
+```yaml
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: production-ready
+  description: Production readiness checks
+spec:
+  rules:
+    # Blocking rule
+    - name: no-latest-tag
+      category: best-practices
+      severity: block
+      condition: 'input.content.contains(":latest")'
+      message: "Do not use :latest tag in production"
+      priority: 100
+
+    # Warning rule
+    - name: recommend-healthcheck
+      category: health
+      severity: warn
+      condition: '!input.content.contains("HEALTHCHECK")'
+      message: "Consider adding HEALTHCHECK for production deployments"
+      priority: 70
+
+    # Suggestion rule
+    - name: suggest-multi-stage
+      category: optimization
+      severity: suggest
+      condition: '!input.content.contains("AS builder")'
+      message: "Consider using multi-stage builds to reduce image size"
+      priority: 50
+```
+
+### CEL Expression Reference
+
+CEL provides built-in string operations:
+
+| Expression | Description | Example |
+|------------|-------------|---------|
+| `input.content.contains("text")` | Check if content contains substring | `input.content.contains("FROM")` |
+| `input.content.size()` | Get content length | `input.content.size() > 0` |
+| `!expr` | Logical NOT | `!input.content.contains("USER")` |
+| `expr1 && expr2` | Logical AND | `input.content.contains("FROM") && !input.content.contains("USER")` |
+| `expr1 \|\| expr2` | Logical OR | `input.content.contains("alpine") \|\| input.content.contains("ubuntu")` |
+
+**Input Structure:**
+- `input.content`: The content being validated (Dockerfile, K8s manifest, etc.)
+
+### CEL Limitations
+
+❌ **Not supported in CEL:**
+- Configuration generation (`generation_config`)
+- Template injection (`templates`)
+- Knowledge filtering (`knowledge_filtering`)
+- Complex computations and data transformations
+- Custom functions
+- Testing framework (must test manually)
+
+✅ **Use Rego instead for these features**
 
 ---
 
@@ -813,9 +979,212 @@ knowledge_filtering contains filter if {
 
 - [OPA Documentation](https://www.openpolicyagent.org/docs/latest/)
 - [Rego Style Guide](https://www.openpolicyagent.org/docs/latest/policy-language/)
+- [CEL Specification](https://github.com/google/cel-spec)
 - [Production-Ready Examples](../../policies.user.examples/production-ready/)
 - [Migration Guide](./policy-migration-v3.md)
 - [Sprint 5 Plan](../sprints/sprint-5.md)
+
+---
+
+## Migration Guide: Rego → CEL
+
+This section helps you convert existing Rego validation rules to CEL format.
+
+### When to Migrate
+
+**Migrate to CEL if:**
+- ✅ Your policy only does validation (no config generation or templates)
+- ✅ Your rules are simple pattern matching
+- ✅ You want easier maintenance for non-Rego developers
+- ✅ You want faster evaluation performance
+
+**Keep Rego if:**
+- ❌ You need `generation_config`, `templates`, or `knowledge_filtering`
+- ❌ Your logic involves complex computations or data transformations
+- ❌ You rely on OPA's testing framework
+
+### Migration Examples
+
+#### Example 1: Simple String Matching
+
+**Rego:**
+```rego
+package containerization.validation
+
+import rego.v1
+
+violations contains result if {
+  not regex.match("USER", input.content)
+  result := {
+    "rule": "require-user",
+    "category": "security",
+    "severity": "block",
+    "message": "Must specify USER directive"
+  }
+}
+```
+
+**CEL:**
+```yaml
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: validation
+spec:
+  rules:
+    - name: require-user
+      category: security
+      severity: block
+      condition: '!input.content.contains("USER")'
+      message: "Must specify USER directive"
+```
+
+#### Example 2: Multiple Conditions
+
+**Rego:**
+```rego
+violations contains result if {
+  regex.match("FROM", input.content)
+  not regex.match("USER", input.content)
+  result := {
+    "rule": "user-required-when-from",
+    "category": "security",
+    "severity": "block",
+    "message": "USER required when using FROM"
+  }
+}
+```
+
+**CEL:**
+```yaml
+spec:
+  rules:
+    - name: user-required-when-from
+      category: security
+      severity: block
+      condition: 'input.content.contains("FROM") && !input.content.contains("USER")'
+      message: "USER required when using FROM"
+```
+
+#### Example 3: Warnings vs Blocking
+
+**Rego:**
+```rego
+warnings contains result if {
+  not regex.match("HEALTHCHECK", input.content)
+  result := {
+    "rule": "recommend-healthcheck",
+    "category": "health",
+    "severity": "warn",
+    "message": "HEALTHCHECK recommended"
+  }
+}
+```
+
+**CEL:**
+```yaml
+spec:
+  rules:
+    - name: recommend-healthcheck
+      category: health
+      severity: warn
+      condition: '!input.content.contains("HEALTHCHECK")'
+      message: "HEALTHCHECK recommended"
+```
+
+#### Example 4: Multiple Rules in One Policy
+
+**Rego:**
+```rego
+package containerization.security
+
+violations contains user_violation if {
+  not regex.match("USER", input.content)
+  user_violation := {...}
+}
+
+violations contains latest_violation if {
+  regex.match(":latest", input.content)
+  latest_violation := {...}
+}
+
+warnings contains healthcheck_warning if {
+  not regex.match("HEALTHCHECK", input.content)
+  healthcheck_warning := {...}
+}
+```
+
+**CEL:**
+```yaml
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: security
+spec:
+  rules:
+    - name: require-user
+      category: security
+      severity: block
+      condition: '!input.content.contains("USER")'
+      message: "Must specify USER"
+
+    - name: no-latest-tag
+      category: security
+      severity: block
+      condition: 'input.content.contains(":latest")'
+      message: "Do not use :latest tag"
+
+    - name: recommend-healthcheck
+      category: health
+      severity: warn
+      condition: '!input.content.contains("HEALTHCHECK")'
+      message: "HEALTHCHECK recommended"
+```
+
+### Migration Checklist
+
+- [ ] Identify pure validation rules (no `generation_config`, `templates`, etc.)
+- [ ] Convert each `violations` rule to `severity: block`
+- [ ] Convert each `warnings` rule to `severity: warn`
+- [ ] Convert each `suggestions` rule to `severity: suggest`
+- [ ] Translate Rego regex patterns to CEL `contains()` calls
+- [ ] Add `apiVersion` and `kind` headers
+- [ ] Add `metadata` section with `name` and `description`
+- [ ] Test the CEL policy with sample input
+- [ ] Update deployment to include `.yaml` files
+- [ ] Remove old `.rego` file if fully migrated
+
+### Hybrid Deployment Strategy
+
+You can migrate incrementally:
+
+1. **Start**: All Rego policies
+2. **Phase 1**: Add new CEL policies for simple validation
+3. **Phase 2**: Migrate simple Rego rules to CEL
+4. **Phase 3**: Keep complex Rego policies, CEL for validation
+
+**Example directory structure:**
+```
+policies.user/
+├── security-baseline.yaml     # CEL: Simple validation
+├── production-ready.yaml       # CEL: Simple validation
+├── advanced-config.rego        # Rego: Complex logic + config
+└── templates.rego              # Rego: Template injection
+```
+
+Both formats will be loaded and merged automatically!
+
+### CEL Expression Patterns
+
+| Rego Pattern | CEL Equivalent |
+|--------------|----------------|
+| `regex.match("USER", input.content)` | `input.content.contains("USER")` |
+| `not regex.match("X", input.content)` | `!input.content.contains("X")` |
+| `regex.match("X", input.content); regex.match("Y", input.content)` | `input.content.contains("X") && input.content.contains("Y")` |
+| `regex.match("X", input.content)` OR `regex.match("Y", input.content)` | `input.content.contains("X") \|\| input.content.contains("Y")` |
+| `count(split(input.content, "\n")) > 100` | `input.content.size() > ...` (approximate) |
+
+**Note:** CEL `contains()` is substring matching, not regex. For complex patterns, keep using Rego.
 
 ---
 
@@ -827,6 +1196,6 @@ knowledge_filtering contains filter if {
 
 ---
 
-**Version:** 3.0.0
-**Last Updated:** Sprint 5
+**Version:** 4.0.0
+**Last Updated:** Sprint 6 (CEL Support)
 **License:** MIT

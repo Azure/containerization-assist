@@ -105,6 +105,25 @@ describe('Policy Discovery', () => {
       expect(policies.some((p) => p.endsWith('user-policy2.rego'))).toBe(true);
     });
 
+    it('should discover both Rego and CEL policies from policies.user/', () => {
+      const policiesUserDir = join(testDir, 'policies.user');
+      mkdirSync(policiesUserDir, { recursive: true });
+
+      // Create mixed policy files
+      writeFileSync(join(policiesUserDir, 'user-rego.rego'), 'package test\ndefault allow := true');
+      writeFileSync(join(policiesUserDir, 'user-cel.yaml'), 'apiVersion: policy.containerization-assist.dev/v1\nkind: PolicySet');
+      writeFileSync(join(policiesUserDir, 'user-cel2.yml'), 'apiVersion: policy.containerization-assist.dev/v1\nkind: PolicySet');
+
+      process.chdir(testDir);
+
+      const policies = discoverUserPolicies(logger);
+
+      expect(policies.length).toBe(3);
+      expect(policies.some((p) => p.endsWith('user-rego.rego'))).toBe(true);
+      expect(policies.some((p) => p.endsWith('user-cel.yaml'))).toBe(true);
+      expect(policies.some((p) => p.endsWith('user-cel2.yml'))).toBe(true);
+    });
+
     it('should exclude test files (*_test.rego)', () => {
       const policiesUserDir = join(testDir, 'policies.user');
       mkdirSync(policiesUserDir, { recursive: true });
@@ -167,9 +186,35 @@ describe('Policy Discovery', () => {
       expect(policies.some((p) => p.endsWith('custom-policy2.rego'))).toBe(true);
     });
 
+    it('should discover both Rego and CEL policies from custom directory', () => {
+      const customDir = join(testDir, 'custom');
+      mkdirSync(customDir, { recursive: true });
+
+      writeFileSync(join(customDir, 'custom-rego.rego'), 'package custom\ndefault allow := true');
+      writeFileSync(join(customDir, 'custom-cel.yaml'), 'apiVersion: policy.containerization-assist.dev/v1\nkind: PolicySet');
+      writeFileSync(join(customDir, 'custom-cel2.yml'), 'apiVersion: policy.containerization-assist.dev/v1\nkind: PolicySet');
+
+      const policies = discoverCustomPolicies(customDir, logger);
+
+      expect(policies.length).toBe(3);
+      expect(policies.some((p) => p.endsWith('custom-rego.rego'))).toBe(true);
+      expect(policies.some((p) => p.endsWith('custom-cel.yaml'))).toBe(true);
+      expect(policies.some((p) => p.endsWith('custom-cel2.yml'))).toBe(true);
+    });
+
     it('should handle single file path', () => {
       const customFile = join(testDir, 'single-policy.rego');
       writeFileSync(customFile, 'package single\ndefault allow := true');
+
+      const policies = discoverCustomPolicies(customFile, logger);
+
+      expect(policies.length).toBe(1);
+      expect(policies[0]).toBe(customFile);
+    });
+
+    it('should handle single CEL policy file path', () => {
+      const customFile = join(testDir, 'single-policy.yaml');
+      writeFileSync(customFile, 'apiVersion: policy.containerization-assist.dev/v1\nkind: PolicySet');
 
       const policies = discoverCustomPolicies(customFile, logger);
 
@@ -198,7 +243,7 @@ describe('Policy Discovery', () => {
       expect(policies).toEqual([]);
     });
 
-    it('should return empty array if file is not .rego', () => {
+    it('should return empty array if file is not .rego, .yaml, or .yml', () => {
       const txtFile = join(testDir, 'not-a-policy.txt');
       writeFileSync(txtFile, 'not a policy');
 

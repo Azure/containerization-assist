@@ -28,9 +28,9 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
   - Semantic validation
   - Cross-tool consistency
 
-### Policy System (v3.0) 🆕
+### Policy System (v4.0) 🆕
 
-Full control over containerization through Rego policies:
+Full control over containerization through **Rego** or **CEL** policies:
 
 - **Configure Before Generation**: Set defaults for resources, base images, build strategy
 - **Guide During Generation**: Filter knowledge base, inject templates automatically
@@ -277,7 +277,11 @@ The logging directory is validated at startup to ensure it's writable.
 
 ### Policy System
 
-The policy system uses **OPA Rego** for security, quality, and compliance enforcement. Rego is the industry-standard policy language from Open Policy Agent, providing expressive rules with rich built-in functions.
+The policy system supports **two policy formats** for security, quality, and compliance enforcement:
+- **OPA Rego** (`.rego` files) - Industry-standard policy language with full programmatic capabilities
+- **CEL** (`.yaml`/`.yml` files) - Google's Common Expression Language for simple validation rules
+
+Both formats can be used interchangeably or mixed together in the same deployment.
 
 **Default Behavior (No Configuration Needed):**
 By default, all policies in the `policies/` directory are automatically discovered and merged:

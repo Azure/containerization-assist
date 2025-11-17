@@ -9,6 +9,8 @@
  * - Template injection
  * - Validation results
  *
+ * Supports both Rego (.rego) and CEL (.yaml/.yml) policy formats.
+ *
  * Usage:
  *   npx tsx src/cli/policy-simulate.ts \
  *     --policy policies.user.examples/production-ready/cost-control-by-tier.rego \
@@ -18,7 +20,7 @@
 
 import path from 'node:path';
 import { createLogger } from '@/lib/logger';
-import { loadRegoPolicy } from '@/config/policy-rego';
+import { loadPolicy } from '@/config/policy-io';
 import type { ToolContext } from '@/mcp/context';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
@@ -63,8 +65,8 @@ async function simulatePolicy(options: SimulationOptions): Promise<SimulationRes
   console.log(`Tool: ${tool}`);
   console.log(`Input: ${JSON.stringify(input, null, 2)}\n`);
 
-  // Load the custom policy
-  const policyResult = await loadRegoPolicy(path.resolve(policyPath), logger);
+  // Load the custom policy (supports both Rego and CEL)
+  const policyResult = await loadPolicy(path.resolve(policyPath));
   if (!policyResult.ok) {
     throw new Error(`Failed to load policy: ${policyResult.error}`);
   }
@@ -263,30 +265,38 @@ Policy Simulation Tool
 
 Simulates the impact of a custom policy by comparing tool execution with and without the policy.
 
+Supports both Rego (.rego) and CEL (.yaml/.yml) policies.
+
 Usage:
   npx tsx src/cli/policy-simulate.ts \\
-    --policy <path-to-policy.rego> \\
+    --policy <path-to-policy> \\
     --tool <tool-name> \\
     --input '<json-input>'
 
 Options:
-  --policy   Path to Rego policy file
+  --policy   Path to policy file (.rego, .yaml, or .yml)
   --tool     Tool to simulate (generate-dockerfile or generate-k8s-manifests)
   --input    JSON input for the tool (as string)
   --help     Show this help message
 
 Examples:
-  # Simulate cost control policy for starter tier
+  # Rego policy - cost control for starter tier
   npx tsx src/cli/policy-simulate.ts \\
     --policy policies.user.examples/production-ready/cost-control-by-tier.rego \\
     --tool generate-dockerfile \\
     --input '{"language": "node", "environment": "production", "teamTier": "starter"}'
 
-  # Simulate security-first policy
+  # Rego policy - security-first organization
   npx tsx src/cli/policy-simulate.ts \\
     --policy policies.user.examples/production-ready/security-first-organization.rego \\
     --tool generate-k8s-manifests \\
     --input '{"name": "secure-app", "language": "java", "environment": "production"}'
+
+  # CEL policy - custom validation
+  npx tsx src/cli/policy-simulate.ts \\
+    --policy policies.user/custom-validation.yaml \\
+    --tool generate-dockerfile \\
+    --input '{"language": "python", "environment": "production"}'
 `);
     process.exit(0);
   }

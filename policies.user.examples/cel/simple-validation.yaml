@@ -1,0 +1,111 @@
+# Simple Validation Rules using CEL
+#
+# This example demonstrates basic validation rules for Dockerfiles using CEL.
+# CEL (Common Expression Language) is ideal for simple pattern-matching and
+# validation rules that don't require complex logic.
+#
+# Usage:
+#   export CUSTOM_POLICY_PATH=/path/to/simple-validation.yaml
+#   ca-mcp start
+#
+# Or place in policies.user/ directory for automatic discovery.
+
+apiVersion: policy.containerization-assist.dev/v1
+kind: PolicySet
+metadata:
+  name: simple-validation
+  version: "1.0.0"
+  description: Basic validation rules for Dockerfiles
+
+spec:
+  rules:
+    # Security: Require non-root user
+    - name: require-non-root-user
+      category: security
+      severity: block
+      priority: 100
+      condition: |
+        input.content.contains("FROM") &&
+        (!input.content.contains("USER") || input.content.contains("USER root"))
+      message: "Dockerfile must specify a non-root USER directive"
+      description: |
+        Running containers as root is a security risk. Always specify a non-root
+        user with the USER directive. Example: USER appuser
+
+    # Best Practices: Avoid :latest tag
+    - name: no-latest-tag
+      category: best-practices
+      severity: warn
+      priority: 90
+      condition: 'input.content.contains(":latest")'
+      message: "Avoid using ':latest' tag - use specific version tags instead"
+      description: |
+        Using :latest makes builds non-reproducible and can lead to unexpected
+        behavior. Always pin to specific versions (e.g., alpine:3.20, node:22-alpine).
+
+    # Best Practices: Recommend HEALTHCHECK
+    - name: recommend-healthcheck
+      category: health
+      severity: warn
+      priority: 80
+      condition: |
+        input.content.contains("FROM") &&
+        !input.content.contains("HEALTHCHECK")
+      message: "Consider adding a HEALTHCHECK directive for production containers"
+      description: |
+        HEALTHCHECK helps container orchestrators detect unhealthy containers.
+        Example: HEALTHCHECK CMD curl -f http://localhost:8080/health || exit 1
+
+    # Optimization: Suggest multi-stage builds
+    - name: suggest-multi-stage-build
+      category: optimization
+      severity: suggest
+      priority: 70
+      condition: |
+        input.content.contains("FROM") &&
+        !input.content.contains(" AS ")
+      message: "Consider using multi-stage builds to reduce image size"
+      description: |
+        Multi-stage builds separate build dependencies from runtime, significantly
+        reducing final image size. Example: FROM node:22 AS builder
+
+    # Security: Warn about exposed sensitive ports
+    - name: warn-sensitive-ports
+      category: security
+      severity: warn
+      priority: 85
+      condition: |
+        input.content.contains("EXPOSE 22") ||
+        input.content.contains("EXPOSE 3306") ||
+        input.content.contains("EXPOSE 5432")
+      message: "Exposing sensitive ports (SSH, databases) may be a security risk"
+      description: |
+        Ports like 22 (SSH), 3306 (MySQL), 5432 (PostgreSQL) should generally not
+        be exposed in containerized applications. Use service meshes or sidecars instead.
+
+    # Best Practices: Recommend LABEL for metadata
+    - name: recommend-labels
+      category: best-practices
+      severity: suggest
+      priority: 60
+      condition: |
+        input.content.contains("FROM") &&
+        !input.content.contains("LABEL")
+      message: "Add LABEL directives for image metadata (maintainer, version, etc.)"
+      description: |
+        Labels help with image organization and automation.
+        Example: LABEL maintainer="team@company.com" version="1.0.0"
+
+    # Security: Detect hardcoded secrets patterns
+    - name: detect-hardcoded-secrets
+      category: security
+      severity: block
+      priority: 95
+      condition: |
+        input.content.contains("PASSWORD=") ||
+        input.content.contains("SECRET=") ||
+        input.content.contains("API_KEY=")
+      message: "Potential hardcoded secrets detected - use build args or runtime secrets"
+      description: |
+        Never hardcode secrets in Dockerfiles. Use ARG for build-time secrets
+        (with caution) or mount secrets at runtime via Docker secrets or K8s secrets.
