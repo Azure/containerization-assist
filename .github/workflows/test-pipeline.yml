@@ -203,11 +203,11 @@ jobs:
         run: npm audit --audit-level moderate || true
 
       - name: CodeQL Analysis
-        uses: github/codeql-action/init@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v3
+        uses: github/codeql-action/init@014f16e7ab1402f30e7c3329d33797e7948572db # v3
         with:
           languages: typescript
           queries: security-and-quality
           config-file: ./.github/workflows/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v3
+        uses: github/codeql-action/analyze@014f16e7ab1402f30e7c3329d33797e7948572db # v3
