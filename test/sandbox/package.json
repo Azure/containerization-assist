@@ -1,0 +1,55 @@
+{
+  "name": "app-modernization-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server using modelcontextprotocol/sdk with STDIO protocol.",
+  "main": "dist/index.js",
+  "aiKey": "f1d5327c-2809-4929-a40c-afae881f2854",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prettier": "prettier --write \"**/*.{js,ts,md}\"",
+    "build": "npm run lint && webpack --mode development",
+    "package": "npm run lint && webpack --mode production",
+    "package:dotnet": "npm run lint && webpack --mode production",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "inspector": "npx -y @modelcontextprotocol/inspector ts-node src/index.ts",
+    "test": "jest --testMatch \"<rootDir>/src/**/*.test.ts\" --passWithNoTests --coverage",
+    "test:integration": "npm run package && jest --testMatch \"<rootDir>/tests/**/integration.test.ts\" --passWithNoTests && npm run package:dotnet && jest --testMatch \"<rootDir>/tests/**/integration.dotnet.test.ts\" --passWithNoTests"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "bufferutil": "^4.0.9",
+    "containerization-assist-mcp": "file:../../dist-cjs",
+    "node-loader": "^2.1.0",
+    "utf-8-validate": "^6.0.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.14.2",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.33.1",
+    "@typescript-eslint/parser": "^8.33.1",
+    "copy-webpack-plugin": "^13.0.0",
+    "eslint": "^9.29.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.1",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "husky": "^9.1.7",
+    "jest": "^29.7.0",
+    "lint-staged": "^16.1.2",
+    "pkg": "^5.8.1",
+    "prettier": "^3.6.1",
+    "ts-jest": "^29.4.0",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.33.1",
+    "typescript-formatter": "^7.2.2",
+    "webpack-cli": "^6.0.1",
+    "webpack-plugin": "^1.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

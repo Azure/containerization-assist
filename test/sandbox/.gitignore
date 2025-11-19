@@ -1,0 +1,27 @@
+# Machine specific
+.vscode
+tmp/
+.claude
+
+# Node
+node_modules/
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Env
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Others
+**/logs
+*.log
