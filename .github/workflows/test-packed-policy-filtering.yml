@@ -11,10 +11,10 @@ env:
   NODE_VERSION: "22"
 
 jobs:
-  test-packed-policy-filtering:
-    name: Test Packed Version with Built-in Policy Auto-Discovery
+  build-tarball:
+    name: Build and Pack Tarball
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -41,14 +41,41 @@ jobs:
 
       - name: Pack the project
         working-directory: containerization-assist
-        run: |
-          npm pack
-          echo "PACKED_FILE=$(ls containerization-assist-mcp-*.tgz)" >> $GITHUB_ENV
+        run: npm pack
+
+      - name: Upload tarball and test scripts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: packed-tarball-${{ github.run_id }}
+          path: |
+            containerization-assist/containerization-assist-mcp-*.tgz
+            containerization-assist/scripts/test-spring-petclinic-policy-filtering.mjs
+          retention-days: 1
+
+  test-packed-policy-filtering:
+    name: Test Packed Version with Built-in Policy Auto-Discovery
+    runs-on: ubuntu-latest
+    needs: build-tarball
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download tarball and test scripts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v4
+        with:
+          name: packed-tarball-${{ github.run_id }}
+          path: ./artifacts
 
       - name: Install packed version globally
-        working-directory: containerization-assist
         run: |
-          npm install -g ${{ env.PACKED_FILE }}
+          PACKED_FILE=$(realpath artifacts/containerization-assist-mcp-*.tgz)
+          npm install -g "$PACKED_FILE"
           echo "Installed version:"
           ca-mcp --version || true
 
@@ -100,8 +127,8 @@ jobs:
           echo "Policy mode: Auto-discover (no custom policy path)"
           echo ""
 
-          # Copy test script from containerization-assist
-          cp ../containerization-assist/scripts/test-spring-petclinic-policy-filtering.mjs ./test-policy-filtering.mjs
+          # Copy test script from artifacts
+          cp ../artifacts/scripts/test-spring-petclinic-policy-filtering.mjs ./test-policy-filtering.mjs
 
           # Run the MCP stdio test WITHOUT custom policy - built-in should be auto-discovered
           node test-policy-filtering.mjs "$(pwd)"
