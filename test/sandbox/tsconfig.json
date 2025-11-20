@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "Node16",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "outDir": "./dist",
     "rootDirs": [
       "./src",
@@ -18,7 +19,12 @@
     "paths": {
       "@containerization-assist/mcp": [
         "../../dist-cjs"
-      ]
+      ],
+      "containerization-assist-mcp": ["../../dist-cjs/src/index.d.ts"],
+      "containerization-assist-mcp/tools": ["../../dist-cjs/src/tools/index.d.ts"],
+      "containerization-assist-mcp/server": ["../../dist-cjs/src/mcp/mcp-server.d.ts"],
+      "containerization-assist-mcp/types": ["../../dist-cjs/src/types/index.d.ts"],
+      "containerization-assist-mcp/config": ["../../dist-cjs/src/config/index.d.ts"]
     }
   },
   "include": [
