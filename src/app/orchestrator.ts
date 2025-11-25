@@ -6,6 +6,8 @@
 import { z, type ZodTypeAny } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
+import { getModuleUrl } from '@/lib/module-url';
+import { resolveModulePaths } from '@/lib/module-path-resolver';
 import { createToolContext, type ToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
@@ -17,8 +19,11 @@ import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { ENV_VARS } from '@/config/constants';
+
+// Capture import.meta.url at module scope (only available in ESM builds)
+// This will be undefined in CJS builds, which is expected
+const MODULE_URL = getModuleUrl();
 
 // ===== Types =====
 
@@ -26,73 +31,17 @@ import { ENV_VARS } from '@/config/constants';
  * Discover built-in policy files from the policies directory
  * Returns paths to all .rego files (excluding test files)
  *
- * Searches relative to the module's installation location first,
- * then falls back to searching upward from process.cwd().
+ * Uses shared module path resolver with symlink support.
  * Works in both ESM (dist/) and CJS (dist-cjs/) builds, and when installed via npm.
  */
 export function discoverBuiltInPolicies(logger: Logger): string[] {
   try {
-    const searchPaths: string[] = [];
-
-    // 1. First, try relative to the installed module location
-    // This ensures policies are found when the package is installed via npm
-
-    // Strategy: Try CJS __dirname first, then fall back to ESM import.meta.url
-    // We use try-catch for both because:
-    //   - __dirname may throw ReferenceError in strict ESM modules
-    //   - import.meta.url may not be available in CJS or Jest
-
-    let modulePathResolved = false;
-
-    // Try CJS approach first (most common in Node.js)
-    try {
-      // Using Function constructor to bypass TypeScript's static analysis
-      // This is safe: the string is a compile-time constant with no user input
-      const dirName = new Function('return typeof __dirname !== "undefined" ? __dirname : undefined')();
-      if (typeof dirName === 'string') {
-        const moduleRelativePath = resolve(dirName, '../../../policies');
-        searchPaths.push(moduleRelativePath);
-        modulePathResolved = true;
-      }
-    } catch (error) {
-      logger.debug({ error }, 'Failed to resolve module path from __dirname');
-    }
-
-    // If CJS failed, try ESM approach
-    if (!modulePathResolved) {
-      try {
-        // Using Function constructor to access import.meta.url dynamically
-        // This bypasses static analysis issues in Jest and CJS builds
-        // The returned value will be undefined if import.meta.url is unavailable or throws
-        const getMetaUrl = new Function('try { return import.meta.url; } catch { return undefined; }');
-        const metaUrl = getMetaUrl();
-        if (typeof metaUrl === 'string') {
-          const __filename = fileURLToPath(metaUrl);
-          const __dirname = dirname(__filename);
-          const moduleRelativePath = resolve(__dirname, '../../../policies');
-          searchPaths.push(moduleRelativePath);
-        }
-      } catch (error) {
-        logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
-      }
-    }
-
-    // 2. Then search upward from current working directory (for development)
-    let currentDir = process.cwd();
-    searchPaths.push(join(currentDir, 'policies'));
-
-    let attempts = 0;
-    const maxAttempts = 5;
-    while (attempts < maxAttempts) {
-      const parentDir = dirname(currentDir);
-      if (parentDir === currentDir) {
-        // Reached filesystem root
-        break;
-      }
-      currentDir = parentDir;
-      searchPaths.push(join(currentDir, 'policies'));
-      attempts++;
-    }
+    // Use shared path resolver utility
+    const searchPaths = resolveModulePaths({
+      relativePath: 'policies',
+      logger,
+      ...(MODULE_URL && { moduleUrl: MODULE_URL }),
+    });
 
     // Try each search path until we find one that exists
     for (const policiesDir of searchPaths) {
@@ -103,13 +52,12 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
           .map((file) => resolve(join(policiesDir, file)));
 
         if (files.length > 0) {
-          logger.info({ policiesDir, count: files.length, searchPaths }, 'Discovered built-in policies');
+          logger.debug({ count: files.length, dir: policiesDir }, 'Discovered built-in policies');
           return files;
         }
       }
     }
 
-    logger.warn({ searchPaths, cwd: process.cwd() }, 'Built-in policies directory not found in any search path');
     return [];
   } catch (error) {
     logger.warn({ error }, 'Failed to discover built-in policies');
@@ -250,6 +198,14 @@ function createContextForTool(
 ): ToolContext {
   const metadata = request.metadata;
 
+  logger.debug(
+    {
+      hasPolicy: !!policy,
+      toolName: request.toolName,
+    },
+    'Creating tool context',
+  );
+
   return createToolContext(logger, {
     ...(metadata?.signal && { signal: metadata.signal }),
     ...(metadata?.progress !== undefined && { progress: metadata.progress }),
@@ -277,6 +233,8 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   const { registry, server, config = { chainHintsMode: CHAINHINTSMODE.ENABLED } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
+  logger.info('createOrchestrator called - policy loading will happen on first tool execution');
+
   // Cache the loaded policy to avoid reloading on every execution
   let policyCache: RegoEvaluator | undefined;
   let policyLoadPromise: Promise<void> | undefined;
@@ -294,34 +252,69 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
       ...(request.metadata?.loggerContext ?? {}),
     });
 
+    logger.info({ toolName, hasPolicyPromise: !!policyLoadPromise }, 'Orchestrator execute called');
+
     // Load policies once (with Promise-based guard to prevent race conditions)
     if (!policyLoadPromise) {
       policyLoadPromise = (async () => {
-        // Use new priority-ordered discovery (includes built-in, user, and custom policies)
-        const policyPaths = discoverPolicies(logger);
+        try {
+          // Use new priority-ordered discovery (includes built-in, user, and custom policies)
+          const policyPaths = discoverPolicies(logger);
 
-        if (policyPaths.length === 0) {
-          logger.warn('No policies discovered');
-          return;
-        }
+          if (policyPaths.length === 0) {
+            logger.warn(
+              { cwd: process.cwd() },
+              'No policies discovered - tools will run without policy constraints',
+            );
+            return; // Not an error, just no policies available
+          }
 
-        const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
-        if (policyResult.ok) {
-          policyCache = policyResult.value;
           logger.info(
-            {
-              total: policyPaths.length,
-            },
-            'Policies loaded for orchestrator',
+            { count: policyPaths.length, paths: policyPaths },
+            'Discovered policies, loading...',
           );
-        } else {
-          logger.warn({ error: policyResult.error }, 'Failed to load policies, continuing without them');
+
+          const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
+
+          if (policyResult.ok) {
+            policyCache = policyResult.value;
+            logger.info(
+              {
+                total: policyPaths.length,
+                policyPaths,
+              },
+              'Policies loaded and merged successfully',
+            );
+          } else {
+            logger.error(
+              { error: policyResult.error },
+              'Failed to load policies - tools will run without policy constraints',
+            );
+            // Note: We don't throw here, tools can still run without policies
+            // But we log clearly that policies are not available
+          }
+        } catch (error) {
+          // Reset promise to allow retry on next execution
+          policyLoadPromise = undefined;
+
+          logger.error(
+            { error },
+            'Failed to load policies - will retry on next tool execution',
+          );
+
+          // Re-throw to signal failure
+          throw error;
         }
       })();
     }
 
     // Wait for policy loading to complete if in progress
-    await policyLoadPromise;
+    try {
+      await policyLoadPromise;
+    } catch {
+      // Policy loading errors are logged above, continue without policies
+      logger.warn('Policy loading failed, continuing tool execution without policies');
+    }
 
     return await executeWithOrchestration(tool, request, {
       registry,

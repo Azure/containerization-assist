@@ -49,6 +49,7 @@ export interface ShutdownInfo {
 export function logStartup(info: StartupInfo, logger: Logger, quiet = false): void {
   logger.info(
     {
+      version: info.version,
       config: {
         logLevel: info.logLevel,
         workspace: info.workspace,

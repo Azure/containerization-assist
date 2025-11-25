@@ -1,0 +1,164 @@
+name: Test Packed Version - Built-in Policy Filtering
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  test-packed-policy-filtering:
+    name: Test Packed Version with Built-in Policy Auto-Discovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout containerization-assist
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          path: containerization-assist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: containerization-assist/package-lock.json
+
+      - name: Install dependencies
+        working-directory: containerization-assist
+        run: npm ci
+
+      - name: Build project
+        working-directory: containerization-assist
+        run: npm run build
+
+      - name: Pack the project
+        working-directory: containerization-assist
+        run: |
+          npm pack
+          echo "PACKED_FILE=$(ls containerization-assist-mcp-*.tgz)" >> $GITHUB_ENV
+
+      - name: Install packed version globally
+        working-directory: containerization-assist
+        run: |
+          npm install -g ${{ env.PACKED_FILE }}
+          echo "Installed version:"
+          ca-mcp --version || true
+
+      - name: Clone Spring PetClinic repository
+        run: |
+          git clone --depth 1 https://github.com/spring-projects/spring-petclinic.git
+          cd spring-petclinic
+          echo "Spring PetClinic cloned successfully"
+          ls -la
+
+      - name: Setup Java for Spring PetClinic
+        uses: actions/setup-java@7a6d8a8234af8eb26422e24e3006232cccaa061b # v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Verify CLI is accessible
+        run: |
+          echo "Testing CLI availability..."
+          which ca-mcp
+          ca-mcp --version
+          ca-mcp --help | head -n 10
+
+      - name: Verify built-in policies are packaged
+        run: |
+          echo "Checking if built-in policies are in the installed package..."
+          # Find where ca-mcp is installed
+          CA_MCP_PATH=$(npm root -g)/containerization-assist-mcp
+          echo "Package installed at: $CA_MCP_PATH"
+
+          if [ -d "$CA_MCP_PATH/policies" ]; then
+            echo "✅ policies/ directory found in package"
+            ls -la "$CA_MCP_PATH/policies/"
+            echo ""
+            echo "base-images.rego preview:"
+            head -n 30 "$CA_MCP_PATH/policies/base-images.rego"
+          else
+            echo "❌ ERROR: policies/ directory NOT found in installed package!"
+            echo "This means built-in policies are not being packaged correctly."
+            exit 1
+          fi
+
+      - name: Test built-in policy filtering via MCP CLI (stdio JSON-RPC)
+        id: test-mcp-policy
+        working-directory: spring-petclinic
+        run: |
+          echo "Testing built-in policy auto-discovery via MCP CLI..."
+          echo "Repository path: $(pwd)"
+          echo "Policy mode: Auto-discover (no custom policy path)"
+          echo ""
+
+          # Copy test script from containerization-assist
+          cp ../containerization-assist/scripts/test-spring-petclinic-policy-filtering.mjs ./test-policy-filtering.mjs
+
+          # Run the MCP stdio test WITHOUT custom policy - built-in should be auto-discovered
+          node test-policy-filtering.mjs "$(pwd)"
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🧪 Packed Version Test - Built-in Policy Auto-Discovery (MCP CLI)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Method" >> $GITHUB_STEP_SUMMARY
+          echo "Tests run via **MCP CLI** using **stdio JSON-RPC protocol** with **built-in policies auto-discovery**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.test-mcp-policy.outcome }}" = "success" ]; then
+            echo "✅ **MCP CLI Built-in Policy Test**: Passed" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ Built-in policies auto-discovered from packaged policies/ directory" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ base-images.rego policy loaded and applied" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ analyze-repo via JSON-RPC" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ generate-dockerfile via JSON-RPC (with built-in policy)" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ Only Microsoft Container Registry images recommended" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ Knowledge pack filtering respected built-in policy constraints" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **MCP CLI Built-in Policy Test**: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Failure indicates:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Built-in policies may not be packaged correctly" >> $GITHUB_STEP_SUMMARY
+            echo "- Policy discovery may not find policies/ in installed package" >> $GITHUB_STEP_SUMMARY
+            echo "- Policy may not be loaded/merged properly" >> $GITHUB_STEP_SUMMARY
+            echo "- Knowledge pack filtering may not respect policy constraints" >> $GITHUB_STEP_SUMMARY
+            echo "- Non-Microsoft images recommended despite base-images.rego policy" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: spring-projects/spring-petclinic" >> $GITHUB_STEP_SUMMARY
+          echo "- **Language**: Java (Spring Boot)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Policy Mode**: Auto-discover built-in policies" >> $GITHUB_STEP_SUMMARY
+          echo "- **Policy File**: policies/base-images.rego (built-in)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Policy Requirement**: Only Microsoft Container Registry images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Testing Approach" >> $GITHUB_STEP_SUMMARY
+          echo "1. Pack project with \`npm pack\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install globally with \`npm install -g\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Verify policies/ directory exists in installed package" >> $GITHUB_STEP_SUMMARY
+          echo "4. Start MCP server via \`ca-mcp start\` (stdio transport, NO custom policy path)" >> $GITHUB_STEP_SUMMARY
+          echo "5. Send JSON-RPC requests to stdin" >> $GITHUB_STEP_SUMMARY
+          echo "6. Parse JSON-RPC responses from stdout" >> $GITHUB_STEP_SUMMARY
+          echo "7. Verify ONLY Microsoft images in recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "8. Verify non-Microsoft images are filtered out" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## What This Tests" >> $GITHUB_STEP_SUMMARY
+          echo "This test validates that the **packed/deployed version** correctly:" >> $GITHUB_STEP_SUMMARY
+          echo "- Includes built-in policies in the packaged tarball" >> $GITHUB_STEP_SUMMARY
+          echo "- Auto-discovers built-in policies from policies/ directory" >> $GITHUB_STEP_SUMMARY
+          echo "- Loads and merges built-in Rego policies" >> $GITHUB_STEP_SUMMARY
+          echo "- Filters knowledge pack recommendations based on policy rules" >> $GITHUB_STEP_SUMMARY
+          echo "- Only recommends policy-compliant base images (Microsoft images)" >> $GITHUB_STEP_SUMMARY
+          echo "- Blocks non-compliant recommendations (Eclipse Temurin, Alpine, etc.)" >> $GITHUB_STEP_SUMMARY

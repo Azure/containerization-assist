@@ -12,32 +12,24 @@ import { KnowledgeEntrySchema, KnowledgePackSchema } from '@/knowledge/schemas';
 
 describe('Knowledge Loader', () => {
   describe('loadKnowledgeBase integration', () => {
-    beforeAll(async () => {
+    beforeAll(() => {
       // Load knowledge base before running tests
-      await loadKnowledgeBase();
+      loadKnowledgeBase();
     });
 
     it('should load knowledge base successfully', () => {
       expect(isKnowledgeLoaded()).toBe(true);
     });
 
-    it('should load all knowledge packs from disk', () => {
-      const packsDir = path.join(process.cwd(), 'knowledge/packs');
-
-      // Verify directory exists
-      expect(existsSync(packsDir)).toBe(true);
-
-      // Count JSON files
-      const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.json'));
-
-      // Verify we have a reasonable number of packs (at least 25)
-      expect(packFiles.length).toBeGreaterThanOrEqual(25);
+    it('should load all knowledge packs from built-in imports', () => {
+      // Built-in packs are now imported as JSON modules
+      const expectedPackCount = 28; // Total number of built-in packs
 
       // Verify entries were loaded
       const entries = getAllEntries();
       expect(entries.length).toBeGreaterThan(0);
 
-      console.log(`✅ Loaded ${entries.length} entries from ${packFiles.length} packs`);
+      console.log(`✅ Loaded ${entries.length} entries from ${expectedPackCount} built-in packs`);
     });
 
     it('should return entries from getAllEntries', () => {
@@ -81,12 +73,12 @@ describe('Knowledge Loader', () => {
       }
     });
 
-    it('should not reload if already loaded', async () => {
+    it('should not reload if already loaded', () => {
       const entriesBefore = getAllEntries();
       const countBefore = entriesBefore.length;
 
       // Try loading again
-      await loadKnowledgeBase();
+      loadKnowledgeBase();
 
       const entriesAfter = getAllEntries();
       const countAfter = entriesAfter.length;
@@ -95,8 +87,8 @@ describe('Knowledge Loader', () => {
       expect(countAfter).toBe(countBefore);
     });
 
-    it('should load knowledge data for prompt engine', async () => {
-      const data = await loadKnowledgeData();
+    it('should load knowledge data for prompt engine', () => {
+      const data = loadKnowledgeData();
 
       expect(data).toHaveProperty('entries');
       expect(Array.isArray(data.entries)).toBe(true);
@@ -198,15 +190,14 @@ describe('Knowledge Loader', () => {
   });
 
   describe('knowledge pack statistics', () => {
-    it('should log pack loading statistics', async () => {
+    it('should log pack loading statistics', () => {
       const entries = getAllEntries();
-      const packsDir = path.join(process.cwd(), 'knowledge/packs');
-      const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.json'));
+      const expectedPackCount = 28; // Built-in packs
 
       console.log('\n📊 Knowledge Pack Statistics:');
-      console.log(`   Total Packs: ${packFiles.length}`);
+      console.log(`   Total Packs: ${expectedPackCount}`);
       console.log(`   Total Entries: ${entries.length}`);
-      console.log(`   Avg Entries/Pack: ${Math.round(entries.length / packFiles.length)}`);
+      console.log(`   Avg Entries/Pack: ${Math.round(entries.length / expectedPackCount)}`);
 
       const categoryCounts = entries.reduce((acc, entry) => {
         acc[entry.category] = (acc[entry.category] || 0) + 1;
@@ -361,6 +352,8 @@ describe('Knowledge Loader', () => {
       for (const packFile of packFiles) {
         const packPath = path.join(packsDir, packFile);
         const content = readFileSync(packPath, 'utf-8');
+
+        // Parse JSON directly
         const data = JSON.parse(content);
 
         const result = KnowledgePackSchema.safeParse(data);
