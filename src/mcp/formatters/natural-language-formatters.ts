@@ -46,7 +46,10 @@ import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
  * - Scan metadata (timestamp)
  * - Context-aware next steps based on pass/fail status (when chainHintsMode is 'enabled')
  */
-export function formatScanImageNarrative(result: ScanImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatScanImageNarrative(
+  result: ScanImageResult,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header
@@ -135,7 +138,10 @@ export function formatScanImageNarrative(result: ScanImageResult, chainHintsMode
  * - Policy validation results (if applicable)
  * - Actionable next steps (when chainHintsMode is 'enabled')
  */
-export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatDockerfilePlanNarrative(
+  plan: DockerfilePlan,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Action-oriented header
@@ -293,7 +299,10 @@ export function formatDockerfilePlanNarrative(plan: DockerfilePlan, chainHintsMo
  * - Layer count (if available)
  * - Standard next steps for containerization workflow (when chainHintsMode is 'enabled')
  */
-export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatBuildImageNarrative(
+  result: BuildImageResult,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header
@@ -350,7 +359,10 @@ export function formatBuildImageNarrative(result: BuildImageResult, chainHintsMo
  * - Graceful handling of empty or undefined modules
  * - Context-aware next steps (with monorepo-specific guidance, when chainHintsMode is 'enabled')
  */
-export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatAnalyzeRepoNarrative(
+  result: RepositoryAnalysis,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header
@@ -416,7 +428,10 @@ export function formatAnalyzeRepoNarrative(result: RepositoryAnalysis, chainHint
  * - Conditions and issues
  * - Context-aware next steps based on health status (when chainHintsMode is 'enabled')
  */
-export function formatVerifyDeployNarrative(result: VerifyDeploymentResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatVerifyDeployNarrative(
+  result: VerifyDeploymentResult,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header
@@ -524,7 +539,10 @@ export function formatVerifyDeployNarrative(result: VerifyDeploymentResult, chai
  * - Estimated impact of fixes
  * - Context-aware next steps for implementation (when chainHintsMode is 'enabled')
  */
-export function formatFixDockerfileNarrative(result: DockerfileFixPlan, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatFixDockerfileNarrative(
+  result: DockerfileFixPlan,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header with validation grade
@@ -677,7 +695,10 @@ export function formatFixDockerfileNarrative(result: DockerfileFixPlan, chainHin
  * - Best practices recommendations
  * - Context-aware next steps (when chainHintsMode is 'enabled')
  */
-export function formatGenerateK8sManifestsNarrative(result: ManifestPlan, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatGenerateK8sManifestsNarrative(
+  result: ManifestPlan,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Action-oriented header
@@ -794,7 +815,10 @@ export function formatGenerateK8sManifestsNarrative(result: ManifestPlan, chainH
  * - Full image reference
  * - Standard next steps (when chainHintsMode is 'enabled')
  */
-export function formatPushImageNarrative(result: PushImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatPushImageNarrative(
+  result: PushImageResult,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header
@@ -844,7 +868,10 @@ export function formatPushImageNarrative(result: PushImageResult, chainHintsMode
  * - Tags applied (list)
  * - Standard next steps with versioning guidance (when chainHintsMode is 'enabled')
  */
-export function formatTagImageNarrative(result: TagImageResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatTagImageNarrative(
+  result: TagImageResult,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header
@@ -890,7 +917,10 @@ export function formatTagImageNarrative(result: TagImageResult, chainHintsMode: 
  * - Warnings if any
  * - Context-aware next steps (when chainHintsMode is 'enabled')
  */
-export function formatPrepareClusterNarrative(result: PrepareClusterResult, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+export function formatPrepareClusterNarrative(
+  result: PrepareClusterResult,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   const parts: string[] = [];
 
   // Header

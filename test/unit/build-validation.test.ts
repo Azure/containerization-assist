@@ -163,9 +163,9 @@ describe('Build Output Validation', () => {
 
         files.forEach(file => {
           const filePath = join(knowledgeDataDir, file);
-          expect(() => {
-            require(filePath);
-          }).not.toThrow();
+          const content = readFileSync(filePath, 'utf-8');
+          // Should be valid JSON
+          expect(() => JSON.parse(content)).not.toThrow();
         });
       });
     });

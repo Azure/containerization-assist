@@ -14,7 +14,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import tmp from 'tmp';
 import type { Logger } from 'pino';
 import { loadPolicy as loadWasmPolicy, LoadedPolicy as WasmPolicy } from '@open-policy-agent/opa-wasm';
@@ -24,13 +24,21 @@ import { ERROR_MESSAGES } from '@/lib/errors';
 const execFileAsync = promisify(execFile);
 
 /**
+ * Default OPA policy namespace
+ *
+ * All containerization policies should export results under this namespace.
+ * Used in OPA queries: data.containerization.security.result
+ */
+const POLICY_NAMESPACE = 'containerization' as const;
+
+/**
  * Built-in policy mappings
  * Maps policy filenames to their WASM bundle entrypoint names
  */
 const BUILT_IN_POLICY_MODULES: Record<string, string> = {
-  'security-baseline.rego': 'containerization/security/result',
-  'base-images.rego': 'containerization/base_images/result',
-  'container-best-practices.rego': 'containerization/best_practices/result',
+  'security-baseline.rego': `${POLICY_NAMESPACE}/security/result`,
+  'base-images.rego': `${POLICY_NAMESPACE}/base_images/result`,
+  'container-best-practices.rego': `${POLICY_NAMESPACE}/best_practices/result`,
 };
 
 /**
@@ -318,6 +326,115 @@ async function evaluateWasmPolicyModule(
   }
 }
 
+/**
+ * Evaluate all WASM policy modules and merge their results
+ *
+ * This function is shared by both evaluate() and evaluatePolicy()
+ * to avoid code duplication.
+ *
+ * @param wasmPolicy - Loaded WASM policy instance
+ * @param inputData - Input data for policy evaluation (must be object)
+ * @param policyPaths - Array of policy file paths to evaluate
+ * @param logger - Logger instance for diagnostics
+ * @returns Merged policy evaluation result
+ */
+function evaluateAllWasmPolicies(
+  wasmPolicy: WasmPolicy,
+  inputData: Record<string, unknown>,
+  policyPaths: string[],
+  logger: Logger,
+): RegoPolicyResult {
+  const allViolations: RegoPolicyViolation[] = [];
+  const allWarnings: RegoPolicyViolation[] = [];
+  const allSuggestions: RegoPolicyViolation[] = [];
+  let overallAllow = true;
+
+  logger.debug(
+    { policyCount: policyPaths.length },
+    'Evaluating all WASM policy modules',
+  );
+
+  for (const policyPath of policyPaths) {
+    // Use path.basename() instead of regex splitting
+    const fileName = basename(policyPath);
+    const policyModule = BUILT_IN_POLICY_MODULES[fileName];
+
+    if (!policyModule) {
+      logger.debug({ fileName }, 'Policy file has no WASM entrypoint mapping, skipping');
+      continue;
+    }
+
+    try {
+      const wasmResult = wasmPolicy.evaluate(inputData, policyModule);
+
+      if (!wasmResult?.[0]?.result) {
+        logger.debug({ policyModule }, 'WASM policy returned no result');
+        continue;
+      }
+
+      const result = wasmResult[0].result as RegoPolicyResult;
+
+      // Merge violations
+      if (result.violations) {
+        allViolations.push(...result.violations);
+      }
+
+      // Merge warnings
+      if (result.warnings) {
+        allWarnings.push(...result.warnings);
+      }
+
+      // Merge suggestions
+      if (result.suggestions) {
+        allSuggestions.push(...result.suggestions);
+      }
+
+      // Merge allow (false if any policy blocks)
+      if (result.allow === false) {
+        overallAllow = false;
+      }
+
+      logger.debug(
+        {
+          policy: fileName,
+          violations: result.violations?.length || 0,
+          warnings: result.warnings?.length || 0,
+          suggestions: result.suggestions?.length || 0,
+          allow: result.allow ?? true,
+        },
+        'WASM policy evaluated',
+      );
+    } catch (error) {
+      logger.warn(
+        { error, policyModule, fileName },
+        'WASM policy evaluation failed, skipping',
+      );
+      // Continue with other policies even if one fails
+    }
+  }
+
+  logger.info(
+    {
+      totalViolations: allViolations.length,
+      totalWarnings: allWarnings.length,
+      totalSuggestions: allSuggestions.length,
+      allow: overallAllow,
+    },
+    'All WASM policies evaluated and merged',
+  );
+
+  return {
+    allow: overallAllow,
+    violations: allViolations,
+    warnings: allWarnings,
+    suggestions: allSuggestions,
+    summary: {
+      total_violations: allViolations.length,
+      total_warnings: allWarnings.length,
+      total_suggestions: allSuggestions.length,
+    },
+  };
+}
 
 /**
  * Load and compile a Rego policy from file
@@ -350,8 +467,8 @@ export async function loadRegoPolicy(
     if (!existsSync(policyPath)) {
       return Failure(`Policy file not found: ${policyPath}`, {
         message: 'Rego policy file does not exist',
-        hint: `Attempted to load: ${policyPath}`,
-        resolution: 'Ensure the policy file path is correct',
+        hint: `Attempted to load: ${policyPath}\nCurrent directory: ${process.cwd()}`,
+        resolution: 'Ensure the policy file path is correct and the file exists',
       });
     }
 
@@ -367,7 +484,7 @@ export async function loadRegoPolicy(
     // Check for pre-compiled WASM bundle (fast path)
     // Only use WASM when loading one of the built-in policy files
     // This ensures tests that load specific policies get only those policies
-    const policyFileName = policyPath.split(/[/\\]/).pop() || '';
+    const policyFileName = basename(policyPath);
     const isBuiltInPolicy = policyFileName in BUILT_IN_POLICY_MODULES;
 
     const wasmPath = join(projectRoot, 'policies', 'compiled', 'policies.wasm');
@@ -429,9 +546,18 @@ export async function loadRegoPolicy(
         return Success(evaluator);
       } catch (wasmError) {
         logger.warn(
-          { error: wasmError },
+          {
+            error: wasmError,
+            wasmPath,
+            policyFile: policyFileName,
+            reason: 'WASM bundle not found or policy not in bundle',
+          },
           'Failed to load WASM bundle, falling back to OPA binary',
         );
+
+        // Add hint about building WASM
+        logger.info('To use WASM mode (faster, no OPA required): npm run build:policies');
+
         // Continue to OPA binary fallback
       }
     }
@@ -451,8 +577,10 @@ export async function loadRegoPolicy(
     } catch {
       return Failure('OPA binary not found', {
         message: 'Open Policy Agent (OPA) CLI is not installed',
-        hint: 'OPA is required for custom .rego policy evaluation. For built-in policies, run: npm run build:policies',
-        resolution: 'Install OPA: https://www.openpolicyagent.org/docs/latest/#running-opa',
+        hint: `Tried to execute: ${opaBinary}\nPath: ${process.env.PATH}`,
+        resolution:
+          'Install OPA from: https://www.openpolicyagent.org/docs/latest/#running-opa\n' +
+          'Or build WASM bundle: npm run build:policies',
       });
     }
 
@@ -480,8 +608,10 @@ export async function loadRegoPolicy(
     const message = error instanceof Error ? error.message : String(error);
     return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(message), {
       message: 'Failed to load Rego policy',
-      hint: `Error: ${message}`,
-      resolution: 'Check policy file syntax and OPA compatibility',
+      hint: `Policy: ${policyPath}\nError: ${message}`,
+      resolution: existsSync(policyPath)
+        ? 'Check policy file syntax with: opa check <policy-file>'
+        : 'Ensure the policy file path is correct',
     });
   }
 }
@@ -614,7 +744,7 @@ async function evaluateRegoPolicy(
           ...policyArgs,
           '-i', tmpFile.name,
           '-f', 'json',
-          'data.containerization',
+          `data.${POLICY_NAMESPACE}`,
         ],
         {
           maxBuffer: 10 * 1024 * 1024, // 10MB buffer
@@ -793,14 +923,92 @@ export async function loadAndMergeRegoPolicies(
 
   logger.info({ policyCount: policyPaths.length, policies: policyPaths }, 'Loading and merging Rego policies');
 
-  // Test that OPA binary is available
+  // Check if all policies are built-in (can use WASM bundle)
+  const allBuiltIn = policyPaths.every(path => {
+    const fileName = basename(path);
+    return fileName in BUILT_IN_POLICY_MODULES;
+  });
+
+  // Fast path: Use pre-compiled WASM bundle for built-in policies (no OPA needed)
+  // Try multiple locations for the WASM bundle (development, packaged, installed)
+  let wasmPath: string | undefined;
+  const wasmSearchPaths: string[] = [
+    join(projectRoot, 'policies', 'compiled', 'policies.wasm'),
+  ];
+
+  // If policies are in the package, try relative to the first policy path
+  if (policyPaths.length > 0 && policyPaths[0]) {
+    wasmSearchPaths.push(join(dirname(policyPaths[0]), 'compiled', 'policies.wasm'));
+  }
+
+  for (const path of wasmSearchPaths) {
+    if (existsSync(path)) {
+      wasmPath = path;
+      break;
+    }
+  }
+
+  if (allBuiltIn && wasmPath) {
+    try {
+      logger.info({ wasmPath, policyCount: policyPaths.length }, 'Loading pre-compiled WASM bundle for built-in policies');
+      const wasmBytes = await readFile(wasmPath);
+      const wasmPolicy = await loadWasmPolicy(wasmBytes);
+
+      // Create evaluator that queries all requested policy modules
+      const evaluator: RegoEvaluator = {
+        policyPaths,
+        evaluate: async (input: string | Record<string, unknown>): Promise<RegoPolicyResult> => {
+          // Wrap string input in content object (Dockerfile text, etc.)
+          const inputData = typeof input === 'string' ? { content: input } : input;
+          return evaluateAllWasmPolicies(wasmPolicy, inputData, policyPaths, logger);
+        },
+        evaluatePolicy: createEvaluatePolicyWrapper(async (input): Promise<RegoPolicyResult> => {
+          const inputData = typeof input === 'string' ? { content: input } : input;
+          return evaluateAllWasmPolicies(wasmPolicy, inputData, policyPaths, logger);
+        }),
+        queryConfig: async <T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null> => {
+          try {
+            const wasmResult = wasmPolicy.evaluate(input, packageName);
+            if (wasmResult?.[0]?.result) {
+              return wasmResult[0].result as T;
+            }
+            return null;
+          } catch (error) {
+            logger.debug({ error, packageName }, 'WASM config query returned no result');
+            return null;
+          }
+        },
+        close: () => {
+          logger.debug({ policyPaths }, 'Cleaning up WASM policy resources');
+        },
+      };
+
+      logger.info({ policyPaths }, 'Built-in policies loaded via WASM bundle (zero-dependency mode)');
+      return Success(evaluator);
+    } catch (wasmError) {
+      logger.warn(
+        {
+          error: wasmError,
+          wasmPath,
+          policyPaths,
+          reason: 'WASM bundle loading failed or policy not in bundle',
+        },
+        'Failed to load WASM bundle, falling back to OPA binary',
+      );
+      // Continue to OPA binary fallback
+    }
+  }
+
+  // Fallback path: Use OPA binary for custom policies or if WASM failed
   const opaBinary = getOpaBinaryPath();
   try {
     await execFileAsync(opaBinary, ['version']);
   } catch {
     return Failure('OPA binary not found', {
       message: 'Open Policy Agent (OPA) CLI is not installed',
-      hint: 'OPA is required for policy evaluation',
+      hint: allBuiltIn
+        ? 'WASM bundle failed to load and OPA binary is not available. Run: npm run build:policies'
+        : 'OPA is required for custom policy evaluation',
       resolution: 'Install OPA: https://www.openpolicyagent.org/docs/latest/#running-opa',
     });
   }

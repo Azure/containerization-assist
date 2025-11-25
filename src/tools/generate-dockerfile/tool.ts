@@ -85,6 +85,38 @@ const DOCKERFILE_KEYWORDS = [
  */
 const DEFAULT_NON_ROOT_USER = 'appuser';
 
+// ===== Image Reference Extraction =====
+
+/**
+ * Regular expressions for extracting Docker image references from text
+ *
+ * Matches patterns like:
+ * - FROM mcr.microsoft.com/dotnet/sdk:8.0
+ * - mcr.microsoft.com/MyOrg/MyImage:latest
+ * - node:18-alpine
+ * - MyRegistry/MyApp:v1.0
+ *
+ * Pattern breakdown:
+ * 1. FROM instruction: Matches "FROM" followed by image:tag
+ * 2. Full registry path: Matches registry.com/org/image:tag
+ * 3. Simple image:tag: Matches image:version patterns
+ *
+ * All patterns are case-insensitive to handle organizational registries
+ * with uppercase names (e.g., MyRegistry, MyOrg)
+ */
+const IMAGE_REFERENCE_PATTERNS = [
+  // FROM instruction with full image reference (case-insensitive)
+  /FROM\s+([A-Za-z0-9._/-]+:[A-Za-z0-9._-]+)/gi,
+
+  // Full registry path with image and tag (case-insensitive)
+  // Matches: registry.com/org/image:tag
+  /\b([A-Za-z0-9.-]+\/[A-Za-z0-9._/-]+:[A-Za-z0-9._-]+)\b/gi,
+
+  // Simple image:tag pattern (case-insensitive)
+  // Matches: node:18, alpine:3.19, MyImage:v1.0
+  /\b([A-Za-z0-9_-]+:[0-9]+(?:\.[0-9]+)?(?:-[A-Za-z0-9_-]+)?)\b/gi,
+] as const;
+
 /**
  * Parse Dockerfile content and extract base images
  */
@@ -1056,6 +1088,136 @@ async function handleGenerateDockerfile(
     }
   } else if (!ctx.policy) {
     ctx.logger.warn('No policy configuration loaded - base images not filtered');
+  }
+
+  // Filter knowledge entries based on policy if available
+  if (ctx.policy && (
+    plan.recommendations.securityConsiderations.length > 0 ||
+    plan.recommendations.optimizations.length > 0 ||
+    plan.recommendations.bestPractices.length > 0
+  )) {
+    ctx.logger.info('Filtering knowledge base entries against policy');
+
+    /**
+     * Extract Docker image references from text
+     * Uses IMAGE_REFERENCE_PATTERNS to find all image mentions
+     */
+    const extractImageReferences = (text: string): string[] => {
+      const images: string[] = [];
+
+      for (const pattern of IMAGE_REFERENCE_PATTERNS) {
+        // Create new RegExp to reset lastIndex for each use
+        // This prevents issues with global flag and matchAll
+        const regex = new RegExp(pattern.source, pattern.flags);
+        const matches = text.matchAll(regex);
+
+        for (const match of matches) {
+          if (match[1]) {
+            images.push(match[1]);
+          }
+        }
+      }
+
+      // Remove duplicates and return
+      return [...new Set(images)];
+    };
+
+    /**
+     * Check if a knowledge entry contains only policy-compliant images
+     * Returns true if no images found or all images are compliant
+     */
+    const containsCompliantImagesOnly = async (entry: DockerfileRequirement): Promise<boolean> => {
+      // Edge case: missing or empty recommendation
+      if (entry.recommendation?.trim().length === 0) {
+        return true; // No content to check, keep entry
+      }
+
+      const imageRefs = extractImageReferences(entry.recommendation);
+
+      // No image references found, keep entry
+      if (imageRefs.length === 0) {
+        return true;
+      }
+
+      // Safety check: if no policy, allow all entries
+      if (!ctx.policy) {
+        return true;
+      }
+
+      // Check each image reference against policy
+      for (const imageRef of imageRefs) {
+        const isCompliant = await isImageCompliant(imageRef, ctx.policy, ctx.logger);
+
+        if (!isCompliant) {
+          ctx.logger.debug(
+            {
+              entryId: entry.id,
+              image: imageRef,
+              recommendation: entry.recommendation.substring(0, 100),
+            },
+            'Knowledge entry filtered: contains non-compliant image',
+          );
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    // Helper to filter array in parallel
+    const filterAsync = async <T>(
+      items: T[],
+      predicate: (item: T) => Promise<boolean>,
+    ): Promise<T[]> => {
+      const results = await Promise.all(
+        items.map(async (item) => {
+          const keep = await predicate(item);
+          return keep ? item : null;
+        }),
+      );
+      return results.filter((item) => item !== null) as T[];
+    };
+
+    // Filter all three categories in parallel
+    const [filteredSecurity, filteredOptimizations, filteredBestPractices] = await Promise.all([
+      filterAsync(plan.recommendations.securityConsiderations, containsCompliantImagesOnly),
+      filterAsync(plan.recommendations.optimizations, containsCompliantImagesOnly),
+      filterAsync(plan.recommendations.bestPractices, containsCompliantImagesOnly),
+    ]);
+
+    // Calculate filtered counts for logging
+    const originalCounts = {
+      security: plan.recommendations.securityConsiderations.length,
+      optimizations: plan.recommendations.optimizations.length,
+      bestPractices: plan.recommendations.bestPractices.length,
+    };
+
+    // Update plan with filtered entries
+    plan.recommendations.securityConsiderations = filteredSecurity;
+    plan.recommendations.optimizations = filteredOptimizations;
+    plan.recommendations.bestPractices = filteredBestPractices;
+
+    const filteredCounts = {
+      security: originalCounts.security - filteredSecurity.length,
+      optimizations: originalCounts.optimizations - filteredOptimizations.length,
+      bestPractices: originalCounts.bestPractices - filteredBestPractices.length,
+    };
+
+    const totalFiltered = filteredCounts.security + filteredCounts.optimizations + filteredCounts.bestPractices;
+    if (totalFiltered > 0) {
+      ctx.logger.info(
+        {
+          filteredCounts,
+          totalFiltered,
+          remaining: {
+            security: filteredSecurity.length,
+            optimizations: filteredOptimizations.length,
+            bestPractices: filteredBestPractices.length,
+          },
+        },
+        'Knowledge entries filtered by policy',
+      );
+    }
   }
 
   // Validate against policy if available

@@ -20,16 +20,16 @@ import {
 export { findPolicyAwareKnowledgeMatches, getPolicyAwareKnowledgeSnippets };
 
 // Internal helper - only used by getKnowledgeForCategory
-async function getKnowledgeRecommendations(query: KnowledgeQuery): Promise<KnowledgeMatch[]> {
-  if (!isKnowledgeLoaded()) await loadKnowledgeBase();
+function getKnowledgeRecommendations(query: KnowledgeQuery): KnowledgeMatch[] {
+  if (!isKnowledgeLoaded()) loadKnowledgeBase();
   return findKnowledgeMatches(getAllEntries(), query);
 }
 
-export async function getKnowledgeForCategory(
+export function getKnowledgeForCategory(
   category: 'dockerfile' | 'kubernetes' | 'security',
   text?: string,
   context?: { language?: string; framework?: string; environment?: string },
-): Promise<KnowledgeMatch[]> {
+): KnowledgeMatch[] {
   const query: KnowledgeQuery = {
     category,
     ...(text && { text }),

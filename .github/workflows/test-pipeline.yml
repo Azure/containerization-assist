@@ -191,7 +191,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Download build artifacts
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v4
         with:
           name: build-and-quality-${{ github.run_id }}
           path: .
