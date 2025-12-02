@@ -18,7 +18,12 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import { extractErrorMessage } from '@/lib/errors';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
-import { type ExecuteRequest, type ExecuteMetadata, type ChainHintsMode, CHAINHINTSMODE } from '@/app/orchestrator-types';
+import {
+  type ExecuteRequest,
+  type ExecuteMetadata,
+  type ChainHintsMode,
+  CHAINHINTSMODE,
+} from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
@@ -267,14 +272,24 @@ export function createMCPServer<TTool extends Tool>(
  * @param options - Registration options including server, tools, and executor
  */
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
-  const { server, tools, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
+  const {
+    server,
+    tools,
+    transport,
+    execute,
+    outputFormat,
+    chainHintsMode = CHAINHINTSMODE.ENABLED,
+  } = options;
 
   for (const tool of tools) {
     server.tool(
       tool.name,
       tool.description,
       tool.inputSchema,
-      async (rawParams: Record<string, unknown> | undefined, extra) => {
+      async (
+        rawParams: Record<string, unknown> | undefined,
+        extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+      ) => {
         const params = rawParams ?? {};
 
         try {
@@ -333,8 +348,8 @@ function createLoggerContext(
     ...(meta?.requestId && typeof meta.requestId === 'string' && { requestId: meta.requestId }),
     ...(meta?.invocationId &&
       typeof meta.invocationId === 'string' && {
-      invocationId: meta.invocationId,
-    }),
+        invocationId: meta.invocationId,
+      }),
   };
 }
 
@@ -505,7 +520,10 @@ export function formatOutput(
  *
  * Falls back to summary field or JSON for other tool types.
  */
-function formatAsNaturalLanguage(output: unknown, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+function formatAsNaturalLanguage(
+  output: unknown,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   if (!output || typeof output !== 'object') {
     return String(output);
   }
@@ -587,7 +605,6 @@ function isDockerfilePlan(output: object): output is DockerfilePlan {
     'buildStrategy' in recommendations
   );
 }
-
 
 function isBuildImageResult(output: object): output is BuildImageResult {
   return 'imageId' in output && 'buildTime' in output;
