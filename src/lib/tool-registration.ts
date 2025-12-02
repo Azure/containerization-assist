@@ -118,8 +118,8 @@ export function createToolHandler<TName extends ToolName>(
 ) {
   const {
     transport = 'external',
-    outputFormat = OUTPUTFORMAT.NATURAL_LANGUAGE,
-    chainHintsMode = CHAINHINTSMODE.ENABLED,
+    outputFormat = app.config?.outputFormat ?? OUTPUTFORMAT.NATURAL_LANGUAGE,
+    chainHintsMode = app.config?.chainHintsMode ?? CHAINHINTSMODE.ENABLED,
     onError,
     onSuccess,
   } = options;

@@ -131,6 +131,14 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
 
   return {
     /**
+     * Configuration values from createApp
+     */
+    config: {
+      chainHintsMode,
+      outputFormat,
+    },
+
+    /**
      * Execute a tool with type-safe parameters and results
      */
     execute: async <T extends ToolName>(
