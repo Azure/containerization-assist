@@ -263,7 +263,11 @@ export function registerTool(
   tool: Tool,
   options?: ToolHandlerOptions,
 ): void {
-  server.tool(
+  // Type assertion to avoid deep type instantiation issues with MCP SDK
+  // The MCP SDK's complex generic constraints on tool() cause TS2589 errors
+  // Runtime safety is preserved by Zod schema validation
+
+  (server as McpServer & { tool: any }).tool(
     tool.name,
     tool.description,
     tool.inputSchema,
@@ -317,7 +321,11 @@ export function registerTools(
   options?: ToolHandlerOptions,
 ): void {
   for (const tool of tools) {
-    server.tool(
+    // Type assertion to avoid deep type instantiation issues with MCP SDK
+    // The MCP SDK's complex generic constraints on tool() cause TS2589 errors
+    // Runtime safety is preserved by Zod schema validation
+
+    (server as McpServer & { tool: any }).tool(
       tool.name,
       tool.description,
       tool.inputSchema,

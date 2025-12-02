@@ -266,6 +266,58 @@ export function createMCPServer<TTool extends Tool>(
 }
 
 /**
+ * Create tool handler function with proper typing to avoid deep type instantiation
+ */
+function createToolHandler(
+  toolName: string,
+  transport: string,
+  outputFormat: OutputFormat,
+  chainHintsMode: ChainHintsMode,
+  execute: ToolExecutor,
+) {
+  return async (
+    rawParams: Record<string, unknown> | undefined,
+    extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  ) => {
+    const params = rawParams ?? {};
+
+    try {
+      const { sanitizedParams, metadata } = prepareExecutionPayload(
+        toolName,
+        params,
+        transport,
+        extra,
+      );
+
+      const result = await execute({
+        toolName,
+        params: sanitizedParams,
+        metadata,
+      });
+
+      if (!result.ok) {
+        // Format error with guidance if available
+        const errorMessage = formatErrorWithGuidance(result.error, result.guidance);
+        throw new McpError(ErrorCode.InternalError, errorMessage);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: formatOutput(result.value, outputFormat, chainHintsMode),
+          },
+        ],
+      };
+    } catch (error) {
+      throw error instanceof McpError
+        ? error
+        : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
+    }
+  };
+}
+
+/**
  * Register tools against an MCP server instance, delegating to the orchestrator executor.
  * Each tool is registered with its name, description, and input schema. Tool execution is
  * delegated to the orchestrator's execute function.
@@ -282,50 +334,17 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
   } = options;
 
   for (const tool of tools) {
-    server.tool(
+    const handler = createToolHandler(tool.name, transport, outputFormat, chainHintsMode, execute);
+
+    // Type assertion to avoid deep type instantiation issues with MCP SDK
+    // The MCP SDK's complex generic constraints on tool() cause TS2589 errors
+    // Runtime safety is preserved by Zod schema validation
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (server as McpServer & { tool: any }).tool(
       tool.name,
       tool.description,
       tool.inputSchema,
-      async (
-        rawParams: Record<string, unknown> | undefined,
-        extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-      ) => {
-        const params = rawParams ?? {};
-
-        try {
-          const { sanitizedParams, metadata } = prepareExecutionPayload(
-            tool.name,
-            params,
-            transport,
-            extra,
-          );
-
-          const result = await execute({
-            toolName: tool.name,
-            params: sanitizedParams,
-            metadata,
-          });
-
-          if (!result.ok) {
-            // Format error with guidance if available
-            const errorMessage = formatErrorWithGuidance(result.error, result.guidance);
-            throw new McpError(ErrorCode.InternalError, errorMessage);
-          }
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: formatOutput(result.value, outputFormat, chainHintsMode),
-              },
-            ],
-          };
-        } catch (error) {
-          throw error instanceof McpError
-            ? error
-            : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
-        }
-      },
+      handler,
     );
   }
 }
