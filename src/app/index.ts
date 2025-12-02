@@ -91,7 +91,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   }
 
   const chainHintsMode = config.chainHintsMode || CHAINHINTSMODE.ENABLED;
-  const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
+  const outputFormat = config.outputFormat || OUTPUTFORMAT.NATURAL_LANGUAGE;
   const orchestratorConfig: OrchestratorConfig = {
     chainHintsMode,
     chainHints: DEFAULT_CHAIN_HINTS,
