@@ -268,7 +268,7 @@ export function createMCPServer<TTool extends Tool>(
 /**
  * Create tool handler function with proper typing to avoid deep type instantiation
  */
-function createToolHandler(
+function getHandler(
   toolName: string,
   transport: string,
   outputFormat: OutputFormat,
@@ -334,7 +334,7 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
   } = options;
 
   for (const tool of tools) {
-    const handler = createToolHandler(tool.name, transport, outputFormat, chainHintsMode, execute);
+    const handler = getHandler(tool.name, transport, outputFormat, chainHintsMode, execute);
 
     // Type assertion to avoid deep type instantiation issues with MCP SDK
     // The MCP SDK's complex generic constraints on tool() cause TS2589 errors
