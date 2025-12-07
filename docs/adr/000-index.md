@@ -152,6 +152,7 @@ Write an ADR when making decisions about:
 | [004](./004-policy-system.md) | Policy-Based Configuration | Accepted | 2025-10-17 |
 | [005](./005-mcp-integration.md) | MCP Protocol Integration | Accepted | 2025-10-17 |
 | [006](./006-infrastructure-organization.md) | Infrastructure Layer Organization | Accepted | 2025-10-17 |
+| [007](./007-sdk-decoupling.md) | SDK Decoupling from MCP | Proposed | 2025-12-07 |
 
 ## References
 
