@@ -18,7 +18,12 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import { extractErrorMessage } from '@/lib/errors';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
-import { type ExecuteRequest, type ExecuteMetadata, type ChainHintsMode, CHAINHINTSMODE } from '@/app/orchestrator-types';
+import {
+  type ExecuteRequest,
+  type ExecuteMetadata,
+  type ChainHintsMode,
+  CHAINHINTSMODE,
+} from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
@@ -261,56 +266,85 @@ export function createMCPServer<TTool extends Tool>(
 }
 
 /**
+ * Create tool handler function with proper typing to avoid deep type instantiation
+ */
+function getHandler(
+  toolName: string,
+  transport: string,
+  outputFormat: OutputFormat,
+  chainHintsMode: ChainHintsMode,
+  execute: ToolExecutor,
+) {
+  return async (
+    rawParams: Record<string, unknown> | undefined,
+    extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  ) => {
+    const params = rawParams ?? {};
+
+    try {
+      const { sanitizedParams, metadata } = prepareExecutionPayload(
+        toolName,
+        params,
+        transport,
+        extra,
+      );
+
+      const result = await execute({
+        toolName,
+        params: sanitizedParams,
+        metadata,
+      });
+
+      if (!result.ok) {
+        // Format error with guidance if available
+        const errorMessage = formatErrorWithGuidance(result.error, result.guidance);
+        throw new McpError(ErrorCode.InternalError, errorMessage);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: formatOutput(result.value, outputFormat, chainHintsMode),
+          },
+        ],
+      };
+    } catch (error) {
+      throw error instanceof McpError
+        ? error
+        : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
+    }
+  };
+}
+
+/**
  * Register tools against an MCP server instance, delegating to the orchestrator executor.
  * Each tool is registered with its name, description, and input schema. Tool execution is
  * delegated to the orchestrator's execute function.
  * @param options - Registration options including server, tools, and executor
  */
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
-  const { server, tools, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
+  const {
+    server,
+    tools,
+    transport,
+    execute,
+    outputFormat,
+    chainHintsMode = CHAINHINTSMODE.ENABLED,
+  } = options;
 
   for (const tool of tools) {
-    server.tool(
+    const handler = getHandler(tool.name, transport, outputFormat, chainHintsMode, execute);
+
+    // Type assertion to avoid deep type instantiation issues with MCP SDK
+    // The MCP SDK's complex generic constraints on tool() cause TS2589 errors
+    // Runtime safety is preserved by Zod schema validation
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (server as McpServer & { tool: any }).tool(
       tool.name,
       tool.description,
       tool.inputSchema,
-      async (rawParams: Record<string, unknown> | undefined, extra) => {
-        const params = rawParams ?? {};
-
-        try {
-          const { sanitizedParams, metadata } = prepareExecutionPayload(
-            tool.name,
-            params,
-            transport,
-            extra,
-          );
-
-          const result = await execute({
-            toolName: tool.name,
-            params: sanitizedParams,
-            metadata,
-          });
-
-          if (!result.ok) {
-            // Format error with guidance if available
-            const errorMessage = formatErrorWithGuidance(result.error, result.guidance);
-            throw new McpError(ErrorCode.InternalError, errorMessage);
-          }
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: formatOutput(result.value, outputFormat, chainHintsMode),
-              },
-            ],
-          };
-        } catch (error) {
-          throw error instanceof McpError
-            ? error
-            : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
-        }
-      },
+      handler,
     );
   }
 }
@@ -333,8 +367,8 @@ function createLoggerContext(
     ...(meta?.requestId && typeof meta.requestId === 'string' && { requestId: meta.requestId }),
     ...(meta?.invocationId &&
       typeof meta.invocationId === 'string' && {
-      invocationId: meta.invocationId,
-    }),
+        invocationId: meta.invocationId,
+      }),
   };
 }
 
@@ -505,7 +539,10 @@ export function formatOutput(
  *
  * Falls back to summary field or JSON for other tool types.
  */
-function formatAsNaturalLanguage(output: unknown, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+function formatAsNaturalLanguage(
+  output: unknown,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   if (!output || typeof output !== 'object') {
     return String(output);
   }
@@ -587,7 +624,6 @@ function isDockerfilePlan(output: object): output is DockerfilePlan {
     'buildStrategy' in recommendations
   );
 }
-
 
 function isBuildImageResult(output: object): output is BuildImageResult {
   return 'imageId' in output && 'buildTime' in output;
