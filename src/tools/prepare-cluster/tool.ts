@@ -23,7 +23,7 @@
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import { extractErrorMessage } from '@/lib/errors';
 import { validateNamespace } from '@/lib/validation';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { DEFAULT_TIMEOUTS, DOCKER, KUBERNETES } from '@/config/constants';
 import {
   createKubernetesClient,

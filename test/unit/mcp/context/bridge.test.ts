@@ -38,9 +38,8 @@ describe('ToolContext', () => {
       const context = createToolContext(mockLogger);
 
       expect(context).toHaveProperty('logger');
-      expect(context).toHaveProperty('signal');
-      expect(context).toHaveProperty('progress');
       expect(context.logger).toBe(mockLogger);
+      // Optional properties are omitted when not provided
       expect(context.signal).toBeUndefined();
       expect(context.progress).toBeUndefined();
     });
@@ -154,7 +153,7 @@ describe('ToolContext', () => {
         progress: request,
       });
 
-      expect(context).toHaveProperty('progress');
+      // Optional property is omitted when not extractable from request
       expect(context.progress).toBeUndefined();
     });
   });

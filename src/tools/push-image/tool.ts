@@ -12,7 +12,7 @@ import { getRegistryCredentials } from '@/infra/docker/credential-helpers';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { parseImageName } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
 import { pushImageSchema } from './schema';
 import type { z } from 'zod';

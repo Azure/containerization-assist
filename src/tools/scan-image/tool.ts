@@ -6,7 +6,7 @@
  */
 
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 
 import { createSecurityScanner } from '@/infra/security/scanner';
 import { Success, Failure, type Result } from '@/types';

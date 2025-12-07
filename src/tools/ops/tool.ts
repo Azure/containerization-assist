@@ -22,7 +22,7 @@ import * as os from 'os';
 import { extractErrorMessage } from '@/lib/errors';
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import { Success, Failure, type Result } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { opsToolSchema } from './schema';
 import type { z } from 'zod';
 import { formatDuration, formatTimestamp } from '@/lib/summary-helpers';

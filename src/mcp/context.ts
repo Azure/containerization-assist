@@ -1,124 +1,134 @@
 /**
- * MCP Context - Tool execution environment abstraction
+ * MCP Context - Tool execution environment with MCP protocol support
+ *
+ * This module re-exports the core ToolContext interface and adds
+ * MCP-specific functionality for progress notifications via the
+ * MCP protocol.
+ *
+ * Design: MCP layer builds ON TOP of core layer, not the other way around.
  *
  * Invariant: All tools receive consistent context interface
  * Trade-off: Abstraction overhead for tool isolation and testability
- * Design: Factory pattern enables context mocking in tests
  */
 
 import type { Logger } from 'pino';
-import { extractProgressReporter } from './context-helpers.js';
 import type { RegoEvaluator } from '@/config/policy-rego';
+import {
+  createToolContext as createCoreContext,
+  type ToolContext,
+  type ProgressReporter,
+  type ContextOptions as CoreContextOptions,
+} from '@/core/context';
+import { extractProgressReporter } from './context-helpers.js';
 
-// ===== TYPES =====
+// ===== CORE RE-EXPORTS =====
+// Canonical types - import from here for backward compatibility
+// New code should import directly from '@/core/context'
+
+export type { ToolContext, ProgressReporter, CoreContextOptions };
+export { createCoreContext as createCoreToolContext };
+
+// ===== MCP-SPECIFIC TYPES =====
 
 /**
- * Progress reporting function
- * Forwards progress updates through MCP notifications
+ * MCP request object that may contain a progress token.
+ * This matches the shape of MCP protocol request structure.
+ *
+ * The progress token is located at `params._meta.progressToken` per MCP spec.
+ * @see https://modelcontextprotocol.io/specification#progress
  */
-export type ProgressReporter = (
-  /** Progress message or step name */
-  message: string,
-  /** Current progress value */
-  progress?: number,
-  /** Total progress value */
-  total?: number,
-) => Promise<void>;
-
-/**
- * Main context object passed to tools
- */
-export interface ToolContext {
-  /**
-   * Optional abort signal for cancellation support
-   * Tools should check this signal periodically for long-running operations
-   */
-  signal: AbortSignal | undefined;
-
-  /**
-   * Optional progress reporting function for user feedback
-   * Should be called at regular intervals during long operations
-   */
-  progress: ProgressReporter | undefined;
-
-  /**
-   * Logger for debugging and error tracking - Required for all tools
-   * Use this for structured logging instead of console.log
-   */
-  logger: Logger;
-
-  /**
-   * Optional Rego policy evaluator for tool self-validation
-   * Tools can use this to validate generated content against organizational policies
-   */
-  policy?: RegoEvaluator;
-
-  /**
-   * Query policy for configuration data
-   * Convenience method that wraps policy.queryConfig() with null-safety
-   *
-   * @param packageName - OPA package name to query (e.g., 'containerization.generation_config')
-   * @param input - Input data for the query
-   * @returns Configuration object from policy or null if no policy configured
-   */
-  queryConfig<T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null>;
+export interface MCPProgressRequest {
+  params?: {
+    _meta?: {
+      progressToken?: string | number;
+    };
+  };
 }
 
-// ===== PROGRESS HANDLING =====
-
-// Re-export types and utilities from helpers
-export type { EnhancedProgressReporter } from './context-helpers.js';
-export { extractProgressToken, createProgressReporter } from './context-helpers.js';
-
-// ===== CONTEXT CREATION =====
+/**
+ * Progress input can be:
+ * - A direct ProgressReporter function
+ * - An MCP request object with optional progress token
+ * - null or undefined for no progress reporting
+ */
+export type ProgressInput = ProgressReporter | MCPProgressRequest | null | undefined;
 
 /**
- * Options for creating a tool context
+ * MCP context options with notification support.
+ *
+ * This interface supports MCP-specific functionality for
+ * progress notifications via the MCP protocol.
+ *
+ * Note: This does not extend CoreContextOptions because the progress
+ * property has a different type (accepts MCP request objects).
  */
 export interface ContextOptions {
   /** Optional abort signal for cancellation */
   signal?: AbortSignal;
-  /** Optional progress reporter or request with progress token */
-  progress?: ProgressReporter | unknown;
-  /** MCP notification callback for progress updates */
+
+  /**
+   * Progress can be:
+   * - A ProgressReporter function directly
+   * - An MCP request object with progress token (will be extracted)
+   * - undefined for no progress reporting
+   */
+  progress?: ProgressInput;
+
+  /**
+   * MCP notification callback for progress updates.
+   * When provided, progress updates are sent via MCP protocol.
+   */
   sendNotification?: (notification: unknown) => Promise<void>;
+
   /** Optional Rego policy evaluator to pass to tools */
   policy?: RegoEvaluator;
 }
 
+// ===== MCP CONTEXT FACTORY =====
+
 /**
- * Create a ToolContext for tool execution
+ * Create a ToolContext with optional MCP progress notification support.
  *
- * @param logger - Logger for debugging and error tracking
- * @param options - Optional configuration
- * @returns Configured ToolContext
+ * This factory extends the core createToolContext with MCP-specific
+ * functionality. If sendNotification is provided, progress updates
+ * are forwarded through the MCP protocol.
+ *
+ * @param logger - Pino logger instance
+ * @param options - Context options including MCP-specific sendNotification
+ * @returns ToolContext configured for MCP or core usage
  *
  * @example
  * ```typescript
- * const context = createToolContext(logger, {
- *   signal: abortController.signal,
- *   progress: async (msg) => console.log(msg),
+ * // MCP usage with notifications
+ * const ctx = createToolContext(logger, {
+ *   signal: request.signal,
+ *   progress: request.params,
+ *   sendNotification: server.sendNotification,
  * });
+ *
+ * // Simple usage (no MCP)
+ * const ctx = createToolContext(logger);
  * ```
  */
 export function createToolContext(logger: Logger, options: ContextOptions = {}): ToolContext {
-  const progressReporter = extractProgressReporter(
-    options.progress,
-    logger,
-    options.sendNotification,
-  );
+  const { sendNotification, progress, signal, policy } = options;
 
-  return {
-    logger,
-    signal: options.signal,
-    progress: progressReporter,
-    ...(options.policy && { policy: options.policy }),
-    queryConfig: async <T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null> => {
-      if (!options.policy) {
-        logger.debug({ packageName }, 'No policy configured, returning null for config query');
-        return null;
-      }
-      return options.policy.queryConfig<T>(packageName, input);
-    },
-  };
+  // Extract progress reporter using MCP-aware helper
+  // This handles both direct ProgressReporter functions and MCP request objects with progress tokens
+  const progressReporter = extractProgressReporter(progress, logger, sendNotification);
+
+  // Build options object explicitly (clearer than conditional spread)
+  const coreOptions: CoreContextOptions = {};
+  if (signal !== undefined) coreOptions.signal = signal;
+  if (policy !== undefined) coreOptions.policy = policy;
+  if (progressReporter !== undefined) coreOptions.progress = progressReporter;
+
+  // Use core factory with extracted progress reporter
+  return createCoreContext(logger, coreOptions);
 }
+
+// ===== MCP-SPECIFIC EXPORTS =====
+
+// Progress handling utilities specific to MCP protocol
+export type { EnhancedProgressReporter } from './context-helpers.js';
+export { extractProgressToken, createProgressReporter } from './context-helpers.js';

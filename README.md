@@ -73,6 +73,25 @@ Add the following to your VS Code settings or create `.vscode/mcp.json` in your 
 
 Restart VS Code to enable the MCP server in GitHub Copilot.
 
+### SDK Usage (Without MCP)
+
+For direct tool usage without MCP protocol (e.g., VS Code extensions, programmatic access):
+
+```typescript
+import { analyzeRepo, buildImage, scanImage } from 'containerization-assist-mcp/sdk';
+
+// Simple function calls - no MCP server needed
+const analysis = await analyzeRepo({ repositoryPath: './myapp' });
+if (analysis.ok) {
+  console.log('Detected:', analysis.value.modules);
+}
+
+const build = await buildImage({ path: './myapp', imageName: 'myapp:v1' });
+const scan = await scanImage({ imageId: 'myapp:v1' });
+```
+
+See [CLAUDE.md](./CLAUDE.md#sdk-usage-non-mcp) for full SDK documentation.
+
 ### Windows Users
 
 For Windows, use the Windows Docker pipe:

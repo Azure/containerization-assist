@@ -19,7 +19,7 @@
 import path from 'node:path';
 import { createLogger } from '@/lib/logger';
 import { loadRegoPolicy } from '@/config/policy-rego';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
 
@@ -79,8 +79,7 @@ async function simulatePolicy(options: SimulationOptions): Promise<SimulationRes
   console.log('📊 Running WITHOUT custom policy...\n');
   const contextWithout: ToolContext = {
     logger,
-    signal: undefined,
-    progress: undefined,
+    // signal and progress are omitted (optional)
     // policy is omitted (no custom policy)
     queryConfig: async () => null,
   };
@@ -97,8 +96,7 @@ async function simulatePolicy(options: SimulationOptions): Promise<SimulationRes
   console.log('📊 Running WITH custom policy...\n');
   const contextWith: ToolContext = {
     logger,
-    signal: undefined,
-    progress: undefined,
+    // signal and progress are omitted (optional)
     policy,
     queryConfig: async <T>(packageName: string, policyInput: Record<string, unknown>): Promise<T | null> => {
       return policy.queryConfig<T>(packageName, policyInput);

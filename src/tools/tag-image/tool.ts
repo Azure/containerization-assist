@@ -12,7 +12,7 @@ import { extractErrorMessage } from '@/lib/errors';
 import { createDockerClient } from '@/infra/docker/client';
 import { parseImageName } from '@/lib/validation-helpers';
 import { Success, Failure, type Result } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
 import { tagImageSchema } from './schema';
 import { z } from 'zod';

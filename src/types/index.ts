@@ -19,7 +19,7 @@ export * from './topics';
  *
  * @public
  */
-export type { ToolContext } from '../mcp/context';
+export type { ToolContext } from '../core/context';
 
 /**
  * Policy validation types

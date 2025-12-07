@@ -10,7 +10,7 @@
 
 import { validatePathOrFail } from '@/lib/validation-helpers';
 import { Failure, type Result, TOPICS } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import {
   generateDockerfileSchema,
   type BaseImageRecommendation,
