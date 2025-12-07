@@ -1,6 +1,6 @@
 {
   "name": "containerization-assist-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -98,7 +98,7 @@
     "@iarna/toml": "^2.2.5",
     "@kubernetes-models/apimachinery": "^2.2.0",
     "@kubernetes/client-node": "^1.4.0",
-    "@modelcontextprotocol/sdk": "1.17.3",
+    "@modelcontextprotocol/sdk": "~1.24.1",
     "@open-policy-agent/opa-wasm": "^1.10.0",
     "@types/xml2js": "^0.4.14",
     "commander": "^14.0.1",
