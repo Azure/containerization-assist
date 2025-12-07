@@ -15,7 +15,7 @@
  */
 
 import { Failure, type Result, TOPICS } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import {
   generateK8sManifestsSchema,
   type ManifestPlan,

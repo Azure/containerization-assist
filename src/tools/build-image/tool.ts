@@ -15,7 +15,7 @@
 import path from 'path';
 import { normalizePath } from '@/lib/platform';
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
 import { validatePathOrFail, parseImageName } from '@/lib/validation-helpers';
 import { readDockerfile } from '@/lib/file-utils';

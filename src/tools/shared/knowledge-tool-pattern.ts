@@ -12,7 +12,7 @@
  */
 
 import { type Result, Success } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import type { Topic } from '@/types/topics';
 import type { KnowledgeCategory, KnowledgeQuery } from '@/knowledge/types';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';

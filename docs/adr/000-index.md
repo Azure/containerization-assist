@@ -152,10 +152,10 @@ Write an ADR when making decisions about:
 | [004](./004-policy-system.md) | Policy-Based Configuration | Accepted | 2025-10-17 |
 | [005](./005-mcp-integration.md) | MCP Protocol Integration | Accepted | 2025-10-17 |
 | [006](./006-infrastructure-organization.md) | Infrastructure Layer Organization | Accepted | 2025-10-17 |
+| [007](./007-sdk-decoupling.md) | SDK Decoupling from MCP | Proposed | 2025-12-07 |
 
 ## References
 
-- [Sprint 3 Planning](../../plans/sprints/sprint-3-documentation-polish.md)
 - [Michael Nygard's ADR Template](https://github.com/joelparkerhenderson/architecture-decision-record/blob/main/templates/decision-record-template-by-michael-nygard/index.md)
 - [ADR GitHub Organization](https://adr.github.io/)
 - Project: [containerization-assist](../../README.md)

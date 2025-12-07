@@ -1,6 +1,6 @@
 import type { z, ZodRawShape } from 'zod';
 import type { Result } from './core';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import type { ToolCategory } from './categories';
 import type { ToolMetadata } from './tool-metadata';
 import type { ToolName } from '@/tools';

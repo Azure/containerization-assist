@@ -9,7 +9,7 @@
  */
 
 import { type Result, Success, TOPICS } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { LIMITS } from '@/config/constants';
 import {

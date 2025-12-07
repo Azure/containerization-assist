@@ -38,6 +38,18 @@
       "import": "./dist/src/config/index.js",
       "require": "./dist-cjs/src/config/index.js",
       "default": "./dist/src/config/index.js"
+    },
+    "./sdk": {
+      "types": "./dist/src/sdk/index.d.ts",
+      "import": "./dist/src/sdk/index.js",
+      "require": "./dist-cjs/src/sdk/index.js",
+      "default": "./dist/src/sdk/index.js"
+    },
+    "./sdk/types": {
+      "types": "./dist/src/sdk/types.d.ts",
+      "import": "./dist/src/sdk/types.js",
+      "require": "./dist-cjs/src/sdk/types.js",
+      "default": "./dist/src/sdk/types.js"
     }
   },
   "bin": {
