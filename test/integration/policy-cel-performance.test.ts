@@ -9,8 +9,10 @@
  * - No performance regression vs. Rego
  */
 
-import { describe, it, expect, beforeAll } from '@jest/globals';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { writeFileSync, rmSync } from 'node:fs';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createLogger } from '@/lib/logger';
 import { loadPolicy, loadAndMergePolicies } from '@/config/policy-io';
@@ -25,8 +27,8 @@ describe('CEL Policy Performance', () => {
   let regoEvaluator: RegoEvaluator;
 
   beforeAll(async () => {
-    testDir = join(__dirname, 'perf-test-' + Date.now());
-    mkdirSync(testDir, { recursive: true });
+    // Create temp directory for test artifacts (using system tmpdir, not repo)
+    testDir = await mkdtemp(join(tmpdir(), 'cel-perf-test-'));
     logger = createLogger({ name: 'perf-test', level: 'silent' });
 
     // Create simple CEL policy (1 rule)
@@ -140,10 +142,13 @@ violations contains result if {
     celEvaluator = celResult.value;
     celEvaluatorMultiple = celComplexResult.value;
     regoEvaluator = regoResult.value;
+  });
 
-    return () => {
+  afterAll(() => {
+    // Clean up temp directory
+    if (testDir) {
       rmSync(testDir, { recursive: true, force: true });
-    };
+    }
   });
 
   describe('Simple Rule Performance', () => {

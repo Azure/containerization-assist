@@ -15,6 +15,9 @@ export type { RegoEvaluator, RegoPolicyResult, RegoPolicyViolation } from './pol
 export { loadPolicy, loadAndMergePolicies, clearPolicyCache } from './policy-io';
 export { applyPolicy } from './policy-eval';
 
+// Export CEL compilation cache for testing and management
+export { celCompilationCache } from './policy-cel-cache';
+
 export const config = {
   server: {
     logLevel: parseStringEnv('LOG_LEVEL', 'info'),

@@ -14,7 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import yaml from 'js-yaml';
 import type { Logger } from 'pino';
-import { evaluate, parse, type ParsedExpression } from '@marcbachmann/cel-js';
+import { parse, type ParseResult } from '@marcbachmann/cel-js';
 import { type Result, Success, Failure } from '@types';
 import { ERROR_MESSAGES, extractErrorMessage } from '@/lib/errors';
 import type {
@@ -29,6 +29,12 @@ import {
   type CelPolicySet,
   type CelPolicyRule,
 } from './policy-cel-schema';
+import { celCompilationCache } from './policy-cel-cache';
+import {
+  formatCompilationError,
+  formatEvaluationError,
+  formatPolicyFileError,
+} from './policy-cel-errors';
 
 /**
  * Compiled CEL program with metadata
@@ -40,7 +46,7 @@ interface CompiledCelRule {
   /** Original rule definition */
   rule: CelPolicyRule;
   /** Compiled CEL expression function */
-  program: ParsedExpression;
+  program: ParseResult;
 }
 
 /**
@@ -94,7 +100,8 @@ export class CelPolicyEvaluator implements RegoEvaluator {
    * Initialize by compiling all CEL expressions
    *
    * This must be called before evaluation. Compilation happens once at
-   * initialization for performance.
+   * initialization for performance. Uses a shared cache to avoid
+   * re-compiling identical rules across policy loads.
    *
    * @returns Result indicating success or compilation errors
    */
@@ -110,40 +117,52 @@ export class CelPolicyEvaluator implements RegoEvaluator {
         'Compiling CEL expressions'
       );
 
+      let cacheHits = 0;
+      let cacheMisses = 0;
+
       for (const rule of this.policySet.spec.rules) {
         try {
-          // Compile CEL expression into reusable program
-          const program = parse(rule.condition);
+          // Check cache first
+          let program = celCompilationCache.get(rule.condition);
+
+          if (program) {
+            cacheHits++;
+            this.logger.debug(
+              { ruleName: rule.name },
+              'Using cached compiled CEL rule'
+            );
+          } else {
+            // Compile and cache
+            cacheMisses++;
+            program = parse(rule.condition);
+            celCompilationCache.set(rule.condition, program);
+
+            this.logger.debug(
+              {
+                ruleName: rule.name,
+                severity: rule.severity,
+                condition: rule.condition.substring(0, 50),
+              },
+              'CEL rule compiled and cached'
+            );
+          }
 
           this.compiledRules.push({
             rule,
             program,
           });
-
-          this.logger.debug(
-            {
-              ruleName: rule.name,
-              severity: rule.severity,
-              condition: rule.condition.substring(0, 50),
-            },
-            'CEL rule compiled successfully'
-          );
         } catch (error) {
-          const message = extractErrorMessage(error);
+          const errorDetails = formatCompilationError(rule, error as Error);
           this.logger.error(
             {
               ruleName: rule.name,
               condition: rule.condition,
-              error: message,
+              error: errorDetails.hint,
             },
             'Failed to compile CEL rule'
           );
 
-          return Failure(`Failed to compile CEL rule '${rule.name}': ${message}`, {
-            message: 'CEL expression compilation failed',
-            hint: `Check syntax in rule: ${rule.name}`,
-            resolution: 'Verify CEL expression syntax and try again',
-          });
+          return Failure(`Failed to compile CEL rule '${rule.name}'`, errorDetails);
         }
       }
 
@@ -153,6 +172,9 @@ export class CelPolicyEvaluator implements RegoEvaluator {
         {
           policyName: this.policySet.metadata.name,
           ruleCount: this.compiledRules.length,
+          cacheHits,
+          cacheMisses,
+          cacheStats: celCompilationCache.getStats(),
         },
         'CEL policy initialized successfully'
       );
@@ -250,12 +272,12 @@ export class CelPolicyEvaluator implements RegoEvaluator {
           );
         }
       } catch (error) {
-        const message = extractErrorMessage(error);
+        const errorDetails = formatEvaluationError(rule, error as Error);
         this.logger.error(
           {
             ruleName: rule.name,
             condition: rule.condition,
-            error: message,
+            error: errorDetails.hint,
           },
           'CEL rule evaluation failed'
         );
@@ -265,8 +287,8 @@ export class CelPolicyEvaluator implements RegoEvaluator {
           rule: `${rule.name}-evaluation-error`,
           category: 'system',
           severity: 'block',
-          message: `Policy evaluation failed: ${message}`,
-          description: `Rule '${rule.name}' encountered runtime error`,
+          message: errorDetails.message,
+          description: `${errorDetails.hint}\n\n${errorDetails.resolution}`,
         });
       }
     }
@@ -402,11 +424,12 @@ export async function loadCelPolicy(
 
     // Validate file exists
     if (!existsSync(policyPath)) {
-      return Failure(`Policy file not found: ${policyPath}`, {
-        message: 'CEL policy file does not exist',
-        hint: `Attempted to load: ${policyPath}`,
-        resolution: 'Ensure the policy file path is correct',
-      });
+      const errorDetails = formatPolicyFileError(
+        policyPath,
+        'read',
+        new Error('File not found')
+      );
+      return Failure(`Policy file not found: ${policyPath}`, errorDetails);
     }
 
     // Validate file extension
@@ -423,28 +446,30 @@ export async function loadCelPolicy(
     const parsed = yaml.load(content);
 
     if (!parsed || typeof parsed !== 'object') {
-      return Failure('Invalid YAML format', {
-        message: 'Failed to parse YAML content',
-        hint: `File: ${policyPath}`,
-        resolution: 'Ensure file contains valid YAML',
-      });
+      const errorDetails = formatPolicyFileError(
+        policyPath,
+        'parse',
+        new Error('Invalid or empty YAML structure')
+      );
+      return Failure('Invalid YAML format', errorDetails);
     }
 
     // Validate schema
     const validation = celPolicySetSchema.safeParse(parsed);
     if (!validation.success) {
       const errorMessage = formatValidationErrors(validation.error);
+      const errorDetails = formatPolicyFileError(
+        policyPath,
+        'validate',
+        new Error(errorMessage)
+      );
 
       logger.error(
         { policyPath, errors: errorMessage },
         'CEL policy validation failed'
       );
 
-      return Failure('Invalid CEL policy format', {
-        message: 'CEL policy validation failed',
-        hint: errorMessage,
-        resolution: 'Check policy structure against schema (see docs)',
-      });
+      return Failure('Invalid CEL policy format', errorDetails);
     }
 
     const policySet = validation.data;
@@ -475,10 +500,10 @@ export async function loadCelPolicy(
     const message = extractErrorMessage(error);
     logger.error({ policyPath, error: message }, 'Failed to load CEL policy');
 
-    return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(message), {
-      message: 'Failed to load CEL policy',
-      hint: `Error: ${message}`,
-      resolution: 'Check policy file syntax and structure',
-    });
+    // Determine error phase based on error type
+    const phase = message.toLowerCase().includes('yaml') ? 'parse' : 'read';
+    const errorDetails = formatPolicyFileError(policyPath, phase, error as Error);
+
+    return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(message), errorDetails);
   }
 }

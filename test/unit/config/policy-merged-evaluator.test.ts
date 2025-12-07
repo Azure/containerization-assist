@@ -2,7 +2,7 @@
  * Unit tests for Merged Policy Evaluator
  */
 
-import { MergedPolicyEvaluator, createMergedEvaluator } from '@/config/policy-merged-evaluator';
+import { MergedPolicyEvaluator, createMergedEvaluator, type PolicyMergeOptions } from '@/config/policy-merged-evaluator';
 import type { RegoEvaluator, RegoPolicyResult } from '@/config/policy-rego';
 import { createLogger } from '@/lib/logger';
 import { Success, Failure } from '@types';
@@ -154,7 +154,7 @@ describe('MergedPolicyEvaluator', () => {
       expect(result.violations[1].rule).toBe('low-priority');
     });
 
-    it('should deduplicate violations by rule name', async () => {
+    it('should deduplicate violations by rule name (smart mode by default)', async () => {
       const mockDuplicate1: RegoEvaluator = {
         policyPaths: ['dup1.rego'],
         evaluate: jest.fn(async () => ({
@@ -185,7 +185,7 @@ describe('MergedPolicyEvaluator', () => {
               rule: 'duplicate-rule',
               category: 'security',
               severity: 'block',
-              message: 'Second occurrence (should be filtered)',
+              message: 'Second occurrence',
               priority: 90,
             },
           ],
@@ -201,9 +201,11 @@ describe('MergedPolicyEvaluator', () => {
 
       const result = await merged.evaluate('test');
 
-      // Should only have one violation (first occurrence)
+      // Should have one merged violation (smart deduplication)
       expect(result.violations).toHaveLength(1);
-      expect(result.violations[0].message).toBe('Second occurrence (should be filtered)'); // Higher priority comes first
+      // Higher priority comes first, message indicates additional issue
+      expect(result.violations[0].message).toContain('Second occurrence');
+      expect(result.violations[0].message).toContain('additional issue');
     });
 
     it('should handle evaluator errors gracefully', async () => {
@@ -469,5 +471,375 @@ describe('createMergedEvaluator', () => {
 
     expect(merged).toBeInstanceOf(MergedPolicyEvaluator);
     expect(merged.policyPaths).toEqual([]);
+  });
+
+  it('should pass options to merged evaluator', () => {
+    const mockEvaluator: RegoEvaluator = {
+      policyPaths: ['test.rego'],
+      evaluate: jest.fn(),
+      evaluatePolicy: jest.fn(),
+      queryConfig: jest.fn(async () => null),
+      close: jest.fn(),
+    };
+
+    const merged = createMergedEvaluator([mockEvaluator], logger, { deduplication: 'strict' });
+
+    expect(merged).toBeInstanceOf(MergedPolicyEvaluator);
+  });
+});
+
+describe('Policy Deduplication', () => {
+  const logger = createLogger({ level: 'silent' });
+
+  // Helper function to create mock evaluators
+  const createMockEvaluator = (
+    name: string,
+    violations: Array<{
+      rule: string;
+      category: string;
+      severity: 'block' | 'warn' | 'suggest';
+      message: string;
+      description?: string;
+      priority?: number;
+    }>
+  ): RegoEvaluator => ({
+    policyPaths: [name],
+    evaluate: jest.fn(async () => ({
+      allow: violations.length === 0,
+      violations: violations.filter((v) => v.severity === 'block'),
+      warnings: violations.filter((v) => v.severity === 'warn'),
+      suggestions: violations.filter((v) => v.severity === 'suggest'),
+    })),
+    evaluatePolicy: jest.fn(async (result) => {
+      if (!result.ok) return result as any;
+      return Success({ blocking: [], warnings: [], suggestions: [] });
+    }),
+    queryConfig: jest.fn(async () => null),
+    close: jest.fn(),
+  });
+
+  describe('Smart Deduplication (Default)', () => {
+    it('should keep unique violations unchanged', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        { rule: 'rule-a', category: 'test', severity: 'block', message: 'Issue A' },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        { rule: 'rule-b', category: 'test', severity: 'block', message: 'Issue B' },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(2);
+      expect(result.violations.map((v) => v.rule)).toContain('rule-a');
+      expect(result.violations.map((v) => v.rule)).toContain('rule-b');
+    });
+
+    it('should deduplicate identical violations', async () => {
+      const violation = {
+        rule: 'same-rule',
+        category: 'test',
+        severity: 'block' as const,
+        message: 'Identical message',
+        description: 'Same description',
+      };
+
+      const evaluator1 = createMockEvaluator('policy1', [violation]);
+      const evaluator2 = createMockEvaluator('policy2', [violation]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      expect(result.violations[0].rule).toBe('same-rule');
+      expect(result.violations[0].message).toBe('Identical message');
+    });
+
+    it('should merge violations with different messages', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'First message',
+          description: 'First description',
+          priority: 80,
+        },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'Second message',
+          description: 'Second description',
+          priority: 60,
+        },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      expect(result.violations[0].rule).toBe('same-rule');
+      expect(result.violations[0].message).toContain('additional issue');
+      expect(result.violations[0].description).toContain('First description');
+      expect(result.violations[0].description).toContain('Second description');
+      expect(result.violations[0].priority).toBe(80); // Higher priority kept
+    });
+
+    it('should respect priority when merging', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        {
+          rule: 'same-rule',
+          category: 'low-priority',
+          severity: 'block',
+          message: 'Low priority message',
+          priority: 40,
+        },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        {
+          rule: 'same-rule',
+          category: 'high-priority',
+          severity: 'block',
+          message: 'High priority message',
+          priority: 90,
+        },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      // Category should come from higher priority violation
+      expect(result.violations[0].category).toBe('high-priority');
+      expect(result.violations[0].priority).toBe(90);
+    });
+
+    it('should handle violations with different descriptions but same message', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'Same message',
+          description: 'Description from Rego policy',
+        },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'Same message',
+          description: 'Description from CEL policy',
+        },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      // Should merge descriptions with separator
+      expect(result.violations[0].description).toContain('Description from Rego policy');
+      expect(result.violations[0].description).toContain('Description from CEL policy');
+      expect(result.violations[0].description).toContain('---');
+    });
+
+    it('should handle multiple additional issues in message', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        { rule: 'same-rule', category: 'test', severity: 'block', message: 'First' },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        { rule: 'same-rule', category: 'test', severity: 'block', message: 'Second' },
+      ]);
+      const evaluator3 = createMockEvaluator('policy3', [
+        { rule: 'same-rule', category: 'test', severity: 'block', message: 'Third' },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2, evaluator3], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      // Should say "issues" (plural) for multiple additional
+      expect(result.violations[0].message).toContain('2 additional issues');
+    });
+  });
+
+  describe('Strict Deduplication', () => {
+    it('should keep only first occurrence per rule name', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'First occurrence',
+          priority: 50,
+        },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'Second occurrence (should be filtered)',
+          priority: 100, // Even with higher priority, this should be filtered in strict mode
+        },
+      ]);
+
+      const merged = new MergedPolicyEvaluator(
+        [evaluator1, evaluator2],
+        logger,
+        [],
+        { deduplication: 'strict' }
+      );
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      // Due to priority sorting, higher priority comes first, then strict mode keeps it
+      expect(result.violations[0].message).toBe('Second occurrence (should be filtered)');
+    });
+
+    it('should not merge descriptions in strict mode', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'Message 1',
+          description: 'Description 1',
+        },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        {
+          rule: 'same-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'Message 2',
+          description: 'Description 2',
+        },
+      ]);
+
+      const merged = new MergedPolicyEvaluator(
+        [evaluator1, evaluator2],
+        logger,
+        [],
+        { deduplication: 'strict' }
+      );
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      // Description should NOT be merged
+      expect(result.violations[0].description).not.toContain('---');
+    });
+  });
+
+  describe('No Deduplication', () => {
+    it('should keep all violations including duplicates', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        { rule: 'same-rule', category: 'test', severity: 'block', message: 'Message 1' },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        { rule: 'same-rule', category: 'test', severity: 'block', message: 'Message 2' },
+      ]);
+
+      const merged = new MergedPolicyEvaluator(
+        [evaluator1, evaluator2],
+        logger,
+        [],
+        { deduplication: 'none' }
+      );
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(2);
+      expect(result.violations.map((v) => v.message)).toContain('Message 1');
+      expect(result.violations.map((v) => v.message)).toContain('Message 2');
+    });
+  });
+
+  describe('Warnings and Suggestions', () => {
+    it('should apply deduplication to warnings', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        { rule: 'warning-rule', category: 'test', severity: 'warn', message: 'Warning 1' },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        { rule: 'warning-rule', category: 'test', severity: 'warn', message: 'Warning 2' },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0].message).toContain('additional issue');
+    });
+
+    it('should apply deduplication to suggestions', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        { rule: 'suggest-rule', category: 'test', severity: 'suggest', message: 'Suggest 1' },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        { rule: 'suggest-rule', category: 'test', severity: 'suggest', message: 'Suggest 2' },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.suggestions).toHaveLength(1);
+      expect(result.suggestions[0].message).toContain('additional issue');
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty description arrays', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        { rule: 'same-rule', category: 'test', severity: 'block', message: 'Message 1' },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        { rule: 'same-rule', category: 'test', severity: 'block', message: 'Message 2' },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      // No description should be set
+      expect(result.violations[0].description).toBeUndefined();
+    });
+
+    it('should handle violations with default priority', async () => {
+      const evaluator1 = createMockEvaluator('policy1', [
+        { rule: 'same-rule', category: 'test1', severity: 'block', message: 'No priority 1' },
+      ]);
+      const evaluator2 = createMockEvaluator('policy2', [
+        { rule: 'same-rule', category: 'test2', severity: 'block', message: 'No priority 2' },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator1, evaluator2], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      // Should still merge even with default priorities
+      expect(result.violations[0].message).toContain('additional issue');
+    });
+
+    it('should handle single violation without modification', async () => {
+      const evaluator = createMockEvaluator('policy', [
+        {
+          rule: 'unique-rule',
+          category: 'test',
+          severity: 'block',
+          message: 'Unique message',
+          description: 'Unique description',
+        },
+      ]);
+
+      const merged = new MergedPolicyEvaluator([evaluator], logger, []);
+      const result = await merged.evaluate('test');
+
+      expect(result.violations).toHaveLength(1);
+      expect(result.violations[0].message).toBe('Unique message');
+      expect(result.violations[0].description).toBe('Unique description');
+    });
   });
 });

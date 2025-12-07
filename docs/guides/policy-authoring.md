@@ -975,6 +975,119 @@ knowledge_filtering contains filter if {
 
 ---
 
+## Policy Merging and Deduplication
+
+When multiple policies (Rego and CEL) are loaded, containerization-assist automatically merges their results. Understanding how deduplication works is important for policy authors.
+
+### How Policy Merging Works
+
+1. **Parallel Evaluation**: All policies are evaluated concurrently for performance
+2. **Priority Sorting**: Violations are sorted by priority (higher priority first)
+3. **Smart Deduplication**: Duplicate violations are intelligently handled
+
+### Deduplication Strategies
+
+The system supports three deduplication strategies:
+
+| Strategy | Behavior | Use Case |
+|----------|----------|----------|
+| **smart** (default) | Merges violations with same rule but different content | Best for combined Rego + CEL policies |
+| **strict** | Keeps only first violation per rule name | Simple deduplication, original behavior |
+| **none** | No deduplication, keep all violations | Debugging, audit trails |
+
+### Smart Deduplication (Default)
+
+When the same rule is reported by multiple policies with different messages:
+
+```yaml
+# Policy A (Rego) reports:
+rule: require-user
+message: "Must specify USER directive"
+description: "Security requirement for non-root execution"
+
+# Policy B (CEL) also reports:
+rule: require-user
+message: "USER directive missing (security risk)"
+description: "Running as root exposes the container to privilege escalation"
+```
+
+**Merged Result:**
+```yaml
+rule: require-user
+message: "Must specify USER directive (1 additional issue)"
+description: |
+  Security requirement for non-root execution
+
+  ---
+
+  Running as root exposes the container to privilege escalation
+```
+
+**Key behaviors:**
+- **Identical violations**: Dropped (no duplication)
+- **Different messages**: Primary message with "(N additional issues)" suffix
+- **Different descriptions**: Combined with `---` separator
+- **Priority handling**: Highest priority violation becomes the primary
+
+### Priority Handling
+
+When merging violations, the highest priority determines:
+- Which violation's attributes (category, severity) are used
+- The order of messages in the merged output
+
+```yaml
+# Low priority (40) from CEL policy
+rule: same-rule
+severity: warn
+priority: 40
+message: "Warning message"
+
+# High priority (90) from Rego policy
+rule: same-rule
+severity: block
+priority: 90
+message: "Critical message"
+```
+
+**Result**: Final violation uses `severity: block` and `priority: 90`
+
+### Best Practices for Multi-Policy Environments
+
+1. **Use Consistent Rule Names**
+   ```yaml
+   # ✅ Good - Same rule name for same concept
+   # policy-a.rego: rule = "require-non-root"
+   # policy-b.yaml: name: require-non-root
+
+   # ❌ Bad - Different names for same rule
+   # policy-a.rego: rule = "no-root-user"
+   # policy-b.yaml: name: require-non-root-user
+   ```
+
+2. **Set Appropriate Priorities**
+   ```yaml
+   # Security policies should have higher priority
+   - name: security-violation
+     priority: 90
+
+   # Best practices can have lower priority
+   - name: optimization-suggestion
+     priority: 50
+   ```
+
+3. **Provide Meaningful Descriptions**
+   - Different descriptions from Rego and CEL will be merged
+   - Users see all relevant guidance in one place
+
+4. **Test Combined Behavior**
+   ```bash
+   # Test how your CEL policy combines with built-in Rego policies
+   export CUSTOM_POLICY_PATH=policies.user/my-policy.yaml
+   npm run mcp:inspect
+   ```
+
+---
+
 ## Additional Resources
 
 - [OPA Documentation](https://www.openpolicyagent.org/docs/latest/)
