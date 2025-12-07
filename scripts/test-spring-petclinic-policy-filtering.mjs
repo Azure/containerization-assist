@@ -186,8 +186,8 @@ async function runTests() {
 
     const analyzeExpectedPhrases = [
       "**Modules Found:** 1",
-      "Build System: gradle (java 25)",
-      "Build System: maven (java 25)",
+      "Build System: gradle (java 17)",
+      "Build System: maven (java 17)",
       "Frameworks: spring-boot",
     ];
     const missingPhrases = [];

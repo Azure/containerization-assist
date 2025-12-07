@@ -59,6 +59,14 @@ export interface ExecutionMetadata {
  */
 export interface AppRuntime {
   /**
+   * Configuration values from createApp
+   */
+  config: {
+    chainHintsMode: ChainHintsMode;
+    outputFormat: OutputFormat;
+  };
+
+  /**
    * Execute a tool with type-safe parameters and results
    */
   execute<T extends ToolName>(
