@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.0.2]
+
+- Upgraded modelcontextprotocol/sdk to v1.24.1 to address high CVE [GHSA-w48q-cv73-mx4w](https://github.com/advisories/GHSA-w48q-cv73-mx4w)
+
 ## [1.0.1]
 
 - Enhanced output format options
