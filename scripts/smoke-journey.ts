@@ -51,23 +51,21 @@ async function runSmokeTest(): Promise<void> {
       name: 'Analyze Repository',
       tool: 'analyze-repo',
       params: {
-        path: TEST_DIR,
+        repositoryPath: TEST_DIR,
       },
     },
     {
       name: 'Generate Dockerfile',
       tool: 'generate-dockerfile',
       params: {
-        projectPath: TEST_DIR,
-        outputPath: join(OUTPUT_DIR, 'Dockerfile'),
+        repositoryPath: TEST_DIR,
       },
     },
     {
       name: 'Fix Dockerfile (optional)',
       tool: 'fix-dockerfile',
       params: {
-        dockerfilePath: join(OUTPUT_DIR, 'Dockerfile'),
-        outputPath: join(OUTPUT_DIR, 'Dockerfile.fixed'),
+        path: join(OUTPUT_DIR, 'Dockerfile'),
       },
       skipOnError: true,
     },
@@ -75,25 +73,25 @@ async function runSmokeTest(): Promise<void> {
       name: 'Generate Kubernetes Manifests',
       tool: 'generate-k8s-manifests',
       params: {
-        projectPath: TEST_DIR,
-        outputPath: join(OUTPUT_DIR, 'k8s.yaml'),
-        appName: 'smoke-test-app',
+        name: 'smoke-test-app',
+        modulePath: TEST_DIR,
+        manifestType: 'kubernetes',
       },
     },
     {
       name: 'Build Docker Image',
       tool: 'build-image',
       params: {
+        path: TEST_DIR,
         dockerfilePath: join(OUTPUT_DIR, 'Dockerfile'),
         imageName: 'smoke-test:latest',
-        context: TEST_DIR,
       },
     },
     {
       name: 'Scan Image',
       tool: 'scan-image',
       params: {
-        imageName: 'smoke-test:latest',
+        imageId: 'smoke-test:latest',
       },
       skipOnError: true,
     },
@@ -101,8 +99,8 @@ async function runSmokeTest(): Promise<void> {
       name: 'Tag Image',
       tool: 'tag-image',
       params: {
-        sourceImage: 'smoke-test:latest',
-        targetImage: 'smoke-test:v1.0.0',
+        imageId: 'smoke-test:latest',
+        tag: 'smoke-test:v1.0.0',
       },
     },
     {
@@ -110,7 +108,6 @@ async function runSmokeTest(): Promise<void> {
       tool: 'prepare-cluster',
       params: {
         namespace: 'smoke-test',
-        createIfMissing: true,
       },
       skipOnError: true,
     },

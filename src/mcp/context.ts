@@ -25,7 +25,15 @@ import { extractProgressReporter } from './context-helpers.js';
 // Canonical types - import from here for backward compatibility
 // New code should import directly from '@/core/context'
 
-export type { ToolContext, ProgressReporter, CoreContextOptions };
+export type { ToolContext, ProgressReporter };
+
+/**
+ * Re-exported as CoreContextOptions to distinguish from MCP-specific ContextOptions.
+ * The core version only accepts ProgressReporter functions, while the MCP version
+ * also accepts MCP request objects with progress tokens.
+ */
+export type { CoreContextOptions };
+
 export { createCoreContext as createCoreToolContext };
 
 // ===== MCP-SPECIFIC TYPES =====

@@ -154,7 +154,7 @@ describe('ToolContext', () => {
       });
 
       // Optional property is omitted when not extractable from request
-      expect(context.progress).toBeUndefined();
+      expect('progress' in context).toBe(false);
     });
   });
 

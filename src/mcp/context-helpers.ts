@@ -37,6 +37,13 @@ export type EnhancedProgressReporter = (
 // ===== TYPE GUARDS =====
 
 /**
+ * Type guard to check if value is a record object (non-null, non-array object)
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
  * Type guard to check if value is a ProgressReporter function.
  */
 function isProgressReporter(value: unknown): value is ProgressReporter {
@@ -48,14 +55,7 @@ function isProgressReporter(value: unknown): value is ProgressReporter {
  * Checks for the `params` property which contains `_meta.progressToken`.
  */
 function isMCPProgressRequest(value: unknown): value is MCPProgressRequest {
-  return typeof value === 'object' && value !== null && 'params' in value;
-}
-
-/**
- * Type guard to check if value is a record object
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return isRecord(value) && 'params' in value;
 }
 
 /**
