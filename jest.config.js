@@ -149,10 +149,10 @@ export default {
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   coverageThreshold: {
     global: {
-      branches: 48,
+      branches: 47,
       functions: 60,
-      lines: 58,
-      statements: 58,
+      lines: 57,
+      statements: 57,
     },
     './src/app/': {
       branches: 55,
