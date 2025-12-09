@@ -65,7 +65,8 @@ async function runSmokeTest(): Promise<void> {
       name: 'Fix Dockerfile (optional)',
       tool: 'fix-dockerfile',
       params: {
-        path: join(OUTPUT_DIR, 'Dockerfile'),
+        // Use the existing Dockerfile in the fixture
+        path: join(TEST_DIR, 'Dockerfile'),
       },
       skipOnError: true,
     },
@@ -83,7 +84,8 @@ async function runSmokeTest(): Promise<void> {
       tool: 'build-image',
       params: {
         path: TEST_DIR,
-        dockerfilePath: join(OUTPUT_DIR, 'Dockerfile'),
+        // Use the existing Dockerfile in the fixture (generate-dockerfile returns a plan, doesn't write files)
+        dockerfilePath: join(TEST_DIR, 'Dockerfile'),
         imageName: 'smoke-test:latest',
       },
     },
