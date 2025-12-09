@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copy application files
 COPY . .
@@ -25,4 +25,4 @@ USER appuser
 EXPOSE 3000
 
 # Start application
-CMD ["node", "index.js"]
+CMD ["node", "server.js"]
