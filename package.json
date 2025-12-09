@@ -76,7 +76,7 @@
     "build": "npm run clean && npm run build:policies && npm run build:esm && npm run build:cjs",
     "build:policies": "tsx scripts/build-policies.ts",
     "build:esm": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json --resolve-full-paths && chmod +x dist/src/cli/cli.js",
-    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json && echo '{\"type\": \"commonjs\"}' > dist-cjs/package.json",
     "build:watch": "tsc --project tsconfig.json --watch",
     "build:verify": "tsx scripts/verify-build.ts",
     "dev": "tsx watch src/cli/cli.ts",
@@ -125,7 +125,8 @@
     "validate-dockerfile": "^1.8.1",
     "xml2js": "^0.6.2",
     "yaml": "^2.8.1",
-    "zod": "^3.25.6"
+    "zod": "^3.25.6",
+    "zod-to-json-schema": "^3.25.0"
   },
   "devDependencies": {
     "@ai-sdk/azure": "^2.0.54",

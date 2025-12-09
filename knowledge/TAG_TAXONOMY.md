@@ -18,7 +18,6 @@ Used to filter knowledge by MCP tool context. These tags ensure that knowledge e
 - `fix-dockerfile` - Dockerfile validation and fixing recommendations
 - `scan-image` - Security scanning context and remediation
 - `verify-deploy` - Deployment verification checks
-- `deploy` - Deployment execution best practices
 - `generate-k8s-manifests` - Kubernetes manifest generation
 - `prepare-cluster` - Cluster preparation and prerequisites
 

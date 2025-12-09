@@ -7,7 +7,16 @@
  */
 
 import { jest } from '@jest/globals';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'node:crypto';
+
+/**
+ * Generate a simple random ID (replaces nanoid dependency for testing)
+ */
+function generateId(length = 21): string {
+  return randomBytes(Math.ceil(length / 2))
+    .toString('hex')
+    .slice(0, length);
+}
 
 /**
  * Simple Docker mock - no complex factory patterns
@@ -117,7 +126,7 @@ CMD ["npm", "start"]`,
 });
 
 export const mockBuildResult = () => ({
-  imageId: `sha256:${nanoid()}`,
+  imageId: `sha256:${generateId()}`,
   tag: 'test:latest',
   tags: ['test:latest', 'test:v1.0'],
   size: 245 * 1024 * 1024, // 245MB  
@@ -267,3 +276,58 @@ export const setupNetworkErrorMocks = () => {
     logger: mockLogger(),
   };
 };
+
+// ===== VS CODE MOCK FACTORIES =====
+
+/**
+ * Interface for cancellation token test trigger.
+ */
+export interface MockCancellationToken {
+  isCancellationRequested: boolean;
+  onCancellationRequested: (listener: () => void) => { dispose: () => void };
+  /** Test helper to trigger cancellation - not part of real CancellationToken */
+  _trigger: () => void;
+}
+
+/**
+ * Create a mock VS Code CancellationToken.
+ *
+ * @param options.cancelled - Whether the token should start in cancelled state
+ * @returns Mock token with _trigger helper for testing
+ *
+ * @example
+ * ```typescript
+ * const mockToken = createMockCancellationToken();
+ * const { signal, dispose } = createAbortSignalFromToken(mockToken);
+ *
+ * expect(signal.aborted).toBe(false);
+ * mockToken._trigger();
+ * expect(signal.aborted).toBe(true);
+ *
+ * dispose();
+ * ```
+ */
+export function createMockCancellationToken(
+  options: { cancelled?: boolean } = {}
+): MockCancellationToken {
+  let listener: (() => void) | null = null;
+
+  return {
+    isCancellationRequested: options.cancelled ?? false,
+    onCancellationRequested: (callback: () => void) => {
+      listener = callback;
+      return { dispose: () => { listener = null; } };
+    },
+    _trigger: () => { listener?.(); },
+  };
+}
+
+/**
+ * Create mock invocation options for a tool.
+ *
+ * @param input - The tool input parameters
+ * @returns Mock invocation options object
+ */
+export function createMockInvocationOptions<T>(input: T): { input: T } {
+  return { input };
+}

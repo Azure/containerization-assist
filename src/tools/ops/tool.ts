@@ -31,7 +31,18 @@ interface PingConfig {
   message?: string;
 }
 
+/**
+ * Result of a ping operation.
+ *
+ * Uses a discriminant field `kind` to enable type-safe narrowing
+ * when working with the OpsResult union type.
+ */
 export interface PingResult {
+  /**
+   * Discriminant field for type narrowing.
+   * Always 'ping' for PingResult.
+   */
+  readonly kind: 'ping';
   /**
    * Natural language summary for user display.
    * 1-3 sentences describing the ping result.
@@ -69,6 +80,7 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
     const summary = `✅ Server is responsive. Ping successful at ${formatTimestamp(timestamp)}.`;
 
     const result: PingResult = {
+      kind: 'ping' as const,
       summary,
       success: true,
       message: `pong: ${message}`,
@@ -102,7 +114,18 @@ interface ServerStatusConfig {
   details?: boolean;
 }
 
+/**
+ * Result of a server status operation.
+ *
+ * Uses a discriminant field `kind` to enable type-safe narrowing
+ * when working with the OpsResult union type.
+ */
 export interface ServerStatusResult {
+  /**
+   * Discriminant field for type narrowing.
+   * Always 'status' for ServerStatusResult.
+   */
+  readonly kind: 'status';
   /**
    * Natural language summary for user display.
    * 1-3 sentences describing the server status.
@@ -167,6 +190,7 @@ export async function serverStatus(
     const summary = `✅ Server healthy. Running for ${uptimeStr}. Memory: ${memPercentage}% used, CPU: ${cpus.length} cores.`;
 
     const status: ServerStatusResult = {
+      kind: 'status' as const,
       summary,
       success: true,
       version,

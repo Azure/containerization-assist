@@ -40,6 +40,13 @@ export {
 
 export type { MockConfigPreset } from './mcp-config.mock.js';
 
+// VS Code mock factories
+export {
+  createMockCancellationToken,
+  createMockInvocationOptions,
+  type MockCancellationToken,
+} from './mock-factories.js';
+
 /**
  * Create real MCP infrastructure with production implementations
  */

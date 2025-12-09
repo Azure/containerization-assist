@@ -25,80 +25,83 @@
 import type { z } from 'zod';
 import type { Result } from '@/types/core';
 import type { Tool } from '@/types/tool';
-import type { SDKOptions } from './types.js';
+import type {
+  SDKOptions,
+  // Types needed for ToolRegistry interface
+  RepositoryAnalysis,
+  DockerfilePlan,
+  DockerfileFixPlan,
+  BuildImageResult,
+  ScanImageResult,
+  TagImageResult,
+  PushImageResult,
+  ManifestPlan,
+  PrepareClusterResult,
+  VerifyDeploymentResult,
+  OpsResult,
+} from './types.js';
 import { executeTool } from './executor.js';
 
 // ===== TOOL AND SCHEMA IMPORTS =====
-// Consolidated imports - tools, schemas, and types from each module
+// Consolidated imports - tools and schemas from each module
 
 // analyze-repo
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
-import {
-  analyzeRepoSchema,
-  type RepositoryAnalysis,
-  type ModuleInfo,
-} from '@/tools/analyze-repo/schema';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 
 // generate-dockerfile
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
-import {
-  generateDockerfileSchema,
-  type DockerfilePlan,
-} from '@/tools/generate-dockerfile/schema';
+import { generateDockerfileSchema } from '@/tools/generate-dockerfile/schema';
 
 // fix-dockerfile
 import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
-import {
-  fixDockerfileSchema,
-  type DockerfileFixPlan,
-} from '@/tools/fix-dockerfile/schema';
+import { fixDockerfileSchema } from '@/tools/fix-dockerfile/schema';
 
 // build-image
-import buildImageTool, { type BuildImageResult } from '@/tools/build-image/tool';
+import buildImageTool from '@/tools/build-image/tool';
 import { buildImageSchema } from '@/tools/build-image/schema';
 
 // scan-image
-import scanImageTool, { type ScanImageResult } from '@/tools/scan-image/tool';
+import scanImageTool from '@/tools/scan-image/tool';
 import { scanImageSchema } from '@/tools/scan-image/schema';
 
 // tag-image
-import tagImageTool, { type TagImageResult } from '@/tools/tag-image/tool';
+import tagImageTool from '@/tools/tag-image/tool';
 import { tagImageSchema } from '@/tools/tag-image/schema';
 
 // push-image
-import pushImageTool, { type PushImageResult } from '@/tools/push-image/tool';
+import pushImageTool from '@/tools/push-image/tool';
 import { pushImageSchema } from '@/tools/push-image/schema';
 
 // generate-k8s-manifests
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
-import {
-  generateK8sManifestsSchema,
-  type ManifestPlan,
-} from '@/tools/generate-k8s-manifests/schema';
+import { generateK8sManifestsSchema } from '@/tools/generate-k8s-manifests/schema';
 
 // prepare-cluster
-import prepareClusterTool, { type PrepareClusterResult } from '@/tools/prepare-cluster/tool';
+import prepareClusterTool from '@/tools/prepare-cluster/tool';
 import { prepareClusterSchema } from '@/tools/prepare-cluster/schema';
 
 // verify-deploy
-import verifyDeployTool, { type VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
+import verifyDeployTool from '@/tools/verify-deploy/tool';
 import { verifyDeploySchema } from '@/tools/verify-deploy/schema';
 
 // ops
-import opsTool, { type OpsResult } from '@/tools/ops/tool';
+import opsTool from '@/tools/ops/tool';
 import { opsToolSchema } from '@/tools/ops/schema';
 
 // ===== TYPE RE-EXPORTS =====
+// All types are consolidated in ./types.ts - re-export from there for convenience
 
-// Result types
+// Core result types and value constructors
 export type { Result, ErrorGuidance } from '@/types/core';
 export { Success, Failure } from '@/types/core';
 
-// SDK options
-export type { SDKOptions } from './types.js';
-
-// Re-export result types for SDK consumers
+// SDK-specific types and tool result types
+// Re-exported from types.ts to provide single import location
 export type {
+  // SDK options
+  SDKOptions,
+  // Tool result types
   RepositoryAnalysis,
   ModuleInfo,
   DockerfilePlan,
@@ -111,7 +114,7 @@ export type {
   PrepareClusterResult,
   VerifyDeploymentResult,
   OpsResult,
-};
+} from './types.js';
 
 // ===== INPUT TYPES (derived from Zod schemas) =====
 
@@ -231,6 +234,30 @@ export const verifyDeploy = createSDKFunction(verifyDeployTool);
  */
 export const ops = createSDKFunction(opsTool);
 
+// ===== TOOL REGISTRY TYPE =====
+
+/**
+ * Type-safe tool registry mapping tool names to their Tool instances.
+ *
+ * This interface ensures:
+ * - All expected tools are present
+ * - Each tool has the correct schema and output type
+ * - TypeScript catches typos in tool names
+ */
+interface ToolRegistry {
+  analyzeRepo: Tool<typeof analyzeRepoSchema, RepositoryAnalysis>;
+  generateDockerfile: Tool<typeof generateDockerfileSchema, DockerfilePlan>;
+  fixDockerfile: Tool<typeof fixDockerfileSchema, DockerfileFixPlan>;
+  buildImage: Tool<typeof buildImageSchema, BuildImageResult>;
+  scanImage: Tool<typeof scanImageSchema, ScanImageResult>;
+  tagImage: Tool<typeof tagImageSchema, TagImageResult>;
+  pushImage: Tool<typeof pushImageSchema, PushImageResult>;
+  generateK8sManifests: Tool<typeof generateK8sManifestsSchema, ManifestPlan>;
+  prepareCluster: Tool<typeof prepareClusterSchema, PrepareClusterResult>;
+  verifyDeploy: Tool<typeof verifyDeploySchema, VerifyDeploymentResult>;
+  ops: Tool<typeof opsToolSchema, OpsResult>;
+}
+
 // ===== ADVANCED: DIRECT TOOL ACCESS =====
 
 /**
@@ -240,6 +267,11 @@ export const ops = createSDKFunction(opsTool);
  * - Access to tool schemas for validation
  * - Tool metadata and descriptions
  * - Custom execution patterns
+ *
+ * Uses `satisfies` to ensure type safety:
+ * - TypeScript will error if a tool is missing
+ * - TypeScript will error if a tool has the wrong type
+ * - TypeScript will error if a key is misspelled
  *
  * @example
  * ```typescript
@@ -284,8 +316,17 @@ export const tools = {
   // ===== Operations =====
   /** Operational utilities (ping, status checks) */
   ops: opsTool,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-} as const satisfies Record<string, Tool<any, any>>;
+} as const satisfies ToolRegistry;
+
+/**
+ * Type for the tools object keys - useful for generic functions.
+ */
+export type SDKToolName = keyof ToolRegistry;
+
+/**
+ * Export the registry type for consumers who need to extend or type-check tools.
+ */
+export type { ToolRegistry };
 
 /**
  * Execute any tool directly with full control.
@@ -307,3 +348,85 @@ export const tools = {
  * ```
  */
 export { executeTool } from './executor.js';
+
+// ===== JSON SCHEMA EXPORTS (for VS Code extension) =====
+
+export {
+  jsonSchemas,
+  type ToolSchemaName,
+  // Individual schemas for selective imports
+  analyzeRepoJsonSchema,
+  generateDockerfileJsonSchema,
+  fixDockerfileJsonSchema,
+  buildImageJsonSchema,
+  scanImageJsonSchema,
+  tagImageJsonSchema,
+  pushImageJsonSchema,
+  generateK8sManifestsJsonSchema,
+  prepareClusterJsonSchema,
+  verifyDeployJsonSchema,
+  opsJsonSchema,
+} from './schemas.js';
+
+// ===== TOOL METADATA EXPORTS (for VS Code extension) =====
+
+export {
+  toolMetadata,
+  type ToolMetadata,
+  type ToolMetadataName,
+  type ConfirmationConfig,
+  standardWorkflow,
+  getToolsByCategory,
+  // External dependency types and helpers
+  ExternalDeps,
+  type ExternalDepId,
+  type ExternalDependency,
+  getRequiredDepsString,
+  requiresDependency,
+  // Individual metadata for selective imports
+  analyzeRepoMetadata,
+  generateDockerfileMetadata,
+  fixDockerfileMetadata,
+  buildImageMetadata,
+  scanImageMetadata,
+  tagImageMetadata,
+  pushImageMetadata,
+  generateK8sManifestsMetadata,
+  prepareClusterMetadata,
+  verifyDeployMetadata,
+  opsMetadata,
+} from './metadata.js';
+
+// ===== RESULT FORMATTERS (for VS Code extension) =====
+
+export {
+  resultFormatters,
+  type FormatterOptions,
+  type FormatterName,
+  type FormatterRegistry,
+  // Individual formatters for selective imports
+  formatAnalyzeRepoResult,
+  formatGenerateDockerfileResult,
+  formatFixDockerfileResult,
+  formatBuildImageResult,
+  formatScanImageResult,
+  formatTagImageResult,
+  formatPushImageResult,
+  formatGenerateK8sManifestsResult,
+  formatPrepareClusterResult,
+  formatVerifyDeployResult,
+  formatOpsResult,
+} from './formatters.js';
+
+// ===== VS CODE UTILITIES =====
+
+export {
+  createAbortSignalFromToken,
+  formatErrorForLLM,
+  resolveWorkspacePath,
+  validateRequiredFields,
+  sanitizeForMarkdown,
+  type CancellationTokenLike,
+  type AbortSignalResult,
+  type ValidationResult,
+} from './vscode-utils.js';
