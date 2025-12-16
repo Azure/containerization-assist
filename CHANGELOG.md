@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.1.0-dev.1]
+
+- VSCode integration
+- Separate mcp sdk from base tools
+
 ## [1.0.2]
 
 - Upgraded modelcontextprotocol/sdk to v1.24.1 to address high CVE [GHSA-w48q-cv73-mx4w](https://github.com/advisories/GHSA-w48q-cv73-mx4w)
