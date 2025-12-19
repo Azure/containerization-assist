@@ -1,6 +1,6 @@
 {
   "name": "containerization-assist-mcp",
-  "version": "1.1.0-dev.1",
+  "version": "1.1.0-dev.2",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
