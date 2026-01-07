@@ -110,7 +110,7 @@
     "@iarna/toml": "^2.2.5",
     "@kubernetes-models/apimachinery": "^2.2.0",
     "@kubernetes/client-node": "^1.4.0",
-    "@modelcontextprotocol/sdk": "~1.24.1",
+    "@modelcontextprotocol/sdk": "~1.25.2",
     "@open-policy-agent/opa-wasm": "^1.10.0",
     "@types/xml2js": "^0.4.14",
     "commander": "^14.0.1",
