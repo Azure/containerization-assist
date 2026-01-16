@@ -1,5 +1,11 @@
 # Change Log
 
+## [1.1.0-dev.2]
+
+- remove "additionalProperties" field from generated vscode package.json
+- fix scan-image tool schema to use 'grype'/'snyk' values
+- bump @modelcontextprotocol/sdk from 1.24.1 to 1.25.2 
+
 ## [1.1.0-dev.1]
 
 - VSCode integration
