@@ -188,4 +188,23 @@ describe('JSON Schema generation', () => {
       expect(Object.keys(jsonSchemas).sort()).toEqual(expectedSchemas.sort());
     });
   });
+
+  describe('additionalProperties stripping', () => {
+    it.each(Object.entries(jsonSchemas))(
+      '%s schema does not have additionalProperties at root level',
+      (name, schema) => {
+        // Root-level schemas should not have additionalProperties field
+        // This is required for VS Code package.json compatibility
+        expect(schema).not.toHaveProperty('additionalProperties');
+      },
+    );
+
+    it('buildImage.buildArgs preserves additionalProperties for dynamic keys', () => {
+      // z.record() schemas should preserve additionalProperties
+      const buildArgsSchema = jsonSchemas.buildImage.properties?.buildArgs;
+      expect(buildArgsSchema).toBeDefined();
+      expect(buildArgsSchema).toHaveProperty('additionalProperties');
+      expect(buildArgsSchema.additionalProperties).toEqual({ type: 'string' });
+    });
+  });
 });
