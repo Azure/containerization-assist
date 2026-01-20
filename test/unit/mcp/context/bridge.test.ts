@@ -51,11 +51,16 @@ describe('ToolContext', () => {
       expect(context.signal).toBe(abortController.signal);
     });
 
-    test('includes progress reporter if provided', () => {
-      const mockProgressReporter = jest.fn();
-      const context = createToolContext(mockLogger, { progress: mockProgressReporter });
+    test('includes progress reporter when string token provided', () => {
+      const context = createToolContext(mockLogger, { progress: 'test-token' });
 
-      expect(context.progress).toBe(mockProgressReporter);
+      expect(context.progress).toBeInstanceOf(Function);
+    });
+
+    test('includes progress reporter when number token provided', () => {
+      const context = createToolContext(mockLogger, { progress: 12345 });
+
+      expect(context.progress).toBeInstanceOf(Function);
     });
   });
 
@@ -129,17 +134,9 @@ describe('ToolContext', () => {
   });
 
   describe('createToolContextWithProgress', () => {
-    test('creates context with progress token extraction', () => {
-      const request = {
-        params: {
-          _meta: {
-            progressToken: 'test-token-123',
-          },
-        },
-      };
-
+    test('creates context with progress token', () => {
       const context = createToolContext(mockLogger, {
-        progress: request,
+        progress: 'test-token-123',
       });
 
       expect(context).toHaveProperty('progress');
@@ -147,10 +144,8 @@ describe('ToolContext', () => {
     });
 
     test('creates context without progress when no token', () => {
-      const request = { params: {} };
-
       const context = createToolContext(mockLogger, {
-        progress: request,
+        progress: undefined,
       });
 
       // Optional property is omitted when not extractable from request

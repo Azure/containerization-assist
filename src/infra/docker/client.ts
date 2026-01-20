@@ -12,6 +12,7 @@ import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
 import { autoDetectDockerSocket } from './socket-validation';
 import { getDockerBuildFiles } from '@/lib/dockerignore-parser';
+import { createProgressTracker, type ProgressCallback } from './progress';
 
 /**
  * Docker client configuration options.
@@ -26,6 +27,11 @@ export interface DockerClientConfig {
   /** Connection timeout in milliseconds */
   timeout?: number;
 }
+
+/**
+ * Callback for Docker build progress events
+ */
+export type DockerBuildProgressCallback = ProgressCallback;
 
 /**
  * Options for building a Docker image.
@@ -45,6 +51,8 @@ export interface DockerBuildOptions {
   buildArgs?: Record<string, string>;
   /** Target platform for multi-platform builds (e.g., 'linux/amd64') */
   platform?: string;
+  /** Optional callback for build progress events */
+  onProgress?: DockerBuildProgressCallback;
 }
 
 /**
@@ -276,6 +284,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         interface DockerBuildEvent {
           stream?: string;
           aux?: { ID?: string };
+          id?: string;
           error?: string;
           errorDetail?: Record<string, unknown>;
         }
@@ -285,6 +294,13 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         }
 
         let buildError: string | null = null;
+
+        // Create progress tracker for BuildKit trace decoding and progress notifications
+        const trackerOptions: { onProgress?: ProgressCallback; logger: Logger } = { logger };
+        if (options.onProgress) {
+          trackerOptions.onProgress = options.onProgress;
+        }
+        const progressTracker = createProgressTracker(trackerOptions);
 
         const result = await new Promise<DockerBuildResponse[]>((resolve, reject) => {
           docker.modem.followProgress(
@@ -321,7 +337,17 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
                 const logLine = event.stream.trimEnd();
                 if (logLine) {
                   buildLogs.push(logLine);
-                  logger.info(logLine);
+                  // Send progress notification with the log line
+                  progressTracker.processStreamLog(logLine);
+                }
+              }
+
+              // For BuildKit progress events, decode and send build status updates
+              if (event.id === 'moby.buildkit.trace') {
+                const buildKitMessage = progressTracker.processBuildKitTrace(event.aux);
+                // Also capture BuildKit messages in build logs
+                if (buildKitMessage) {
+                  buildLogs.push(buildKitMessage);
                 }
               }
 

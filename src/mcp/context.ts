@@ -39,27 +39,11 @@ export { createCoreContext as createCoreToolContext };
 // ===== MCP-SPECIFIC TYPES =====
 
 /**
- * MCP request object that may contain a progress token.
- * This matches the shape of MCP protocol request structure.
- *
- * The progress token is located at `params._meta.progressToken` per MCP spec.
- * @see https://modelcontextprotocol.io/specification#progress
- */
-export interface MCPProgressRequest {
-  params?: {
-    _meta?: {
-      progressToken?: string | number;
-    };
-  };
-}
-
-/**
  * Progress input can be:
- * - A direct ProgressReporter function
- * - An MCP request object with optional progress token
+ * - A simple progress token (string or number) from MCP protocol
  * - null or undefined for no progress reporting
  */
-export type ProgressInput = ProgressReporter | MCPProgressRequest | null | undefined;
+export type ProgressInput = string | number | null | undefined;
 
 /**
  * MCP context options with notification support.
@@ -75,10 +59,8 @@ export interface ContextOptions {
   signal?: AbortSignal;
 
   /**
-   * Progress can be:
-   * - A ProgressReporter function directly
-   * - An MCP request object with progress token (will be extracted)
-   * - undefined for no progress reporting
+   * Progress token from MCP protocol.
+   * When provided along with sendNotification, enables progress notifications.
    */
   progress?: ProgressInput;
 

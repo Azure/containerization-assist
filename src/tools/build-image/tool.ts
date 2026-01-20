@@ -54,7 +54,6 @@ export interface BuildImageResult {
   securityWarnings?: string[];
 }
 
-
 /**
  * Prepare build arguments by merging user-provided args with default build metadata
  */
@@ -227,10 +226,7 @@ async function handleBuildImage(
     }
 
     // Log the final tags that will be applied
-    logger.info(
-      { finalTags, originalTags: tags, imageName },
-      'Determined final tags for build',
-    );
+    logger.info({ finalTags, originalTags: tags, imageName }, 'Determined final tags for build');
 
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
@@ -241,8 +237,14 @@ async function handleBuildImage(
       ...(finalTags.length > 0 && finalTags[0] && { t: finalTags[0] }),
     };
 
-    // Build the image
-    logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
+    if (context.progress) {
+      buildOptions.onProgress = (message: string) => {
+        context.progress?.(message).catch((err) => {
+          logger.warn({ error: err, message }, 'Failed to send progress notification');
+        });
+      };
+    }
+
     const buildResult = await dockerClient.buildImage(buildOptions);
 
     if (!buildResult.ok) {

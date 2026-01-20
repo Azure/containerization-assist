@@ -5,8 +5,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { ProgressReporter } from '@/core/context';
-import type { MCPProgressRequest, ProgressInput } from './context.js';
+import type { ProgressInput } from './context.js';
 
 /**
  * Progress notification data structure
@@ -41,21 +40,6 @@ export type EnhancedProgressReporter = (
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * Type guard to check if value is a ProgressReporter function.
- */
-function isProgressReporter(value: unknown): value is ProgressReporter {
-  return typeof value === 'function';
-}
-
-/**
- * Type guard to check if value is an MCP progress request object.
- * Checks for the `params` property which contains `_meta.progressToken`.
- */
-function isMCPProgressRequest(value: unknown): value is MCPProgressRequest {
-  return isRecord(value) && 'params' in value;
 }
 
 /**
@@ -183,14 +167,12 @@ async function sendProgressNotification(
 }
 
 /**
- * Extract progress reporter from various input types.
+ * Extract progress reporter from progress token.
  *
- * Uses type guards for type-safe handling of different progress input types:
- * - Direct ProgressReporter functions are returned as-is
- * - MCP request objects have their progress token extracted
- * - undefined returns undefined
+ * Takes a simple progress token (string/number) and creates a progress reporter
+ * that sends MCP notifications.
  *
- * @param progress - Progress input (function, MCP request, or undefined)
+ * @param progress - Progress token from MCP protocol
  * @param logger - Logger for creating progress reporter
  * @param sendNotification - MCP notification callback for progress updates
  * @returns ProgressReporter function or undefined
@@ -202,17 +184,9 @@ export function extractProgressReporter(
 ): EnhancedProgressReporter | undefined {
   if (!progress) return undefined;
 
-  // Direct ProgressReporter function
-  if (isProgressReporter(progress)) {
-    return progress as EnhancedProgressReporter;
-  }
-
-  // MCP request object with progress token in params._meta
-  if (isMCPProgressRequest(progress)) {
-    const token = progress.params?._meta?.progressToken;
-    if (token !== undefined) {
-      return createProgressReporter(token, logger, sendNotification);
-    }
+  // Simple progress token (string or number) - wrap it in a reporter
+  if (typeof progress === 'string' || typeof progress === 'number') {
+    return createProgressReporter(progress, logger, sendNotification);
   }
 
   return undefined;
