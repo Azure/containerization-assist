@@ -89,17 +89,18 @@ violations contains result if {
 }
 
 # Rule: recommend-alpine (priority: 60)
-# Recommend Alpine variants for smaller images
+# Recommend Alpine variants for smaller images (MCR mirror paths only)
 warnings contains result if {
 	is_dockerfile
-	regex.match(`(?im)FROM\s+(node|python|ruby):(?!.*alpine)`, input.content)
+	regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(node|python|ruby):`, input.content)
+	not regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(node|python|ruby):(alpine[^\s]*|[^\s]*-alpine[^\s]*)`, input.content)
 
 	result := {
 		"rule": "recommend-alpine",
 		"category": "performance",
 		"priority": 60,
 		"severity": "warn",
-		"message": "Consider using Alpine variant for smaller image size (e.g., node:20-alpine).",
+		"message": "Consider using Alpine variant for smaller image size (e.g., mcr.microsoft.com/mirror/docker/library/node:20-alpine).",
 		"description": "Recommend Alpine variants for smaller images",
 	}
 }
@@ -153,17 +154,18 @@ violations contains result if {
 }
 
 # Rule: block-oversized-base (priority: 65)
-# Warn about large base images
+# Warn about large base images (MCR mirror paths only)
 warnings contains result if {
 	is_dockerfile
-	regex.match(`(?im)FROM\s+(ubuntu|centos|fedora):(?!.*minimal)`, input.content)
+	regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(ubuntu|centos|fedora):`, input.content)
+	not regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(ubuntu|centos|fedora):[^\s]*-minimal[^\s]*`, input.content)
 
 	result := {
 		"rule": "block-oversized-base",
 		"category": "performance",
 		"priority": 65,
 		"severity": "warn",
-		"message": "Large base images detected. Consider Alpine, slim, or distroless variants.",
+		"message": "Large base images detected. Consider Alpine, slim, or distroless variants from MCR.",
 		"description": "Warn about large base images",
 	}
 }

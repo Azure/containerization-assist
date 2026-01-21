@@ -44,6 +44,7 @@ policies.user/**/*_test.rego
 coverage/
 .nyc_output/
 WEEK5_PERFORMANCE_*.json
+policy-test-results.json
 
 # Test-generated fixture files
 test/__support__/fixtures/*/Dockerfile
