@@ -279,5 +279,56 @@ describe('BuildKit decoder', () => {
       expect(result?.steps).toHaveLength(1);
       expect(result?.steps[0]).toBe('[1/3] FROM node:18');
     });
+
+    it('should handle warnings with non-Buffer short field', () => {
+      const root = createProtobufRoot();
+      const StatusResponseType = root.lookupType('moby.buildkit.v1.StatusResponse');
+
+      const message = StatusResponseType.create({
+        warnings: [
+          {
+            vertex: 'sha256:warn1',
+            level: 1,
+            short: Buffer.from('Warning as string'),
+          },
+        ],
+      });
+
+      const encoded = StatusResponseType.encode(message).finish();
+      const base64 = Buffer.from(encoded).toString('base64');
+
+      const result = decodeBuildKitTrace(base64, mockLogger);
+
+      expect(result).not.toBeNull();
+      expect(result?.warnings).toHaveLength(1);
+      expect(typeof result?.warnings[0]).toBe('string');
+      expect(result?.warnings[0]).toContain('Warning');
+    });
+
+    it('should handle logs with various msg encodings', () => {
+      const root = createProtobufRoot();
+      const StatusResponseType = root.lookupType('moby.buildkit.v1.StatusResponse');
+
+      const message = StatusResponseType.create({
+        logs: [
+          {
+            vertex: 'sha256:log1',
+            timestamp: { seconds: 1000, nanos: 0 },
+            stream: 1,
+            msg: Buffer.from('String log message'),
+          },
+        ],
+      });
+
+      const encoded = StatusResponseType.encode(message).finish();
+      const base64 = Buffer.from(encoded).toString('base64');
+
+      const result = decodeBuildKitTrace(base64, mockLogger);
+
+      expect(result).not.toBeNull();
+      expect(result?.logs).toHaveLength(1);
+      expect(typeof result?.logs[0]).toBe('string');
+      expect(result?.logs[0]).toContain('String log');
+    });
   });
 });
