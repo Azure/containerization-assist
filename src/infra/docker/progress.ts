@@ -25,7 +25,7 @@ export interface ProgressTrackerOptions {
 export class ProgressTracker {
   private readonly onProgress: ProgressCallback | undefined;
   private readonly logger: Logger;
-  private readonly collectedLogs: string[] = [];
+  private readonly seenMessages: Set<string> = new Set();
 
   constructor(options: ProgressTrackerOptions) {
     this.onProgress = options.onProgress;
@@ -46,8 +46,8 @@ export class ProgressTracker {
       const status = decodeBuildKitTrace(auxData, this.logger);
       if (status) {
         const message = formatBuildKitStatus(status);
-        if (message && !this.collectedLogs.includes(message)) {
-          this.collectedLogs.push(message);
+        if (message && !this.seenMessages.has(message)) {
+          this.seenMessages.add(message);
           if (this.onProgress) {
             this.onProgress(message);
           }

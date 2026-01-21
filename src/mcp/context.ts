@@ -30,7 +30,7 @@ export type { ToolContext, ProgressReporter };
 /**
  * Re-exported as CoreContextOptions to distinguish from MCP-specific ContextOptions.
  * The core version only accepts ProgressReporter functions, while the MCP version
- * also accepts MCP request objects with progress tokens.
+ * also accepts simple progress tokens (string or number).
  */
 export type { CoreContextOptions };
 
@@ -52,7 +52,7 @@ export type ProgressInput = string | number | null | undefined;
  * progress notifications via the MCP protocol.
  *
  * Note: This does not extend CoreContextOptions because the progress
- * property has a different type (accepts MCP request objects).
+ * property has a different type (accepts simple tokens: string or number).
  */
 export interface ContextOptions {
   /** Optional abort signal for cancellation */
@@ -104,7 +104,7 @@ export function createToolContext(logger: Logger, options: ContextOptions = {}):
   const { sendNotification, progress, signal, policy } = options;
 
   // Extract progress reporter using MCP-aware helper
-  // This handles both direct ProgressReporter functions and MCP request objects with progress tokens
+  // This handles simple progress tokens (string or number) and converts them to ProgressReporter functions
   const progressReporter = extractProgressReporter(progress, logger, sendNotification);
 
   // Build options object explicitly (clearer than conditional spread)

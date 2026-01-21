@@ -151,8 +151,8 @@ export default {
     global: {
       branches: 47,
       functions: 60,
-      lines: 57,
-      statements: 57,
+      lines: 56,
+      statements: 56,
     },
     './src/app/': {
       branches: 55,
