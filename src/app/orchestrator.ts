@@ -218,7 +218,15 @@ function createContextForTool(
   if (metadata?.signal) contextOptions.signal = metadata.signal;
 
   if (metadata?.progress !== undefined) {
-    contextOptions.progress = metadata.progress;
+    const progress = metadata.progress;
+    if (
+      typeof progress === 'string' ||
+      typeof progress === 'number' ||
+      progress === null ||
+      progress === undefined
+    ) {
+      contextOptions.progress = progress;
+    }
   }
 
   if (metadata?.sendNotification) contextOptions.sendNotification = metadata.sendNotification;
