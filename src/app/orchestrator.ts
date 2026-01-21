@@ -218,15 +218,7 @@ function createContextForTool(
   if (metadata?.signal) contextOptions.signal = metadata.signal;
 
   if (metadata?.progress !== undefined) {
-    const progress = metadata.progress;
-    if (progress === null || typeof progress === 'string' || typeof progress === 'number') {
-      contextOptions.progress = progress;
-    } else {
-      logger.warn(
-        { progressType: typeof progress },
-        'Invalid progress metadata type, expected string or number',
-      );
-    }
+    contextOptions.progress = metadata.progress;
   }
 
   if (metadata?.sendNotification) contextOptions.sendNotification = metadata.sendNotification;

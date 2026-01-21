@@ -33,8 +33,12 @@ export class ProgressTracker {
   }
 
   /**
-   * Process a BuildKit trace event and extract readable status
-   * @returns The extracted status message if any
+   * Process a BuildKit trace event and extract a readable status message.
+   *
+   * @returns The extracted status message when a new, non-duplicate message is
+   *          produced; otherwise an empty string (for example, when no message
+   *          can be extracted, when the message is a duplicate, or when an
+   *          error occurs during processing).
    */
   processBuildKitTrace(auxData: unknown): string {
     try {
