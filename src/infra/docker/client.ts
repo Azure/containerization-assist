@@ -331,17 +331,6 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
               }
             },
             (event: DockerBuildEvent) => {
-              logger.debug(event, 'Docker build progress');
-
-              if (event.stream) {
-                const logLine = event.stream.trimEnd();
-                if (logLine) {
-                  buildLogs.push(logLine);
-                  // Send progress notification with the log line
-                  progressTracker.processStreamLog(logLine);
-                }
-              }
-
               // For BuildKit progress events, decode and send build status updates
               if (event.id === 'moby.buildkit.trace') {
                 const buildKitMessage = progressTracker.processBuildKitTrace(event.aux);

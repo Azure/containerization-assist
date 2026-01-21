@@ -13,6 +13,7 @@ import {
   ErrorCode,
   type ServerRequest,
   type ServerNotification,
+  type RequestId,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
@@ -63,22 +64,6 @@ const ERROR_FORMAT = {
   RESOLUTION_PREFIX: '🔧',
   DEFAULT_RESOLUTION: 'Check logs for more information',
 } as const;
-
-/**
- * Type definitions for metadata extraction
- */
-interface MetaParams {
-  requestId?: string;
-  invocationId?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Type guard to check if a value is valid metadata params
- */
-function isMetaParams(value: unknown): value is MetaParams {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 /**
  * Server options
@@ -350,25 +335,21 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
 }
 
 /**
- * Creates logger context from tool name, transport, and metadata
+ * Creates logger context from tool name, transport, and MCP request metadata
  * @param toolName - Name of the tool being executed
  * @param transport - Transport type (e.g., 'stdio')
- * @param meta - Optional metadata parameters
+ * @param requestId - JSON-RPC request ID from MCP SDK
  * @returns Logger context object
  */
 function createLoggerContext(
   toolName: string,
   transport: string,
-  meta?: MetaParams,
+  requestId?: RequestId,
 ): Record<string, unknown> {
   return {
     transport,
     tool: toolName,
-    ...(meta?.requestId && typeof meta.requestId === 'string' && { requestId: meta.requestId }),
-    ...(meta?.invocationId &&
-      typeof meta.invocationId === 'string' && {
-        invocationId: meta.invocationId,
-      }),
+    ...(requestId !== undefined && { requestId: String(requestId) }),
   };
 }
 
@@ -387,24 +368,20 @@ function createNotificationAdapter(
 }
 
 /**
- * Creates execution metadata from parameters and request context
+ * Creates execution metadata from MCP request context
  * @param toolName - Name of the tool being executed
- * @param params - Tool parameters
  * @param transport - Transport type
  * @param extra - Request handler extras from MCP SDK
  * @returns ExecuteMetadata object
  */
 function createExecuteMetadata(
   toolName: string,
-  params: Record<string, unknown>,
   transport: string,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
 ): ExecuteMetadata {
-  const meta = extractMeta(params);
-
   return {
-    progress: params,
-    loggerContext: createLoggerContext(toolName, transport, meta),
+    progress: extra._meta?.progressToken,
+    loggerContext: createLoggerContext(toolName, transport, extra.requestId),
     ...(extra.sendNotification && {
       sendNotification: createNotificationAdapter(extra.sendNotification),
     }),
@@ -430,18 +407,8 @@ function prepareExecutionPayload(
 } {
   return {
     sanitizedParams: sanitizeParams(params),
-    metadata: createExecuteMetadata(toolName, params, transport, extra),
+    metadata: createExecuteMetadata(toolName, transport, extra),
   };
-}
-
-/**
- * Extracts metadata from tool parameters
- * @param params - Raw tool parameters
- * @returns Metadata object or undefined if not present/invalid
- */
-function extractMeta(params: Record<string, unknown>): MetaParams | undefined {
-  const meta = params._meta;
-  return isMetaParams(meta) ? meta : undefined;
 }
 
 /**

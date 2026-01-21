@@ -8,12 +8,7 @@ import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import { getModuleUrl } from '@/lib/module-url';
 import { resolveModulePaths } from '@/lib/module-path-resolver';
-import {
-  createToolContext,
-  type ToolContext,
-  type ProgressInput,
-  type ContextOptions,
-} from '@/mcp/context';
+import { createToolContext, type ToolContext, type ContextOptions } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
 import {
@@ -221,8 +216,19 @@ function createContextForTool(
 
   const contextOptions: ContextOptions = {};
   if (metadata?.signal) contextOptions.signal = metadata.signal;
-  if (metadata?.progress !== undefined)
-    contextOptions.progress = metadata.progress as ProgressInput;
+
+  if (metadata?.progress !== undefined) {
+    const progress = metadata.progress;
+    if (progress === null || typeof progress === 'string' || typeof progress === 'number') {
+      contextOptions.progress = progress;
+    } else {
+      logger.warn(
+        { progressType: typeof progress },
+        'Invalid progress metadata type, expected string or number',
+      );
+    }
+  }
+
   if (metadata?.sendNotification) contextOptions.sendNotification = metadata.sendNotification;
   if (policy) contextOptions.policy = policy;
 

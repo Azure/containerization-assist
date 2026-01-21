@@ -4,6 +4,7 @@
  */
 
 import type { Logger } from 'pino';
+import { decodeBuildKitTrace, formatBuildKitStatus } from './buildkit-decoder';
 
 export type ProgressCallback = (message: string) => void;
 
@@ -24,6 +25,7 @@ export interface ProgressTrackerOptions {
 export class ProgressTracker {
   private readonly onProgress: ProgressCallback | undefined;
   private readonly logger: Logger;
+  private readonly collectedLogs: string[] = [];
 
   constructor(options: ProgressTrackerOptions) {
     this.onProgress = options.onProgress;
@@ -31,53 +33,34 @@ export class ProgressTracker {
   }
 
   /**
-   * Process a stream log line and send progress notification
-   */
-  processStreamLog(logLine: string): void {
-    if (logLine && this.onProgress) {
-      this.onProgress(logLine);
-    }
-  }
-
-  /**
    * Process a BuildKit trace event and extract readable status
    * @returns The extracted status message if any
    */
   processBuildKitTrace(auxData: unknown): string {
-    const statusMessage = this.extractBuildKitStatus(auxData);
-    if (statusMessage && this.onProgress) {
-      this.onProgress(statusMessage);
-    }
-    return statusMessage;
-  }
-
-  /**
-   * Extract readable status message from BuildKit trace data
-   */
-  private extractBuildKitStatus(auxData: unknown): string {
-    if (!auxData || typeof auxData !== 'string') {
-      return '';
-    }
-
     try {
-      const decoded = Buffer.from(auxData, 'base64').toString('utf-8');
-
-      // Extract readable text by removing control characters and binary data
-      // eslint-disable-next-line no-control-regex
-      const readable = decoded.replace(/[\x00-\x1F\x7F-\xFF]/g, '').trim();
-
-      if (readable.length > 0) {
-        // Clean up multiple spaces
-        const cleaned = readable.replace(/\s+/g, ' ');
-        this.logger.debug({ cleaned }, 'Extracted BuildKit status (no regex)');
-        return cleaned;
+      // Decode BuildKit trace synchronously
+      const status = decodeBuildKitTrace(auxData, this.logger);
+      if (status) {
+        const message = formatBuildKitStatus(status);
+        if (message && !this.collectedLogs.includes(message)) {
+          this.collectedLogs.push(message);
+          if (this.onProgress) {
+            this.onProgress(message);
+          }
+          return message;
+        }
       }
-
-      return '';
     } catch (error) {
-      this.logger.debug({ error }, 'Failed to decode BuildKit trace');
-      return '';
+      this.logger.error(
+        {
+          error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        'Error in processBuildKitTrace',
+      );
     }
+
+    return '';
   }
 }
 

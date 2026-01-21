@@ -252,14 +252,8 @@ async function handleBuildImage(
 
       // Propagate Docker error guidance from infrastructure layer
       const guidance = buildResult.guidance;
-      const buildLogs = (guidance?.details?.buildLogs as string[]) || [];
 
-      let detailedError = `Failed to build image: ${errorMessage}`;
-      if (buildLogs.length > 0) {
-        detailedError += `\n\nBuild logs:\n${buildLogs.join('\n')}`;
-      }
-
-      return Failure(detailedError, guidance);
+      return Failure(`Failed to build image: ${errorMessage}`, guidance);
     }
 
     // Apply additional tags to the built image
