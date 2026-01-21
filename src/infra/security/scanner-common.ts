@@ -12,7 +12,7 @@ import { Failure, type Result } from '@/types';
  * Safely quote a value for use in shell commands
  * Uses POSIX single-quote escaping: wraps in '' and escapes internal quotes as '\''
  * This is the standard approach used by shell-quote and similar libraries
- * 
+ *
  * @example
  * shellQuote("hello") => "'hello'"
  * shellQuote("it's") => "'it'\\''s'"
@@ -213,7 +213,12 @@ export function parseVersion(output: string, pattern: RegExp): string | undefine
 /**
  * Log scanner information
  */
-export function logScanStart(logger: Logger, scanner: string, version: string, imageId: string): void {
+export function logScanStart(
+  logger: Logger,
+  scanner: string,
+  version: string,
+  imageId: string,
+): void {
   logger.info({ scanner, version, imageId }, `Starting ${scanner} scan`);
 }
 
