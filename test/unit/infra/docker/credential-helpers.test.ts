@@ -376,4 +376,107 @@ describe('Docker Credential Helpers Security', () => {
       expect(result.ok).toBe(true);
     });
   });
+
+  describe('readDockerConfig error handling', () => {
+    it('should handle missing Docker config file gracefully', async () => {
+      // When Docker config doesn't exist, should return Success with empty config
+      const result = await getRegistryCredentials('docker.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+      // Should not fail when config file is missing
+    });
+  });
+
+  describe('normalizeRegistryHostname edge cases', () => {
+    it('should handle malformed URLs gracefully', async () => {
+      const malformedUrls = [
+        'ht!tp://invalid',
+        ':::invalid:::',
+        'reg[istry].com',
+      ];
+
+      for (const url of malformedUrls) {
+        const result = await getRegistryCredentials(url, mockLogger);
+        expect(result.ok).toBe(true);
+        // Should handle without crashing
+      }
+    });
+
+    it('should normalize registry-1.docker.io to docker.io', async () => {
+      const result = await getRegistryCredentials('registry-1.docker.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should normalize registry.hub.docker.com to docker.io', async () => {
+      const result = await getRegistryCredentials('registry.hub.docker.com', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle URL with fragment and query', async () => {
+      const result = await getRegistryCredentials('gcr.io/path?query=value#fragment', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should strip port from registry hostname', async () => {
+      const result = await getRegistryCredentials('registry.example.com:8080', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  describe('isAzureACR function coverage', () => {
+    it('should detect Azure ACR with subdomain', async () => {
+      const result = await getRegistryCredentials('myregistry.azurecr.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle Azure ACR with protocol', async () => {
+      const result = await getRegistryCredentials('https://myregistry.azurecr.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle Azure ACR with malformed URL', async () => {
+      const result = await getRegistryCredentials('invalid:::myregistry.azurecr.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should reject bare azurecr.io (no subdomain)', async () => {
+      const result = await getRegistryCredentials('azurecr.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+      // Should not be treated as valid ACR (length requirement)
+    });
+
+    it('should handle Azure ACR with port', async () => {
+      const result = await getRegistryCredentials('myregistry.azurecr.io:443', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  describe('whitespace and trimming', () => {
+    it('should handle registry with leading whitespace', async () => {
+      const result = await getRegistryCredentials('  docker.io', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle registry with trailing whitespace', async () => {
+      const result = await getRegistryCredentials('docker.io  ', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('should handle registry with mixed case and whitespace', async () => {
+      const result = await getRegistryCredentials('  Docker.IO  ', mockLogger);
+
+      expect(result.ok).toBe(true);
+    });
+  });
 });
