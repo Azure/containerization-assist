@@ -282,7 +282,8 @@ async function handleAnalyzeRepo(
 
 export default tool({
   name: 'analyze-repo',
-  description: 'Analyze repository structure and detect technologies by parsing config files',
+  description:
+    'Analyze repository structure and detect technologies by parsing config files to prepare for containerization and generating container artifacts like Dockerfiles and Kubernetes manifests',
   category: 'analysis',
   version: '4.0.0',
   schema: analyzeRepoSchema,
