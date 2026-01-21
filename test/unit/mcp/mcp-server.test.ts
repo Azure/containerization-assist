@@ -74,8 +74,13 @@ describe('registerToolsWithServer', () => {
       toolName: tool.name,
       params: { foo: 'value' },
       metadata: expect.objectContaining({
-        progress: expect.objectContaining({ _meta: expect.objectContaining({ progressToken: 'tok' }) }),
-        loggerContext: expect.objectContaining({ transport: 'stdio' }),
+        progress: 'tok',
+        loggerContext: expect.objectContaining({
+          transport: 'stdio',
+          tool: tool.name,
+          requestId: '123',
+        }),
+        sendNotification: expect.any(Function),
       }),
     });
   });
