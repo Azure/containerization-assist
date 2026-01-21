@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -145,3 +145,121 @@ jobs:
           echo "6. ✅ Deploy pod using \`localhost:PORT/image\` format" >> $GITHUB_STEP_SUMMARY
           echo "7. ✅ Verify pod pulls image successfully" >> $GITHUB_STEP_SUMMARY
           echo "8. ✅ Verify pod executes successfully" >> $GITHUB_STEP_SUMMARY
+
+  # Test policy enforcement with fix-dockerfile
+  test-policy-enforcement:
+    name: fix-dockerfile Policy Enforcement Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Install OPA CLI
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/opa
+          opa version
+
+      - name: Verify test fixtures
+        run: |
+          echo "Verifying test fixtures exist..."
+          ls -la test/fixtures/policy-validation/happy/
+          ls -la test/fixtures/policy-validation/sad/
+          echo "✅ All test fixtures found"
+
+      - name: Run policy enforcement tests
+        id: policy-tests
+        run: |
+          tsx scripts/test-policy-enforcement.ts
+        timeout-minutes: 5
+
+      - name: Display test results
+        if: always()
+        run: |
+          if [ -f "policy-test-results.json" ]; then
+            echo "=== Test Results ==="
+            cat policy-test-results.json
+          fi
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🛡️ Policy Enforcement Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- \`fix-dockerfile\` - Validates Dockerfiles against built-in Rego policies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "policy-test-results.json" ]; then
+            TOTAL=$(jq -r '.total' policy-test-results.json)
+            PASSED=$(jq -r '.passed' policy-test-results.json)
+            FAILED=$(jq -r '.failed' policy-test-results.json)
+            TOTAL_RULES=$(jq -r '.coverage.totalRules' policy-test-results.json)
+            COVERED_RULES=$(jq -r '.coverage.coveredRules' policy-test-results.json)
+            MISSING_RULES=$(jq -r '.coverage.missingRules' policy-test-results.json)
+            
+            echo "## Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Tests**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed**: ✅ $PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed**: ❌ $FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Policy Rules**: $TOTAL_RULES" >> $GITHUB_STEP_SUMMARY
+            echo "- **Rules with Tests**: ✅ $COVERED_RULES" >> $GITHUB_STEP_SUMMARY
+            echo "- **Rules Missing Tests**: $(if [ "$MISSING_RULES" -eq "0" ]; then echo "✅ 0"; else echo "❌ $MISSING_RULES"; fi)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ steps.policy-tests.outcome }}" = "success" ]; then
+              echo "### ✅ All Tests Passed!" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### ❌ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Dynamically generate test coverage from JSON
+            echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            BLOCKING_COUNT=$(jq -r '.coverage.blockingRules' policy-test-results.json)
+            echo "### Blocking Violations ($BLOCKING_COUNT rules)" >> $GITHUB_STEP_SUMMARY
+            jq -r '.coverage.blockingRuleDetails[] | "- " + (if .tested then "✅" else "❌" end) + " `" + .ruleId + "`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            WARNING_COUNT=$(jq -r '.coverage.warningRules' policy-test-results.json)
+            echo "### Warnings ($WARNING_COUNT rules)" >> $GITHUB_STEP_SUMMARY
+            jq -r '.coverage.warningRuleDetails[] | "- " + (if .tested then "⚠️" else "❌" end) + " `" + .ruleId + "`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "## Policies Tested" >> $GITHUB_STEP_SUMMARY
+            jq -r '.coverage.policyFiles[] | "- `policies/" + . + "`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        with:
+          name: policy-test-results
+          path: policy-test-results.json
+          retention-days: 7
