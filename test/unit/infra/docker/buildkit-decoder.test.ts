@@ -19,6 +19,61 @@ describe('BuildKit decoder', () => {
     } as unknown as Logger;
   });
 
+  // Helper function to create protobuf root with full schema
+  function createProtobufRoot(): protobuf.Root {
+    const Timestamp = new protobuf.Type('Timestamp')
+      .add(new protobuf.Field('seconds', 1, 'int64'))
+      .add(new protobuf.Field('nanos', 2, 'int32'));
+
+    const Vertex = new protobuf.Type('Vertex')
+      .add(new protobuf.Field('digest', 1, 'string'))
+      .add(new protobuf.Field('inputs', 2, 'string', 'repeated'))
+      .add(new protobuf.Field('name', 3, 'string'))
+      .add(new protobuf.Field('cached', 4, 'bool'))
+      .add(new protobuf.Field('started', 5, 'google.protobuf.Timestamp'))
+      .add(new protobuf.Field('completed', 6, 'google.protobuf.Timestamp'))
+      .add(new protobuf.Field('error', 7, 'string'));
+
+    const VertexStatus = new protobuf.Type('VertexStatus')
+      .add(new protobuf.Field('ID', 1, 'string'))
+      .add(new protobuf.Field('vertex', 2, 'string'));
+
+    const VertexLog = new protobuf.Type('VertexLog')
+      .add(new protobuf.Field('vertex', 1, 'string'))
+      .add(new protobuf.Field('timestamp', 2, 'google.protobuf.Timestamp'))
+      .add(new protobuf.Field('stream', 3, 'int64'))
+      .add(new protobuf.Field('msg', 4, 'bytes'));
+
+    const VertexWarning = new protobuf.Type('VertexWarning')
+      .add(new protobuf.Field('vertex', 1, 'string'))
+      .add(new protobuf.Field('level', 2, 'int64'))
+      .add(new protobuf.Field('short', 3, 'bytes'))
+      .add(new protobuf.Field('detail', 4, 'bytes', 'repeated'))
+      .add(new protobuf.Field('url', 5, 'string'));
+
+    const StatusResponse = new protobuf.Type('StatusResponse')
+      .add(new protobuf.Field('vertexes', 1, 'Vertex', 'repeated'))
+      .add(new protobuf.Field('statuses', 2, 'VertexStatus', 'repeated'))
+      .add(new protobuf.Field('logs', 3, 'VertexLog', 'repeated'))
+      .add(new protobuf.Field('warnings', 4, 'VertexWarning', 'repeated'));
+
+    const googleProtobuf = new protobuf.Namespace('google.protobuf');
+    googleProtobuf.add(Timestamp);
+
+    const mobyBuildkit = new protobuf.Namespace('moby.buildkit.v1');
+    mobyBuildkit.add(Vertex);
+    mobyBuildkit.add(VertexStatus);
+    mobyBuildkit.add(VertexLog);
+    mobyBuildkit.add(VertexWarning);
+    mobyBuildkit.add(StatusResponse);
+
+    const root = new protobuf.Root();
+    root.add(googleProtobuf);
+    root.add(mobyBuildkit);
+
+    return root;
+  }
+
   describe('formatBuildKitStatus', () => {
     it('should return null for empty status', () => {
       const result = formatBuildKitStatus({
@@ -90,6 +145,139 @@ describe('BuildKit decoder', () => {
     it('should handle empty protobuf message', () => {
       const result = decodeBuildKitTrace('', mockLogger);
       expect(result).toBeNull();
+    });
+
+    it('should decode valid protobuf with all data types', () => {
+      const root = createProtobufRoot();
+      const StatusResponseType = root.lookupType('moby.buildkit.v1.StatusResponse');
+
+      const message = StatusResponseType.create({
+        vertexes: [
+          {
+            digest: 'sha256:step1',
+            name: '[1/3] FROM node:18',
+            started: { seconds: 1000, nanos: 0 },
+            completed: { seconds: 1010, nanos: 0 },
+          },
+          {
+            digest: 'sha256:step2',
+            name: '[2/3] COPY package.json .',
+            started: { seconds: 1020, nanos: 0 },
+            completed: { seconds: 1025, nanos: 0 },
+          },
+          {
+            digest: 'sha256:error-step',
+            name: '[3/3] RUN npm install',
+            error: 'ENOENT: no such file or directory',
+          },
+        ],
+        logs: [
+          {
+            vertex: 'sha256:step2',
+            timestamp: { seconds: 1021, nanos: 0 },
+            stream: 1,
+            msg: Buffer.from('Copying files...'),
+          },
+        ],
+        warnings: [
+          {
+            vertex: 'sha256:step1',
+            level: 1,
+            short: Buffer.from('Using latest tag'),
+          },
+        ],
+      });
+
+      const encoded = StatusResponseType.encode(message).finish();
+      const base64 = Buffer.from(encoded).toString('base64');
+
+      const result = decodeBuildKitTrace(base64, mockLogger);
+
+      expect(result).not.toBeNull();
+      // Verify steps extraction
+      expect(result?.steps).toHaveLength(2);
+      expect(result?.steps).toContain('[1/3] FROM node:18');
+      expect(result?.steps).toContain('[2/3] COPY package.json .');
+      // Verify logs extraction
+      expect(result?.logs).toHaveLength(1);
+      expect(result?.logs[0]).toBe('Copying files...');
+      // Verify warnings extraction
+      expect(result?.warnings).toHaveLength(1);
+      expect(result?.warnings[0]).toBe('Using latest tag');
+      // Verify errors extraction
+      expect(result?.errors).toHaveLength(1);
+      expect(result?.errors[0]).toBe('[3/3] RUN npm install: ENOENT: no such file or directory');
+    });
+
+    it('should filter out empty and whitespace-only log messages', () => {
+      const root = createProtobufRoot();
+      const StatusResponseType = root.lookupType('moby.buildkit.v1.StatusResponse');
+
+      const message = StatusResponseType.create({
+        logs: [
+          {
+            vertex: 'sha256:abc',
+            timestamp: { seconds: 1000, nanos: 0 },
+            stream: 1,
+            msg: Buffer.from('Valid log message'),
+          },
+          {
+            vertex: 'sha256:def',
+            timestamp: { seconds: 1001, nanos: 0 },
+            stream: 1,
+            msg: Buffer.from('   '), // Whitespace only - should be filtered
+          },
+          {
+            vertex: 'sha256:ghi',
+            timestamp: { seconds: 1002, nanos: 0 },
+            stream: 1,
+            msg: Buffer.from(''), // Empty - should be filtered
+          },
+        ],
+      });
+
+      const encoded = StatusResponseType.encode(message).finish();
+      const base64 = Buffer.from(encoded).toString('base64');
+
+      const result = decodeBuildKitTrace(base64, mockLogger);
+
+      expect(result).not.toBeNull();
+      expect(result?.logs).toHaveLength(1);
+      expect(result?.logs[0]).toBe('Valid log message');
+    });
+
+    it('should only include vertices with both started and completed timestamps', () => {
+      const root = createProtobufRoot();
+      const StatusResponseType = root.lookupType('moby.buildkit.v1.StatusResponse');
+
+      const message = StatusResponseType.create({
+        vertexes: [
+          {
+            digest: 'sha256:completed',
+            name: '[1/3] FROM node:18',
+            started: { seconds: 1000, nanos: 0 },
+            completed: { seconds: 1010, nanos: 0 },
+          },
+          {
+            digest: 'sha256:started-only',
+            name: '[2/3] COPY package.json .',
+            started: { seconds: 1020, nanos: 0 },
+          },
+          {
+            digest: 'sha256:not-started',
+            name: '[3/3] RUN npm install',
+          },
+        ],
+      });
+
+      const encoded = StatusResponseType.encode(message).finish();
+      const base64 = Buffer.from(encoded).toString('base64');
+
+      const result = decodeBuildKitTrace(base64, mockLogger);
+
+      expect(result).not.toBeNull();
+      expect(result?.steps).toHaveLength(1);
+      expect(result?.steps[0]).toBe('[1/3] FROM node:18');
     });
   });
 });

@@ -138,7 +138,6 @@
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.9.1",
-    "@types/protobufjs": "^6.0.0",
     "@types/tar": "^6.1.13",
     "@types/tar-fs": "^2.0.4",
     "@types/tmp": "^0.2.6",
