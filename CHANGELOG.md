@@ -3,7 +3,7 @@
 ## [1.1.0-dev.3]
 
 - update description of `analyze-repo` tool
-- add policy intergration test for `fix-dockerfile` tool
+- add policy integration test for `fix-dockerfile` tool
 - show progress notifications during docker build operations
 - dependency updates
 
