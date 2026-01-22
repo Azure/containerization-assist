@@ -1,5 +1,12 @@
 # Change Log
 
+## [1.1.0-dev.3]
+
+- update description of `analyze-repo` tool
+- add policy intergration test for `fix-dockerfile` tool
+- show progress notifications during docker build operations
+- dependency updates
+
 ## [1.1.0-dev.2]
 
 - remove "additionalProperties" field from generated vscode package.json
