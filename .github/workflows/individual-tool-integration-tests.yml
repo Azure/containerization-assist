@@ -263,3 +263,599 @@ jobs:
           name: policy-test-results
           path: policy-test-results.json
           retention-days: 7
+
+  # Test scan-image with real security scanners (Trivy)
+  test-scan-image:
+    name: scan-image Security Scanner Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Install Trivy
+        run: |
+          # Install Trivy using official installation script
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy --version
+
+      - name: Update Trivy vulnerability database
+        run: |
+          # Download the vulnerability database before scanning
+          trivy image --download-db-only
+          echo "✅ Trivy database updated"
+
+      - name: Run scan-image integration test
+        id: scan-tests
+        run: |
+          tsx scripts/integration-test-scan-image.ts
+        timeout-minutes: 15
+
+      - name: Show test results on failure
+        if: failure()
+        run: |
+          echo "=== Docker images ==="
+          docker images || true
+          echo ""
+          echo "=== Test results ==="
+          if [ -f "scan-image-test-results.json" ]; then
+            cat scan-image-test-results.json
+          fi
+
+      - name: Cleanup Docker images
+        if: always()
+        run: |
+          docker rmi -f test-scan:java-vulns test-scan:dotnet-vulns test-scan:clean || true
+          docker rmi -f openjdk:8u181-jdk mcr.microsoft.com/dotnet/aspnet:3.1 mcr.microsoft.com/dotnet/runtime:8.0-alpine || true
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🔒 Security Scanner Integration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- \`scan-image\` - Scans Docker images for vulnerabilities using Trivy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "scan-image-test-results.json" ]; then
+            TOTAL=$(jq -r '.total' scan-image-test-results.json)
+            PASSED=$(jq -r '.passed' scan-image-test-results.json)
+            FAILED=$(jq -r '.failed' scan-image-test-results.json)
+            
+            echo "## Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Tests**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed**: ✅ $PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed**: ❌ $FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "## Test Cases" >> $GITHUB_STEP_SUMMARY
+            jq -r '.results[] | "- " + (if .passed then "✅" else "❌" end) + " **" + .name + "**" + (if .vulnerabilities then " (C:" + (.vulnerabilities.critical|tostring) + " H:" + (.vulnerabilities.high|tostring) + " M:" + (.vulnerabilities.medium|tostring) + ")" else "" end)' scan-image-test-results.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ steps.scan-tests.outcome }}" = "success" ]; then
+              echo "### ✅ All Tests Passed!" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### ❌ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Failed test details:**" >> $GITHUB_STEP_SUMMARY
+              jq -r '.results[] | select(.passed == false) | "- **" + .name + "**: " + .message' scan-image-test-results.json >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Images (Pulled from Registries)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`openjdk:8u181-jdk\`: Java OpenJDK 8 (2018) with known CVEs" >> $GITHUB_STEP_SUMMARY
+          echo "- \`mcr.microsoft.com/dotnet/aspnet:3.1\`: .NET Core 3.1 (EOL Dec 2022)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`mcr.microsoft.com/dotnet/runtime:8.0-alpine\`: Clean .NET 8 baseline" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        with:
+          name: scan-image-test-results
+          path: scan-image-test-results.json
+          retention-days: 7
+
+  # Test tag-image with various tagging scenarios
+  test-tag-image:
+    name: tag-image Docker Tagging Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Verify Docker
+        run: |
+          docker --version
+          docker info
+
+      - name: Run tag-image integration test
+        id: tag-tests
+        run: |
+          tsx scripts/integration-test-tag-image.ts
+        timeout-minutes: 5
+
+      - name: Cleanup Docker images
+        if: always()
+        run: |
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep test-tag-image | xargs -r docker rmi -f || true
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🏷️ Docker Tagging Integration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- \`tag-image\` - Tags Docker images with version and registry information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "tag-image-test-results.json" ]; then
+            TOTAL=$(jq -r '.total' tag-image-test-results.json)
+            PASSED=$(jq -r '.passed' tag-image-test-results.json)
+            FAILED=$(jq -r '.failed' tag-image-test-results.json)
+            
+            echo "## Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Tests**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed**: ✅ $PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed**: ❌ $FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "## Test Cases" >> $GITHUB_STEP_SUMMARY
+            jq -r '.results[] | "- " + (if .passed then "✅" else "❌" end) + " **" + .name + "**"' tag-image-test-results.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ steps.tag-tests.outcome }}" = "success" ]; then
+              echo "### ✅ All Tests Passed!" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### ❌ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Failed test details:**" >> $GITHUB_STEP_SUMMARY
+              jq -r '.results[] | select(.passed == false) | "- **" + .name + "**: " + .message' tag-image-test-results.json >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Tag Formats Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- Simple version tags (\`v1.0.0\`)" >> $GITHUB_STEP_SUMMARY
+          echo "- Latest tag" >> $GITHUB_STEP_SUMMARY
+          echo "- Git SHA tags (\`sha-abc1234\`)" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment + date tags (\`staging-2024.01.15\`)" >> $GITHUB_STEP_SUMMARY
+          echo "- Registry URL prefixed tags" >> $GITHUB_STEP_SUMMARY
+          echo "- Nested repository paths" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        with:
+          name: tag-image-test-results
+          path: tag-image-test-results.json
+          retention-days: 7
+
+  # Test verify-deploy with real Kubernetes deployments
+  test-verify-deploy:
+    name: verify-deploy Kubernetes Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/
+          kind version
+
+      - name: Read platform and set TARGET_PLATFORM
+        run: |
+          if [ "$(uname -m)" == "x86_64" ]; then
+            echo "TARGET_PLATFORM=linux/amd64" >> $GITHUB_ENV
+          elif [ "$(uname -m)" == "arm64" ] || [ "$(uname -m)" == "aarch64" ]; then
+            echo "TARGET_PLATFORM=linux/arm64" >> $GITHUB_ENV
+          else
+            echo "Unsupported architecture: $(uname -m)"
+            exit 1
+          fi
+
+      - name: Verify test fixtures
+        run: |
+          echo "Verifying test fixtures exist..."
+          ls -la test/fixtures/kubernetes-deployments/
+          ls -la test/fixtures/kubernetes-deployments/health-check-app/
+          cat test/fixtures/kubernetes-deployments/simple-web-app.yaml
+          echo "✅ All test fixtures found"
+
+      - name: Run verify-deploy integration test
+        id: verify-tests
+        env:
+          TARGET_PLATFORM: ${{ env.TARGET_PLATFORM }}
+        run: |
+          tsx scripts/integration-test-verify-deploy.ts
+        timeout-minutes: 15
+
+      - name: Show debug info on failure
+        if: failure()
+        run: |
+          echo "=== Kind clusters ==="
+          kind get clusters || true
+          echo ""
+          echo "=== Pods ==="
+          kubectl get pods -A || true
+          echo ""
+          echo "=== Pod description ==="
+          kubectl describe pods -l app=test-web-app || true
+          echo ""
+          echo "=== Docker containers ==="
+          docker ps -a || true
+          echo ""
+          echo "=== Registry logs ==="
+          docker logs ca-registry 2>&1 | tail -50 || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kubectl delete deployment test-web-app --ignore-not-found=true || true
+          kubectl delete service test-web-app --ignore-not-found=true || true
+          kind delete cluster --name containerization-assist || true
+          docker rm -f ca-registry || true
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🚀 Kubernetes Deployment Verification Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- \`verify-deploy\` - Verifies Kubernetes deployment health and endpoints" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "verify-deploy-test-results.json" ]; then
+            TOTAL=$(jq -r '.total' verify-deploy-test-results.json)
+            PASSED=$(jq -r '.passed' verify-deploy-test-results.json)
+            FAILED=$(jq -r '.failed' verify-deploy-test-results.json)
+            PLATFORM=$(jq -r '.platform' verify-deploy-test-results.json)
+            
+            echo "## Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Tests**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed**: ✅ $PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed**: ❌ $FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Platform**: $PLATFORM" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "## Test Steps" >> $GITHUB_STEP_SUMMARY
+            jq -r '.results[] | "- " + (if .passed then "✅" else "❌" end) + " **" + .name + "**"' verify-deploy-test-results.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ steps.verify-tests.outcome }}" = "success" ]; then
+              echo "### ✅ All Tests Passed!" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### ❌ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Failed step details:**" >> $GITHUB_STEP_SUMMARY
+              jq -r '.results[] | select(.passed == false) | "- **" + .name + "**: " + .message' verify-deploy-test-results.json >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Flow" >> $GITHUB_STEP_SUMMARY
+          echo "1. Create kind cluster with local registry" >> $GITHUB_STEP_SUMMARY
+          echo "2. Build health check application" >> $GITHUB_STEP_SUMMARY
+          echo "3. Push to local registry" >> $GITHUB_STEP_SUMMARY
+          echo "4. Deploy to Kubernetes (2 replicas)" >> $GITHUB_STEP_SUMMARY
+          echo "5. Wait for deployment ready" >> $GITHUB_STEP_SUMMARY
+          echo "6. Run verify-deploy tool" >> $GITHUB_STEP_SUMMARY
+          echo "7. Validate health checks and endpoints" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        with:
+          name: verify-deploy-test-results
+          path: verify-deploy-test-results.json
+          retention-days: 7
+
+  # Test build-image with multi-language scenarios
+  test-build-image:
+    name: build-image Multi-Language Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Verify Docker
+        run: |
+          docker --version
+          docker info
+
+      - name: Verify test fixtures
+        run: |
+          echo "Verifying test fixtures exist..."
+          ls -la test/fixtures/build-scenarios/
+          ls -la test/fixtures/build-scenarios/java/
+          ls -la test/fixtures/build-scenarios/dotnet/
+          echo "✅ All test fixtures found"
+
+      - name: Run build-image integration test
+        id: build-tests
+        run: |
+          tsx scripts/integration-test-build-image.ts
+        timeout-minutes: 15
+
+      - name: Cleanup Docker images
+        if: always()
+        run: |
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep test-build | xargs -r docker rmi -f || true
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🔨 Multi-Language Build Integration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- \`build-image\` - Builds Docker images from Dockerfiles" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "build-image-test-results.json" ]; then
+            TOTAL=$(jq -r '.total' build-image-test-results.json)
+            PASSED=$(jq -r '.passed' build-image-test-results.json)
+            FAILED=$(jq -r '.failed' build-image-test-results.json)
+            
+            echo "## Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Tests**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed**: ✅ $PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed**: ❌ $FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "## Test Cases" >> $GITHUB_STEP_SUMMARY
+            jq -r '.results[] | "- " + (if .passed then "✅" else "❌" end) + " **" + .name + "**" + (if .imageSize then " (" + ((.imageSize / 1000000) | floor | tostring) + "MB)" else "" end)' build-image-test-results.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ steps.build-tests.outcome }}" = "success" ]; then
+              echo "### ✅ All Tests Passed!" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### ❌ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Failed test details:**" >> $GITHUB_STEP_SUMMARY
+              jq -r '.results[] | select(.passed == false) | "- **" + .name + "**: " + .message' build-image-test-results.json >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Languages Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- **Java**: Multi-stage build with Eclipse Temurin JRE" >> $GITHUB_STEP_SUMMARY
+          echo "- **.NET**: Multi-stage build with ASP.NET 8 runtime" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Features Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- Multi-stage builds" >> $GITHUB_STEP_SUMMARY
+          echo "- Build argument injection" >> $GITHUB_STEP_SUMMARY
+          echo "- Image size validation" >> $GITHUB_STEP_SUMMARY
+          echo "- Layer count validation" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        with:
+          name: build-image-test-results
+          path: build-image-test-results.json
+          retention-days: 7
+
+  # Complete E2E Workflow Test - Tests entire containerization pipeline
+  test-e2e-workflow:
+    name: Complete E2E Workflow Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Install kind and kubectl
+        run: |
+          # Install kind
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/
+          kind version
+          
+          # kubectl is usually pre-installed on ubuntu-latest
+          kubectl version --client || true
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+          trivy --version
+
+      - name: Verify Docker
+        run: |
+          docker --version
+          docker info
+
+      - name: Verify test fixtures
+        run: |
+          echo "Verifying test fixtures exist..."
+          ls -la test/fixtures/complete-workflow/
+          ls -la test/fixtures/complete-workflow/kubernetes/
+          echo "✅ All test fixtures found"
+
+      - name: Run E2E workflow integration test
+        id: e2e-tests
+        run: |
+          tsx scripts/integration-test-complete-workflow.ts
+        timeout-minutes: 25
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          echo "Cleaning up resources..."
+          kind delete cluster --name containerization-assist || true
+          docker rm -f ca-registry || true
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep sample-workflow | xargs -r docker rmi -f || true
+          echo "Cleanup complete"
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "# 🎯 Complete E2E Workflow Integration Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Workflow Pipeline Tested" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "analyze-repo → generate-dockerfile → build-image → scan-image" >> $GITHUB_STEP_SUMMARY
+          echo "    → tag-image → prepare-cluster → push-image → deploy → verify-deploy" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "e2e-workflow-test-results.json" ]; then
+            TOTAL=$(jq -r '.total' e2e-workflow-test-results.json)
+            PASSED=$(jq -r '.passed' e2e-workflow-test-results.json)
+            FAILED=$(jq -r '.failed' e2e-workflow-test-results.json)
+            DURATION=$(jq -r '.totalDuration' e2e-workflow-test-results.json)
+            DURATION_SEC=$((DURATION / 1000))
+            
+            echo "## Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Steps**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed**: ✅ $PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed**: ❌ $FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "- **Duration**: ${DURATION_SEC}s" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "## Step Results" >> $GITHUB_STEP_SUMMARY
+            jq -r '.steps[] | "| Step " + (.step | tostring) + " | " + .tool + " | " + (if .passed then "✅ Pass" else "❌ Fail" end) + " | " + ((.duration / 1000) | floor | tostring) + "s |"' e2e-workflow-test-results.json | \
+              (echo "| Step | Tool | Status | Duration |"; echo "|------|------|--------|----------|"; cat) >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ steps.e2e-tests.outcome }}" = "success" ]; then
+              echo "### 🎉 Complete E2E Workflow Passed!" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "All 9 tools in the containerization pipeline are working correctly together." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### ❌ Workflow Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Failed steps:**" >> $GITHUB_STEP_SUMMARY
+              jq -r '.steps[] | select(.passed == false) | "- **Step " + (.step | tostring) + " (" + .tool + ")**: " + .message' e2e-workflow-test-results.json >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Tools Tested" >> $GITHUB_STEP_SUMMARY
+          echo "1. **analyze-repo** - Repository analysis" >> $GITHUB_STEP_SUMMARY
+          echo "2. **generate-dockerfile** - Dockerfile generation" >> $GITHUB_STEP_SUMMARY
+          echo "3. **build-image** - Docker image building" >> $GITHUB_STEP_SUMMARY
+          echo "4. **scan-image** - Security vulnerability scanning" >> $GITHUB_STEP_SUMMARY
+          echo "5. **prepare-cluster** - Kubernetes cluster setup" >> $GITHUB_STEP_SUMMARY
+          echo "6. **tag-image** - Image tagging" >> $GITHUB_STEP_SUMMARY
+          echo "7. **push-image** - Registry push" >> $GITHUB_STEP_SUMMARY
+          echo "8. **kubectl** - Kubernetes deployment" >> $GITHUB_STEP_SUMMARY
+          echo "9. **verify-deploy** - Deployment verification" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        with:
+          name: e2e-workflow-test-results
+          path: e2e-workflow-test-results.json
+          retention-days: 7

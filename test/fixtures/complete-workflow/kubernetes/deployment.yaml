@@ -1,0 +1,63 @@
+# Kubernetes Deployment for E2E workflow testing
+# This manifest is used as a template - the image will be replaced at test time
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-workflow-app
+  labels:
+    app: sample-workflow-app
+    test: e2e-workflow
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sample-workflow-app
+  template:
+    metadata:
+      labels:
+        app: sample-workflow-app
+    spec:
+      containers:
+      - name: app
+        image: REGISTRY_PLACEHOLDER/sample-workflow-app:v1.0.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: JAVA_OPTS
+          value: "-Xmx128m -Xms64m"
+        - name: APP_VERSION
+          value: "1.0.0"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-workflow-app
+  labels:
+    app: sample-workflow-app
+spec:
+  selector:
+    app: sample-workflow-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
