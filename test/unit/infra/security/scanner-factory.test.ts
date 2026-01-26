@@ -23,6 +23,11 @@ jest.mock('../../../../src/infra/security/grype-scanner', () => ({
   checkGrypeAvailability: jest.fn(),
 }));
 
+jest.mock('../../../../src/infra/security/osv-scanner', () => ({
+  scanImageWithOSV: jest.fn(),
+  checkOSVAvailability: jest.fn(),
+}));
+
 jest.mock('../../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => ({
     info: jest.fn(),
@@ -44,11 +49,16 @@ describe('Scanner Factory', () => {
   });
 
   describe('Scanner Type Selection', () => {
-    it('should create Trivy scanner by default', () => {
+    it('should create OSV scanner by default', () => {
       const scanner = createSecurityScanner(logger);
       expect(scanner).toBeDefined();
       expect(scanner.scanImage).toBeDefined();
       expect(scanner.ping).toBeDefined();
+    });
+
+    it('should create OSV scanner when explicitly specified', () => {
+      const scanner = createSecurityScanner(logger, 'osv');
+      expect(scanner).toBeDefined();
     });
 
     it('should create Trivy scanner when explicitly specified', () => {
@@ -73,6 +83,7 @@ describe('Scanner Factory', () => {
 
     it('should handle case-insensitive scanner names', () => {
       const scanners = [
+        createSecurityScanner(logger, 'OSV'),
         createSecurityScanner(logger, 'TRIVY'),
         createSecurityScanner(logger, 'Snyk'),
         createSecurityScanner(logger, 'GrYpE'),
@@ -84,24 +95,24 @@ describe('Scanner Factory', () => {
       });
     });
 
-    it('should fall back to Trivy for unknown scanner types', () => {
+    it('should fall back to OSV for unknown scanner types', () => {
       const scanner = createSecurityScanner(logger, 'unknown-scanner');
       expect(scanner).toBeDefined();
       expect(logger.warn).toHaveBeenCalledWith(
         { scannerType: 'unknown-scanner' },
-        'Unknown scanner type, falling back to Trivy',
+        'Unknown scanner type, falling back to OSV',
       );
     });
   });
 
   describe('Scanner Interface', () => {
     it('should return scanner with scanImage method', () => {
-      const scanner = createSecurityScanner(logger, 'trivy');
+      const scanner = createSecurityScanner(logger, 'osv');
       expect(typeof scanner.scanImage).toBe('function');
     });
 
     it('should return scanner with ping method', () => {
-      const scanner = createSecurityScanner(logger, 'trivy');
+      const scanner = createSecurityScanner(logger, 'osv');
       expect(typeof scanner.ping).toBe('function');
     });
   });
@@ -139,19 +150,21 @@ describe('Scanner Factory', () => {
 
   describe('Scanner Factory Consistency', () => {
     it('should return different instances for different scanner types', () => {
+      const osvScanner = createSecurityScanner(logger, 'osv');
       const trivyScanner = createSecurityScanner(logger, 'trivy');
       const snykScanner = createSecurityScanner(logger, 'snyk');
       const grypeScanner = createSecurityScanner(logger, 'grype');
 
       // All should be defined but may be different instances
+      expect(osvScanner).toBeDefined();
       expect(trivyScanner).toBeDefined();
       expect(snykScanner).toBeDefined();
       expect(grypeScanner).toBeDefined();
     });
 
     it('should create new instance for each call', () => {
-      const scanner1 = createSecurityScanner(logger, 'trivy');
-      const scanner2 = createSecurityScanner(logger, 'trivy');
+      const scanner1 = createSecurityScanner(logger, 'osv');
+      const scanner2 = createSecurityScanner(logger, 'osv');
 
       // Both should be defined (instances may or may not be the same)
       expect(scanner1).toBeDefined();
