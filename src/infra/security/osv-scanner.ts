@@ -5,6 +5,12 @@
  * OSV is a distributed vulnerability database maintained by Google and the open source community.
  * No external CLI tools required - uses Docker API + OSV REST API.
  *
+ * Features:
+ * - Rate limiting (10 req/sec) to prevent API abuse
+ * - Automatic retry on 429 (rate limit) responses
+ * - Batch queries (up to 1000 packages per request)
+ * - CVSS score to severity mapping
+ *
  * @see https://osv.dev
  * @see https://google.github.io/osv.dev/api/
  */
@@ -23,6 +29,75 @@ import {
   logScanComplete,
   ScannerErrors,
 } from './scanner-common';
+
+/**
+ * Rate limiter for OSV API requests
+ *
+ * OSV API documentation doesn't specify explicit rate limits publicly,
+ * but we implement conservative rate limiting to:
+ * 1. Be a good API citizen and avoid overwhelming the service
+ * 2. Handle potential undocumented rate limits gracefully
+ * 3. Prevent accidental DoS from scanning large images
+ *
+ * Configuration:
+ * - Max tokens: 10 (burst capacity)
+ * - Refill rate: 10 tokens/second (steady state limit)
+ * - This allows bursts of 10 requests, then sustained 10 req/sec
+ *
+ * Token bucket algorithm:
+ * - Tokens refill continuously at the specified rate
+ * - Each request consumes 1 token
+ * - If no tokens available, request waits until tokens refill
+ */
+class RateLimiter {
+  private tokens: number;
+  private lastRefill: number;
+  private readonly maxTokens: number;
+  private readonly refillRate: number; // tokens per second
+
+  constructor(maxTokens: number = 10, refillRate: number = 10) {
+    this.maxTokens = maxTokens;
+    this.refillRate = refillRate;
+    this.tokens = maxTokens;
+    this.lastRefill = Date.now();
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const timePassed = (now - this.lastRefill) / 1000; // seconds
+    const tokensToAdd = timePassed * this.refillRate;
+
+    this.tokens = Math.min(this.maxTokens, this.tokens + tokensToAdd);
+    this.lastRefill = now;
+  }
+
+  async acquire(tokens: number = 1): Promise<void> {
+    this.refill();
+
+    if (this.tokens >= tokens) {
+      this.tokens -= tokens;
+      return;
+    }
+
+    // Not enough tokens, wait until we have enough
+    const tokensNeeded = tokens - this.tokens;
+    const waitTime = (tokensNeeded / this.refillRate) * 1000; // milliseconds
+
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
+
+    this.refill();
+    this.tokens -= tokens;
+  }
+
+  /** Reset the rate limiter (primarily for testing) */
+  reset(): void {
+    this.tokens = this.maxTokens;
+    this.lastRefill = Date.now();
+  }
+}
+
+// Shared rate limiter instance for all OSV API calls
+const osvRateLimiter = new RateLimiter(10, 10); // 10 requests per second
 
 // OSV API types
 interface OSVPackage {
@@ -387,7 +462,13 @@ async function queryOSVBatch(
     };
 
     try {
-      logger.debug({ queryCount: batch.length }, 'Querying OSV API');
+      // Apply rate limiting before making the request
+      await osvRateLimiter.acquire();
+
+      logger.debug(
+        { queryCount: batch.length, batchNumber: Math.floor(i / batchSize) + 1 },
+        'Querying OSV API',
+      );
 
       const response = await fetch(OSV_API_URL, {
         method: 'POST',
@@ -399,6 +480,18 @@ async function queryOSVBatch(
 
       if (!response.ok) {
         logger.warn({ status: response.status }, 'OSV API returned error status');
+
+        // Handle rate limiting from API (status 429)
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
+          logger.warn({ waitTime }, 'Rate limited by OSV API, waiting before retry');
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+          // Retry this batch by decrementing i
+          i -= batchSize;
+          continue;
+        }
+
         continue;
       }
 
@@ -428,6 +521,9 @@ async function queryOSVBatch(
  */
 export async function checkOSVAvailability(logger: Logger): Promise<Result<string>> {
   try {
+    // Apply rate limiting
+    await osvRateLimiter.acquire();
+
     const response = await fetch('https://api.osv.dev/v1/query', {
       method: 'POST',
       headers: {
