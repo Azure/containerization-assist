@@ -5,6 +5,7 @@ import type { Logger } from 'pino';
 import { extractErrorMessage } from '@/lib/errors';
 import type { StandardSeverity } from '../scanner-common';
 import type { ExtractedPackage } from './maven/types';
+import { parseCVSSVector } from './cvss-parser';
 
 class RateLimiter {
   private tokens: number;
@@ -143,33 +144,18 @@ export interface OSVBatchResponse {
   results: OSVQueryResponse[];
 }
 
-function mapCVSSToSeverity(score: number): StandardSeverity {
-  if (score >= 9.0) return 'CRITICAL';
-  if (score >= 7.0) return 'HIGH';
-  if (score >= 4.0) return 'MEDIUM';
-  if (score > 0.0) return 'LOW';
-  return 'UNKNOWN';
-}
-
 export function extractSeverity(vuln: OSVVulnerability): StandardSeverity {
   if (vuln.severity?.length) {
     for (const sev of vuln.severity) {
-      if (sev.type === 'CVSS_V3' || sev.type === 'CVSS_V2') {
-        const score = parseFloat(sev.score);
-        if (!isNaN(score)) return mapCVSSToSeverity(score);
+      try {
+        if (sev.type === 'CVSS_V3' || sev.type === 'CVSS_V2') {
+          const result = parseCVSSVector(sev.score);
+          return result.severity as StandardSeverity;
+        }
+      } catch {
+        // If CVSS parsing fails, continue to next severity entry
+        continue;
       }
-    }
-  }
-
-  const dbSev = vuln.database_specific?.severity?.toUpperCase();
-  if (dbSev && ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(dbSev)) {
-    return dbSev as StandardSeverity;
-  }
-
-  for (const affected of vuln.affected || []) {
-    const affSev = affected.database_specific?.severity?.toUpperCase();
-    if (affSev && ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(affSev)) {
-      return affSev as StandardSeverity;
     }
   }
 
