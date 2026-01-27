@@ -226,7 +226,12 @@ export class DockerTestCleaner {
         this.trackedImages.delete(image);
       } else {
         this.logger.debug(`Failed to remove image ${image}: ${removeResult.error}`);
-        // Keep in tracked set if removal failed
+        // If the image doesn't exist (404), remove it from tracking since there's nothing to clean up
+        if (removeResult.error && removeResult.error.includes('not found')) {
+          this.logger.debug(`Image ${image} not found, removing from tracking`);
+          this.trackedImages.delete(image);
+        }
+        // Keep in tracked set if removal failed for other reasons (e.g., image in use)
       }
     }
   }

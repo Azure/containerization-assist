@@ -18,8 +18,8 @@ export const scanImageSchema = z.object({
     .default('vulnerability') // Added default
     .describe('Type of scan to perform'),
   scanner: z
-    .enum(['trivy', 'snyk', 'grype'])
-    .default('trivy') // Added default
+    .enum(['trivy', 'snyk', 'grype', 'osv'])
+    .default('osv') // Changed default to osv
     .describe('Scanner to use for vulnerability detection'),
   enableAISuggestions: z
     .boolean()
