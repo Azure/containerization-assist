@@ -1,11 +1,5 @@
-/**
- * Maven POM Parser
- * Parses pom.xml from Docker tar archives and resolves dependencies.
- * Note: Only resolves local properties - no remote parent POM fetching.
- *
- * Security: Protects against XML bomb attacks (billion laughs, quadratic blowup)
- * by enforcing size limits on XML content.
- */
+// Maven POM parser with XML bomb protection (max 10MB)
+// Local property resolution only - no remote parent POM fetching
 
 import type { Logger } from 'pino';
 import * as tar from 'tar';
@@ -18,20 +12,8 @@ import {
   resolvePropertyValue,
 } from './property-resolver';
 
-/**
- * Maximum allowed size for pom.xml files (10 MB)
- * This protects against:
- * - Billion laughs attack (exponential entity expansion)
- * - Quadratic blowup attack (nested entities)
- * - Memory exhaustion via large XML files
- *
- * Real-world pom.xml files are typically <100KB. The largest legitimate
- * pom.xml files rarely exceed 1MB. Setting 10MB provides generous headroom
- * while still protecting against malicious XML bombs.
- */
-const MAX_XML_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_XML_SIZE_BYTES = 10 * 1024 * 1024;
 
-/** Parse Maven pom.xml from Docker tar archive */
 export async function parseMavenPackages(
   buffer: Buffer,
   path: string,
@@ -53,7 +35,6 @@ export async function parseMavenPackages(
   }
 }
 
-/** Extract file from tar buffer with size limit protection */
 async function extractFileFromTar(buffer: Buffer, targetPath: string): Promise<string | null> {
   const { Readable } = await import('stream');
   const { pipeline } = await import('stream/promises');
@@ -68,7 +49,6 @@ async function extractFileFromTar(buffer: Buffer, targetPath: string): Promise<s
       stream,
       tar.list({
         onentry: (entry) => {
-          // Prevent path traversal attacks
           if (entry.path.includes('..')) {
             entry.resume();
             return;
@@ -76,13 +56,11 @@ async function extractFileFromTar(buffer: Buffer, targetPath: string): Promise<s
 
           const entryFileName = entry.path.split('/').pop() || entry.path;
           if (entryFileName === fileName) {
-            // Check file size before extracting to prevent XML bomb attacks
             if (entry.size > MAX_XML_SIZE_BYTES) {
               sizeError = new Error(
-                `pom.xml file too large (${entry.size} bytes, max ${MAX_XML_SIZE_BYTES}). ` +
-                  'Possible XML bomb attack (billion laughs, quadratic blowup).',
+                `pom.xml file too large (${entry.size} bytes, max ${MAX_XML_SIZE_BYTES})`,
               );
-              entry.resume(); // Skip this entry
+              entry.resume();
               return;
             }
 
@@ -91,22 +69,18 @@ async function extractFileFromTar(buffer: Buffer, targetPath: string): Promise<s
 
             entry.on('data', (chunk: Buffer) => {
               totalSize += chunk.length;
-              // Double-check accumulated size to catch decompression bombs
               if (totalSize > MAX_XML_SIZE_BYTES) {
                 sizeError = new Error(
-                  `pom.xml content exceeded size limit during extraction (${totalSize} bytes, max ${MAX_XML_SIZE_BYTES}). ` +
-                    'Possible XML bomb attack.',
+                  `pom.xml content exceeded size limit (${totalSize} bytes, max ${MAX_XML_SIZE_BYTES})`,
                 );
-                entry.resume(); // Stop reading
+                entry.resume();
                 return;
               }
               chunks.push(chunk);
             });
 
             entry.on('end', () => {
-              if (!sizeError) {
-                content = Buffer.concat(chunks).toString('utf-8');
-              }
+              if (!sizeError) content = Buffer.concat(chunks).toString('utf-8');
             });
           } else {
             entry.resume();
@@ -115,29 +89,19 @@ async function extractFileFromTar(buffer: Buffer, targetPath: string): Promise<s
       }) as unknown as NodeJS.WritableStream,
     );
   } catch {
-    // Ignore pipeline errors unless it's our size error
-    if (sizeError) {
-      throw sizeError;
-    }
+    if (sizeError) throw sizeError;
   }
 
-  // Throw size error if detected
-  if (sizeError) {
-    throw sizeError;
-  }
+  if (sizeError) throw sizeError;
 
   return content;
 }
 
-/** Parse pom.xml and extract dependencies with local property resolution only */
 async function parsePomXml(xmlContent: string, logger: Logger): Promise<ExtractedPackage[]> {
-  // Final size check before parsing (defense in depth)
-  // This catches cases where the content wasn't extracted from tar
   const contentSizeBytes = Buffer.byteLength(xmlContent, 'utf-8');
   if (contentSizeBytes > MAX_XML_SIZE_BYTES) {
     throw new Error(
-      `pom.xml content too large (${contentSizeBytes} bytes, max ${MAX_XML_SIZE_BYTES}). ` +
-        'Possible XML bomb attack (billion laughs, quadratic blowup).',
+      `pom.xml content too large (${contentSizeBytes} bytes, max ${MAX_XML_SIZE_BYTES})`,
     );
   }
 
@@ -171,7 +135,6 @@ async function parsePomXml(xmlContent: string, logger: Logger): Promise<Extracte
           const packages: ExtractedPackage[] = [];
           let skippedDeps = 0;
 
-          // Extract dependencies
           if (project.dependencies?.dependency) {
             const deps = Array.isArray(project.dependencies.dependency)
               ? project.dependencies.dependency
@@ -181,18 +144,15 @@ async function parsePomXml(xmlContent: string, logger: Logger): Promise<Extracte
               if (dep.groupId && dep.artifactId) {
                 let version = dep.version;
 
-                // Try to resolve from dependency management if no explicit version
                 if (!version || version.includes('${')) {
                   const key = `${dep.groupId}:${dep.artifactId}`;
                   version = dependencyManagement.get(key);
                 }
 
-                // Try to resolve property placeholders
                 if (version?.includes('${')) {
                   version = resolvePropertyValue(version, properties, project);
                 }
 
-                // Only include if version is fully resolved
                 if (version && !version.includes('${')) {
                   packages.push({
                     name: `${dep.groupId}:${dep.artifactId}`,
@@ -201,16 +161,11 @@ async function parsePomXml(xmlContent: string, logger: Logger): Promise<Extracte
                   });
                 } else {
                   skippedDeps++;
-                  logger.debug(
-                    { dependency: `${dep.groupId}:${dep.artifactId}`, version: dep.version },
-                    'Skipping dependency with unresolved version (parent POM needed)',
-                  );
                 }
               }
             }
           }
 
-          // Extract dependency management
           if (project.dependencyManagement?.dependencies?.dependency) {
             const deps = Array.isArray(project.dependencyManagement.dependencies.dependency)
               ? project.dependencyManagement.dependencies.dependency
@@ -240,7 +195,7 @@ async function parsePomXml(xmlContent: string, logger: Logger): Promise<Extracte
           if (skippedDeps > 0) {
             logger.info(
               { skippedCount: skippedDeps },
-              'Skipped dependencies with unresolved versions - parent POM resolution disabled',
+              'Skipped dependencies with unresolved versions',
             );
           }
 

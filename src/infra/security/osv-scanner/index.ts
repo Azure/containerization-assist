@@ -1,9 +1,5 @@
-/**
- * OSV Scanner - vulnerability scanning via Google's OSV API
- *
- * Maven-only scope. Rate-limited batch queries (10 req/sec, max 1000/batch).
- * @see https://osv.dev
- */
+// OSV Scanner using Google's OSV API (https://osv.dev)
+// Supports Maven packages with rate-limited batch queries
 
 import type { Logger } from 'pino';
 import type Dockerode from 'dockerode';
@@ -23,9 +19,6 @@ import {
 import { extractPackagesFromImage } from './package-extractor';
 import { osvRateLimiter, queryOSVBatch, extractSeverity, extractFixedVersion } from './osv-api';
 
-/**
- * Check if OSV API is available
- */
 export async function checkOSVAvailability(logger: Logger): Promise<Result<string>> {
   try {
     await osvRateLimiter.acquire();
@@ -41,13 +34,9 @@ export async function checkOSVAvailability(logger: Logger): Promise<Result<strin
 
     logger.debug({ status: response.status }, 'OSV API availability check');
 
-    // Accept 2xx (success) and 4xx (client errors like 404 = package not found)
-    // 4xx means API is up and responding, just no data for our test package
-    if (response.ok || (response.status >= 400 && response.status < 500)) {
-      return Success('osv-api-available');
-    }
+    const isAvailable = response.ok || (response.status >= 400 && response.status < 500);
+    if (isAvailable) return Success('osv-api-available');
 
-    // 5xx = server errors (API is down or malfunctioning)
     return Failure(`OSV API returned server error: ${response.status}`, {
       message: `OSV API is experiencing issues (HTTP ${response.status})`,
       hint: 'The OSV API server is not responding correctly',
@@ -64,9 +53,6 @@ export async function checkOSVAvailability(logger: Logger): Promise<Result<strin
   }
 }
 
-/**
- * Scan a Docker image using OSV API
- */
 export async function scanImageWithOSV(
   docker: Dockerode,
   imageId: string,
