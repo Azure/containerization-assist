@@ -5,7 +5,7 @@ import { extractErrorMessage } from '@/lib/errors';
 import { scanImageWithTrivy, checkTrivyAvailability } from './trivy-scanner';
 import { scanImageWithSnyk, checkSnykAvailability } from './snyk-scanner';
 import { scanImageWithGrype, checkGrypeAvailability } from './grype-scanner';
-import { scanImageWithOSV, checkOSVAvailability } from './osv-scanner';
+import { scanImageWithOSV, checkOSVAvailability } from './osv-scanner/index';
 import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
 
 interface SecurityScanner {
@@ -174,6 +174,7 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
 
   switch (type) {
     case 'osv':
+    case 'osv-scanner':
       return createOSVScanner(logger);
     case 'trivy':
       return createTrivyScanner(logger);
