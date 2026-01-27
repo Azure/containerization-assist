@@ -45,7 +45,7 @@ interface TestCase {
     medium?: { min: number; max?: number };
   };
   shouldPassThreshold: boolean;
-  scanner: 'trivy' | 'snyk' | 'grype';
+  scanner: 'trivy' | 'snyk' | 'grype' | 'osv';
   description: string;
 }
 
@@ -75,6 +75,19 @@ interface TestResult {
  * - Clean: mcr.microsoft.com/dotnet/runtime:8.0-alpine - Current, minimal CVEs
  */
 const TEST_CASES: TestCase[] = [
+  {
+    name: 'OSV Java OpenJDK 8 with Known CVEs',
+    pullImage: 'openjdk:8u181-jdk',
+    localTag: 'test-scan:java-vulns',
+    expectedSeverities: {
+      // OpenJDK 8u181 (2018) + Debian stretch = many CVEs
+      critical: { min: 1 }, // At least 1 critical (OpenSSL, glibc, etc.)
+      high: { min: 5 }, // At least 5 high severity
+    },
+    shouldPassThreshold: false, // Should fail HIGH threshold
+    scanner: 'osv',
+    description: 'Tests detection of Java base image CVEs (OpenJDK 8u181 from 2018)',
+  },
   {
     name: 'Java OpenJDK 8 with Known CVEs',
     pullImage: 'openjdk:8u181-jdk',
