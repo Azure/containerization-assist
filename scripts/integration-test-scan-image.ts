@@ -43,6 +43,7 @@ interface TestCase {
     critical?: { min: number; max?: number };
     high?: { min: number; max?: number };
     medium?: { min: number; max?: number };
+    total?: { min: number; max?: number };
   };
   shouldPassThreshold: boolean;
   scanner: 'trivy' | 'snyk' | 'grype' | 'osv';
@@ -87,6 +88,23 @@ const TEST_CASES: TestCase[] = [
     shouldPassThreshold: false, // Should fail HIGH threshold
     scanner: 'osv',
     description: 'Tests detection of Java base image CVEs (OpenJDK 8u181 from 2018)',
+  },
+  {
+    name: 'OSV Alpine 3.9 with Known CVEs',
+    pullImage: 'alpine:3.9',
+    localTag: 'test-scan:alpine-vulns',
+    expectedSeverities: {
+      // Alpine 3.9 (January 2019) - old version, minimal base (14 packages)
+      // OSV now correctly maps binary packages (libcrypto1.1, libssl1.1) to source package (openssl)
+      // Finds 6 unique OpenSSL CVEs: CVE-2020-1971, CVE-2021-23839, CVE-2021-23840,
+      // CVE-2021-23841, CVE-2021-3449, CVE-2021-3450
+      high: { min: 2 }, // CVE-2021-23840, CVE-2021-3450
+      medium: { min: 3 }, // CVE-2020-1971, CVE-2021-23841, CVE-2021-3449
+      total: { min: 6 }, // Total 6-7 vulnerabilities (OSV has good Alpine coverage for major CVEs)
+    },
+    shouldPassThreshold: false, // Will fail due to 2 HIGH severity OpenSSL CVEs
+    scanner: 'osv',
+    description: 'Tests detection of Alpine package CVEs (Alpine 3.9 from 2019)',
   },
   {
     name: 'Java OpenJDK 8 with Known CVEs',
@@ -203,7 +221,7 @@ function cleanupImages(tags: string[], remoteImages: string[]): void {
  */
 function validateSeverityCounts(
   testCase: TestCase,
-  actual: { critical: number; high: number; medium: number; low: number },
+  actual: { critical: number; high: number; medium: number; low: number; total: number },
 ): { passed: boolean; messages: string[] } {
   const messages: string[] = [];
   let passed = true;
@@ -252,6 +270,20 @@ function validateSeverityCounts(
     }
   }
 
+  // Validate total
+  if (expectedSeverities.total) {
+    const { min, max } = expectedSeverities.total;
+    const count = actual.total;
+    if (count < min) {
+      messages.push(`Expected at least ${min} total vulnerabilities, got ${count}`);
+      passed = false;
+    }
+    if (max !== undefined && count > max) {
+      messages.push(`Expected at most ${max} total vulnerabilities, got ${count}`);
+      passed = false;
+    }
+  }
+
   return { passed, messages };
 }
 
@@ -284,7 +316,9 @@ async function main() {
     console.error('\n❌ Trivy is required but not installed.');
     console.error('   Install Trivy:');
     console.error('   - macOS: brew install trivy');
-    console.error('   - Linux: https://aquasecurity.github.io/trivy/latest/getting-started/installation/');
+    console.error(
+      '   - Linux: https://aquasecurity.github.io/trivy/latest/getting-started/installation/',
+    );
     process.exit(1);
   }
 
@@ -387,6 +421,7 @@ async function main() {
         high: vulns.high,
         medium: vulns.medium,
         low: vulns.low,
+        total: vulns.total,
       });
 
       // Validate threshold enforcement
@@ -402,7 +437,9 @@ async function main() {
 
       // Check remediation guidance for vulnerable images
       if (!testCase.shouldPassThreshold && scanResult.remediationGuidance) {
-        console.log(`      Remediation guidance: ${scanResult.remediationGuidance.length} recommendations`);
+        console.log(
+          `      Remediation guidance: ${scanResult.remediationGuidance.length} recommendations`,
+        );
       }
 
       if (validation.passed) {

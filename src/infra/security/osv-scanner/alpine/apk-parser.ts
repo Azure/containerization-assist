@@ -33,6 +33,7 @@ export async function parseAlpinePackages(
   release?: string,
 ): Promise<ExtractedPackage[]> {
   const packages: ExtractedPackage[] = [];
+  const seenSourcePackages = new Set<string>(); // Deduplicate source packages
   const ecosystem = release ? `Alpine:v${release}` : 'Alpine';
 
   try {
@@ -48,21 +49,34 @@ export async function parseAlpinePackages(
       name?: string;
       version?: string;
       architecture?: string;
+      origin?: string; // Source package name (o: field)
     } = {};
 
     for (const line of lines) {
       // Blank line indicates end of package block
       if (line.trim() === '') {
         if (currentPackage.name && currentPackage.version) {
-          packages.push({
-            name: currentPackage.name,
-            version: currentPackage.version,
-            ecosystem,
-            metadata: {
-              architecture: currentPackage.architecture,
-              release,
-            },
-          });
+          // Use origin (source package) name if available, otherwise use package name
+          // OSV tracks vulnerabilities at source package level (e.g., "openssl" not "libcrypto1.1")
+          const packageName = currentPackage.origin || currentPackage.name;
+
+          // Deduplicate: only add each source package once
+          // Multiple binary packages (libcrypto1.1, libssl1.1) can come from same source (openssl)
+          const packageKey = `${packageName}@${currentPackage.version}`;
+          if (!seenSourcePackages.has(packageKey)) {
+            seenSourcePackages.add(packageKey);
+
+            packages.push({
+              name: packageName,
+              version: currentPackage.version,
+              ecosystem,
+              metadata: {
+                architecture: currentPackage.architecture,
+                release,
+                binaryPackage: currentPackage.origin ? currentPackage.name : undefined,
+              },
+            });
+          }
         }
         currentPackage = {};
         continue;
@@ -85,20 +99,33 @@ export async function parseAlpinePackages(
         case 'A':
           currentPackage.architecture = value;
           break;
+        case 'o':
+          currentPackage.origin = value; // Source package for OSV queries
+          break;
       }
     }
 
     // Handle last package if file doesn't end with blank line
     if (currentPackage.name && currentPackage.version) {
-      packages.push({
-        name: currentPackage.name,
-        version: currentPackage.version,
-        ecosystem,
-        metadata: {
-          architecture: currentPackage.architecture,
-          release,
-        },
-      });
+      // Use origin (source package) name if available, otherwise use package name
+      const packageName = currentPackage.origin || currentPackage.name;
+
+      // Deduplicate: only add each source package once
+      const packageKey = `${packageName}@${currentPackage.version}`;
+      if (!seenSourcePackages.has(packageKey)) {
+        seenSourcePackages.add(packageKey);
+
+        packages.push({
+          name: packageName,
+          version: currentPackage.version,
+          ecosystem,
+          metadata: {
+            architecture: currentPackage.architecture,
+            release,
+            binaryPackage: currentPackage.origin ? currentPackage.name : undefined,
+          },
+        });
+      }
     }
 
     logger.debug(
