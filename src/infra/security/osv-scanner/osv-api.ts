@@ -184,6 +184,7 @@ export function extractFixedVersion(vuln: OSVVulnerability): string | undefined 
       }
     }
   }
+  return undefined;
 }
 
 async function fetchVulnerabilityDetails(
