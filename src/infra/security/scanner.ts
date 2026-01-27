@@ -174,7 +174,6 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
 
   switch (type) {
     case 'osv':
-    case 'osv-scanner':
       return createOSVScanner(logger);
     case 'trivy':
       return createTrivyScanner(logger);
