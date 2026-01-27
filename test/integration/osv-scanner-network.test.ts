@@ -286,10 +286,9 @@ CMD ["echo", "Test image for OSV scanning"]
       if (log4shellVuln) {
         expect(log4shellVuln.package).toContain('log4j-core');
         expect(log4shellVuln.version).toBe('2.14.1');
-        // Log4Shell should be CRITICAL or HIGH severity, but OSV API may return UNKNOWN
-        // if severity data is not available
+        // Log4Shell should be CRITICAL or HIGH severity
         console.log(`Found Log4Shell: ${log4shellVuln.id}, severity: ${log4shellVuln.severity}`);
-        expect(['CRITICAL', 'HIGH', 'MEDIUM', 'UNKNOWN']).toContain(log4shellVuln.severity);
+        expect(['CRITICAL', 'HIGH']).toContain(log4shellVuln.severity);
       }
     }, 60000); // 60 second timeout for build + scan
 
