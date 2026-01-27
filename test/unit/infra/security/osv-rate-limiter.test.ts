@@ -2,7 +2,7 @@
  * Test RateLimiter queue cleanup and retry logic
  */
 
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { osvRateLimiter } from '@/infra/security/osv-scanner/osv-api';
 
 describe('OSV RateLimiter', () => {
@@ -51,7 +51,7 @@ describe('OSV RateLimiter', () => {
       Promise.race([
         pendingPromise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 100)),
-      ])
+      ]),
     ).resolves.toBeUndefined();
   });
 
