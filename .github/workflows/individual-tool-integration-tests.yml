@@ -654,6 +654,13 @@ jobs:
           colima start --cpu 2 --memory 4
           docker context use colima
 
+      - name: Setup Docker (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Start-Service docker -ErrorAction SilentlyContinue
+          docker version
+
       - name: Verify Docker
         shell: bash
         run: |
@@ -661,6 +668,7 @@ jobs:
           docker info
 
       - name: Verify test fixtures
+        shell: bash
         run: |
           echo "Verifying test fixtures exist..."
           ls -la test/fixtures/build-scenarios/
