@@ -264,23 +264,11 @@ jobs:
           path: policy-test-results.json
           retention-days: 7
 
-<<<<<<< Updated upstream
   # Test scan-image with real security scanners (Trivy)
   test-scan-image:
     name: scan-image Security Scanner Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-=======
-  # Test build-image tool with real Docker daemon
-  test-docker-build:
-    name: Docker Build Tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-      fail-fast: false
->>>>>>> Stashed changes
     permissions:
       contents: read
 
@@ -289,11 +277,7 @@ jobs:
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # 6.0.1
 
       - name: Setup Node.js
-<<<<<<< Updated upstream
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
-=======
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4
->>>>>>> Stashed changes
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -304,7 +288,6 @@ jobs:
       - name: Build project
         run: npm run build
 
-<<<<<<< Updated upstream
       - name: Install tsx
         run: npm install -g tsx
 
@@ -634,9 +617,13 @@ jobs:
 
   # Test build-image with multi-language scenarios
   test-build-image:
-    name: build-image Multi-Language Tests
-    runs-on: ubuntu-latest
+    name: build-image Multi-Language Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false
     permissions:
       contents: read
 
@@ -659,7 +646,16 @@ jobs:
       - name: Install tsx
         run: npm install -g tsx
 
+      - name: Setup Docker (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install docker
+          brew install colima
+          colima start --cpu 2 --memory 4
+          docker context use colima
+
       - name: Verify Docker
+        shell: bash
         run: |
           docker --version
           docker info
@@ -680,18 +676,24 @@ jobs:
 
       - name: Cleanup Docker images
         if: always()
+        shell: bash
         run: |
-          docker images --format "{{.Repository}}:{{.Tag}}" | grep test-build | xargs -r docker rmi -f || true
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep test-build | while read image; do
+            docker rmi -f "$image" || true
+          done
 
       - name: Generate test summary
         if: always()
+        shell: bash
         run: |
           echo "# 🔨 Multi-Language Build Integration Tests" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
           echo "- \`build-image\` - Builds Docker images from Dockerfiles" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+          echo "**Platform:** ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           if [ -f "build-image-test-results.json" ]; then
             TOTAL=$(jq -r '.total' build-image-test-results.json)
             PASSED=$(jq -r '.passed' build-image-test-results.json)
@@ -734,7 +736,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
-          name: build-image-test-results
+          name: build-image-test-results-${{ matrix.os }}
           path: build-image-test-results.json
           retention-days: 7
 
@@ -876,71 +878,3 @@ jobs:
           name: e2e-workflow-test-results
           path: e2e-workflow-test-results.json
           retention-days: 7
-=======
-      # macOS requires Docker Desktop or Colima to be installed
-      # GitHub Actions macOS runners do NOT have Docker pre-installed
-      - name: Setup Docker on macOS
-        if: runner.os == 'macOS'
-        run: |
-          echo "Installing Docker on macOS..."
-          brew install colima docker
-
-          echo "Starting Colima..."
-          colima start --cpu 2 --memory 4
-
-          echo "Verifying Docker..."
-          docker --version
-          docker info
-
-      - name: Verify Docker daemon
-        run: |
-          docker --version
-          docker info
-          docker ps
-
-      - name: Run Docker integration tests
-        run: npm test -- test/integration/infrastructure/docker/build-image.test.ts --verbose
-        env:
-          CI: true
-          DOCKER_AVAILABLE: true
-        timeout-minutes: 15
-
-      - name: Cleanup test images
-        if: always()
-        run: |
-          docker images --format '{{.Repository}}:{{.Tag}}' | grep '^test-' | xargs -r docker rmi -f 2>/dev/null || true
-          docker ps -a --filter "name=test-" --format '{{.ID}}' | xargs -r docker rm -f 2>/dev/null || true
-        shell: bash
-
-      - name: Cleanup Colima on macOS
-        if: always() && runner.os == 'macOS'
-        run: |
-          colima stop || true
-          colima delete -f || true
-
-      - name: Show diagnostic info on failure
-        if: failure()
-        run: |
-          echo "=== Docker Info ==="
-          docker info || true
-          echo "=== Docker Images ==="
-          docker images || true
-          echo "=== Docker Containers ==="
-          docker ps -a || true
-        shell: bash
-
-      - name: Generate test summary
-        if: always()
-        shell: bash
-        run: |
-          echo "# 🐳 Docker Build Integration Tests" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Platform:** ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Tests (4)" >> $GITHUB_STEP_SUMMARY
-          echo "- Socket path detection" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker daemon availability" >> $GITHUB_STEP_SUMMARY
-          echo "- Successful build" >> $GITHUB_STEP_SUMMARY
-          echo "- Build failure handling" >> $GITHUB_STEP_SUMMARY
->>>>>>> Stashed changes
