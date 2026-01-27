@@ -686,7 +686,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          docker images --format "{{.Repository}}:{{.Tag}}" | grep test-build | while read image; do
+          docker images --format "{{.Repository}}:{{.Tag}}" | { grep test-build || true; } | while read image; do
             docker rmi -f "$image" || true
           done
 
