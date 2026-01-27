@@ -72,6 +72,17 @@ export async function scanImageWithOSV(
   try {
     const packages = await extractPackagesFromImage(docker, imageId, logger);
 
+    logger.info(
+      {
+        packageCount: packages.length,
+        ecosystems: [...new Set(packages.map((p) => p.ecosystem))],
+        samplePackages: packages
+          .slice(0, 10)
+          .map((p) => ({ name: p.name, version: p.version, ecosystem: p.ecosystem })),
+      },
+      'Extracted packages for OSV scan',
+    );
+
     if (packages.length === 0) {
       logger.warn({ imageId }, 'No packages found - returning empty scan result');
       return Success({
@@ -89,6 +100,7 @@ export async function scanImageWithOSV(
     }
 
     const vulnerabilityMap = await queryOSVBatch(packages, logger);
+    logger.info({ vulnCount: vulnerabilityMap.size }, 'OSV query completed');
     const vulnerabilities: BasicScanResult['vulnerabilities'] = [];
     const counter = new SeverityCounter();
 

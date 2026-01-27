@@ -236,6 +236,15 @@ async function fetchBatchVulnerabilityIds(
       })),
     };
 
+    logger.debug(
+      {
+        batchIndex: i / batchSize,
+        batchSize: batch.length,
+        sampleQueries: query.queries.slice(0, 5),
+      },
+      'Querying OSV batch',
+    );
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         await osvRateLimiter.acquire();

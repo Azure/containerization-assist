@@ -41,11 +41,12 @@ export interface ParseResult {
 }
 
 /**
- * Package extracted from Docker image (Maven only)
+ * Package extracted from Docker image
  */
 export interface ExtractedPackage {
-  name: string; // groupId:artifactId format
+  name: string; // groupId:artifactId for Maven, package name for Debian/Alpine
   version: string;
-  ecosystem: 'Maven';
+  ecosystem: string; // Maven, Debian, Debian:9, Alpine, Alpine:v3.18, etc.
   path?: string;
+  metadata?: Record<string, unknown>;
 }
