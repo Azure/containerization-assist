@@ -77,6 +77,8 @@ import { buildImage } from '../../src/tools/build-image/tool';
 describe('Error Recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
   });
 
   describe('Error Handling Pattern', () => {

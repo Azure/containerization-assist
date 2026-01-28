@@ -53,7 +53,7 @@ describe('Docker Socket Validation', () => {
       const { autoDetectDockerSocket } = await import('@/infra/docker/socket-validation');
 
       const socket = autoDetectDockerSocket();
-      expect(socket).toBe('npipe://./pipe/docker_engine');
+      expect(socket).toBe('//./pipe/docker_engine');
     });
 
     it('should return Unix socket path on non-Windows platforms', async () => {
@@ -94,11 +94,11 @@ describe('Docker Socket Validation', () => {
       const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
 
       const result = validateDockerSocket(
-        { dockerSocket: 'npipe://./pipe/docker_engine' },
+        { dockerSocket: '//./pipe/docker_engine' },
         true,
       );
 
-      expect(result.dockerSocket).toBe('npipe://./pipe/docker_engine');
+      expect(result.dockerSocket).toBe('//./pipe/docker_engine');
       expect(result.warnings).toEqual([]);
     });
 

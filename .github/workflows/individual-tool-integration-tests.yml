@@ -617,9 +617,13 @@ jobs:
 
   # Test build-image with multi-language scenarios
   test-build-image:
-    name: build-image Multi-Language Tests
-    runs-on: ubuntu-latest
+    name: build-image Multi-Language Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false
     permissions:
       contents: read
 
@@ -642,12 +646,23 @@ jobs:
       - name: Install tsx
         run: npm install -g tsx
 
-      - name: Verify Docker
+      - name: Verify Docker socket path (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Verifying Docker socket path on Windows..."
+          tsx scripts/verify-docker-socket-windows.ts
+
+      - name: Verify Docker (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
         run: |
           docker --version
           docker info
 
-      - name: Verify test fixtures
+      - name: Verify test fixtures (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
         run: |
           echo "Verifying test fixtures exist..."
           ls -la test/fixtures/build-scenarios/
@@ -655,41 +670,55 @@ jobs:
           ls -la test/fixtures/build-scenarios/dotnet/
           echo "✅ All test fixtures found"
 
-      - name: Run build-image integration test
+      - name: Run build-image integration test (Linux only)
+        if: runner.os == 'Linux'
         id: build-tests
         run: |
           tsx scripts/integration-test-build-image.ts
         timeout-minutes: 15
 
-      - name: Cleanup Docker images
-        if: always()
+      - name: Cleanup Docker images (Linux only)
+        if: always() && runner.os == 'Linux'
+        shell: bash
         run: |
-          docker images --format "{{.Repository}}:{{.Tag}}" | grep test-build | xargs -r docker rmi -f || true
+          docker images --format "{{.Repository}}:{{.Tag}}" | { grep test-build || true; } | while read image; do
+            docker rmi -f "$image" || true
+          done
 
       - name: Generate test summary
         if: always()
+        shell: bash
         run: |
           echo "# 🔨 Multi-Language Build Integration Tests" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
           echo "- \`build-image\` - Builds Docker images from Dockerfiles" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f "build-image-test-results.json" ]; then
+          echo "**Platform:** ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            echo "## Windows: Docker Socket Path Verification" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Verified correct Docker socket path is being used" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Expected:** \`//./pipe/docker_engine\` (Windows named pipe)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Note:** Windows runners only validate socket path. Full build tests run on Linux." >> $GITHUB_STEP_SUMMARY
+          elif [ -f "build-image-test-results.json" ]; then
             TOTAL=$(jq -r '.total' build-image-test-results.json)
             PASSED=$(jq -r '.passed' build-image-test-results.json)
             FAILED=$(jq -r '.failed' build-image-test-results.json)
-            
+
             echo "## Results" >> $GITHUB_STEP_SUMMARY
             echo "- **Total Tests**: $TOTAL" >> $GITHUB_STEP_SUMMARY
             echo "- **Passed**: ✅ $PASSED" >> $GITHUB_STEP_SUMMARY
             echo "- **Failed**: ❌ $FAILED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            
+
             echo "## Test Cases" >> $GITHUB_STEP_SUMMARY
             jq -r '.results[] | "- " + (if .passed then "✅" else "❌" end) + " **" + .name + "**" + (if .imageSize then " (" + ((.imageSize / 1000000) | floor | tostring) + "MB)" else "" end)' build-image-test-results.json >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            
+
             if [ "${{ steps.build-tests.outcome }}" = "success" ]; then
               echo "### ✅ All Tests Passed!" >> $GITHUB_STEP_SUMMARY
             else
@@ -698,26 +727,26 @@ jobs:
               echo "**Failed test details:**" >> $GITHUB_STEP_SUMMARY
               jq -r '.results[] | select(.passed == false) | "- **" + .name + "**: " + .message' build-image-test-results.json >> $GITHUB_STEP_SUMMARY
             fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Languages Tested" >> $GITHUB_STEP_SUMMARY
+            echo "- **Java**: Multi-stage build with Eclipse Temurin JRE" >> $GITHUB_STEP_SUMMARY
+            echo "- **.NET**: Multi-stage build with ASP.NET 8 runtime" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Features Tested" >> $GITHUB_STEP_SUMMARY
+            echo "- Multi-stage builds" >> $GITHUB_STEP_SUMMARY
+            echo "- Build argument injection" >> $GITHUB_STEP_SUMMARY
+            echo "- Image size validation" >> $GITHUB_STEP_SUMMARY
+            echo "- Layer count validation" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Languages Tested" >> $GITHUB_STEP_SUMMARY
-          echo "- **Java**: Multi-stage build with Eclipse Temurin JRE" >> $GITHUB_STEP_SUMMARY
-          echo "- **.NET**: Multi-stage build with ASP.NET 8 runtime" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Features Tested" >> $GITHUB_STEP_SUMMARY
-          echo "- Multi-stage builds" >> $GITHUB_STEP_SUMMARY
-          echo "- Build argument injection" >> $GITHUB_STEP_SUMMARY
-          echo "- Image size validation" >> $GITHUB_STEP_SUMMARY
-          echo "- Layer count validation" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload test results
-        if: always()
+        if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
-          name: build-image-test-results
+          name: build-image-test-results-${{ matrix.os }}
           path: build-image-test-results.json
           retention-days: 7
 

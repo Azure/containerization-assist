@@ -190,6 +190,12 @@ export interface DockerClient {
     all?: boolean;
     filters?: Record<string, string[]>;
   }) => Promise<Result<DockerContainerInfo[]>>;
+
+  /**
+   * Pings the Docker daemon to verify connectivity.
+   * @returns Result indicating whether Docker daemon is available
+   */
+  ping: () => Promise<Result<void>>;
 }
 
 /**
@@ -689,6 +695,39 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         );
 
         return Failure(errorMessage, guidance);
+      }
+    },
+
+    async ping(): Promise<Result<void>> {
+      try {
+        logger.debug('Pinging Docker daemon');
+
+        await docker.ping();
+
+        logger.debug('Docker daemon is available');
+        return Success(undefined);
+      } catch (error) {
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Docker daemon is not available: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
+            originalError: error,
+          },
+          'Docker ping failed',
+        );
+
+        return Failure(errorMessage, {
+          message: guidance.message,
+          hint: 'Docker daemon is not running or not accessible',
+          resolution:
+            'Ensure Docker is installed and running. On Windows, check Docker Desktop is started. On Mac, ensure Docker Desktop or Colima is running.',
+          ...(guidance.details && { details: guidance.details }),
+        });
       }
     },
   };

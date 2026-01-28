@@ -108,6 +108,13 @@ jest.mock('node:fs', () => ({
 
 // Mock lib modules
 const mockDockerClient = {
+  ping: jest.fn() as jest.MockedFunction<
+    () => Promise<{
+      ok: boolean;
+      value?: any;
+      error?: string;
+    }>
+  >,
   buildImage: jest.fn() as jest.MockedFunction<
     (options: any) => Promise<{
       ok: boolean;
@@ -184,6 +191,8 @@ CMD ["node", "index.js"]`;
     mockFs.stat.mockResolvedValue({ isFile: () => true, isDirectory: () => false } as any);
     mockFs.readFile.mockResolvedValue(mockDockerfile);
     mockFs.writeFile.mockResolvedValue(undefined);
+
+    mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
 
     // Default successful Docker build
     mockDockerClient.buildImage.mockResolvedValue(

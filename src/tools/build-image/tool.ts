@@ -195,6 +195,19 @@ async function handleBuildImage(
 
     const dockerClient = createDockerClient(logger);
 
+    // Verify Docker daemon is available
+    logger.debug('Checking Docker daemon availability');
+    const pingResult = await dockerClient.ping();
+    if (!pingResult.ok) {
+      return Failure('Docker daemon is not available', {
+        message: pingResult.error,
+        hint: 'Docker daemon is not running or not accessible',
+        resolution:
+          'Ensure Docker is installed and running. On Windows, verify Docker Desktop is started and running in Linux container mode.',
+      });
+    }
+    logger.debug('Docker daemon is available');
+
     // Read Dockerfile for security analysis
     const dockerfileContentResult = await readDockerfile({
       path: finalDockerfilePath,
