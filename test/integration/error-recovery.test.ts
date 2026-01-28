@@ -77,6 +77,9 @@ import { buildImage } from '../../src/tools/build-image/tool';
 describe('Error Recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Mock successful Docker ping by default
+    mockDockerClient.ping.mockResolvedValue(createSuccessResult(true));
   });
 
   describe('Error Handling Pattern', () => {
