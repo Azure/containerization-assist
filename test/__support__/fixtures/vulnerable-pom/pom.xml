@@ -34,7 +34,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.9.8</version>
+            <version>2.12.7.1</version>
         </dependency>
         
         <!-- Commons Collections 3.2.1 - Has CVE-2015-6420 -->
