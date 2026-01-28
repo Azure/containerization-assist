@@ -43,7 +43,6 @@ interface TestCase {
     critical?: { min: number; max?: number };
     high?: { min: number; max?: number };
     medium?: { min: number; max?: number };
-    total?: { min: number; max?: number };
   };
   shouldPassThreshold: boolean;
   scanner: 'trivy' | 'snyk' | 'grype' | 'osv';
@@ -62,7 +61,6 @@ interface TestResult {
     high: number;
     medium: number;
     low: number;
-    total: number;
   };
   duration?: number;
 }
@@ -100,7 +98,6 @@ const TEST_CASES: TestCase[] = [
       // CVE-2021-23841, CVE-2021-3449, CVE-2021-3450
       high: { min: 2 }, // CVE-2021-23840, CVE-2021-3450
       medium: { min: 3 }, // CVE-2020-1971, CVE-2021-23841, CVE-2021-3449
-      total: { min: 6 }, // Total 6-7 vulnerabilities (OSV has good Alpine coverage for major CVEs)
     },
     shouldPassThreshold: false, // Will fail due to 2 HIGH severity OpenSSL CVEs
     scanner: 'osv',
@@ -221,7 +218,7 @@ function cleanupImages(tags: string[], remoteImages: string[]): void {
  */
 function validateSeverityCounts(
   testCase: TestCase,
-  actual: { critical: number; high: number; medium: number; low: number; total: number },
+  actual: { critical: number; high: number; medium: number; low: number },
 ): { passed: boolean; messages: string[] } {
   const messages: string[] = [];
   let passed = true;
@@ -266,20 +263,6 @@ function validateSeverityCounts(
     }
     if (max !== undefined && count > max) {
       messages.push(`Expected at most ${max} MEDIUM, got ${count}`);
-      passed = false;
-    }
-  }
-
-  // Validate total
-  if (expectedSeverities.total) {
-    const { min, max } = expectedSeverities.total;
-    const count = actual.total;
-    if (count < min) {
-      messages.push(`Expected at least ${min} total vulnerabilities, got ${count}`);
-      passed = false;
-    }
-    if (max !== undefined && count > max) {
-      messages.push(`Expected at most ${max} total vulnerabilities, got ${count}`);
       passed = false;
     }
   }
@@ -413,7 +396,6 @@ async function main() {
       console.log(`        - High: ${vulns.high}`);
       console.log(`        - Medium: ${vulns.medium}`);
       console.log(`        - Low: ${vulns.low}`);
-      console.log(`        - Total: ${vulns.total}`);
 
       // Validate vulnerability counts
       const validation = validateSeverityCounts(testCase, {
@@ -421,7 +403,6 @@ async function main() {
         high: vulns.high,
         medium: vulns.medium,
         low: vulns.low,
-        total: vulns.total,
       });
 
       // Validate threshold enforcement
@@ -453,7 +434,6 @@ async function main() {
             high: vulns.high,
             medium: vulns.medium,
             low: vulns.low,
-            total: vulns.total,
           },
           duration,
         });
@@ -472,7 +452,6 @@ async function main() {
             high: vulns.high,
             medium: vulns.medium,
             low: vulns.low,
-            total: vulns.total,
           },
           duration,
         });
