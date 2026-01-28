@@ -30,6 +30,14 @@ export async function parseTarStream(
     stream.pipe(
       tar.t({
         onentry: (entry) => {
+          // Path traversal protection (defense-in-depth)
+          // While this function is currently only used with Docker-generated tar archives,
+          // validating paths prevents potential directory traversal attacks
+          if (entry.path.includes('..')) {
+            entry.resume();
+            return;
+          }
+
           if (
             entry.path === normalizedPath ||
             entry.path === targetPath ||
