@@ -192,8 +192,7 @@ CMD ["node", "index.js"]`;
     mockFs.readFile.mockResolvedValue(mockDockerfile);
     mockFs.writeFile.mockResolvedValue(undefined);
 
-    // Default successful Docker ping
-    mockDockerClient.ping.mockResolvedValue(createSuccessResult(true));
+    mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
 
     // Default successful Docker build
     mockDockerClient.buildImage.mockResolvedValue(

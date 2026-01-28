@@ -92,8 +92,7 @@ describe('Docker Error Scenarios', () => {
     mockFs.readFile.mockResolvedValue(mockDockerfile);
     mockFs.writeFile.mockResolvedValue(undefined);
 
-    // Mock successful ping by default
-    mockDockerClient.ping.mockResolvedValue(createSuccessResult(true));
+    mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
   });
 
   describe('Error Handling Pattern', () => {

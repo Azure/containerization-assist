@@ -78,8 +78,7 @@ describe('Error Recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock successful Docker ping by default
-    mockDockerClient.ping.mockResolvedValue(createSuccessResult(true));
+    mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
   });
 
   describe('Error Handling Pattern', () => {
