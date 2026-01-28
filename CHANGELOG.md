@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.1.0-dev.4]
+
+- add new `osv` parser for scan-image tool that has no CLI dependencies
+- bug fix for windows docker named pipe socket connection
+
 ## [1.1.0-dev.3]
 
 - update description of `analyze-repo` tool
