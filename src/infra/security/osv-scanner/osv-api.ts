@@ -177,6 +177,19 @@ async function fetchVulnerabilityDetails(
   vulnId: string,
   _logger: Logger,
 ): Promise<OSVVulnerability | null> {
+  // Validate and sanitize vulnId to prevent URL injection
+  if (!vulnId || typeof vulnId !== 'string') {
+    return null;
+  }
+
+  // Trim whitespace and validate format (OSV IDs typically follow patterns like CVE-*, GHSA-*, etc.)
+  const sanitizedVulnId = vulnId.trim();
+
+  // Reject IDs with potentially dangerous characters
+  if (!/^[A-Za-z0-9._-]+$/.test(sanitizedVulnId)) {
+    return null;
+  }
+
   const maxRetries = 3;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -187,7 +200,9 @@ async function fetchVulnerabilityDetails(
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       try {
-        const response = await fetch(`https://api.osv.dev/v1/vulns/${vulnId}`, {
+        // Use encodeURIComponent for additional safety
+        const encodedVulnId = encodeURIComponent(sanitizedVulnId);
+        const response = await fetch(`https://api.osv.dev/v1/vulns/${encodedVulnId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,

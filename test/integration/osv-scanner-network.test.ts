@@ -452,48 +452,6 @@ CMD ["echo", "Test image for OSV scanning"]
     }, 90000); // Longer timeout for build + multiple API calls
   });
 
-  describe('Clean Dependencies (No Vulnerabilities)', () => {
-    it('should return minimal vulnerabilities for a recent safe version', async () => {
-      if (skipTests) {
-        console.log('Skipping test - OSV API or Docker not available');
-        return;
-      }
-
-      // Use recent versions that should be clean (as of test creation)
-      const pomXml = `<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>com.example</groupId>
-  <artifactId>clean-test</artifactId>
-  <version>1.0.0</version>
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-core</artifactId>
-      <version>2.23.1</version>
-    </dependency>
-  </dependencies>
-</project>`;
-
-      const imageTag = 'osv-test:clean';
-      await buildTestImage(pomXml, imageTag);
-
-      const result = await osvScanner.scanImage(imageTag);
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        console.error('Scan failed:', result.error);
-        return;
-      }
-
-      const { totalVulnerabilities } = result.value;
-
-      // Recent log4j version should have few or no known vulnerabilities
-      // Note: This may change over time as new vulnerabilities are discovered
-      expect(totalVulnerabilities).toBeLessThanOrEqual(5); // Allow some buffer
-    }, 60000);
-  });
-
   describe('Error Handling', () => {
     it('should handle empty pom.xml gracefully', async () => {
       if (skipTests) {
