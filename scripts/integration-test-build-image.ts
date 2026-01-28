@@ -2,8 +2,8 @@
  * Integration Test: build-image with Multi-Language Scenarios
  *
  * Tests the complete flow of:
- * 1. Building Node.js application with multi-stage Dockerfile
- * 2. Building Python application with multi-stage Dockerfile
+ * 1. Building Java application with multi-stage Dockerfile
+ * 2. Building .NET application with multi-stage Dockerfile
  * 3. Verifying build success, image metadata, and layer counts
  * 4. Testing build arguments injection
  * 5. Validating image sizes are reasonable
@@ -61,14 +61,10 @@ const TEST_CASES: BuildTestCase[] = [
     name: 'Java Multi-Stage Build',
     dockerContext: 'test/fixtures/build-scenarios/java',
     tags: ['test-build:java-app'],
-    expectedSize: process.platform === 'win32'
-      ? { min: 300_000_000, max: 8_000_000_000 }  // 300MB - 8GB for Windows
-      : { min: 100_000_000, max: 400_000_000 },    // 100MB - 400MB for Linux/Alpine
+    expectedSize: { min: 100_000_000, max: 400_000_000 },  // 100MB - 400MB for Alpine
     expectedLayers: { min: 5, max: 30 },
     shouldSucceed: true,
-    description: process.platform === 'win32'
-      ? 'Tests Java build with Windows Server/Nano and multi-stage'
-      : 'Tests Java build with Eclipse Temurin JRE and multi-stage',
+    description: 'Tests Java build with Eclipse Temurin JRE and multi-stage',
   },
   {
     name: 'Java with Build Args',
@@ -77,9 +73,7 @@ const TEST_CASES: BuildTestCase[] = [
     buildArgs: {
       VERSION: '2.0.0',
     },
-    expectedSize: process.platform === 'win32'
-      ? { min: 300_000_000, max: 8_000_000_000 }
-      : { min: 100_000_000, max: 400_000_000 },
+    expectedSize: { min: 100_000_000, max: 400_000_000 },  // 100MB - 400MB for Alpine
     shouldSucceed: true,
     description: 'Tests Java build argument injection',
   },
@@ -87,14 +81,10 @@ const TEST_CASES: BuildTestCase[] = [
     name: '.NET Multi-Stage Build',
     dockerContext: 'test/fixtures/build-scenarios/dotnet',
     tags: ['test-build:dotnet-app'],
-    expectedSize: process.platform === 'win32'
-      ? { min: 200_000_000, max: 6_000_000_000 }  // 200MB - 6GB for Windows
-      : { min: 80_000_000, max: 300_000_000 },     // 80MB - 300MB for Linux/Alpine
+    expectedSize: { min: 80_000_000, max: 300_000_000 },  // 80MB - 300MB for Alpine
     expectedLayers: { min: 5, max: 30 },
     shouldSucceed: true,
-    description: process.platform === 'win32'
-      ? 'Tests .NET 8 build with Windows Nano Server runtime and multi-stage'
-      : 'Tests .NET 8 build with ASP.NET runtime and multi-stage',
+    description: 'Tests .NET 8 build with ASP.NET runtime and multi-stage',
   },
   {
     name: '.NET with Build Args',
@@ -103,9 +93,7 @@ const TEST_CASES: BuildTestCase[] = [
     buildArgs: {
       VERSION: '3.0.0',
     },
-    expectedSize: process.platform === 'win32'
-      ? { min: 200_000_000, max: 6_000_000_000 }
-      : { min: 80_000_000, max: 300_000_000 },
+    expectedSize: { min: 80_000_000, max: 300_000_000 },  // 80MB - 300MB for Alpine
     shouldSucceed: true,
     description: 'Tests .NET build with version argument',
   },
@@ -124,7 +112,7 @@ function verifyDockerInstalled(): boolean {
     execSync('docker info', { stdio: 'pipe' });
     console.log('   ✅ Docker daemon is running');
     return true;
-  } catch (error) {
+  } catch {
     console.log('   ❌ Docker not found or not running');
     return false;
   }
@@ -282,22 +270,19 @@ async function main() {
     try {
       const contextPath = join(process.cwd(), testCase.dockerContext);
 
-      // Detect platform and choose appropriate Dockerfile
-      let platform: 'linux/amd64' | 'linux/arm64' | 'windows/amd64' = 'linux/amd64';
-      let dockerfile = testCase.dockerfile || 'Dockerfile';
+      let platform: 'linux/amd64' | 'linux/arm64' = 'linux/amd64';
+      const dockerfile = testCase.dockerfile || 'Dockerfile';
 
       try {
-        const isWindows = process.platform === 'win32';
-        if (isWindows) {
-          platform = 'windows/amd64';
-          dockerfile = 'Dockerfile.windows';
-          console.log(`      Using Windows Dockerfile: ${dockerfile}`);
-        } else {
-          const arch = execSync('uname -m', { encoding: 'utf-8' }).trim();
-          if (arch === 'arm64' || arch === 'aarch64') {
-            platform = 'linux/arm64';
-          }
+        const arch = process.platform === 'win32'
+          ? 'x86_64'  // Windows Docker Desktop defaults to linux/amd64
+          : execSync('uname -m', { encoding: 'utf-8' }).trim();
+
+        if (arch === 'arm64' || arch === 'aarch64') {
+          platform = 'linux/arm64';
         }
+
+        console.log(`      Platform: ${platform}`);
       } catch {
         // Default to linux/amd64
       }
