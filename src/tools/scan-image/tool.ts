@@ -83,7 +83,7 @@ async function handleScanImage(
   }
   const { logger, timer } = setupToolContext(context, 'scan-image');
 
-  const { scanner = 'trivy', severity } = params;
+  const { scanner = 'osv', severity } = params;
 
   // Map severity parameter to threshold
   const finalSeverityThreshold = severity
@@ -274,7 +274,8 @@ async function handleScanImage(
     return Failure(errorMessage, {
       message: errorMessage,
       hint: 'An unexpected error occurred during the security scan',
-      resolution: 'Verify that the scanner (Trivy) is installed and accessible, the image exists, and you have proper permissions',
+      resolution:
+        'Verify that the scanner is installed and accessible, the image exists, and you have proper permissions',
     });
   }
 }
