@@ -1,5 +1,9 @@
 # Change Log
 
+## [Unreleased]
+
+- enable full build-image integration tests on Windows CI runners
+
 ## [1.1.0-dev.4]
 
 - add new `osv` parser for scan-image tool that has no CLI dependencies

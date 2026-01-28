@@ -646,21 +646,12 @@ jobs:
       - name: Install tsx
         run: npm install -g tsx
 
-      - name: Verify Docker socket path (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Write-Host "Verifying Docker socket path on Windows..."
-          tsx scripts/verify-docker-socket-windows.ts
-
-      - name: Verify Docker (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
+      - name: Verify Docker
         run: |
           docker --version
           docker info
 
-      - name: Verify test fixtures (Linux only)
+      - name: Verify test fixtures (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -670,20 +661,37 @@ jobs:
           ls -la test/fixtures/build-scenarios/dotnet/
           echo "✅ All test fixtures found"
 
-      - name: Run build-image integration test (Linux only)
-        if: runner.os == 'Linux'
+      - name: Verify test fixtures (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Verifying test fixtures exist..."
+          Get-ChildItem test/fixtures/build-scenarios/
+          Get-ChildItem test/fixtures/build-scenarios/java/
+          Get-ChildItem test/fixtures/build-scenarios/dotnet/
+          Write-Host "✅ All test fixtures found"
+
+      - name: Run build-image integration test
         id: build-tests
         run: |
           tsx scripts/integration-test-build-image.ts
         timeout-minutes: 15
 
-      - name: Cleanup Docker images (Linux only)
+      - name: Cleanup Docker images (Linux)
         if: always() && runner.os == 'Linux'
         shell: bash
         run: |
           docker images --format "{{.Repository}}:{{.Tag}}" | { grep test-build || true; } | while read image; do
             docker rmi -f "$image" || true
           done
+
+      - name: Cleanup Docker images (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -match "test-build" } | ForEach-Object {
+            docker rmi -f $_ 2>$null
+          }
 
       - name: Generate test summary
         if: always()
@@ -697,14 +705,7 @@ jobs:
           echo "**Platform:** ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            echo "## Windows: Docker Socket Path Verification" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Verified correct Docker socket path is being used" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Expected:** \`//./pipe/docker_engine\` (Windows named pipe)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Note:** Windows runners only validate socket path. Full build tests run on Linux." >> $GITHUB_STEP_SUMMARY
-          elif [ -f "build-image-test-results.json" ]; then
+          if [ -f "build-image-test-results.json" ]; then
             TOTAL=$(jq -r '.total' build-image-test-results.json)
             PASSED=$(jq -r '.passed' build-image-test-results.json)
             FAILED=$(jq -r '.failed' build-image-test-results.json)
@@ -743,7 +744,7 @@ jobs:
           fi
 
       - name: Upload test results
-        if: always() && runner.os == 'Linux'
+        if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: build-image-test-results-${{ matrix.os }}
