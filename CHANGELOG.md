@@ -1,6 +1,6 @@
 # Change Log
 
-## [1.0.3]
+## [1.1.0]
 
 - add new `osv` parser for scan-image tool that has no CLI dependencies
 - bug fix for windows docker named pipe socket connection
