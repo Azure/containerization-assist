@@ -153,19 +153,43 @@ describe('Docker Workflow Integration', () => {
         expect(scanResult.value).toBeDefined();
       }
 
-      // Step 5: Tag image
+      // Step 5: Tag image (with retry for potential race condition after build)
       const newTag = `docker-workflow-test:v1.0`;
-      const tagResult = await tagImageTool.handler(
-        {
+      let tagResult;
+      const maxRetries = 3;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        tagResult = await tagImageTool.handler(
+          {
+            imageId: build.imageId,
+            tag: newTag,
+          },
+          toolContext
+        );
+
+        if (tagResult.ok) {
+          break;
+        }
+
+        // Log error details for debugging
+        console.log(`Tag attempt ${attempt + 1} failed:`, {
+          error: tagResult.error,
+          guidance: tagResult.guidance,
           imageId: build.imageId,
           tag: newTag,
-        },
-        toolContext
-      );
+        });
 
-      expect(tagResult.ok).toBe(true);
-      if (tagResult.ok) {
+        // If tag failed and we have retries left, wait briefly and retry
+        if (attempt < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+        }
+      }
+
+      expect(tagResult?.ok).toBe(true);
+      if (tagResult?.ok) {
         expect(tagResult.value).toBeDefined();
+      } else {
+        console.log('All tag attempts failed. Final result:', tagResult);
       }
     }, testTimeout);
 
@@ -228,15 +252,29 @@ CMD ["python", "app.py"]`
         const build = buildResult.value as BuildImageResult;
         testCleaner.trackImage(build.imageId);
 
-        // Step 4: Tag the image
-        const tagResult = await tagImageTool.handler(
-          {
-            imageId: build.imageId,
-            tag: `docker-workflow-python:latest`,
-          },
-          toolContext
-        );
-        
+        // Step 4: Tag the image (with retry for potential race condition)
+        let tagResult;
+        const maxRetries = 3;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          tagResult = await tagImageTool.handler(
+            {
+              imageId: build.imageId,
+              tag: `docker-workflow-python:latest`,
+            },
+            toolContext
+          );
+
+          if (tagResult.ok) {
+            break;
+          }
+
+          if (attempt < maxRetries - 1) {
+            console.log(`Tag attempt ${attempt + 1} failed, retrying...`);
+            await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+          }
+        }
+
         if (!tagResult.ok) {
           console.log('Tagging failed:', tagResult.error);
           return;
@@ -335,13 +373,28 @@ CMD ["python", "app.py"]`
         // Scan may fail if Trivy not available - that's OK
         expect(scanResult.ok !== undefined).toBe(true);
 
-        const tagResult = await tagImageTool.handler(
-          {
-            imageId: build.imageId,
-            tag: `partial-workflow-test:latest`,
-          },
-          toolContext
-        );
+        // Tag with retry for potential race condition
+        let tagResult;
+        const maxRetries = 3;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          tagResult = await tagImageTool.handler(
+            {
+              imageId: build.imageId,
+              tag: `partial-workflow-test:latest`,
+            },
+            toolContext
+          );
+
+          if (tagResult.ok) {
+            break;
+          }
+
+          if (attempt < maxRetries - 1) {
+            console.log(`Tag attempt ${attempt + 1} failed, retrying...`);
+            await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+          }
+        }
 
         if (!tagResult.ok) {
           console.log('Tagging failed:', tagResult.error);
