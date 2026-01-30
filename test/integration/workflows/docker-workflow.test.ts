@@ -171,16 +171,25 @@ describe('Docker Workflow Integration', () => {
           break;
         }
 
+        // Log error details for debugging
+        console.log(`Tag attempt ${attempt + 1} failed:`, {
+          error: tagResult.error,
+          guidance: tagResult.guidance,
+          imageId: build.imageId,
+          tag: newTag,
+        });
+
         // If tag failed and we have retries left, wait briefly and retry
         if (attempt < maxRetries - 1) {
-          console.log(`Tag attempt ${attempt + 1} failed, retrying...`);
           await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
         }
       }
 
-      expect(tagResult.ok).toBe(true);
-      if (tagResult.ok) {
+      expect(tagResult?.ok).toBe(true);
+      if (tagResult?.ok) {
         expect(tagResult.value).toBeDefined();
+      } else {
+        console.log('All tag attempts failed. Final result:', tagResult);
       }
     }, testTimeout);
 
