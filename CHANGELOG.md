@@ -1,5 +1,19 @@
 # Change Log
 
+## [1.1.0]
+
+- add new `osv` parser for scan-image tool that has no CLI dependencies
+- bug fix for windows docker named pipe socket connection
+- update description of `analyze-repo` tool
+- add policy integration test for `fix-dockerfile` tool
+- show progress notifications during docker build operations
+- dependency updates
+- remove "additionalProperties" field from generated vscode package.json
+- fix scan-image tool schema to use 'grype'/'snyk' values
+- bump @modelcontextprotocol/sdk from 1.24.1 to 1.25.2 to address high severity [CVE-2026-0621](https://github.com/advisories/GHSA-8r9q-7v3j-jr4g)
+- VSCode integration
+- Separate mcp sdk from base tools
+
 ## [1.1.0-dev.4]
 
 - add new `osv` parser for scan-image tool that has no CLI dependencies
