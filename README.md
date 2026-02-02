@@ -63,8 +63,7 @@ Add the following to your VS Code settings or create `.vscode/mcp.json` in your 
       "command": "npx",
       "args": ["-y", "containerization-assist-mcp", "start"],
       "env": {
-        "DOCKER_SOCKET": "/var/run/docker.sock",
-        "LOG_LEVEL": "info"
+         "LOG_LEVEL": "info"
       }
     }
   }
