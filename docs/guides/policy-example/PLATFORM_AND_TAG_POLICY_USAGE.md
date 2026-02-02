@@ -169,10 +169,10 @@ All 11 tests pass:
 2. Tags are applied when running `docker build -t myimage:demo`
 3. The LABEL serves as documentation and policy enforcement
 
-When using the `build-image` tool, make sure to specify the tag:
+When using the `build-image-context` tool, make sure to specify the tag:
 
 ```bash
-# The build-image tool should tag the image as "demo"
+# The build-image-context tool should tag the image as "demo"
 # Policy ensures the Dockerfile has LABEL tag="demo" for consistency
 ```
 

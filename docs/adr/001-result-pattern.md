@@ -17,14 +17,14 @@ type Result<T, E = Error> =
   | { ok: false; error: E };
 
 // Usage example
-async function buildImage(config: BuildConfig): Promise<Result<Image>> {
+async function buildImageContext(config: BuildConfig): Promise<Result<BuildContext>> {
   const docker = await createDockerClient();
   if (!docker.ok) {
     return Failure('Docker client unavailable', docker.error);
   }
 
-  // ... build logic
-  return Success(image);
+  // ... prepare build context
+  return Success(buildContext);
 }
 ```
 

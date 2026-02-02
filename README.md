@@ -77,7 +77,7 @@ Restart VS Code to enable the MCP server in GitHub Copilot.
 For direct tool usage without MCP protocol (e.g., VS Code extensions, programmatic access):
 
 ```typescript
-import { analyzeRepo, buildImage, scanImage } from 'containerization-assist-mcp/sdk';
+import { analyzeRepo, buildImageContext, scanImage } from 'containerization-assist-mcp/sdk';
 
 // Simple function calls - no MCP server needed
 const analysis = await analyzeRepo({ repositoryPath: './myapp' });
@@ -85,7 +85,8 @@ if (analysis.ok) {
   console.log('Detected:', analysis.value.modules);
 }
 
-const build = await buildImage({ path: './myapp', imageName: 'myapp:v1' });
+const buildContext = await buildImageContext({ path: './myapp', imageName: 'myapp:v1', platform: 'linux/amd64' });
+// buildContext returns build commands for the agent to execute
 const scan = await scanImage({ imageId: 'myapp:v1' });
 ```
 
@@ -212,7 +213,7 @@ The server provides 13 MCP tools organized by functionality:
 ### Image Operations
 | Tool | Description |
 |------|-------------|
-| `build-image` | Build Docker images from Dockerfiles with security analysis |
+| `build-image-context` | Prepare Docker build context with security analysis and return build commands |
 | `scan-image` | Scan Docker images for security vulnerabilities with remediation guidance (uses Trivy CLI) |
 | `tag-image` | Tag Docker images with version and registry information |
 | `push-image` | Push Docker images to a registry |
