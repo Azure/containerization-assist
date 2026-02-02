@@ -157,7 +157,7 @@ export function extractSafeTelemetryMetrics(
       if ('moduleCount' in result) metrics.moduleCount = result.moduleCount;
       break;
 
-    case 'build-image':
+    case 'build-image-context':
       // Safe: Build duration, image size (aggregates)
       if ('buildTime' in result) metrics.buildTimeMs = result.buildTime;
       if ('size' in result) metrics.imageSizeBytes = result.size;

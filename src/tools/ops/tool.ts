@@ -11,7 +11,7 @@
  * - Server diagnostics and metadata
  *
  * **NOT for:**
- * - Application containerization (use build-image, etc.)
+ * - Application containerization (use build-image-context, etc.)
  * - Docker operations (use Docker tools)
  * - Kubernetes operations (use K8s tools)
  *
@@ -271,7 +271,8 @@ async function handleOps(
       return Failure(`Unknown operation: ${input.operation}`, {
         message: `Unknown operation: ${input.operation}`,
         hint: 'The requested operation is not supported',
-        resolution: 'Use one of the supported operations: "ping" for connectivity testing or "status" for server information',
+        resolution:
+          'Use one of the supported operations: "ping" for connectivity testing or "status" for server information',
       });
   }
 }
@@ -283,7 +284,8 @@ import { tool } from '@/types/tool';
 
 export default tool({
   name: 'ops',
-  description: 'MCP server diagnostics: ping for connectivity testing, status for health metrics (memory, CPU, uptime). Use this for server monitoring, not application containerization.',
+  description:
+    'MCP server diagnostics: ping for connectivity testing, status for health metrics (memory, CPU, uptime). Use this for server monitoring, not application containerization.',
   category: 'utility',
   version: '2.0.0',
   schema: opsToolSchema,

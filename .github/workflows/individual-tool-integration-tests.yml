@@ -615,9 +615,9 @@ jobs:
           path: verify-deploy-test-results.json
           retention-days: 7
 
-  # Test build-image with multi-language scenarios
-  test-build-image:
-    name: build-image Multi-Language Tests (${{ matrix.os }})
+  # Test build-image-context with multi-language scenarios
+  test-build-image-context:
+    name: build-image-context Multi-Language Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -670,7 +670,7 @@ jobs:
           ls -la test/fixtures/build-scenarios/dotnet/
           echo "✅ All test fixtures found"
 
-      - name: Run build-image integration test (Linux only)
+      - name: Run build-image-context integration test (Linux only)
         if: runner.os == 'Linux'
         id: build-tests
         run: |
@@ -692,7 +692,7 @@ jobs:
           echo "# 🔨 Multi-Language Build Integration Tests" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Tool Tested" >> $GITHUB_STEP_SUMMARY
-          echo "- \`build-image\` - Builds Docker images from Dockerfiles" >> $GITHUB_STEP_SUMMARY
+          echo "- \`build-image-context\` - Returns Docker build commands for agents to execute" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Platform:** ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -704,10 +704,10 @@ jobs:
             echo "**Expected:** \`//./pipe/docker_engine\` (Windows named pipe)" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Note:** Windows runners only validate socket path. Full build tests run on Linux." >> $GITHUB_STEP_SUMMARY
-          elif [ -f "build-image-test-results.json" ]; then
-            TOTAL=$(jq -r '.total' build-image-test-results.json)
-            PASSED=$(jq -r '.passed' build-image-test-results.json)
-            FAILED=$(jq -r '.failed' build-image-test-results.json)
+          elif [ -f "build-image-context-test-results.json" ]; then
+            TOTAL=$(jq -r '.total' build-image-context-test-results.json)
+            PASSED=$(jq -r '.passed' build-image-context-test-results.json)
+            FAILED=$(jq -r '.failed' build-image-context-test-results.json)
 
             echo "## Results" >> $GITHUB_STEP_SUMMARY
             echo "- **Total Tests**: $TOTAL" >> $GITHUB_STEP_SUMMARY
@@ -716,7 +716,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
 
             echo "## Test Cases" >> $GITHUB_STEP_SUMMARY
-            jq -r '.results[] | "- " + (if .passed then "✅" else "❌" end) + " **" + .name + "**" + (if .imageSize then " (" + ((.imageSize / 1000000) | floor | tostring) + "MB)" else "" end)' build-image-test-results.json >> $GITHUB_STEP_SUMMARY
+            jq -r '.results[] | "- " + (if .passed then "✅" else "❌" end) + " **" + .name + "**" + (if .imageSize then " (" + ((.imageSize / 1000000) | floor | tostring) + "MB)" else "" end)' build-image-context-test-results.json >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
 
             if [ "${{ steps.build-tests.outcome }}" = "success" ]; then
@@ -725,7 +725,7 @@ jobs:
               echo "### ❌ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Failed test details:**" >> $GITHUB_STEP_SUMMARY
-              jq -r '.results[] | select(.passed == false) | "- **" + .name + "**: " + .message' build-image-test-results.json >> $GITHUB_STEP_SUMMARY
+              jq -r '.results[] | select(.passed == false) | "- **" + .name + "**: " + .message' build-image-context-test-results.json >> $GITHUB_STEP_SUMMARY
             fi
 
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -746,8 +746,8 @@ jobs:
         if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
-          name: build-image-test-results-${{ matrix.os }}
-          path: build-image-test-results.json
+          name: build-image-context-test-results-${{ matrix.os }}
+          path: build-image-context-test-results.json
           retention-days: 7
 
   # Complete E2E Workflow Test - Tests entire containerization pipeline
@@ -831,7 +831,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Workflow Pipeline Tested" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "analyze-repo → generate-dockerfile → build-image → scan-image" >> $GITHUB_STEP_SUMMARY
+          echo "analyze-repo → generate-dockerfile → build-image-context → scan-image" >> $GITHUB_STEP_SUMMARY
           echo "    → tag-image → prepare-cluster → push-image → deploy → verify-deploy" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -873,7 +873,7 @@ jobs:
           echo "## Tools Tested" >> $GITHUB_STEP_SUMMARY
           echo "1. **analyze-repo** - Repository analysis" >> $GITHUB_STEP_SUMMARY
           echo "2. **generate-dockerfile** - Dockerfile generation" >> $GITHUB_STEP_SUMMARY
-          echo "3. **build-image** - Docker image building" >> $GITHUB_STEP_SUMMARY
+          echo "3. **build-image-context** - Docker build command generation" >> $GITHUB_STEP_SUMMARY
           echo "4. **scan-image** - Security vulnerability scanning" >> $GITHUB_STEP_SUMMARY
           echo "5. **prepare-cluster** - Kubernetes cluster setup" >> $GITHUB_STEP_SUMMARY
           echo "6. **tag-image** - Image tagging" >> $GITHUB_STEP_SUMMARY

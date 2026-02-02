@@ -69,13 +69,6 @@ function formatSection(title: string, content: string): string {
   return `## ${title}\n${content}\n`;
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
@@ -144,8 +137,14 @@ function formatAnalyzeRepoResultProse(
   } else if (result.language) {
     // Fallback to top-level fields if modules not populated
     const details: string[] = [];
-    if (result.language) details.push(`- **Language**: ${result.language}${result.languageVersion ? ` ${result.languageVersion}` : ''}`);
-    if (result.framework) details.push(`- **Framework**: ${result.framework}${result.frameworkVersion ? ` ${result.frameworkVersion}` : ''}`);
+    if (result.language)
+      details.push(
+        `- **Language**: ${result.language}${result.languageVersion ? ` ${result.languageVersion}` : ''}`,
+      );
+    if (result.framework)
+      details.push(
+        `- **Framework**: ${result.framework}${result.frameworkVersion ? ` ${result.frameworkVersion}` : ''}`,
+      );
     if (result.buildSystem?.type) details.push(`- **Build System**: ${result.buildSystem.type}`);
     if (result.entryPoint) details.push(`- **Entry Point**: ${result.entryPoint}`);
     if (details.length > 0) {
@@ -156,7 +155,8 @@ function formatAnalyzeRepoResultProse(
   // Dependencies
   if (result.dependencies && result.dependencies.length > 0) {
     const depList = result.dependencies.slice(0, 10).join(', ');
-    const moreText = result.dependencies.length > 10 ? ` (+${result.dependencies.length - 10} more)` : '';
+    const moreText =
+      result.dependencies.length > 10 ? ` (+${result.dependencies.length - 10} more)` : '';
     sections.push(formatSection('Key Dependencies', depList + moreText));
   }
 
@@ -317,6 +317,7 @@ export const formatFixDockerfileResult = createFormatter(formatFixDockerfileResu
 
 /**
  * Format build-image result prose output.
+ * Now formats build context preparation results (not execution results).
  */
 function formatBuildImageResultProse(
   result: BuildImageResult,
@@ -324,48 +325,61 @@ function formatBuildImageResultProse(
 ): string {
   const sections: string[] = [];
 
-  if (result.summary) {
-    sections.push(formatSection('Build Result', result.summary));
-  } else {
-    sections.push(
-      formatSection('Build Result', result.success ? '✅ Build successful' : '❌ Build failed'),
-    );
-  }
+  // Summary
+  sections.push(formatSection('Build Context Analysis', result.summary));
 
-  // Details
-  const details: string[] = [];
-  if (result.imageId) details.push(`- **Image ID**: \`${result.imageId.slice(0, 19)}...\``);
-  if (result.createdTags?.length) {
-    details.push(`- **Tags**: ${result.createdTags.map((t) => `\`${t}\``).join(', ')}`);
-  }
-  if (result.size) details.push(`- **Size**: ${formatBytes(result.size)}`);
-  if (result.buildTime) details.push(`- **Build Time**: ${formatDuration(result.buildTime)}`);
-  if (result.layers) details.push(`- **Layers**: ${result.layers}`);
+  // Context paths
+  const contextDetails = [
+    `- **Build Context**: \`${result.context.buildContextPath}\``,
+    `- **Dockerfile**: \`${result.context.dockerfilePath}\``,
+    `- **Has .dockerignore**: ${result.context.hasDockerignore ? 'Yes' : 'No'}`,
+  ];
+  sections.push(formatSection('Paths', contextDetails.join('\n')));
 
-  if (details.length > 0) {
-    sections.push(formatSection('Build Details', details.join('\n')));
+  // Build configuration
+  if (result.buildConfig.finalTags.length > 0) {
+    const configDetails = [
+      `- **Tags**: ${result.buildConfig.finalTags.map((t: string) => `\`${t}\``).join(', ')}`,
+      `- **Platform**: ${result.buildConfig.platform}`,
+    ];
+    sections.push(formatSection('Build Configuration', configDetails.join('\n')));
   }
 
   // Security warnings
-  if (result.securityWarnings && result.securityWarnings.length > 0) {
-    const warnings = result.securityWarnings.map((w) => `- ⚠️ ${w}`).join('\n');
+  if (result.securityAnalysis.warnings.length > 0) {
+    const warnings = result.securityAnalysis.warnings
+      .map(
+        (w: { severity: string; message: string }) =>
+          `- ⚠️ [${w.severity.toUpperCase()}] ${w.message}`,
+      )
+      .join('\n');
     sections.push(formatSection('Security Warnings', warnings));
   }
 
-  // Failed tags
-  if (result.failedTags && result.failedTags.length > 0) {
-    sections.push(
-      formatSection('Failed Tags', result.failedTags.map((t) => `- \`${t}\``).join('\n')),
-    );
+  // Dockerfile analysis
+  const analysis = result.dockerfileAnalysis;
+  const analysisDetails = [
+    `- **Base Images**: ${analysis.baseImages.join(', ') || 'None detected'}`,
+    `- **Exposed Ports**: ${analysis.exposedPorts.join(', ') || 'None'}`,
+    `- **Estimated Layers**: ${analysis.layerCount}`,
+    `- **Has HEALTHCHECK**: ${analysis.hasHealthcheck ? 'Yes' : 'No'}`,
+  ];
+  if (analysis.finalUser) {
+    analysisDetails.push(`- **Final USER**: ${analysis.finalUser}`);
   }
+  sections.push(formatSection('Dockerfile Analysis', analysisDetails.join('\n')));
+
+  // Build command
+  sections.push(
+    formatSection('Build Command', `\`\`\`bash\n${result.nextAction.buildCommand.command}\n\`\`\``),
+  );
 
   if (opts.includeSuggestedNext) {
-    sections.push(
-      formatSection(
-        'Suggested Next Step',
-        'Use `scan_image` to check for vulnerabilities, or `tag_image` to add version tags.',
-      ),
-    );
+    const nextSteps = [
+      'Execute the build command above',
+      ...result.nextAction.postBuildSteps.map((step: string) => step),
+    ];
+    sections.push(formatSection('Suggested Next Steps', nextSteps.map((s) => `- ${s}`).join('\n')));
   }
 
   return sections.join('\n');
@@ -585,7 +599,9 @@ function formatGenerateK8sManifestsResultProse(
 /**
  * Format generate-k8s-manifests result for LLM consumption.
  */
-export const formatGenerateK8sManifestsResult = createFormatter(formatGenerateK8sManifestsResultProse);
+export const formatGenerateK8sManifestsResult = createFormatter(
+  formatGenerateK8sManifestsResultProse,
+);
 
 /**
  * Format prepare-cluster result prose output.
@@ -678,13 +694,18 @@ function formatVerifyDeployResultProse(
   details.push(`- **Deployment**: ${result.deploymentName}`);
   details.push(`- **Namespace**: ${result.namespace}`);
   details.push(`- **Status**: ${result.ready ? 'Ready' : 'Not Ready'}`);
-  details.push(`- **Replicas**: ${result.status.readyReplicas}/${result.status.totalReplicas} ready`);
+  details.push(
+    `- **Replicas**: ${result.status.readyReplicas}/${result.status.totalReplicas} ready`,
+  );
   sections.push(formatSection('Status', details.join('\n')));
 
   // Endpoints
   if (result.endpoints && result.endpoints.length > 0) {
     const endpoints = result.endpoints
-      .map((e) => `- ${e.type}: \`${e.url}:${e.port}\` ${e.healthy ? '✓' : e.healthy === false ? '✗' : ''}`)
+      .map(
+        (e) =>
+          `- ${e.type}: \`${e.url}:${e.port}\` ${e.healthy ? '✓' : e.healthy === false ? '✗' : ''}`,
+      )
       .join('\n');
     sections.push(formatSection('Endpoints', endpoints));
   }
@@ -761,10 +782,7 @@ function formatServerStatusResultProse(result: ServerStatusResult): string {
  * Uses discriminated union pattern with `kind` field for type-safe narrowing.
  * No type guards or unsafe casts needed.
  */
-function formatOpsResultProse(
-  result: OpsResult,
-  _opts: Required<FormatterOptions>,
-): string {
+function formatOpsResultProse(result: OpsResult, _opts: Required<FormatterOptions>): string {
   switch (result.kind) {
     case 'ping':
       return formatPingResultProse(result);
@@ -803,7 +821,7 @@ interface FormatterRegistry {
   analyzeRepo: FormatterFunction<RepositoryAnalysis>;
   generateDockerfile: FormatterFunction<DockerfilePlan>;
   fixDockerfile: FormatterFunction<DockerfileFixPlan>;
-  buildImage: FormatterFunction<BuildImageResult>;
+  buildImageContext: FormatterFunction<BuildImageResult>;
   scanImage: FormatterFunction<ScanImageResult>;
   tagImage: FormatterFunction<TagImageResult>;
   pushImage: FormatterFunction<PushImageResult>;
@@ -837,7 +855,7 @@ export const resultFormatters = {
   analyzeRepo: formatAnalyzeRepoResult,
   generateDockerfile: formatGenerateDockerfileResult,
   fixDockerfile: formatFixDockerfileResult,
-  buildImage: formatBuildImageResult,
+  buildImageContext: formatBuildImageResult,
   scanImage: formatScanImageResult,
   tagImage: formatTagImageResult,
   pushImage: formatPushImageResult,

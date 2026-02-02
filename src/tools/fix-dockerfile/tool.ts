@@ -268,9 +268,10 @@ const runPattern = createKnowledgeTool<
       const totalIssues = rules.issueCount;
       const totalFixes = knowledgeMatches.length;
       const environment = input.environment || 'production';
-      const summary = totalIssues > 0
-        ? `✅ Dockerfile validation complete for ${environment} environment. Found ${pluralize(totalIssues, 'issue')} (${securityIssues.length} security, ${performanceIssues.length} performance). ${pluralize(totalFixes, 'fix recommendation')} available. Validation score: ${validationScore}/100 (${validationGrade}).`
-        : `✅ Dockerfile validation passed for ${environment} environment. Score: ${validationScore}/100 (${validationGrade}). No critical issues found.`;
+      const summary =
+        totalIssues > 0
+          ? `✅ Dockerfile validation complete for ${environment} environment. Found ${pluralize(totalIssues, 'issue')} (${securityIssues.length} security, ${performanceIssues.length} performance). ${pluralize(totalFixes, 'fix recommendation')} available. Validation score: ${validationScore}/100 (${validationGrade}).`
+          : `✅ Dockerfile validation passed for ${environment} environment. Score: ${validationScore}/100 (${validationGrade}). No critical issues found.`;
 
       return {
         currentIssues: {
@@ -431,7 +432,7 @@ export default tool({
   },
   chainHints: {
     success:
-      'Dockerfile validation and analysis complete (includes built-in best practices + organizational policy validation if configured). Next: Apply recommended fixes, then call build-image to test the Dockerfile.',
+      'Dockerfile validation and analysis complete (includes built-in best practices + organizational policy validation if configured). Next: Apply recommended fixes, then call build-image-context to test the Dockerfile.',
     failure:
       'Dockerfile validation failed. Review validation errors, policy violations (if any), and apply recommended fixes.',
   },

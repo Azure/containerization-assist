@@ -236,8 +236,8 @@ describe('telemetry-utils', () => {
       expect(metrics).not.toHaveProperty('path');
     });
 
-    it('should extract safe metrics from build-image results', () => {
-      const metrics = extractSafeTelemetryMetrics('build-image' as ToolName, {
+    it('should extract safe metrics from build-image-context results', () => {
+      const metrics = extractSafeTelemetryMetrics('build-image-context' as ToolName, {
         imageId: 'sha256:abc123',
         size: 245678234,
         buildTime: 45000,
@@ -305,13 +305,13 @@ describe('telemetry-utils', () => {
   describe('createSafeTelemetryEvent', () => {
     it('should create complete safe telemetry event for success', () => {
       const event = createSafeTelemetryEvent(
-        'build-image' as ToolName,
+        'build-image-context' as ToolName,
         { path: '/home/user/app', imageName: 'myapp' },
         { ok: true, value: { imageId: 'abc', size: 1000, buildTime: 5000, tags: [] } },
         5000,
       );
 
-      expect(event.toolName).toBe('build-image');
+      expect(event.toolName).toBe('build-image-context');
       expect(event.success).toBe(true);
       expect(event.durationMs).toBe(5000);
       // Path has 3 segments, so all should be hashed
@@ -326,13 +326,13 @@ describe('telemetry-utils', () => {
 
     it('should create complete safe telemetry event for error', () => {
       const event = createSafeTelemetryEvent(
-        'build-image' as ToolName,
+        'build-image-context' as ToolName,
         { path: '/home/user/app', imageName: 'myapp' },
         { ok: false, error: 'Build failed: file not found' },
         2000,
       );
 
-      expect(event.toolName).toBe('build-image');
+      expect(event.toolName).toBe('build-image-context');
       expect(event.success).toBe(false);
       expect(event.durationMs).toBe(2000);
       // Path has 3 segments, so all should be hashed
@@ -409,7 +409,10 @@ describe('telemetry-utils', () => {
         buildTime: 45000,
       };
 
-      const metrics = extractSafeTelemetryMetrics('build-image' as ToolName, sensitiveResult);
+      const metrics = extractSafeTelemetryMetrics(
+        'build-image-context' as ToolName,
+        sensitiveResult,
+      );
 
       // Verify only safe metrics are included
       const metricsStr = JSON.stringify(metrics);
@@ -425,7 +428,7 @@ describe('telemetry-utils', () => {
 
     it('should create telemetry events with no customer data leakage', () => {
       const event = createSafeTelemetryEvent(
-        'build-image' as ToolName,
+        'build-image-context' as ToolName,
         {
           path: '/home/john.doe/acme-corp/payment-service',
           imageName: 'acme-corp/payment-api:v2.1.0',

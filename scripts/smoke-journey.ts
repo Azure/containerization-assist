@@ -81,7 +81,7 @@ async function runSmokeTest(): Promise<void> {
     },
     {
       name: 'Build Docker Image',
-      tool: 'build-image',
+      tool: 'build-image-context',
       params: {
         path: TEST_DIR,
         // Use the existing Dockerfile in the fixture (generate-dockerfile returns a plan, doesn't write files)

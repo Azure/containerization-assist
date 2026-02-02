@@ -1,6 +1,5 @@
 import {
   AnalysisResult,
-  DockerBuildResult,
   DockerfileResult,
   ScanResult,
   K8sManifestResult,
@@ -59,26 +58,6 @@ CMD ["node", "index"]`,
     stages: ['production'],
     optimizations: ['multistage', 'layer-caching'],
     multistage: false,
-    ...overrides,
-  };
-}
-
-export function createMockDockerBuildResult(
-  overrides?: Partial<DockerBuildResult>,
-): DockerBuildResult {
-  return {
-    image_id: `sha256:${'a'.repeat(64)}`,
-    image_tag: 'test-app:latest',
-    size_bytes: 52428800, // 50MB
-    layers: [
-      { id: `sha256:${'b'.repeat(64)}`, size: 5242880, command: 'FROM node:18-alpine' },
-      { id: `sha256:${'c'.repeat(64)}`, size: 1048576, command: 'WORKDIR /app' },
-      { id: `sha256:${'d'.repeat(64)}`, size: 41943040, command: 'RUN npm ci' },
-      { id: `sha256:${'e'.repeat(64)}`, size: 4194304, command: 'COPY . .' },
-    ],
-    build_duration_ms: 45000,
-    build_args: {},
-    cache_used: true,
     ...overrides,
   };
 }
@@ -403,7 +382,7 @@ export function createMockCoreServices(): {
 
   return {
     docker: {
-      build: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
+      build: jest.fn().mockResolvedValue({ success: true }),
       scan: jest.fn().mockResolvedValue(createMockScanResult()),
       push: jest.fn().mockResolvedValue(undefined),
       tag: jest.fn().mockResolvedValue(undefined),
@@ -442,8 +421,8 @@ export function createMockCoreServices(): {
  */
 export function createMockDockerClient() {
   return {
-    build: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
-    buildImage: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
+    build: jest.fn().mockResolvedValue({ success: true }),
+    buildImage: jest.fn().mockResolvedValue({ success: true }),
     getImage: jest.fn().mockResolvedValue({
       ok: true,
       value: {
@@ -1098,15 +1077,7 @@ export function createMockAIService() {
 export function createMockDockerClientForService() {
   return {
     initialize: jest.fn().mockResolvedValue(undefined),
-    build: jest.fn().mockResolvedValue({
-      image_id: 'sha256:mock-build-result',
-      image_tag: 'test-app:latest',
-      size_bytes: 52428800,
-      layers: [],
-      build_duration_ms: 45000,
-      build_args: {},
-      cache_used: true,
-    }),
+    build: jest.fn().mockResolvedValue({ success: true }),
     scan: jest.fn().mockResolvedValue({
       scanner: 'trivy',
       vulnerabilities: [],
@@ -1163,7 +1134,7 @@ export function createMockDockerClientForService() {
 export function createMockDockerService() {
   return {
     initialize: jest.fn().mockResolvedValue(undefined),
-    buildImage: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
+    buildImage: jest.fn().mockResolvedValue({ success: true }),
     scanImage: jest.fn().mockResolvedValue(createMockScanResult()),
     tagImage: jest.fn().mockResolvedValue(undefined),
     pushImage: jest.fn().mockResolvedValue(undefined),

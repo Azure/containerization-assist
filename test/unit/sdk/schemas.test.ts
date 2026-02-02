@@ -14,15 +14,12 @@ describe('JSON Schema generation', () => {
   const ajv = new Ajv({ strict: false });
 
   describe('schema validity', () => {
-    it.each(Object.entries(jsonSchemas))(
-      '%s schema is valid JSON Schema',
-      (name, schema) => {
-        // Compile should not throw for valid schemas
-        const validate = ajv.compile(schema);
-        expect(validate).toBeDefined();
-        expect(typeof validate).toBe('function');
-      },
-    );
+    it.each(Object.entries(jsonSchemas))('%s schema is valid JSON Schema', (name, schema) => {
+      // Compile should not throw for valid schemas
+      const validate = ajv.compile(schema);
+      expect(validate).toBeDefined();
+      expect(typeof validate).toBe('function');
+    });
   });
 
   describe('analyzeRepo schema', () => {
@@ -49,19 +46,20 @@ describe('JSON Schema generation', () => {
     });
   });
 
-  describe('buildImage schema', () => {
+  describe('buildImageContext schema', () => {
     it('validates input with path and imageName', () => {
-      const validate = ajv.compile(jsonSchemas.buildImage);
+      const validate = ajv.compile(jsonSchemas.buildImageContext);
       const valid = validate({
         path: '/path/to/app',
         imageName: 'myapp:latest',
+        platform: 'linux/amd64',
       });
       expect(valid).toBe(true);
       expect(validate.errors).toBeNull();
     });
 
     it('validates input with optional fields', () => {
-      const validate = ajv.compile(jsonSchemas.buildImage);
+      const validate = ajv.compile(jsonSchemas.buildImageContext);
       const valid = validate({
         path: '/path/to/app',
         imageName: 'myapp:latest',
@@ -71,14 +69,14 @@ describe('JSON Schema generation', () => {
       expect(valid).toBe(true);
     });
 
-    it('accepts path only (imageName is optional)', () => {
-      const validate = ajv.compile(jsonSchemas.buildImage);
-      const valid = validate({ path: '/path/to/app' });
+    it('accepts path only with platform (imageName is optional)', () => {
+      const validate = ajv.compile(jsonSchemas.buildImageContext);
+      const valid = validate({ path: '/path/to/app', platform: 'linux/amd64' });
       expect(valid).toBe(true);
     });
 
     it('rejects wrong type for path', () => {
-      const validate = ajv.compile(jsonSchemas.buildImage);
+      const validate = ajv.compile(jsonSchemas.buildImageContext);
       const valid = validate({ path: 123 });
       expect(valid).toBe(false);
     });
@@ -176,7 +174,7 @@ describe('JSON Schema generation', () => {
         'analyzeRepo',
         'generateDockerfile',
         'fixDockerfile',
-        'buildImage',
+        'buildImageContext',
         'scanImage',
         'tagImage',
         'pushImage',
@@ -199,9 +197,9 @@ describe('JSON Schema generation', () => {
       },
     );
 
-    it('buildImage.buildArgs preserves additionalProperties for dynamic keys', () => {
+    it('buildImageContext.buildArgs preserves additionalProperties for dynamic keys', () => {
       // z.record() schemas should preserve additionalProperties
-      const buildArgsSchema = jsonSchemas.buildImage.properties?.buildArgs;
+      const buildArgsSchema = jsonSchemas.buildImageContext.properties?.buildArgs;
       expect(buildArgsSchema).toBeDefined();
       expect(buildArgsSchema).toHaveProperty('additionalProperties');
       expect(buildArgsSchema.additionalProperties).toEqual({ type: 'string' });

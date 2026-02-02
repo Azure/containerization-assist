@@ -11,11 +11,11 @@
  *
  * @example
  * ```typescript
- * import { analyzeRepo, buildImage, scanImage } from 'containerization-assist-mcp/sdk';
+ * import { analyzeRepo, buildImageContext, scanImage } from 'containerization-assist-mcp/sdk';
  *
  * // Full containerization workflow
  * const analysis = await analyzeRepo({ repositoryPath: './my-app' });
- * const build = await buildImage({ path: './my-app', imageName: 'myapp:v1' });
+ * const build = await buildImageContext({ path: './my-app', imageName: 'myapp:v1' });
  * const scan = await scanImage({ imageId: 'myapp:v1' });
  * ```
  *
@@ -57,9 +57,9 @@ import { generateDockerfileSchema } from '@/tools/generate-dockerfile/schema';
 import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
 import { fixDockerfileSchema } from '@/tools/fix-dockerfile/schema';
 
-// build-image
-import buildImageTool from '@/tools/build-image/tool';
-import { buildImageSchema } from '@/tools/build-image/schema';
+// build-image-context
+import buildImageContextTool from '@/tools/build-image-context/tool';
+import { buildImageSchema } from '@/tools/build-image-context/schema';
 
 // scan-image
 import scanImageTool from '@/tools/scan-image/tool';
@@ -124,8 +124,8 @@ export type AnalyzeRepoInput = z.input<typeof analyzeRepoSchema>;
 export type GenerateDockerfileInput = z.input<typeof generateDockerfileSchema>;
 /** Input type for fixDockerfile - derived from Zod schema */
 export type FixDockerfileInput = z.input<typeof fixDockerfileSchema>;
-/** Input type for buildImage - derived from Zod schema */
-export type BuildImageInput = z.input<typeof buildImageSchema>;
+/** Input type for buildImageContext - derived from Zod schema */
+export type BuildImageContextInput = z.input<typeof buildImageSchema>;
 /** Input type for scanImage - derived from Zod schema */
 export type ScanImageInput = z.input<typeof scanImageSchema>;
 /** Input type for tagImage - derived from Zod schema */
@@ -185,10 +185,10 @@ export const fixDockerfile = createSDKFunction(fixDockerfileTool);
 // ----- Image Tools -----
 
 /**
- * Build a Docker image from a Dockerfile.
- * Requires Docker daemon to be running.
+ * Prepare Docker build context with security analysis and optimized commands.
+ * Returns structured guidance for executing builds - does not execute Docker directly.
  */
-export const buildImage = createSDKFunction(buildImageTool);
+export const buildImageContext = createSDKFunction(buildImageContextTool);
 
 /**
  * Scan a Docker image for security vulnerabilities.
@@ -248,7 +248,7 @@ interface ToolRegistry {
   analyzeRepo: Tool<typeof analyzeRepoSchema, RepositoryAnalysis>;
   generateDockerfile: Tool<typeof generateDockerfileSchema, DockerfilePlan>;
   fixDockerfile: Tool<typeof fixDockerfileSchema, DockerfileFixPlan>;
-  buildImage: Tool<typeof buildImageSchema, BuildImageResult>;
+  buildImageContext: Tool<typeof buildImageSchema, BuildImageResult>;
   scanImage: Tool<typeof scanImageSchema, ScanImageResult>;
   tagImage: Tool<typeof tagImageSchema, TagImageResult>;
   pushImage: Tool<typeof pushImageSchema, PushImageResult>;
@@ -281,7 +281,7 @@ interface ToolRegistry {
  * const schema = tools.analyzeRepo.schema;
  *
  * // Access tool metadata
- * console.log(tools.buildImage.description);
+ * console.log(tools.buildImageContext.description);
  * ```
  */
 export const tools = {
@@ -296,8 +296,8 @@ export const tools = {
   fixDockerfile: fixDockerfileTool,
 
   // ===== Image Operations =====
-  /** Build Docker image from Dockerfile (requires Docker daemon) */
-  buildImage: buildImageTool,
+  /** Prepare Docker build context with security analysis (returns build commands) */
+  buildImageContext: buildImageContextTool,
   /** Scan image for security vulnerabilities (requires Trivy) */
   scanImage: scanImageTool,
   /** Tag Docker image with additional tags */
@@ -358,7 +358,7 @@ export {
   analyzeRepoJsonSchema,
   generateDockerfileJsonSchema,
   fixDockerfileJsonSchema,
-  buildImageJsonSchema,
+  buildImageContextJsonSchema,
   scanImageJsonSchema,
   tagImageJsonSchema,
   pushImageJsonSchema,
@@ -387,7 +387,7 @@ export {
   analyzeRepoMetadata,
   generateDockerfileMetadata,
   fixDockerfileMetadata,
-  buildImageMetadata,
+  buildImageContextMetadata,
   scanImageMetadata,
   tagImageMetadata,
   pushImageMetadata,

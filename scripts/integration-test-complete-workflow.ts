@@ -26,7 +26,7 @@
 import { createToolContext } from '../dist/src/mcp/context.js';
 import analyzeRepoTool from '../dist/src/tools/analyze-repo/tool.js';
 import generateDockerfileTool from '../dist/src/tools/generate-dockerfile/tool.js';
-import buildImageTool from '../dist/src/tools/build-image/tool.js';
+import buildImageContextTool from '../dist/src/tools/build-image-context/tool.js';
 import scanImageTool from '../dist/src/tools/scan-image/tool.js';
 import tagImageTool from '../dist/src/tools/tag-image/tool.js';
 import prepareClusterTool from '../dist/src/tools/prepare-cluster/tool.js';
@@ -100,7 +100,7 @@ async function waitForCondition(
 ): Promise<boolean> {
   const startTime = Date.now();
   let attempts = 0;
-  
+
   while (Date.now() - startTime < timeoutMs) {
     attempts++;
     try {
@@ -114,15 +114,15 @@ async function waitForCondition(
       }
       // Transient error, continue waiting
     }
-    
+
     if (attempts % 5 === 0) {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       console.log(`      Still waiting for ${description}... (${elapsed}s elapsed)`);
     }
-    
+
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
-  
+
   return false;
 }
 
@@ -142,33 +142,41 @@ function detectPlatform(): DockerPlatform {
  */
 async function cleanup(registryPort?: string): Promise<void> {
   console.log('\n🧹 Cleaning up resources...\n');
-  
+
   try {
-    execSync('kubectl delete deployment sample-workflow-app --ignore-not-found=true', { stdio: 'pipe' });
-    execSync('kubectl delete service sample-workflow-app --ignore-not-found=true', { stdio: 'pipe' });
+    execSync('kubectl delete deployment sample-workflow-app --ignore-not-found=true', {
+      stdio: 'pipe',
+    });
+    execSync('kubectl delete service sample-workflow-app --ignore-not-found=true', {
+      stdio: 'pipe',
+    });
     console.log('   ✅ Kubernetes resources deleted');
   } catch {
     console.log('   ⚠️ Kubernetes cleanup (may not exist)');
   }
-  
+
   try {
     execSync('kind delete cluster --name containerization-assist', { stdio: 'pipe' });
     console.log('   ✅ Kind cluster deleted');
   } catch {
     console.log('   ⚠️ Kind cluster cleanup (may not exist)');
   }
-  
+
   try {
     execSync('docker rm -f ca-registry', { stdio: 'pipe' });
     console.log('   ✅ Registry container deleted');
   } catch {
     console.log('   ⚠️ Registry cleanup (may not exist)');
   }
-  
+
   try {
     if (registryPort) {
-      execSync(`docker rmi -f localhost:${registryPort}/sample-workflow-app:v1.0.0`, { stdio: 'pipe' });
-      execSync(`docker rmi -f localhost:${registryPort}/sample-workflow-app:latest`, { stdio: 'pipe' });
+      execSync(`docker rmi -f localhost:${registryPort}/sample-workflow-app:v1.0.0`, {
+        stdio: 'pipe',
+      });
+      execSync(`docker rmi -f localhost:${registryPort}/sample-workflow-app:latest`, {
+        stdio: 'pipe',
+      });
     }
     execSync('docker rmi -f sample-workflow-app:local', { stdio: 'pipe' });
     execSync('docker rmi -f sample-workflow-app:v1.0.0', { stdio: 'pipe' });
@@ -189,25 +197,25 @@ async function main() {
 
   const results: StepResult[] = [];
   let registryPort: string | undefined;
-  let currentImageId: string | undefined;
   const workflowStartTime = Date.now();
-  
+
   // Paths
   const fixturesPath = resolve('test/fixtures/complete-workflow');
   const sampleAppPath = join(fixturesPath, 'sample-java-app');
   const tempWorkDir = join(os.tmpdir(), 'e2e-workflow-test-' + Date.now());
-  
+
   // Determine platform
   const platform = detectPlatform();
   console.log(`\n🖥️  Host Platform: ${platform}\n`);
-  
+
   // Verify prerequisites
   console.log('📋 Checking prerequisites...\n');
   const hasDocker = verifyToolInstalled('Docker', 'docker --version');
   const hasKind = verifyToolInstalled('kind', 'kind --version');
   // Try short version first, fall back to long version (avoids shell-specific operators)
-  const hasKubectl = verifyToolInstalled('kubectl', 'kubectl version --client --short') 
-    || verifyToolInstalled('kubectl', 'kubectl version --client');
+  const hasKubectl =
+    verifyToolInstalled('kubectl', 'kubectl version --client --short') ||
+    verifyToolInstalled('kubectl', 'kubectl version --client');
   const hasTrivy = verifyToolInstalled('Trivy', 'trivy --version');
 
   if (!hasDocker || !hasKind || !hasKubectl) {
@@ -229,11 +237,11 @@ async function main() {
   // Create temp work directory and copy sample app
   console.log(`\n📁 Setting up work directory: ${tempWorkDir}\n`);
   mkdirSync(tempWorkDir, { recursive: true });
-  
+
   // Copy sample Java app files
   copyFileSync(join(sampleAppPath, 'App.java'), join(tempWorkDir, 'App.java'));
   copyFileSync(join(sampleAppPath, 'pom.xml'), join(tempWorkDir, 'pom.xml'));
-  
+
   // Create context
   const ctx = createToolContext(logger);
 
@@ -244,11 +252,14 @@ async function main() {
     console.log('\n' + '─'.repeat(70));
     console.log('📊 Step 1: Analyzing repository with analyze-repo');
     console.log('─'.repeat(70));
-    
+
     const step1Start = Date.now();
-    const analyzeResult = await analyzeRepoTool.handler({
-      repositoryPath: tempWorkDir,
-    }, ctx);
+    const analyzeResult = await analyzeRepoTool.handler(
+      {
+        repositoryPath: tempWorkDir,
+      },
+      ctx,
+    );
     const step1Duration = Date.now() - step1Start;
 
     if (!analyzeResult.ok) {
@@ -266,7 +277,7 @@ async function main() {
     const analysis = analyzeResult.value;
     const detectedLanguage = analysis.modules?.[0]?.language || analysis.language;
     const detectedFramework = analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework;
-    
+
     if (!detectedLanguage) {
       results.push({
         step: 1,
@@ -278,11 +289,11 @@ async function main() {
       });
       throw new Error('analyze-repo failed: no language detected');
     }
-    
+
     console.log('   ✅ Repository analyzed');
     console.log(`      Language: ${detectedLanguage}`);
     console.log(`      Framework: ${detectedFramework || 'none'}`);
-    
+
     results.push({
       step: 1,
       name: 'Analyze Repository',
@@ -302,18 +313,22 @@ async function main() {
     console.log('\n' + '─'.repeat(70));
     console.log('📝 Step 2: Generating Dockerfile with generate-dockerfile');
     console.log('─'.repeat(70));
-    
-    const detectedVersion = analysis.modules?.[0]?.buildSystems?.[0]?.languageVersion || analysis.languageVersion || '21';
-    
+
+    const detectedVersion =
+      analysis.modules?.[0]?.buildSystems?.[0]?.languageVersion || analysis.languageVersion || '21';
+
     const step2Start = Date.now();
-    const dockerfileResult = await generateDockerfileTool.handler({
-      repositoryPath: tempWorkDir,
-      language: detectedLanguage,
-      languageVersion: detectedVersion,
-      framework: detectedFramework,
-      environment: 'production',
-      targetPlatform: platform,
-    }, ctx);
+    const dockerfileResult = await generateDockerfileTool.handler(
+      {
+        repositoryPath: tempWorkDir,
+        language: detectedLanguage,
+        languageVersion: detectedVersion,
+        framework: detectedFramework,
+        environment: 'production',
+        targetPlatform: platform,
+      },
+      ctx,
+    );
     const step2Duration = Date.now() - step2Start;
 
     if (!dockerfileResult.ok) {
@@ -359,11 +374,11 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \\
 CMD ["java", "-jar", "app.jar"]
 `;
     writeFileSync(join(tempWorkDir, 'Dockerfile'), generatedDockerfile);
-    
+
     console.log('   ✅ Dockerfile generated');
     console.log(`      Base image: ${baseImage}`);
     console.log(`      Multi-stage: Yes`);
-    
+
     results.push({
       step: 2,
       name: 'Generate Dockerfile',
@@ -384,21 +399,23 @@ CMD ["java", "-jar", "app.jar"]
     console.log('\n' + '─'.repeat(70));
     console.log('🔨 Step 3: Building image with build-image');
     console.log('─'.repeat(70));
-    
+
     const step3Start = Date.now();
-    const buildResult = await buildImageTool.handler({
-      path: tempWorkDir,
-      tags: ['sample-workflow-app:v1.0.0'],
-      platform,
-      strictPlatformValidation: false,
-    }, ctx);
+    const buildResult = await buildImageContextTool.handler(
+      {
+        path: tempWorkDir,
+        tags: ['sample-workflow-app:v1.0.0'],
+        platform,
+      },
+      ctx,
+    );
     const step3Duration = Date.now() - step3Start;
 
     if (!buildResult.ok) {
       results.push({
         step: 3,
         name: 'Build Image',
-        tool: 'build-image',
+        tool: 'build-image-context',
         passed: false,
         message: `Build failed: ${buildResult.error}`,
         duration: step3Duration,
@@ -406,21 +423,64 @@ CMD ["java", "-jar", "app.jar"]
       throw new Error('build-image failed');
     }
 
-    currentImageId = buildResult.value.imageId;
+    // Execute the build command returned by build-image
+    const buildCommand = buildResult.value.nextAction.buildCommand;
+    console.log(`   Executing: ${buildCommand.command}`);
+
+    try {
+      const envVars = Object.entries(buildCommand.environment)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(' ');
+      const fullCommand = envVars ? `${envVars} ${buildCommand.command}` : buildCommand.command;
+      execSync(fullCommand, {
+        stdio: 'inherit',
+        cwd: tempWorkDir,
+        env: { ...process.env, ...buildCommand.environment },
+      });
+    } catch (buildError) {
+      results.push({
+        step: 3,
+        name: 'Build Image',
+        tool: 'build-image-context',
+        passed: false,
+        message: `Docker build execution failed: ${buildError instanceof Error ? buildError.message : 'Unknown error'}`,
+        duration: Date.now() - step3Start,
+      });
+      throw new Error('build-image execution failed');
+    }
+
+    // Get the image ID after successful build
+    const imageTag = buildResult.value.buildConfig.finalTags[0] || 'sample-workflow-app:v1.0.0';
+    let currentImageId: string | undefined;
+    let imageSize: number | undefined;
+    try {
+      currentImageId = execSync(`docker inspect --format='{{.Id}}' ${imageTag}`, {
+        encoding: 'utf-8',
+      }).trim();
+      const sizeStr = execSync(`docker inspect --format='{{.Size}}' ${imageTag}`, {
+        encoding: 'utf-8',
+      }).trim();
+      imageSize = parseInt(sizeStr, 10);
+    } catch {
+      // Image ID lookup failed, continue anyway
+    }
+
     console.log('   ✅ Image built');
-    console.log(`      Image ID: ${currentImageId?.substring(0, 20)}...`);
-    console.log(`      Size: ${buildResult.value.size ? Math.round(buildResult.value.size / 1024 / 1024) + 'MB' : 'unknown'}`);
-    
+    console.log(`      Image ID: ${currentImageId?.substring(0, 20) || 'unknown'}...`);
+    console.log(
+      `      Size: ${imageSize ? Math.round(imageSize / 1024 / 1024) + 'MB' : 'unknown'}`,
+    );
+
     results.push({
       step: 3,
       name: 'Build Image',
-      tool: 'build-image',
+      tool: 'build-image-context',
       passed: true,
       message: 'Image built successfully',
-      duration: step3Duration,
+      duration: Date.now() - step3Start,
       details: {
         imageId: currentImageId,
-        size: buildResult.value.size,
+        size: imageSize,
       },
     });
 
@@ -430,15 +490,18 @@ CMD ["java", "-jar", "app.jar"]
     console.log('\n' + '─'.repeat(70));
     console.log('🔒 Step 4: Scanning image with scan-image');
     console.log('─'.repeat(70));
-    
+
     const step4Start = Date.now();
-    const scanResult = await scanImageTool.handler({
-      imageId: 'sample-workflow-app:v1.0.0',
-      scanner: 'trivy',
-      severity: 'HIGH',
-      scanType: 'vulnerability',
-      enableAISuggestions: false,
-    }, ctx);
+    const scanResult = await scanImageTool.handler(
+      {
+        imageId: 'sample-workflow-app:v1.0.0',
+        scanner: 'trivy',
+        severity: 'HIGH',
+        scanType: 'vulnerability',
+        enableAISuggestions: false,
+      },
+      ctx,
+    );
     const step4Duration = Date.now() - step4Start;
 
     if (!scanResult.ok) {
@@ -453,9 +516,9 @@ CMD ["java", "-jar", "app.jar"]
       });
       throw new Error('scan-image failed');
     }
-    
+
     const vulnCounts = scanResult.value.vulnerabilities;
-    
+
     // Validate scan result structure
     if (vulnCounts === undefined || vulnCounts === null) {
       console.log(`   ❌ Scan result missing vulnerability counts`);
@@ -469,13 +532,13 @@ CMD ["java", "-jar", "app.jar"]
       });
       throw new Error('scan-image failed: invalid result structure');
     }
-    
+
     console.log('   ✅ Image scanned');
     console.log(`      Critical: ${vulnCounts.critical}`);
     console.log(`      High: ${vulnCounts.high}`);
     console.log(`      Medium: ${vulnCounts.medium}`);
     console.log(`      Low: ${vulnCounts.low}`);
-    
+
     results.push({
       step: 4,
       name: 'Scan Image',
@@ -494,14 +557,17 @@ CMD ["java", "-jar", "app.jar"]
     console.log('\n' + '─'.repeat(70));
     console.log('☸️  Step 5: Preparing cluster with prepare-cluster');
     console.log('─'.repeat(70));
-    
+
     const step5Start = Date.now();
-    const clusterResult = await prepareClusterTool.handler({
-      targetPlatform: platform,
-      environment: 'development',
-      namespace: 'default',
-      strictPlatformValidation: false,
-    }, ctx);
+    const clusterResult = await prepareClusterTool.handler(
+      {
+        targetPlatform: platform,
+        environment: 'development',
+        namespace: 'default',
+        strictPlatformValidation: false,
+      },
+      ctx,
+    );
     const step5Duration = Date.now() - step5Start;
 
     if (!clusterResult.ok) {
@@ -521,7 +587,7 @@ CMD ["java", "-jar", "app.jar"]
     console.log('   ✅ Cluster prepared');
     console.log(`      Cluster: ${clusterResult.value.cluster}`);
     console.log(`      Registry: ${registryUrl}`);
-    
+
     results.push({
       step: 5,
       name: 'Prepare Cluster',
@@ -541,20 +607,26 @@ CMD ["java", "-jar", "app.jar"]
     console.log('\n' + '─'.repeat(70));
     console.log('🏷️  Step 6: Tagging image with tag-image');
     console.log('─'.repeat(70));
-    
+
     const step6Start = Date.now();
     // Tag for registry - apply first tag
-    const tagResult = await tagImageTool.handler({
-      imageId: 'sample-workflow-app:v1.0.0',
-      tag: `localhost:${registryPort}/sample-workflow-app:v1.0.0`,
-    }, ctx);
-    
+    const tagResult = await tagImageTool.handler(
+      {
+        imageId: 'sample-workflow-app:v1.0.0',
+        tag: `localhost:${registryPort}/sample-workflow-app:v1.0.0`,
+      },
+      ctx,
+    );
+
     // Apply second tag (latest)
     if (tagResult.ok) {
-      await tagImageTool.handler({
-        imageId: 'sample-workflow-app:v1.0.0',
-        tag: `localhost:${registryPort}/sample-workflow-app:latest`,
-      }, ctx);
+      await tagImageTool.handler(
+        {
+          imageId: 'sample-workflow-app:v1.0.0',
+          tag: `localhost:${registryPort}/sample-workflow-app:latest`,
+        },
+        ctx,
+      );
     }
     const step6Duration = Date.now() - step6Start;
 
@@ -572,7 +644,7 @@ CMD ["java", "-jar", "app.jar"]
 
     console.log('   ✅ Image tagged');
     console.log(`      Tags applied: 2`);
-    
+
     results.push({
       step: 6,
       name: 'Tag Image',
@@ -591,21 +663,27 @@ CMD ["java", "-jar", "app.jar"]
     console.log('\n' + '─'.repeat(70));
     console.log('📤 Step 7: Pushing image with push-image');
     console.log('─'.repeat(70));
-    
+
     const step7Start = Date.now();
-    const pushResult = await pushImageTool.handler({
-      imageId: `localhost:${registryPort}/sample-workflow-app:v1.0.0`,
-      registry: `localhost:${registryPort}`,
-      platform,
-    }, ctx);
-    
-    // Also push the latest tag
-    if (pushResult.ok) {
-      await pushImageTool.handler({
-        imageId: `localhost:${registryPort}/sample-workflow-app:latest`,
+    const pushResult = await pushImageTool.handler(
+      {
+        imageId: `localhost:${registryPort}/sample-workflow-app:v1.0.0`,
         registry: `localhost:${registryPort}`,
         platform,
-      }, ctx);
+      },
+      ctx,
+    );
+
+    // Also push the latest tag
+    if (pushResult.ok) {
+      await pushImageTool.handler(
+        {
+          imageId: `localhost:${registryPort}/sample-workflow-app:latest`,
+          registry: `localhost:${registryPort}`,
+          platform,
+        },
+        ctx,
+      );
     }
     const step7Duration = Date.now() - step7Start;
 
@@ -623,7 +701,7 @@ CMD ["java", "-jar", "app.jar"]
 
     console.log('   ✅ Image pushed');
     console.log(`      Registry: localhost:${registryPort}`);
-    
+
     results.push({
       step: 7,
       name: 'Push Image',
@@ -642,17 +720,17 @@ CMD ["java", "-jar", "app.jar"]
     console.log('\n' + '─'.repeat(70));
     console.log('🚀 Step 8: Deploying to Kubernetes');
     console.log('─'.repeat(70));
-    
+
     const step8Start = Date.now();
-    
+
     // Read and update deployment manifest with correct registry URL
     const manifestPath = join(fixturesPath, 'kubernetes', 'deployment.yaml');
     let manifest = readFileSync(manifestPath, 'utf-8');
     manifest = manifest.replace('REGISTRY_PLACEHOLDER', `localhost:${registryPort}`);
-    
+
     const tempManifestPath = join(tempWorkDir, 'deployment.yaml');
     writeFileSync(tempManifestPath, manifest);
-    
+
     try {
       execSync(`kubectl apply -f ${tempManifestPath}`, { stdio: 'pipe' });
       console.log('   ✅ Deployment applied');
@@ -671,7 +749,7 @@ CMD ["java", "-jar", "app.jar"]
 
     // Wait for deployment to be ready
     console.log('   ⏳ Waiting for deployment to be ready...');
-    
+
     try {
       const ready = await waitForCondition(
         'deployment ready',
@@ -679,40 +757,44 @@ CMD ["java", "-jar", "app.jar"]
           // Check for CrashLoopBackOff or other failure states first
           const podStatus = execSync(
             'kubectl get pods -l app=sample-workflow-app -o jsonpath="{.items[*].status.containerStatuses[*].state.waiting.reason}"',
-            { encoding: 'utf-8', stdio: 'pipe' }
+            { encoding: 'utf-8', stdio: 'pipe' },
           ).trim();
-          
-          if (podStatus.includes('CrashLoopBackOff') || podStatus.includes('ImagePullBackOff') || podStatus.includes('ErrImagePull')) {
+
+          if (
+            podStatus.includes('CrashLoopBackOff') ||
+            podStatus.includes('ImagePullBackOff') ||
+            podStatus.includes('ErrImagePull')
+          ) {
             throw new TerminalPodStateError(podStatus);
           }
-          
+
           // Check deployment Available condition (more reliable than readyReplicas)
           const available = execSync(
             'kubectl get deployment sample-workflow-app -o jsonpath="{.status.conditions[?(@.type==\'Available\')].status}"',
-            { encoding: 'utf-8', stdio: 'pipe' }
+            { encoding: 'utf-8', stdio: 'pipe' },
           ).trim();
-          
+
           const readyReplicas = execSync(
             'kubectl get deployment sample-workflow-app -o jsonpath="{.status.readyReplicas}"',
-            { encoding: 'utf-8', stdio: 'pipe' }
+            { encoding: 'utf-8', stdio: 'pipe' },
           ).trim();
-          
+
           return available === 'True' && parseInt(readyReplicas || '0') >= 2;
         },
         180000, // 3 minute timeout (JVM startup can be slow in CI)
         3000,
       );
-      
+
       if (!ready) {
         throw new Error('Deployment did not become ready in time');
       }
     } catch (error) {
       const step8Duration = Date.now() - step8Start;
-      
+
       if (error instanceof TerminalPodStateError) {
         console.log(`      ❌ Pod entered terminal failure state: ${error.podStatus}`);
       }
-      
+
       // Get debug info
       console.log('\n   Debug info:');
       try {
@@ -721,7 +803,7 @@ CMD ["java", "-jar", "app.jar"]
       } catch {
         // Ignore
       }
-      
+
       results.push({
         step: 8,
         name: 'Deploy to Kubernetes',
@@ -734,7 +816,7 @@ CMD ["java", "-jar", "app.jar"]
     }
 
     console.log('   ✅ Deployment ready (2/2 replicas)');
-    
+
     const step8Duration = Date.now() - step8Start;
     results.push({
       step: 8,
@@ -754,13 +836,16 @@ CMD ["java", "-jar", "app.jar"]
     console.log('\n' + '─'.repeat(70));
     console.log('✅ Step 9: Verifying deployment with verify-deploy');
     console.log('─'.repeat(70));
-    
+
     const step9Start = Date.now();
-    const verifyResult = await verifyDeployTool.handler({
-      deploymentName: 'sample-workflow-app',
-      namespace: 'default',
-      checks: ['pods', 'services', 'health'],
-    }, ctx);
+    const verifyResult = await verifyDeployTool.handler(
+      {
+        deploymentName: 'sample-workflow-app',
+        namespace: 'default',
+        checks: ['pods', 'services', 'health'],
+      },
+      ctx,
+    );
     const step9Duration = Date.now() - step9Start;
 
     if (!verifyResult.ok) {
@@ -777,9 +862,11 @@ CMD ["java", "-jar", "app.jar"]
 
     console.log('   ✅ Deployment verified');
     console.log(`      Status: ${verifyResult.value.ready ? 'ready' : 'not ready'}`);
-    console.log(`      Ready replicas: ${verifyResult.value.status?.readyReplicas || 0}/${verifyResult.value.status?.totalReplicas || 0}`);
+    console.log(
+      `      Ready replicas: ${verifyResult.value.status?.readyReplicas || 0}/${verifyResult.value.status?.totalReplicas || 0}`,
+    );
     console.log(`      Health: ${verifyResult.value.healthCheck?.status || 'healthy'}`);
-    
+
     results.push({
       step: 9,
       name: 'Verify Deployment',
@@ -793,7 +880,6 @@ CMD ["java", "-jar", "app.jar"]
         healthStatus: verifyResult.value.healthCheck?.status,
       },
     });
-
   } catch (error) {
     console.error('\n❌ Workflow failed:', error);
   } finally {
@@ -816,7 +902,7 @@ CMD ["java", "-jar", "app.jar"]
   console.log(`Failed: ❌ ${failed}`);
   console.log(`Total Duration: ${Math.round(totalDuration / 1000)}s`);
   console.log('\nStep Results:');
-  
+
   for (const result of results) {
     const status = result.passed ? '✅' : '❌';
     const duration = result.duration > 0 ? ` (${Math.round(result.duration / 1000)}s)` : '';

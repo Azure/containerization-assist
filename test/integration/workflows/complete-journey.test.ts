@@ -2,7 +2,7 @@
  * Integration Test: Complete Containerization Journey
  *
  * Tests the complete end-to-end containerization workflow:
- * analyze-repo → generate-dockerfile → build-image → scan-image →
+ * analyze-repo → generate-dockerfile → build-image-context → scan-image →
  * tag-image → generate-k8s-manifests → prepare-cluster → kubectl apply → verify-deploy
  *
  * This mirrors the smoke journey test but as a comprehensive integration test
@@ -27,7 +27,7 @@ import { createDockerClient } from '@/infra/docker/client';
 // Import all tools for complete workflow
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
-import buildImageTool from '@/tools/build-image/tool';
+import buildImageContextTool from '@/tools/build-image-context/tool';
 import scanImageTool from '@/tools/scan-image/tool';
 import tagImageTool from '@/tools/tag-image/tool';
 import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
@@ -35,7 +35,8 @@ import prepareClusterTool from '@/tools/prepare-cluster/tool';
 import verifyDeployTool from '@/tools/verify-deploy/tool';
 
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
-import type { BuildImageResult } from '@/tools/build-image/tool';
+import type { BuildImageResult } from '@/tools/build-image-context/schema';
+import { execSync } from 'child_process';
 
 describe('Complete Containerization Journey', () => {
   let testDir: DirResult;
@@ -155,7 +156,7 @@ describe('Complete Containerization Journey', () => {
 
       journeyLog.push('Step 3: Building Docker image...');
       const imageName = `journey-test-node:${timestamp}`;
-      const buildResult = await buildImageTool.handler(
+      const buildResult = await buildImageContextTool.handler(
         {
           path: testRepo,
           dockerfile: dockerfileToUse.replace(testRepo + '/', ''),
@@ -166,19 +167,43 @@ describe('Complete Containerization Journey', () => {
 
       expect(buildResult.ok).toBe(true);
       if (!buildResult.ok) {
-        journeyLog.push(`Build failed: ${buildResult.error}`);
+        journeyLog.push(`Build preparation failed: ${buildResult.error}`);
         console.log(journeyLog.join('\n'));
         return;
       }
 
       const build = buildResult.value as BuildImageResult;
-      testCleaner.trackImage(build.imageId);
-      journeyLog.push(`✓ Image built: ${build.imageId.substring(0, 12)}`);
+      
+      // Execute the build command
+      let builtImageTag: string | undefined;
+      try {
+        execSync(build.nextAction.buildCommand.command, {
+          cwd: testRepo,
+          encoding: 'utf-8',
+          env: { ...process.env, ...build.nextAction.buildCommand.environment },
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        builtImageTag = build.buildConfig.finalTags[0];
+        if (builtImageTag) {
+          testCleaner.trackImage(builtImageTag);
+        }
+      } catch (error) {
+        journeyLog.push(`Build execution failed: ${error}`);
+        console.log(journeyLog.join('\n'));
+        return;
+      }
+      
+      if (!builtImageTag) {
+        journeyLog.push('✗ No image tag available after build');
+        console.log(journeyLog.join('\n'));
+        return;
+      }
+      journeyLog.push(`✓ Image built: ${builtImageTag}`);
 
       // ===== STEP 4: Scan Image =====
       journeyLog.push('Step 4: Scanning image for vulnerabilities...');
       const scanResult = await scanImageTool.handler(
-        { imageId: build.imageId },
+        { imageId: builtImageTag },
         toolContext
       );
 
@@ -193,7 +218,7 @@ describe('Complete Containerization Journey', () => {
       const finalTag = `journey-test-node:v1.0.0`;
       const tagResult = await tagImageTool.handler(
         {
-          imageId: build.imageId,
+          imageId: builtImageTag,
           tag: finalTag,
         },
         toolContext
@@ -397,7 +422,7 @@ CMD ["python", "app.py"]`
 
       journeyLog.push('Step 3: Building Docker image...');
       const imageName = `journey-test-python:${timestamp}`;
-      const buildResult = await buildImageTool.handler(
+      const buildResult = await buildImageContextTool.handler(
         {
           path: testRepo,
           dockerfile: 'Dockerfile',
@@ -408,13 +433,37 @@ CMD ["python", "app.py"]`
 
       if (buildResult.ok) {
         const build = buildResult.value as BuildImageResult;
-        testCleaner.trackImage(build.imageId);
-        journeyLog.push(`✓ Image built: ${build.imageId.substring(0, 12)}`);
+        
+        // Execute the build command
+        let builtImageTag: string | undefined;
+        try {
+          execSync(build.nextAction.buildCommand.command, {
+            cwd: testRepo,
+            encoding: 'utf-8',
+            env: { ...process.env, ...build.nextAction.buildCommand.environment },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+          builtImageTag = build.buildConfig.finalTags[0];
+          if (builtImageTag) {
+            testCleaner.trackImage(builtImageTag);
+          }
+        } catch (error) {
+          journeyLog.push(`Build execution failed: ${error}`);
+          console.log(journeyLog.join('\n'));
+          return;
+        }
+        
+        if (!builtImageTag) {
+          journeyLog.push('✗ No image tag available after build');
+          console.log(journeyLog.join('\n'));
+          return;
+        }
+        journeyLog.push(`✓ Image built: ${builtImageTag}`);
 
         // Tag image
         const tagResult = await tagImageTool.handler(
           {
-            imageId: build.imageId,
+            imageId: builtImageTag,
             tag: `journey-test-python:latest`,
           },
           toolContext
@@ -480,7 +529,7 @@ CMD ["node", "index.js"]`;
         }
 
         const imageName = `multi-journey-${app.name}:${timestamp}`;
-        const buildResult = await buildImageTool.handler(
+        const buildResult = await buildImageContextTool.handler(
           {
             path: app.path,
             dockerfile: 'Dockerfile',
@@ -491,8 +540,23 @@ CMD ["node", "index.js"]`;
 
         if (buildResult.ok) {
           const build = buildResult.value as BuildImageResult;
-          testCleaner.trackImage(build.imageId);
-          results.push({ name: app.name, success: true });
+          
+          // Execute the build command
+          try {
+            execSync(build.nextAction.buildCommand.command, {
+              cwd: app.path,
+              encoding: 'utf-8',
+              env: { ...process.env, ...build.nextAction.buildCommand.environment },
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            const builtImageTag = build.buildConfig.finalTags[0];
+            if (builtImageTag) {
+              testCleaner.trackImage(builtImageTag);
+            }
+            results.push({ name: app.name, success: true });
+          } catch {
+            results.push({ name: app.name, success: false });
+          }
         } else {
           results.push({ name: app.name, success: false });
         }
@@ -526,7 +590,7 @@ CMD ["node", "index.js"]`;
 
       // Test 2: Invalid Dockerfile
       journeyLog.push('Test 2: Invalid Dockerfile path');
-      const buildResult = await buildImageTool.handler(
+      const buildResult = await buildImageContextTool.handler(
         {
           dockerfilePath: '/nonexistent/Dockerfile',
           context: testDir.name,
@@ -608,7 +672,7 @@ CMD ["node", "index.js"]`;
       }
 
       const imageName = `perf-test:${Date.now()}`;
-      const buildResult = await buildImageTool.handler(
+      const buildResult = await buildImageContextTool.handler(
         {
           path: testRepo,
           dockerfile: 'Dockerfile',
@@ -619,16 +683,33 @@ CMD ["node", "index.js"]`;
 
       if (buildResult.ok) {
         const build = buildResult.value as BuildImageResult;
-        testCleaner.trackImage(build.imageId);
+        
+        // Execute the build command
+        let builtImageTag: string | undefined;
+        try {
+          execSync(build.nextAction.buildCommand.command, {
+            cwd: testRepo,
+            encoding: 'utf-8',
+            env: { ...process.env, ...build.nextAction.buildCommand.environment },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+          builtImageTag = build.buildConfig.finalTags[0];
+          if (builtImageTag) {
+            testCleaner.trackImage(builtImageTag);
+          }
+        } catch {
+          // Build execution failed, skip tagging
+        }
 
-        await tagImageTool.handler(
-          {
-            imageId: build.imageId,
-            tag: 'perf-test:latest',
-          },
-          toolContext
-        );
-
+        if (builtImageTag) {
+          await tagImageTool.handler(
+            {
+              imageId: builtImageTag,
+              tag: 'perf-test:latest',
+            },
+            toolContext
+          );
+        }
       }
 
       const duration = Date.now() - startTime;

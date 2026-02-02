@@ -11,7 +11,7 @@ Tests complete containerization workflows by chaining tools together:
 - **containerization-workflow.test.ts** - Complete containerization workflow tests:
   - Repository Analysis: analyze-repo tool for Node.js and Python applications
   - Multi-Module Workflow: Detects and analyzes monorepo structures
-  - Docker Operations: build-image → tag-image → scan-image with real Docker operations
+  - Docker Operations: build-image-context → tag-image → scan-image with real Docker operations
   - Error Handling: Invalid paths, missing files, graceful degradation
   - Tests use direct tool imports without createApp to avoid ES module issues
   - NO AI sampling - all operations are deterministic
@@ -152,7 +152,7 @@ Some tools require AI sampling (generate-dockerfile, generate-k8s-manifests). Te
 **Current Test Strategy:**
 - Tests import tools directly without `createApp` to avoid Kubernetes client import issues
 - NO AI sampling in integration tests - focus on deterministic operations only
-- All tools being tested (analyze-repo, build-image, tag-image, scan-image) are AI-free
+- All tools being tested (analyze-repo, build-image-context, tag-image, scan-image) are AI-free
 - Manual ToolContext creation to avoid transitive imports of Kubernetes client
 - Environment-aware test skipping (Docker/Trivy availability)
 - Full end-to-end workflows with AI tools can be tested via: `npm run smoke:journey`

@@ -77,7 +77,7 @@ Examples:
 MCP Tools Available (11 total):
   • Analysis: analyze-repo
   • Dockerfile: generate-dockerfile, fix-dockerfile
-  • Image: build-image, scan-image, tag-image, push-image
+  • Image: build-image-context, scan-image, tag-image, push-image
   • Kubernetes: generate-k8s-manifests, prepare-cluster, verify-deploy
   • Utilities: ops
 
@@ -120,11 +120,11 @@ async function handleListPoliciesCommand(opts: { showMerged?: boolean }): Promis
   }
 
   // Group by source
-  const builtIn = policies.filter(
-    (p) => p.includes('/policies/') && !p.includes('/policies.user'),
-  );
+  const builtIn = policies.filter((p) => p.includes('/policies/') && !p.includes('/policies.user'));
   const user = policies.filter((p) => p.includes('/policies.user/'));
-  const custom = policies.filter((p) => !p.includes('/policies/') && !p.includes('/policies.user/'));
+  const custom = policies.filter(
+    (p) => !p.includes('/policies/') && !p.includes('/policies.user/'),
+  );
 
   if (builtIn.length > 0) {
     console.error('  Built-in (Priority: Low):');
