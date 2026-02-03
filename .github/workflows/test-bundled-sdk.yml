@@ -135,9 +135,9 @@ jobs:
               process.exit(1);
             }
             
-            // Verify entry structure
+            // Verify entry structure (required fields: id, category, pattern, recommendation)
             const sample = entries[0];
-            if (!sample.id || !sample.category || !sample.content) {
+            if (!sample.id || !sample.category || !sample.recommendation) {
               console.error('FAIL: Entry missing required fields:', JSON.stringify(sample, null, 2));
               process.exit(1);
             }
