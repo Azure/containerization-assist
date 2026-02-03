@@ -31,7 +31,7 @@ import { verifyDeployToolDefinition } from './types';
 
 import { DEFAULT_TIMEOUTS } from '@/config/constants';
 import { Success, Failure, type Result } from '@/types';
-import { verifyDeploySchema, type VerifyDeployParams } from './schema';
+import { type VerifyDeployParams } from './schema';
 import { buildStatusSummary } from '@/lib/summary-helpers';
 
 export interface VerifyDeploymentResult extends Record<string, unknown> {

@@ -12,7 +12,7 @@ import { createSecurityScanner } from '@/infra/security/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import { scanImageSchema, type ScanImageParams } from './schema';
+import { type ScanImageParams } from './schema';
 import { formatVulnerabilities, buildStatusSummary, pluralize } from '@/lib/summary-helpers';
 import { scanImageToolDefinition } from './types';
 

@@ -22,7 +22,7 @@ import { readDockerfile } from '@/lib/file-utils';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
-import { type BuildImageParams, buildImageSchema } from './schema';
+import { type BuildImageParams } from './schema';
 import { formatSize, formatDuration } from '@/lib/summary-helpers';
 import { tool } from '@/types/tool';
 import { buildImageToolDefinition } from './types';

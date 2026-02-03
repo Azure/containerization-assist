@@ -44,7 +44,7 @@ import type { DockerPlatform } from '@/tools/shared/schemas';
 
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '@/types';
-import { prepareClusterSchema, type PrepareClusterParams } from './schema';
+import { type PrepareClusterParams } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pluralize } from '@/lib/summary-helpers';
