@@ -30,6 +30,9 @@ build/
 .tsbuildinfo*
 *.tgz
 
+# Generated files (rebuilt during build)
+src/knowledge/embedded-packs.ts
+
 # Policy build intermediates (keep *.wasm files - they ship with package)
 policies/compiled/*.tar.gz
 policies/compiled/temp/

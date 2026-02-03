@@ -2,27 +2,22 @@
  * Knowledge Pack Loader
  * Loads and manages static knowledge packs for AI enhancement
  *
+ * Knowledge packs are embedded at build time via static JSON imports,
+ * eliminating the need for filesystem access at runtime. This allows
+ * the SDK to work correctly when bundled by consumer applications.
+ *
  * @see {@link ../../docs/adr/003-knowledge-enhancement.md ADR-003: Knowledge Enhancement System}
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
 import { createLogger } from '@/lib/logger';
-import { getModuleUrl } from '@/lib/module-url';
-import { resolveModulePaths } from '@/lib/module-path-resolver';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from './schemas';
+import { EMBEDDED_PACKS } from './embedded-packs';
 import { z } from 'zod';
 
 // ===== Constants =====
 
-const JSON_FILE_EXTENSION = '.json';
-
 const logger = createLogger({ name: 'knowledge-loader' });
-
-// Capture import.meta.url at module scope (ESM builds only)
-// This is used for module path resolution
-const MODULE_URL = getModuleUrl();
 
 // ===== Types =====
 
@@ -54,66 +49,6 @@ const knowledgeState: KnowledgeState = {
   loaded: false,
 };
 
-// ===== Path Resolution =====
-// Uses shared module path resolver utility
-
-/**
- * Find JSON files in the given directory
- */
-function findJsonFiles(directory: string): string[] {
-  if (!existsSync(directory)) {
-    return [];
-  }
-
-  return readdirSync(directory)
-    .filter((file) => file.endsWith(JSON_FILE_EXTENSION))
-    .map((file) => resolve(join(directory, file)));
-}
-
-/**
- * Discover built-in knowledge pack JSON files using a chain of resolution strategies.
- *
- * Search priority:
- *  1. Relative to the installed module location (CJS __dirname)
- *  2. Relative to the installed module location (ESM import.meta.url)
- *  3. Heuristic based on process.argv[1] (CLI entrypoint with symlink resolution)
- *  4. Walk upward from process.cwd() (dev / repo root)
- */
-export function discoverBuiltInKnowledgePacks(): string[] {
-  try {
-    // Use shared path resolver utility
-    const searchPaths = resolveModulePaths({
-      relativePath: 'knowledge/packs',
-      logger,
-      ...(MODULE_URL && { moduleUrl: MODULE_URL }),
-    });
-
-    // Try each search path until we find one with JSON files
-    for (const packsDir of searchPaths) {
-      logger.debug({ path: packsDir, exists: existsSync(packsDir) }, 'Checking knowledge pack path');
-
-      const files = findJsonFiles(packsDir);
-      if (files.length > 0) {
-        logger.debug(
-          { count: files.length, dir: packsDir, files: files.slice(0, 3) },
-          'Found files in knowledge pack directory',
-        );
-        logger.info({ count: files.length, dir: packsDir }, 'Discovered built-in knowledge packs');
-        return files;
-      }
-    }
-
-    logger.error(
-      { searchPaths, cwd: process.cwd() },
-      'FATAL: No knowledge packs found in any search path',
-    );
-    return [];
-  } catch (error) {
-    logger.warn({ error }, 'Failed to discover built-in knowledge packs');
-    return [];
-  }
-}
-
 // ===== Validation =====
 
 /**
@@ -130,7 +65,7 @@ function formatZodErrors(errors: z.ZodIssue[]): Array<{ path: string; message: s
  * Validate and normalize pack structure
  * Handles both array and object-wrapped pack formats
  */
-function validateAndNormalizePack(packFile: string, data: unknown): ValidationResult {
+function validateAndNormalizePack(packName: string, data: unknown): ValidationResult {
   try {
     const validated = KnowledgePackSchema.parse(data);
 
@@ -144,7 +79,7 @@ function validateAndNormalizePack(packFile: string, data: unknown): ValidationRe
     if (error instanceof z.ZodError) {
       logger.warn(
         {
-          pack: packFile,
+          pack: packName,
           errors: formatZodErrors(error.issues.slice(0, 5)),
           totalErrors: error.issues.length,
         },
@@ -245,29 +180,25 @@ interface LoadStats {
   packsFailed: number;
   entriesValid: number;
   entriesInvalid: number;
-  failures: Array<{ file: string; error: string }>;
+  failures: Array<{ name: string; error: string }>;
 }
 
 /**
- * Load a single knowledge pack file
+ * Load a single embedded knowledge pack
  */
-function loadPackFile(packPath: string, stats: LoadStats): void {
+function loadEmbeddedPack(packName: string, packData: unknown, stats: LoadStats): void {
   try {
-    // Read and parse JSON file
-    const fileContent = readFileSync(packPath, 'utf-8');
-    const data = JSON.parse(fileContent);
-
     // Validate and normalize pack structure
-    const result = validateAndNormalizePack(packPath, data);
+    const result = validateAndNormalizePack(packName, packData);
 
     if (!result.success) {
       const error = 'Pack validation failed (see previous log)';
       stats.packsFailed++;
-      stats.failures.push({ file: packPath, error });
-      throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${error}`);
+      stats.failures.push({ name: packName, error });
+      throw new Error(`Failed to load embedded knowledge pack ${packName}: ${error}`);
     }
 
-    logger.debug({ pack: packPath, count: result.entries.length }, 'Loading knowledge pack');
+    logger.debug({ pack: packName, count: result.entries.length }, 'Loading knowledge pack');
 
     // Validate and add individual entries
     for (const entry of result.entries) {
@@ -283,15 +214,15 @@ function loadPackFile(packPath: string, stats: LoadStats): void {
   } catch (error) {
     stats.packsFailed++;
     const errorMessage = String(error);
-    stats.failures.push({ file: packPath, error: errorMessage });
-    logger.error({ pack: packPath, error }, 'Failed to load knowledge pack');
-    throw new Error(`Failed to load built-in knowledge pack ${packPath}: ${errorMessage}`);
+    stats.failures.push({ name: packName, error: errorMessage });
+    logger.error({ pack: packName, error }, 'Failed to load knowledge pack');
+    throw new Error(`Failed to load embedded knowledge pack ${packName}: ${errorMessage}`);
   }
 }
 
 /**
- * Load knowledge entries from built-in knowledge packs
- * Throws an error if any built-in pack fails to load
+ * Load knowledge entries from embedded knowledge packs
+ * Throws an error if any embedded pack fails to load
  */
 export function loadKnowledgeBase(): void {
   if (knowledgeState.loaded) {
@@ -299,7 +230,7 @@ export function loadKnowledgeBase(): void {
   }
 
   const stats: LoadStats = {
-    packsAttempted: 0,
+    packsAttempted: EMBEDDED_PACKS.length,
     packsLoaded: 0,
     packsFailed: 0,
     entriesValid: 0,
@@ -307,49 +238,27 @@ export function loadKnowledgeBase(): void {
     failures: [],
   };
 
-  const packPaths = discoverBuiltInKnowledgePacks();
-  stats.packsAttempted = packPaths.length;
-
-  if (packPaths.length === 0) {
-    // Get search paths for better error message
-    const searchPaths = resolveModulePaths({
-      relativePath: 'knowledge/packs',
-      logger,
-      ...(MODULE_URL && { moduleUrl: MODULE_URL }),
-    });
-
+  if (EMBEDDED_PACKS.length === 0) {
     const error = new Error(
-      `No knowledge packs discovered - server cannot start without knowledge base.\n` +
+      `No knowledge packs embedded - server cannot start without knowledge base.\n` +
         `\n` +
-        `Searched locations:\n${searchPaths.map((p) => `  - ${p}`).join('\n')}\n` +
-        `\n` +
-        `Expected: JSON files matching pattern knowledge/packs/*.json\n` +
+        `This is likely a build issue. The embedded-packs.ts file should contain\n` +
+        `static imports of all knowledge pack JSON files.\n` +
         `\n` +
         `Resolution:\n` +
-        `  • If running from source: Ensure knowledge/packs/ directory exists\n` +
-        `  • If installed via npm: Report this as a packaging issue\n` +
-        `  • Current directory: ${process.cwd()}\n` +
-        `  • Platform: ${process.platform}`,
+        `  - Ensure knowledge/packs/*.json files exist\n` +
+        `  - Rebuild the package with: npm run build`,
     );
 
-    logger.error(
-      {
-        error,
-        searchPaths,
-        cwd: process.cwd(),
-        platform: process.platform,
-      },
-      'No knowledge packs discovered',
-    );
-
+    logger.error({ error }, 'No knowledge packs embedded');
     throw error;
   }
 
-  logger.info({ totalPacks: packPaths.length }, 'Loading built-in knowledge packs');
+  logger.info({ totalPacks: EMBEDDED_PACKS.length }, 'Loading embedded knowledge packs');
 
-  // Load each discovered pack (loadPackFile already throws on failure)
-  for (const packPath of packPaths) {
-    loadPackFile(packPath, stats);
+  // Load each embedded pack
+  for (const pack of EMBEDDED_PACKS) {
+    loadEmbeddedPack(pack.name, pack.data, stats);
   }
 
   buildIndices();
@@ -397,4 +306,14 @@ export function loadKnowledgeData(): { entries: LoadedEntry[] } {
   return {
     entries: getAllEntries(),
   };
+}
+
+/**
+ * Reset knowledge state (for testing purposes)
+ */
+export function resetKnowledgeState(): void {
+  knowledgeState.entries.clear();
+  knowledgeState.byCategory.clear();
+  knowledgeState.byTag.clear();
+  knowledgeState.loaded = false;
 }

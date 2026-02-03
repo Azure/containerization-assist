@@ -64,7 +64,8 @@
   },
   "include": [
     "src/**/*",
-    "apps/**/*"
+    "apps/**/*",
+    "knowledge/**/*.json"
   ],
   "exclude": [
     "node_modules",
