@@ -450,4 +450,4 @@ export {
  * console.log(`Loaded ${entries.length} knowledge entries`);
  * ```
  */
-export { loadKnowledgeData } from '@/knowledge/index.js';
+export { loadKnowledgeData } from '@/knowledge/index';
