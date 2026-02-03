@@ -67,78 +67,71 @@ jobs:
           mkdir test-project
           cd test-project
 
-          # Create package.json
+          # Create package.json (type: commonjs for simpler webpack config)
           cat > package.json << 'EOF'
           {
             "name": "test-webpack-bundle",
             "version": "1.0.0",
             "private": true,
+            "type": "commonjs",
             "scripts": {
-              "build": "webpack",
+              "build": "webpack --config webpack.config.js",
               "test": "node dist/bundle.js"
             }
           }
           EOF
 
-          # Create TypeScript config
-          cat > tsconfig.json << 'EOF'
-          {
-            "compilerOptions": {
-              "target": "ES2020",
-              "module": "ESNext",
-              "moduleResolution": "node",
-              "esModuleInterop": true,
-              "strict": true,
-              "skipLibCheck": true,
-              "outDir": "./dist"
-            },
-            "include": ["*.ts"]
-          }
-          EOF
-
           # Create webpack config
+          # We externalize native modules that tools depend on since we're only
+          # testing the knowledge loading functionality, not the full tool chain.
           cat > webpack.config.js << 'EOF'
           const path = require('path');
 
           module.exports = {
-            entry: './test.ts',
+            entry: './test.js',
             target: 'node',
             mode: 'production',
             resolve: {
-              extensions: ['.ts', '.js'],
-            },
-            module: {
-              rules: [
-                {
-                  test: /\.ts$/,
-                  use: 'ts-loader',
-                  exclude: /node_modules/,
-                },
-              ],
+              extensions: ['.js', '.json'],
             },
             output: {
               filename: 'bundle.js',
               path: path.resolve(__dirname, 'dist'),
             },
-            // Ensure all dependencies are bundled
-            externals: [],
+            // Externalize native modules - we're testing knowledge loading, not the tools
+            externals: {
+              'cpu-features': 'commonjs cpu-features',
+              'ssh2': 'commonjs ssh2',
+              'bufferutil': 'commonjs bufferutil',
+              'utf-8-validate': 'commonjs utf-8-validate',
+            },
+            // Ignore .node files (native modules)
+            module: {
+              rules: [
+                {
+                  test: /\.node$/,
+                  loader: 'node-loader',
+                },
+              ],
+            },
           };
           EOF
 
-          # Create test script
-          cat > test.ts << 'EOF'
-          import { loadKnowledgeData } from 'containerization-assist-mcp/sdk';
+          # Create test script (plain JavaScript)
+          cat > test.js << 'EOF'
+          // Test that knowledge packs load correctly in a bundled context
+          const { loadKnowledgeData } = require('containerization-assist-mcp/sdk');
 
-          function main(): void {
+          function main() {
             console.log('Testing knowledge loading in bundled context...');
             
             const { entries } = loadKnowledgeData();
-            console.log(`Loaded ${entries.length} knowledge entries`);
+            console.log('Loaded ' + entries.length + ' knowledge entries');
             
             // Verify minimum expected entries (currently 672)
             const MIN_EXPECTED = 600;
             if (entries.length < MIN_EXPECTED) {
-              console.error(`FAIL: Expected at least ${MIN_EXPECTED} entries, got ${entries.length}`);
+              console.error('FAIL: Expected at least ' + MIN_EXPECTED + ' entries, got ' + entries.length);
               process.exit(1);
             }
             
@@ -150,8 +143,8 @@ jobs:
             }
             
             // Log some stats
-            const categories = new Set(entries.map(e => e.category));
-            console.log(`Categories: ${Array.from(categories).join(', ')}`);
+            const categories = new Set(entries.map(function(e) { return e.category; }));
+            console.log('Categories: ' + Array.from(categories).join(', '));
             
             console.log('SUCCESS: Knowledge packs loaded correctly in bundled context');
           }
@@ -163,7 +156,7 @@ jobs:
         working-directory: test-project
         run: |
           # Install webpack tooling
-          npm install webpack webpack-cli ts-loader typescript
+          npm install webpack webpack-cli node-loader
           
           # Install SDK from tarball
           npm install ../containerization-assist-*.tgz
