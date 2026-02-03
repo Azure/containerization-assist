@@ -27,6 +27,7 @@ import { setupToolContext } from '@/lib/tool-context-helpers';
 import { extractErrorMessage } from '@/lib/errors';
 import type { ToolContext } from '@/core/context';
 import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
+import { verifyDeployToolDefinition } from './types';
 
 import { DEFAULT_TIMEOUTS } from '@/config/constants';
 import { Success, Failure, type Result } from '@/types';
@@ -308,13 +309,6 @@ async function handleVerifyDeployment(
 import { tool } from '@/types/tool';
 
 export default tool({
-  name: 'verify-deploy',
-  description: 'Verify Kubernetes deployment status',
-  category: 'kubernetes',
-  version: '2.0.0',
-  schema: verifyDeploySchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
+  ...verifyDeployToolDefinition,
   handler: handleVerifyDeployment,
 });

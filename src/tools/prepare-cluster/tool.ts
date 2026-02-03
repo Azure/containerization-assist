@@ -25,6 +25,7 @@ import { extractErrorMessage } from '@/lib/errors';
 import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/core/context';
 import { DEFAULT_TIMEOUTS, DOCKER, KUBERNETES } from '@/config/constants';
+import { prepareClusterToolDefinition } from './types';
 import {
   createKubernetesClient,
   type K8sManifest,
@@ -1733,19 +1734,6 @@ export const prepareCluster = handlePrepareCluster;
 import { tool } from '@/types/tool';
 
 export default tool({
-  name: 'prepare-cluster',
-  description: 'Prepare Kubernetes cluster for deployment',
-  category: 'kubernetes',
-  version: '2.0.0',
-  schema: prepareClusterSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
-  chainHints: {
-    success:
-      'Cluster preparation successful. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
-    failure:
-      'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
-  },
+  ...prepareClusterToolDefinition,
   handler: handlePrepareCluster,
 });

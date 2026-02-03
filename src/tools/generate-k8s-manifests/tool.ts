@@ -38,11 +38,9 @@ import {
   type PolicyViolation,
   type PolicyValidationResult,
 } from '@/lib/policy-helpers';
+import { generateK8sManifestsToolDefinition } from './types';
 
-const name = 'generate-k8s-manifests';
-const description =
-  'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation. Supports repository analysis or ACA manifest conversion.';
-const version = '2.0.0';
+const { name } = generateK8sManifestsToolDefinition;
 
 /**
  * Extended input parameters that include optional policy configuration.
@@ -707,19 +705,6 @@ async function handleGenerateK8sManifests(
 import { tool } from '@/types/tool';
 
 export default tool({
-  name,
-  description,
-  category: 'kubernetes',
-  version,
-  schema: generateK8sManifestsSchema,
-  metadata: {
-    knowledgeEnhanced: true,
-  },
-  chainHints: {
-    success:
-      'Manifest plan generated successfully and passed policy validation. Next: Call prepare-cluster to create a kind cluster to deploy to.',
-    failure:
-      'Manifest generation failed or plan violates policies. Review manifest requirements and policy violations.',
-  },
+  ...generateK8sManifestsToolDefinition,
   handler: handleGenerateK8sManifests,
 });
