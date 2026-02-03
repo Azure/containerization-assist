@@ -50,6 +50,12 @@
       "import": "./dist/src/sdk/types.js",
       "require": "./dist-cjs/src/sdk/types.js",
       "default": "./dist/src/sdk/types.js"
+    },
+    "./knowledge": {
+      "types": "./dist/src/knowledge/index.d.ts",
+      "import": "./dist/src/knowledge/index.js",
+      "require": "./dist-cjs/src/knowledge/index.js",
+      "default": "./dist/src/knowledge/index.js"
     }
   },
   "bin": {

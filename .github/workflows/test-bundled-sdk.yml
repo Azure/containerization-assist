@@ -82,8 +82,7 @@ jobs:
           EOF
 
           # Create webpack config
-          # We externalize native modules that tools depend on since we're only
-          # testing the knowledge loading functionality, not the full tool chain.
+          # Simple config - the knowledge module has no native dependencies
           cat > webpack.config.js << 'EOF'
           const path = require('path');
 
@@ -98,29 +97,15 @@ jobs:
               filename: 'bundle.js',
               path: path.resolve(__dirname, 'dist'),
             },
-            // Externalize native modules - we're testing knowledge loading, not the tools
-            externals: {
-              'cpu-features': 'commonjs cpu-features',
-              'ssh2': 'commonjs ssh2',
-              'bufferutil': 'commonjs bufferutil',
-              'utf-8-validate': 'commonjs utf-8-validate',
-            },
-            // Ignore .node files (native modules)
-            module: {
-              rules: [
-                {
-                  test: /\.node$/,
-                  loader: 'node-loader',
-                },
-              ],
-            },
           };
           EOF
 
           # Create test script (plain JavaScript)
+          # Uses the lightweight knowledge-only export to avoid native module deps
           cat > test.js << 'EOF'
           // Test that knowledge packs load correctly in a bundled context
-          const { loadKnowledgeData } = require('containerization-assist-mcp/sdk');
+          // Using containerization-assist-mcp/knowledge to avoid pulling in native deps
+          const { loadKnowledgeData } = require('containerization-assist-mcp/knowledge');
 
           function main() {
             console.log('Testing knowledge loading in bundled context...');
@@ -156,7 +141,7 @@ jobs:
         working-directory: test-project
         run: |
           # Install webpack tooling
-          npm install webpack webpack-cli node-loader
+          npm install webpack webpack-cli
           
           # Install SDK from tarball
           npm install ../containerization-assist-*.tgz
