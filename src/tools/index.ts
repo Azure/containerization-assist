@@ -1,22 +1,3 @@
-/**
- * Tool implementations with handlers (heavy - includes all dependencies).
- *
- * This file exports complete tool implementations including handlers and all
- * their dependencies (Dockerode, Kubernetes clients, parsers, etc.).
- *
- * For lightweight imports of just tool metadata (name, description, schema),
- * import from './types' instead to avoid loading heavy implementation dependencies.
- *
- * @example
- * ```typescript
- * // Heavy - loads all tool implementations and dependencies
- * import { analyzeRepoTool, ALL_TOOLS } from 'containerization-assist-mcp/tools';
- *
- * // Lightweight - only tool metadata, no heavy dependencies
- * import { analyzeRepoToolDefinition, TOOL_NAME } from 'containerization-assist-mcp/tools/types';
- * ```
- */
-
 import analyzeRepoTool from './analyze-repo/tool';
 import buildImageTool from './build-image/tool';
 import fixDockerfileTool from './fix-dockerfile/tool';
@@ -26,9 +7,9 @@ import opsTool from './ops/tool';
 import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
 import scanImageTool from './scan-image/tool';
-import { TOOL_NAME } from './shared/toolDefinition';
 import tagImageTool from './tag-image/tool';
 import verifyDeployTool from './verify-deploy/tool';
+import { TOOL_NAME } from './shared/toolDefinition';
 
 export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];
 
