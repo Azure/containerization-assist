@@ -26,8 +26,9 @@ export { scanImageToolDefinition } from './scan-image/types';
 export { tagImageToolDefinition } from './tag-image/types';
 export { verifyDeployToolDefinition } from './verify-deploy/types';
 
-// Re-export the shared type
-export type { IToolDefinition } from './shared/toolDefinition';
+// Re-export the shared types and constants
+export { TOOL_NAME, type IToolDefinition } from './shared/toolDefinition';
+export type { ToolName } from './shared/toolDefinition';
 
 // Aggregate all tool definitions into a single array
 import { analyzeRepoToolDefinition } from './analyze-repo/types';
@@ -55,20 +56,3 @@ export const ALL_TOOL_DEFINITIONS = [
   tagImageToolDefinition,
   verifyDeployToolDefinition,
 ] as const;
-
-// Export tool name constants (re-exported from index for convenience)
-export const TOOL_NAME = {
-  ANALYZE_REPO: 'analyze-repo',
-  BUILD_IMAGE: 'build-image',
-  FIX_DOCKERFILE: 'fix-dockerfile',
-  GENERATE_DOCKERFILE: 'generate-dockerfile',
-  GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
-  OPS: 'ops',
-  PREPARE_CLUSTER: 'prepare-cluster',
-  PUSH_IMAGE: 'push-image',
-  SCAN_IMAGE: 'scan-image',
-  TAG_IMAGE: 'tag-image',
-  VERIFY_DEPLOY: 'verify-deploy',
-} as const;
-
-export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];

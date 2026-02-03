@@ -1,8 +1,8 @@
 import { prepareClusterSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const prepareClusterToolDefinition = {
-  name: 'prepare-cluster' as const,
+  name: TOOL_NAME.PREPARE_CLUSTER,
   description: 'Prepare Kubernetes cluster for deployment',
   category: 'kubernetes' as const,
   version: '2.0.0',
@@ -16,4 +16,4 @@ export const prepareClusterToolDefinition = {
     failure:
       'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
   },
-} satisfies IToolDefinition<'prepare-cluster'>;
+} satisfies IToolDefinition;

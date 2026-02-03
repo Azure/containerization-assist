@@ -1,8 +1,8 @@
 import { verifyDeploySchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const verifyDeployToolDefinition = {
-  name: 'verify-deploy' as const,
+  name: TOOL_NAME.VERIFY_DEPLOY,
   description: 'Verify Kubernetes deployment status',
   category: 'kubernetes' as const,
   version: '2.0.0',
@@ -10,4 +10,4 @@ export const verifyDeployToolDefinition = {
   metadata: {
     knowledgeEnhanced: false,
   },
-} satisfies IToolDefinition<'verify-deploy'>;
+} satisfies IToolDefinition;

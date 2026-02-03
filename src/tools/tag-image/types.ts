@@ -1,8 +1,8 @@
 import { tagImageSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const tagImageToolDefinition = {
-  name: 'tag-image' as const,
+  name: TOOL_NAME.TAG_IMAGE,
   description: 'Tag Docker images with version and registry information',
   category: 'docker' as const,
   version: '2.0.0',
@@ -10,4 +10,4 @@ export const tagImageToolDefinition = {
   metadata: {
     knowledgeEnhanced: false,
   },
-} satisfies IToolDefinition<'tag-image'>;
+} satisfies IToolDefinition;

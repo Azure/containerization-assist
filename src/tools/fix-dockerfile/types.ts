@@ -1,8 +1,8 @@
 import { fixDockerfileSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const fixDockerfileToolDefinition = {
-  name: 'fix-dockerfile' as const,
+  name: TOOL_NAME.FIX_DOCKERFILE,
   description: 'Analyze Dockerfile for issues and return knowledge-based fix recommendations',
   category: 'docker' as const,
   version: '2.0.0',
@@ -16,4 +16,4 @@ export const fixDockerfileToolDefinition = {
     failure:
       'Dockerfile validation failed. Review validation errors, policy violations (if any), and apply recommended fixes.',
   },
-} satisfies IToolDefinition<'fix-dockerfile'>;
+} satisfies IToolDefinition;

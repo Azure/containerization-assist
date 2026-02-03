@@ -1,8 +1,8 @@
 import { generateK8sManifestsSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const generateK8sManifestsToolDefinition = {
-  name: 'generate-k8s-manifests' as const,
+  name: TOOL_NAME.GENERATE_K8S_MANIFESTS,
   description:
     'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation. Supports repository analysis or ACA manifest conversion.',
   category: 'kubernetes' as const,
@@ -17,4 +17,4 @@ export const generateK8sManifestsToolDefinition = {
     failure:
       'Manifest generation failed or plan violates policies. Review manifest requirements and policy violations.',
   },
-} satisfies IToolDefinition<'generate-k8s-manifests'>;
+} satisfies IToolDefinition;

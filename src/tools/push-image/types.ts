@@ -1,8 +1,8 @@
 import { pushImageSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const pushImageToolDefinition = {
-  name: 'push-image' as const,
+  name: TOOL_NAME.PUSH_IMAGE,
   description: 'Push a Docker image to a registry',
   category: 'docker' as const,
   version: '2.0.0',
@@ -15,4 +15,4 @@ export const pushImageToolDefinition = {
     failure:
       'Image push failed. Check registry credentials, network connectivity, and image tag format.',
   },
-} satisfies IToolDefinition<'push-image'>;
+} satisfies IToolDefinition;

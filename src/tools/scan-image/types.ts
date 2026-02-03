@@ -1,8 +1,8 @@
 import { scanImageSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const scanImageToolDefinition = {
-  name: 'scan-image' as const,
+  name: TOOL_NAME.SCAN_IMAGE,
   description:
     'Scan Docker images for security vulnerabilities with knowledge-based remediation guidance',
   category: 'security' as const,
@@ -17,4 +17,4 @@ export const scanImageToolDefinition = {
     failure:
       'Security scan found vulnerabilities. Use fix-dockerfile to address security issues in your base images and dependencies.',
   },
-} satisfies IToolDefinition<'scan-image'>;
+} satisfies IToolDefinition;

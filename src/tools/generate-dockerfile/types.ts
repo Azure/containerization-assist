@@ -1,8 +1,8 @@
 import { generateDockerfileSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const generateDockerfileToolDefinition = {
-  name: 'generate-dockerfile' as const,
+  name: TOOL_NAME.GENERATE_DOCKERFILE,
   description:
     'Gather insights from knowledgebase and return requirements for Dockerfile creation or enhancement. Automatically detects existing Dockerfiles and provides detailed analysis and guidance.',
   category: 'docker' as const,
@@ -17,4 +17,4 @@ export const generateDockerfileToolDefinition = {
     failure:
       'Failed to generate Dockerfile plan or plan violates policies. Review repository analysis and policy violations.',
   },
-} satisfies IToolDefinition<'generate-dockerfile'>;
+} satisfies IToolDefinition;

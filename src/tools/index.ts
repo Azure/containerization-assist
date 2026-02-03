@@ -26,23 +26,9 @@ import opsTool from './ops/tool';
 import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
 import scanImageTool from './scan-image/tool';
-import { IToolDefinition } from './shared/toolDefinition';
+import { TOOL_NAME } from './shared/toolDefinition';
 import tagImageTool from './tag-image/tool';
 import verifyDeployTool from './verify-deploy/tool';
-
-const TOOL_NAME = {
-  ANALYZE_REPO: 'analyze-repo',
-  BUILD_IMAGE: 'build-image',
-  FIX_DOCKERFILE: 'fix-dockerfile',
-  GENERATE_DOCKERFILE: 'generate-dockerfile',
-  GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
-  OPS: 'ops',
-  PREPARE_CLUSTER: 'prepare-cluster',
-  PUSH_IMAGE: 'push-image',
-  SCAN_IMAGE: 'scan-image',
-  TAG_IMAGE: 'tag-image',
-  VERIFY_DEPLOY: 'verify-deploy',
-} as const;
 
 export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];
 
@@ -72,7 +58,7 @@ export type Tool = (
   | typeof scanImageTool
   | typeof tagImageTool
   | typeof verifyDeployTool
-) & { name: ToolName, toolDefinition: IToolDefinition };
+) & { name: ToolName };
 
 // Type-safe tool array using the union type
 // All tools are now deterministic plan-based or operational tools

@@ -1,8 +1,8 @@
 import { analyzeRepoSchema } from './schema';
-import type { IToolDefinition } from '../shared/toolDefinition';
+import { TOOL_NAME, type IToolDefinition } from '../shared/toolDefinition';
 
 export const analyzeRepoToolDefinition = {
-  name: 'analyze-repo' as const,
+  name: TOOL_NAME.ANALYZE_REPO,
   description:
     'Analyze repository structure and detect technologies by parsing config files to prepare for containerization and generating container artifacts like Dockerfiles and Kubernetes manifests',
   category: 'analysis' as const,
@@ -16,4 +16,4 @@ export const analyzeRepoToolDefinition = {
       'Repository analysis completed successfully. Continue by calling the generate-dockerfile or fix-dockerfile tools to create or fix your Dockerfile.',
     failure: 'Repository analysis failed. Please check the logs for details.',
   },
-} satisfies IToolDefinition<'analyze-repo'>;
+} satisfies IToolDefinition;
