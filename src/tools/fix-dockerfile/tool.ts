@@ -27,10 +27,9 @@ import type { z } from 'zod';
 import { readDockerfile } from '@/lib/file-utils';
 import { validateContentAgainstPolicy, type PolicyValidationResult } from '@/lib/policy-helpers';
 import { pluralize } from '@/lib/summary-helpers';
+import { fixDockerfileToolDefinition } from './types';
 
-const name = 'fix-dockerfile';
-const description = 'Analyze Dockerfile for issues and return knowledge-based fix recommendations';
-const version = '2.0.0';
+const { name } = fixDockerfileToolDefinition;
 
 // Score calculation constant
 const SCORE_PENALTY_PER_ISSUE = 10;
@@ -422,14 +421,7 @@ Dockerfile Fix Planning Summary:
 import { tool } from '@/types/tool';
 
 export default tool({
-  name,
-  description,
-  category: 'docker',
-  version,
-  schema: fixDockerfileSchema,
-  metadata: {
-    knowledgeEnhanced: true,
-  },
+  ...fixDockerfileToolDefinition,
   chainHints: {
     success:
       'Dockerfile validation and analysis complete (includes built-in best practices + organizational policy validation if configured). Next: Apply recommended fixes, then call build-image-context to test the Dockerfile.',

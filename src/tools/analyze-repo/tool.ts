@@ -8,6 +8,7 @@ import { getToolLogger } from '@/lib/tool-helpers';
 import { validatePathOrFail } from '@/lib/validation-helpers';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
 import { pluralize } from '@/lib/summary-helpers';
+import { analyzeRepoToolDefinition } from './types';
 import {
   parsePackageJson,
   parseGradle,
@@ -281,19 +282,6 @@ async function handleAnalyzeRepo(
 }
 
 export default tool({
-  name: 'analyze-repo',
-  description:
-    'Analyze repository structure and detect technologies by parsing config files to prepare for containerization and generating container artifacts like Dockerfiles and Kubernetes manifests',
-  category: 'analysis',
-  version: '4.0.0',
-  schema: analyzeRepoSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
-  chainHints: {
-    success:
-      'Repository analysis completed successfully. Continue by calling the generate-dockerfile or fix-dockerfile tools to create or fix your Dockerfile.',
-    failure: 'Repository analysis failed. Please check the logs for details.',
-  },
+  ...analyzeRepoToolDefinition,
   handler: handleAnalyzeRepo,
 });
