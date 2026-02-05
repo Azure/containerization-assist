@@ -9,22 +9,9 @@ import pushImageTool from './push-image/tool';
 import scanImageTool from './scan-image/tool';
 import tagImageTool from './tag-image/tool';
 import verifyDeployTool from './verify-deploy/tool';
+import { TOOL_NAME, ToolName } from './shared/toolDefinition';
 
-const TOOL_NAME = {
-  ANALYZE_REPO: 'analyze-repo',
-  BUILD_IMAGE: 'build-image',
-  FIX_DOCKERFILE: 'fix-dockerfile',
-  GENERATE_DOCKERFILE: 'generate-dockerfile',
-  GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
-  OPS: 'ops',
-  PREPARE_CLUSTER: 'prepare-cluster',
-  PUSH_IMAGE: 'push-image',
-  SCAN_IMAGE: 'scan-image',
-  TAG_IMAGE: 'tag-image',
-  VERIFY_DEPLOY: 'verify-deploy',
-} as const;
-
-export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];
+export type { ToolName };
 
 // Ensure proper names on all tools
 analyzeRepoTool.name = TOOL_NAME.ANALYZE_REPO;

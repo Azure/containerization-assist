@@ -27,6 +27,12 @@
       "require": "./dist-cjs/src/tools/index.js",
       "default": "./dist/src/tools/index.js"
     },
+    "./tools/types": {
+      "types": "./dist/src/tools/types.d.ts",
+      "import": "./dist/src/tools/types.js",
+      "require": "./dist-cjs/src/tools/types.js",
+      "default": "./dist/src/tools/types.js"
+    },
     "./types": {
       "types": "./dist/src/types/index.d.ts",
       "import": "./dist/src/types/index.js",

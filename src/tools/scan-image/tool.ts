@@ -12,8 +12,9 @@ import { createSecurityScanner } from '@/infra/security/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import { scanImageSchema, type ScanImageParams } from './schema';
+import { type ScanImageParams } from './schema';
 import { formatVulnerabilities, buildStatusSummary, pluralize } from '@/lib/summary-helpers';
+import { scanImageToolDefinition } from './types';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -288,20 +289,6 @@ export const scanImage = handleScanImage;
 import { tool } from '@/types/tool';
 
 export default tool({
-  name: 'scan-image',
-  description:
-    'Scan Docker images for security vulnerabilities with knowledge-based remediation guidance',
-  category: 'security',
-  version: '2.0.0',
-  schema: scanImageSchema,
-  metadata: {
-    knowledgeEnhanced: true,
-  },
-  chainHints: {
-    success:
-      'Security scan passed! Proceed with push-image to push to a registry, or continue with deployment preparation.',
-    failure:
-      'Security scan found vulnerabilities. Use fix-dockerfile to address security issues in your base images and dependencies.',
-  },
+  ...scanImageToolDefinition,
   handler: handleScanImage,
 });

@@ -17,6 +17,7 @@ import { tool } from '@/types/tool';
 import { tagImageSchema } from './schema';
 import { z } from 'zod';
 import { summarizeList } from '@/lib/summary-helpers';
+import { tagImageToolDefinition } from './types';
 
 export interface TagImageResult {
   /**
@@ -113,13 +114,6 @@ async function handleTagImage(
  * Tag image tool conforming to Tool interface
  */
 export default tool({
-  name: 'tag-image',
-  description: 'Tag Docker images with version and registry information',
-  category: 'docker',
-  version: '2.0.0',
-  schema: tagImageSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
+  ...tagImageToolDefinition,
   handler: handleTagImage,
 });

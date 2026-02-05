@@ -22,8 +22,10 @@ import { readDockerfile } from '@/lib/file-utils';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
-import { type BuildImageParams, buildImageSchema } from './schema';
+import { type BuildImageParams } from './schema';
 import { formatSize, formatDuration } from '@/lib/summary-helpers';
+import { tool } from '@/types/tool';
+import { buildImageToolDefinition } from './types';
 
 export interface BuildImageResult {
   /**
@@ -333,15 +335,7 @@ async function handleBuildImage(
 
 export const buildImage = handleBuildImage;
 
-import { tool } from '@/types/tool';
-
 export default tool({
-  name: 'build-image',
-  description: 'Build Docker images from Dockerfiles with security analysis',
-  version: '2.0.0',
-  schema: buildImageSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
+  ...buildImageToolDefinition,
   handler: handleBuildImage,
 });

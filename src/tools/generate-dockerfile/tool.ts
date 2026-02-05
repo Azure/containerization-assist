@@ -33,11 +33,9 @@ import {
 } from '@/lib/policy-helpers';
 import type { RegoEvaluator } from '@/config/policy-rego';
 import type { Logger } from 'pino';
+import { generateDockerfileToolDefinition } from './types';
 
-const name = 'generate-dockerfile';
-const description =
-  'Gather insights from knowledgebase and return requirements for Dockerfile creation or enhancement. Automatically detects existing Dockerfiles and provides detailed analysis and guidance.';
-const version = '2.0.0';
+const { name } = generateDockerfileToolDefinition;
 
 type DockerfileCategory = 'baseImages' | 'security' | 'optimization' | 'bestPractices';
 
@@ -1255,19 +1253,6 @@ async function handleGenerateDockerfile(
 import { tool } from '@/types/tool';
 
 export default tool({
-  name,
-  description,
-  category: 'docker',
-  version,
-  schema: generateDockerfileSchema,
-  metadata: {
-    knowledgeEnhanced: true,
-  },
-  chainHints: {
-    success:
-      'Dockerfile plan generated successfully and passed policy validation. Next: Use fix-dockerfile to validate the actual Dockerfile content before building.',
-    failure:
-      'Failed to generate Dockerfile plan or plan violates policies. Review repository analysis and policy violations.',
-  },
+  ...generateDockerfileToolDefinition,
   handler: handleGenerateDockerfile,
 });
