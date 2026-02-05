@@ -17,6 +17,7 @@ import { tool } from '@/types/tool';
 import { pushImageSchema } from './schema';
 import type { z } from 'zod';
 import { createErrorGuidance } from '@/lib/errors';
+import { pushImageToolDefinition } from './types';
 
 export interface PushImageResult {
   /**
@@ -250,18 +251,6 @@ async function handlePushImage(
  * Push image tool conforming to Tool interface
  */
 export default tool({
-  name: 'push-image',
-  description: 'Push a Docker image to a registry',
-  category: 'docker',
-  version: '2.0.0',
-  schema: pushImageSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
-  chainHints: {
-    success: 'Image pushed successfully. Review AI optimization insights for push improvements.',
-    failure:
-      'Image push failed. Check registry credentials, network connectivity, and image tag format.',
-  },
+  ...pushImageToolDefinition,
   handler: handlePushImage,
 });

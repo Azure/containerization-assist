@@ -26,6 +26,7 @@ import type { ToolContext } from '@/core/context';
 import { opsToolSchema } from './schema';
 import type { z } from 'zod';
 import { formatDuration, formatTimestamp } from '@/lib/summary-helpers';
+import { opsToolDefinition } from './types';
 
 interface PingConfig {
   message?: string;
@@ -282,13 +283,6 @@ async function handleOps(
 import { tool } from '@/types/tool';
 
 export default tool({
-  name: 'ops',
-  description: 'MCP server diagnostics: ping for connectivity testing, status for health metrics (memory, CPU, uptime). Use this for server monitoring, not application containerization.',
-  category: 'utility',
-  version: '2.0.0',
-  schema: opsToolSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
+  ...opsToolDefinition,
   handler: handleOps,
 });
