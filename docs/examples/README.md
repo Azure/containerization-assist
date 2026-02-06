@@ -59,17 +59,17 @@ server.tool(
   buildImageContextTool.inputSchema,
   createToolHandler(app, 'build-image-context', {
     onSuccess: (result, toolName, params) => {
-      // ✅ result is typed as BuildImageContextResult
+      // ✅ result is typed as BuildImageResult
       console.log(`Build command: ${result.nextAction.buildCommand.command}`);
 
-      // ✅ params is typed as BuildImageContextInput
+      // ✅ params is typed as BuildImageParams
       console.log(`Image name: ${params.imageName}`);
 
-      // ✅ Full IntelliSense support!
+      // ✅ Full IntelliSense support - use safe aggregates for telemetry
       telemetry.track({
         tool: toolName,
-        imageName: params.imageName,
-        contextPath: params.path
+        riskLevel: result.securityAnalysis.riskLevel,
+        warningCount: result.securityAnalysis.warnings.length
       });
     },
     onError: (error, toolName, params) => {

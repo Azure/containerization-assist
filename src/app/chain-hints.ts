@@ -35,9 +35,9 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
 
   [TOOL_NAME.BUILD_IMAGE_CONTEXT]: {
     success:
-      'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
+      'Build context prepared. Next: Execute the provided build command, then call scan-image to check for security vulnerabilities.',
     failure:
-      'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image-context.',
+      'Build context preparation failed. Use fix-dockerfile to resolve issues, then retry build-image-context.',
   },
 
   [TOOL_NAME.FIX_DOCKERFILE]: {

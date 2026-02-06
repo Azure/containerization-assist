@@ -629,7 +629,7 @@ async function handleBuildImage(
       },
     };
 
-    timer.end({ tags: finalTags, riskLevel });
+    timer.end({ tagCount: finalTags.length, riskLevel });
     return Success(result);
   } catch (error) {
     timer.error(error);

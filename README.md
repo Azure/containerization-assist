@@ -92,8 +92,9 @@ if (buildContext.ok) {
   const { securityAnalysis, nextAction } = buildContext.value;
   console.log('Security risk:', securityAnalysis.riskLevel);
   
-  // Execute the generated build command
+  // Execute the generated build command from the build context directory
   execSync(nextAction.buildCommand.command, {
+    cwd: buildContext.value.context.buildContextPath,
     env: { ...process.env, ...nextAction.buildCommand.environment }
   });
 }
