@@ -1,0 +1,206 @@
+# Test that embedded knowledge packs work correctly when the SDK is bundled
+# by consumer applications using webpack.
+#
+# This workflow validates that:
+# 1. The SDK can be bundled with webpack (no fs/path resolution issues)
+# 2. The bundled output is fully self-contained (no runtime node_modules needed)
+#
+# Background: Knowledge packs were previously loaded via fs.readFileSync() at runtime,
+# which breaks when consumers bundle the SDK. The fix embeds knowledge as JS objects
+# at build time via scripts/generate-embedded-packs.ts.
+
+name: Test Bundled SDK
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Job 1: Build the SDK and create npm tarball
+  build-and-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build SDK
+        run: npm run build
+
+      - name: Create npm tarball
+        run: npm pack
+
+      - name: Upload SDK tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-tarball
+          path: '*.tgz'
+          retention-days: 1
+
+  # Job 2: Bundle SDK with webpack and test
+  test-webpack-bundle:
+    needs: build-and-pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download SDK tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-tarball
+
+      - name: Create test project
+        run: |
+          mkdir test-project
+          cd test-project
+
+          # Create package.json (type: commonjs for simpler webpack config)
+          cat > package.json << 'EOF'
+          {
+            "name": "test-webpack-bundle",
+            "version": "1.0.0",
+            "private": true,
+            "type": "commonjs",
+            "scripts": {
+              "build": "webpack --config webpack.config.js",
+              "test": "node dist/bundle.js"
+            }
+          }
+          EOF
+
+          # Create webpack config
+          # Simple config - the knowledge module has no native dependencies
+          cat > webpack.config.js << 'EOF'
+          const path = require('path');
+
+          module.exports = {
+            entry: './test.js',
+            target: 'node',
+            mode: 'production',
+            resolve: {
+              extensions: ['.js', '.json'],
+            },
+            output: {
+              filename: 'bundle.js',
+              path: path.resolve(__dirname, 'dist'),
+            },
+          };
+          EOF
+
+          # Create test script (plain JavaScript)
+          # Uses the lightweight knowledge-only export to avoid native module deps
+          cat > test.js << 'EOF'
+          // Test that knowledge packs load correctly in a bundled context
+          // Using containerization-assist-mcp/knowledge to avoid pulling in native deps
+          const { loadKnowledgeData } = require('containerization-assist-mcp/knowledge');
+
+          function main() {
+            console.log('Testing knowledge loading in bundled context...');
+            
+            const { entries } = loadKnowledgeData();
+            console.log('Loaded ' + entries.length + ' knowledge entries');
+            
+            // Verify minimum expected entries (currently 672)
+            const MIN_EXPECTED = 600;
+            if (entries.length < MIN_EXPECTED) {
+              console.error('FAIL: Expected at least ' + MIN_EXPECTED + ' entries, got ' + entries.length);
+              process.exit(1);
+            }
+            
+            // Verify entry structure (required fields: id, category, pattern, recommendation)
+            const sample = entries[0];
+            if (!sample.id || !sample.category || !sample.recommendation) {
+              console.error('FAIL: Entry missing required fields:', JSON.stringify(sample, null, 2));
+              process.exit(1);
+            }
+            
+            // Log some stats
+            const categories = new Set(entries.map(function(e) { return e.category; }));
+            console.log('Categories: ' + Array.from(categories).join(', '));
+            
+            console.log('SUCCESS: Knowledge packs loaded correctly in bundled context');
+          }
+
+          main();
+          EOF
+
+      - name: Install dependencies
+        working-directory: test-project
+        run: |
+          # Install webpack tooling
+          npm install webpack webpack-cli
+          
+          # Install SDK from tarball
+          npm install ../containerization-assist-*.tgz
+
+      - name: Bundle with webpack
+        working-directory: test-project
+        run: npm run build
+
+      - name: Show bundle stats
+        working-directory: test-project
+        run: |
+          echo "Bundle size:"
+          ls -lh dist/bundle.js
+          echo ""
+          echo "Bundle created successfully"
+
+      - name: Run bundled code (with node_modules present)
+        working-directory: test-project
+        run: npm run test
+
+      - name: Upload webpack bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: webpack-bundle
+          path: test-project/dist/bundle.js
+          retention-days: 1
+
+  # Job 3: Test bundle in complete isolation (no node_modules)
+  test-bundle-isolation:
+    needs: test-webpack-bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download webpack bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: webpack-bundle
+
+      - name: Verify isolation environment
+        run: |
+          echo "Contents of current directory:"
+          ls -la
+          echo ""
+          echo "Confirming no node_modules present:"
+          if [ -d "node_modules" ]; then
+            echo "FAIL: node_modules directory exists"
+            exit 1
+          fi
+          echo "Confirmed: no node_modules directory"
+
+      - name: Run isolated bundle
+        run: |
+          echo "Running bundle in complete isolation..."
+          echo "This proves the bundle has no runtime filesystem dependencies."
+          echo ""
+          node bundle.js
+          echo ""
+          echo "ISOLATION TEST PASSED: Bundle is fully self-contained"

@@ -56,6 +56,12 @@
       "import": "./dist/src/sdk/types.js",
       "require": "./dist-cjs/src/sdk/types.js",
       "default": "./dist/src/sdk/types.js"
+    },
+    "./knowledge": {
+      "types": "./dist/src/knowledge/index.d.ts",
+      "import": "./dist/src/knowledge/index.js",
+      "require": "./dist-cjs/src/knowledge/index.js",
+      "default": "./dist/src/knowledge/index.js"
     }
   },
   "bin": {
@@ -79,7 +85,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist dist-cjs coverage .tsbuildinfo*",
-    "build": "npm run clean && npm run build:policies && npm run build:esm && npm run build:cjs",
+    "build": "npm run clean && npm run build:knowledge && npm run build:policies && npm run build:esm && npm run build:cjs",
+    "build:knowledge": "tsx scripts/generate-embedded-packs.ts",
     "build:policies": "tsx scripts/build-policies.ts",
     "build:esm": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json --resolve-full-paths && chmod +x dist/src/cli/cli.js",
     "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json && printf '{\"type\": \"commonjs\"}\\n' > dist-cjs/package.json",

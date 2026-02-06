@@ -9,7 +9,10 @@ export type {
 } from './policy-types';
 
 import { findKnowledgeMatches } from './matcher';
-import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded } from './loader';
+import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded, loadKnowledgeData } from './loader';
+
+// Export knowledge loader for SDK consumers
+export { loadKnowledgeData };
 import type { KnowledgeQuery, KnowledgeMatch } from './types';
 import {
   findPolicyAwareKnowledgeMatches,

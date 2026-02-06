@@ -430,3 +430,24 @@ export {
   type AbortSignalResult,
   type ValidationResult,
 } from './vscode-utils.js';
+
+// ===== KNOWLEDGE BASE =====
+
+/**
+ * Load the embedded knowledge base and return all entries.
+ *
+ * Knowledge packs contain best practices for Dockerfile generation, Kubernetes
+ * manifests, and security configurations. They are embedded at build time,
+ * eliminating runtime filesystem dependencies.
+ *
+ * @returns Object containing all loaded knowledge entries
+ *
+ * @example
+ * ```typescript
+ * import { loadKnowledgeData } from 'containerization-assist-mcp/sdk';
+ *
+ * const { entries } = loadKnowledgeData();
+ * console.log(`Loaded ${entries.length} knowledge entries`);
+ * ```
+ */
+export { loadKnowledgeData } from '@/knowledge/index';
