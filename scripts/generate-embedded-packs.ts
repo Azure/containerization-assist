@@ -44,7 +44,7 @@ function generateEmbeddedPacks(): void {
 
     // Generate inline data
     imports.push(`const ${varName} = ${JSON.stringify(data)} as const;`);
-    exports.push(`  { name: '${packName}', data: ${varName} },`);
+    exports.push(`  { name: ${JSON.stringify(packName)}, data: ${varName} },`);
   }
 
   const output = `/**
