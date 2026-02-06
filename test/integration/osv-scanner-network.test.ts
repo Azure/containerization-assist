@@ -220,6 +220,13 @@ CMD ["echo", "Test image for OSV scanning"]
 
   describe('Multiple Dependencies with Vulnerabilities', () => {
     it('should detect vulnerabilities across multiple packages in pom.xml', async () => {
+      // Skip in CI - this test builds Docker images and makes multiple API calls
+      // which is too slow/flaky for CI. The unit tests cover mocked behavior.
+      if (process.env.CI) {
+        console.log('Skipping slow network test in CI environment');
+        return;
+      }
+
       if (skipTests) {
         console.log('Skipping test - OSV API or Docker not available');
         return;
