@@ -78,6 +78,7 @@ For direct tool usage without MCP protocol (e.g., VS Code extensions, programmat
 
 ```typescript
 import { analyzeRepo, buildImageContext, scanImage } from 'containerization-assist-mcp/sdk';
+import { execSync } from 'child_process';
 
 // Simple function calls - no MCP server needed
 const analysis = await analyzeRepo({ repositoryPath: './myapp' });
@@ -85,8 +86,18 @@ if (analysis.ok) {
   console.log('Detected:', analysis.value.modules);
 }
 
+// buildImageContext returns build context with security analysis and commands
 const buildContext = await buildImageContext({ path: './myapp', imageName: 'myapp:v1', platform: 'linux/amd64' });
-// buildContext returns build commands for the agent to execute
+if (buildContext.ok) {
+  const { securityAnalysis, nextAction } = buildContext.value;
+  console.log('Security risk:', securityAnalysis.riskLevel);
+  
+  // Execute the generated build command
+  execSync(nextAction.buildCommand.command, {
+    env: { ...process.env, ...nextAction.buildCommand.environment }
+  });
+}
+
 const scan = await scanImage({ imageId: 'myapp:v1' });
 ```
 
