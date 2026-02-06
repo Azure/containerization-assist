@@ -186,7 +186,7 @@ The plan is returned as structured data, NOT the actual Dockerfile content. The 
       'Generate Dockerfile plan for:\n\n`{{repositoryPath}}`\n\nTarget: {{targetPlatform}}',
     isReadOnly: true,
   },
-  suggestedNextTools: ['build_image'],
+  suggestedNextTools: ['build_image_context'],
   category: 'dockerfile',
   requiresExternalDeps: [] as const,
 };
@@ -213,7 +213,7 @@ Does NOT modify the file - returns recommendations for the LLM to apply.`,
     messageTemplate: 'Analyze Dockerfile at:\n\n`{{dockerfilePath}}`',
     isReadOnly: true,
   },
-  suggestedNextTools: ['build_image', 'scan_image'],
+  suggestedNextTools: ['build_image_context', 'scan_image'],
   category: 'dockerfile',
   requiresExternalDeps: [] as const,
 };
