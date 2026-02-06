@@ -8,7 +8,7 @@
  * Run with: npx tsx scripts/generate-embedded-packs.ts
  */
 
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
 const PACKS_DIR = join(import.meta.dirname, '../knowledge/packs');
@@ -24,9 +24,21 @@ function camelCase(str: string): string {
 function generateEmbeddedPacks(): void {
   console.log('Generating embedded knowledge packs...');
 
+  // Validate packs directory exists
+  if (!existsSync(PACKS_DIR)) {
+    console.error(`Knowledge packs directory not found: ${PACKS_DIR}`);
+    process.exit(1);
+  }
+
   const packFiles = readdirSync(PACKS_DIR)
     .filter((f) => f.endsWith('.json'))
     .sort();
+
+  // Validate at least one pack exists
+  if (packFiles.length === 0) {
+    console.error(`No knowledge pack JSON files found in: ${PACKS_DIR}`);
+    process.exit(1);
+  }
 
   console.log(`Found ${packFiles.length} knowledge packs`);
 
@@ -38,13 +50,19 @@ function generateEmbeddedPacks(): void {
     const packName = basename(file, '.json');
     const varName = camelCase(packName);
 
-    // Read and parse the JSON to validate it
-    const content = readFileSync(packPath, 'utf-8');
-    const data = JSON.parse(content);
+    try {
+      // Read and parse the JSON to validate it
+      const content = readFileSync(packPath, 'utf-8');
+      const data = JSON.parse(content);
 
-    // Generate inline data
-    imports.push(`const ${varName} = ${JSON.stringify(data)} as const;`);
-    exports.push(`  { name: ${JSON.stringify(packName)}, data: ${varName} },`);
+      // Generate inline data (use JSON.stringify for packName to escape special chars)
+      imports.push(`const ${varName} = ${JSON.stringify(data)} as const;`);
+      exports.push(`  { name: ${JSON.stringify(packName)}, data: ${varName} },`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to process knowledge pack "${file}" at ${packPath}: ${message}`);
+      process.exit(1);
+    }
   }
 
   const output = `/**

@@ -70,8 +70,7 @@
   },
   "include": [
     "src/**/*",
-    "apps/**/*",
-    "knowledge/**/*.json"
+    "apps/**/*"
   ],
   "exclude": [
     "node_modules",
