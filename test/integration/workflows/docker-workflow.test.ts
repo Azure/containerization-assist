@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { createLogger } from '@/lib/logger';
 import type { ToolContext } from '@/mcp/context';
 import { join } from 'node:path';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync, copyFileSync } from 'node:fs';
 import { DockerTestCleaner } from '../../__support__/utilities/docker-test-cleaner';
 import { createDockerClient } from '@/infra/docker/client';
 
@@ -143,13 +143,13 @@ describe('Docker Workflow Integration', () => {
         expect(build.createdTags).toContain(imageName);
         testCleaner.trackImage(build.imageId);
 
-        console.log('Created Tags:', build.createdTags);
-
         // Step 4: Scan image
         const scanResult = await scanImageTool.handler({ imageId: build.imageId }, toolContext);
 
         expect(scanResult.ok).toBe(true);
-        expect(scanResult.value).toBeDefined();
+        if (scanResult.ok) {
+          expect(scanResult.value).toBeDefined();
+        }
 
         // Step 5: Tag image
         const tagResult = await tagImageTool.handler(
@@ -163,6 +163,8 @@ describe('Docker Workflow Integration', () => {
         expect(tagResult.ok).toBe(true);
         if (tagResult.ok) {
           expect(tagResult.value).toBeDefined();
+        } else {
+          console.log('Tagging failed:', tagResult.error);
         }
       },
       testTimeout,
@@ -181,6 +183,13 @@ describe('Docker Workflow Integration', () => {
         if (!existsSync(testRepo)) {
           console.log('Skipping: python-flask fixture not found');
           return;
+        }
+
+        // Rename requirements.txt.fixture to requirements.txt for detection
+        const reqFixture = join(testRepo, 'requirements.txt.fixture');
+        const reqFile = join(testRepo, 'requirements.txt');
+        if (existsSync(reqFixture) && !existsSync(reqFile)) {
+          copyFileSync(reqFixture, reqFile);
         }
 
         // Step 1: Analyze
@@ -241,7 +250,8 @@ CMD ["python", "app.py"]`,
           expect(tagResult.ok).toBe(true);
           if (tagResult.ok) {
             expect(tagResult.value).toBeDefined();
-          }
+          } else
+            console.log('Tagging failed:', tagResult.error);
         }
       },
       testTimeout,
@@ -352,6 +362,8 @@ CMD ["python", "app.py"]`,
           expect(tagResult.ok).toBe(true);
           if (tagResult.ok) {
             expect(tagResult.value).toBeDefined();
+          } else {
+            console.log('Tagging failed:', tagResult.error);
           }
         }
       },
