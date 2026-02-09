@@ -160,11 +160,12 @@ describe('Docker Workflow Integration', () => {
           toolContext,
         );
 
+        if (!tagResult.ok) {
+          console.log('Tagging failed:', tagResult.error);
+        }
         expect(tagResult.ok).toBe(true);
         if (tagResult.ok) {
           expect(tagResult.value).toBeDefined();
-        } else {
-          console.log('Tagging failed:', tagResult.error);
         }
       },
       testTimeout,
@@ -247,11 +248,14 @@ CMD ["python", "app.py"]`,
             toolContext,
           );
 
+          if (!tagResult.ok) {
+            console.log('Tagging failed:', tagResult.error);
+          }
+          
           expect(tagResult.ok).toBe(true);
           if (tagResult.ok) {
             expect(tagResult.value).toBeDefined();
-          } else
-            console.log('Tagging failed:', tagResult.error);
+          }
         }
       },
       testTimeout,
@@ -359,11 +363,13 @@ CMD ["python", "app.py"]`,
             toolContext,
           );
 
+          if (!tagResult.ok) {
+            console.log('Tagging failed:', tagResult.error);
+          }
+
           expect(tagResult.ok).toBe(true);
           if (tagResult.ok) {
             expect(tagResult.value).toBeDefined();
-          } else {
-            console.log('Tagging failed:', tagResult.error);
           }
         }
       },
