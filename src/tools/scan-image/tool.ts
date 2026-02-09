@@ -40,6 +40,25 @@ interface DockerScanResult {
   };
 }
 
+/**
+ * Actionable fix recommendation that groups related vulnerabilities
+ */
+export interface FixAction {
+  type: 'UPGRADE_PACKAGE';
+  action: string;
+  current: string;
+  recommended: string;
+  package: string;
+  vulnerabilitiesFixed: number;
+  severityCounts: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  cveIds: string[];
+}
+
 export interface ScanImageResult {
   /**
    * Natural language summary for user display.
@@ -49,6 +68,7 @@ export interface ScanImageResult {
   summary?: string;
   success: boolean;
   scanner: string;
+  recommendedActions?: FixAction[];
   remediationGuidance?: Array<{
     vulnerability: string;
     recommendation: string;
@@ -64,8 +84,76 @@ export interface ScanImageResult {
     unknown: number;
     total: number;
   };
+  vulnerabilityDetails?: Array<{
+    id: string;
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NEGLIGIBLE' | 'UNKNOWN';
+    package: string;
+    version: string;
+    description: string;
+    fixedVersion?: string;
+  }>;
   scanTime: string;
   passed: boolean;
+}
+
+/**
+ * Analyze vulnerabilities and generate actionable fix recommendations
+ * Groups vulnerabilities by package for cleaner output
+ */
+function analyzeFixActions(
+  vulnerabilities: Array<{
+    id: string;
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NEGLIGIBLE' | 'UNKNOWN';
+    package: string;
+    version: string;
+    fixedVersion?: string;
+  }>,
+): FixAction[] {
+  const fixable = vulnerabilities.filter((v) => v.fixedVersion);
+  if (fixable.length === 0) return [];
+
+  const byPackage = new Map<string, typeof fixable>();
+  for (const vuln of fixable) {
+    const pkg = byPackage.get(vuln.package) || [];
+    pkg.push(vuln);
+    byPackage.set(vuln.package, pkg);
+  }
+
+  const actions: FixAction[] = Array.from(byPackage.entries()).map(([packageName, vulns]) => {
+    const severityCounts = {
+      critical: vulns.filter((v) => v.severity === 'CRITICAL').length,
+      high: vulns.filter((v) => v.severity === 'HIGH').length,
+      medium: vulns.filter((v) => v.severity === 'MEDIUM').length,
+      low: vulns.filter((v) => v.severity === 'LOW').length,
+    };
+
+    const cveIds = [...new Set(vulns.map((v) => v.id))].slice(0, 5);
+    const currentVersion = vulns[0]?.version ?? 'unknown';
+    const fixedVersion = vulns[0]?.fixedVersion ?? 'latest';
+
+    return {
+      type: 'UPGRADE_PACKAGE',
+      action: `Upgrade ${packageName}`,
+      current: `${packageName}: ${currentVersion}`,
+      recommended: `${packageName}: ${fixedVersion}`,
+      package: packageName,
+      vulnerabilitiesFixed: vulns.length,
+      severityCounts,
+      cveIds,
+    };
+  });
+
+  actions.sort((a, b) => {
+    if (b.severityCounts.critical !== a.severityCounts.critical) {
+      return b.severityCounts.critical - a.severityCounts.critical;
+    }
+    if (b.severityCounts.high !== a.severityCounts.high) {
+      return b.severityCounts.high - a.severityCounts.high;
+    }
+    return b.vulnerabilitiesFixed - a.vulnerabilitiesFixed;
+  });
+
+  return actions.slice(0, 5);
 }
 
 /**
@@ -231,11 +319,28 @@ async function handleScanImage(
       `🔒 Security scan failed (${scanner}). ${vulnSummary}.${remediationText}`,
     );
 
-    // Prepare the result
+    const vulnerabilityDetails =
+      dockerScanResult.vulnerabilities && dockerScanResult.vulnerabilities.length > 0
+        ? dockerScanResult.vulnerabilities.map((v) => ({
+            id: v.id ?? 'UNKNOWN',
+            severity: v.severity,
+            package: v.package ?? 'unknown',
+            version: v.version ?? 'unknown',
+            description: v.description ?? 'No description available',
+            ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
+          }))
+        : undefined;
+
+    const recommendedActions =
+      vulnerabilityDetails && vulnerabilityDetails.length > 0
+        ? analyzeFixActions(vulnerabilityDetails)
+        : undefined;
+
     const result: ScanImageResult = {
       summary,
       success: true,
       scanner,
+      ...(recommendedActions && recommendedActions.length > 0 && { recommendedActions }),
       ...(remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {
         critical: scanResult.criticalCount,
@@ -246,6 +351,7 @@ async function handleScanImage(
         unknown: scanResult.unknownCount,
         total: scanResult.totalVulnerabilities,
       },
+      ...(vulnerabilityDetails && { vulnerabilityDetails }),
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
     };

@@ -156,6 +156,166 @@ describe('scanImage - Error Scenarios', () => {
         expect(result.value.passed).toBe(false); // Should fail with high severity
       }
     });
+
+    it('should include vulnerabilityDetails with fixedVersion information', async () => {
+      mockSecurityScanner.scanImage.mockResolvedValue(
+        createSuccessResult({
+          vulnerabilities: [
+            {
+              id: 'CVE-2023-1234',
+              severity: 'CRITICAL' as const,
+              package: 'openssl',
+              version: '1.1.1',
+              description: 'Critical security vulnerability',
+              fixedVersion: '1.1.1t',
+            },
+            {
+              id: 'CVE-2023-5678',
+              severity: 'HIGH' as const,
+              package: 'libssl',
+              version: '3.0.0',
+              description: 'High severity vulnerability',
+              fixedVersion: '3.0.8',
+            },
+            {
+              id: 'CVE-2023-9999',
+              severity: 'MEDIUM' as const,
+              package: 'curl',
+              version: '7.68.0',
+              description: 'Medium severity vulnerability without fix',
+            },
+          ],
+          criticalCount: 1,
+          highCount: 1,
+          mediumCount: 1,
+          lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
+          totalVulnerabilities: 3,
+          scanDate: new Date(),
+        }),
+      );
+
+      const result = await scanImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.vulnerabilityDetails).toBeDefined();
+        expect(result.value.vulnerabilityDetails).toHaveLength(3);
+
+        const vuln1 = result.value.vulnerabilityDetails![0];
+        expect(vuln1.id).toBe('CVE-2023-1234');
+        expect(vuln1.package).toBe('openssl');
+        expect(vuln1.version).toBe('1.1.1');
+        expect(vuln1.fixedVersion).toBe('1.1.1t');
+        expect(vuln1.severity).toBe('CRITICAL');
+
+        const vuln2 = result.value.vulnerabilityDetails![1];
+        expect(vuln2.id).toBe('CVE-2023-5678');
+        expect(vuln2.fixedVersion).toBe('3.0.8');
+
+        const vuln3 = result.value.vulnerabilityDetails![2];
+        expect(vuln3.id).toBe('CVE-2023-9999');
+        expect(vuln3.fixedVersion).toBeUndefined();
+      }
+    });
+
+    it('should generate recommendedActions grouped by package', async () => {
+      mockSecurityScanner.scanImage.mockResolvedValue(
+        createSuccessResult({
+          vulnerabilities: [
+            {
+              id: 'CVE-2023-1',
+              severity: 'CRITICAL' as const,
+              package: 'openssl',
+              version: '1.1.1',
+              description: 'Critical vulnerability 1',
+              fixedVersion: '1.1.1t',
+            },
+            {
+              id: 'CVE-2023-2',
+              severity: 'HIGH' as const,
+              package: 'openssl',
+              version: '1.1.1',
+              description: 'High vulnerability 2',
+              fixedVersion: '1.1.1t',
+            },
+            {
+              id: 'CVE-2023-3',
+              severity: 'MEDIUM' as const,
+              package: 'curl',
+              version: '7.68.0',
+              description: 'Medium vulnerability',
+              fixedVersion: '7.88.0',
+            },
+          ],
+          criticalCount: 1,
+          highCount: 1,
+          mediumCount: 1,
+          lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
+          totalVulnerabilities: 3,
+          scanDate: new Date(),
+        }),
+      );
+
+      const result = await scanImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendedActions).toBeDefined();
+        expect(result.value.recommendedActions).toHaveLength(2);
+
+        const action1 = result.value.recommendedActions![0];
+        expect(action1.action).toBe('Upgrade openssl');
+        expect(action1.package).toBe('openssl');
+        expect(action1.vulnerabilitiesFixed).toBe(2);
+        expect(action1.severityCounts.critical).toBe(1);
+        expect(action1.severityCounts.high).toBe(1);
+        expect(action1.current).toBe('openssl: 1.1.1');
+        expect(action1.recommended).toBe('openssl: 1.1.1t');
+        expect(action1.cveIds).toContain('CVE-2023-1');
+        expect(action1.cveIds).toContain('CVE-2023-2');
+
+        const action2 = result.value.recommendedActions![1];
+        expect(action2.action).toBe('Upgrade curl');
+        expect(action2.package).toBe('curl');
+        expect(action2.vulnerabilitiesFixed).toBe(1);
+        expect(action2.severityCounts.medium).toBe(1);
+      }
+    });
+
+    it('should not generate recommendedActions when no fixes available', async () => {
+      mockSecurityScanner.scanImage.mockResolvedValue(
+        createSuccessResult({
+          vulnerabilities: [
+            {
+              id: 'CVE-2023-9999',
+              severity: 'CRITICAL' as const,
+              package: 'oldpkg',
+              version: '1.0.0',
+              description: 'No fix available',
+            },
+          ],
+          criticalCount: 1,
+          highCount: 0,
+          mediumCount: 0,
+          lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
+          totalVulnerabilities: 1,
+          scanDate: new Date(),
+        }),
+      );
+
+      const result = await scanImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendedActions).toBeUndefined();
+      }
+    });
   });
 
   describe('Error Scenarios - Infrastructure', () => {

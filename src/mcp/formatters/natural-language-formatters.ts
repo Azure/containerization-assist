@@ -86,6 +86,68 @@ export function formatScanImageNarrative(
     }
   }
 
+  // Recommended actions
+  if (result.recommendedActions && result.recommendedActions.length > 0) {
+    const totalFixed = result.recommendedActions.reduce(
+      (sum, action) => sum + action.vulnerabilitiesFixed,
+      0,
+    );
+    parts.push(
+      `\n**Recommended Actions:** (${result.recommendedActions.length} actions fix ${totalFixed} vulnerabilities)`,
+    );
+
+    result.recommendedActions.forEach((action, idx) => {
+      const severityText =
+        action.severityCounts.critical > 0
+          ? `${action.severityCounts.critical} critical`
+          : action.severityCounts.high > 0
+            ? `${action.severityCounts.high} high`
+            : `${action.severityCounts.medium} medium`;
+
+      parts.push(
+        `\n  ${idx + 1}. ${action.action} - Fixes ${action.vulnerabilitiesFixed} (${severityText})`,
+      );
+      parts.push(`     ${action.current}`);
+      parts.push(`     → ${action.recommended}`);
+    });
+  }
+
+  // Fixable vulnerabilities
+  if (result.vulnerabilityDetails && result.vulnerabilityDetails.length > 0) {
+    const fixableVulns = result.vulnerabilityDetails.filter((v) => v.fixedVersion);
+
+    if (fixableVulns.length > 0) {
+      const severityWeight: Record<string, number> = {
+        CRITICAL: 4,
+        HIGH: 3,
+        MEDIUM: 2,
+        LOW: 1,
+        NEGLIGIBLE: 0,
+        UNKNOWN: 0,
+      };
+
+      const sortedFixable = fixableVulns
+        .sort((a, b) => (severityWeight[b.severity] ?? 0) - (severityWeight[a.severity] ?? 0))
+        .slice(0, 10);
+
+      parts.push(
+        `\n**Fixable Vulnerabilities:** (${fixableVulns.length} of ${result.vulnerabilities.total})`,
+      );
+      sortedFixable.forEach((vuln, idx) => {
+        parts.push(
+          `  ${idx + 1}. [${vuln.severity}] ${vuln.package}: ${vuln.version} → ${vuln.fixedVersion}`,
+        );
+        if (vuln.id) {
+          parts.push(`     CVE: ${vuln.id}`);
+        }
+      });
+
+      if (fixableVulns.length > 10) {
+        parts.push(`  ... and ${fixableVulns.length - 10} more fixable vulnerabilities`);
+      }
+    }
+  }
+
   // Remediation guidance
   if (result.remediationGuidance && result.remediationGuidance.length > 0) {
     parts.push(
