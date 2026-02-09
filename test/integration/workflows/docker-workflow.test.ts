@@ -143,16 +143,13 @@ describe('Docker Workflow Integration', () => {
         expect(build.createdTags).toContain(imageName);
         testCleaner.trackImage(build.imageId);
 
-        console.log("Created Tags:", build.createdTags);
+        console.log('Created Tags:', build.createdTags);
 
-        // Step 4: Scan image (may fail if Trivy not installed)
+        // Step 4: Scan image
         const scanResult = await scanImageTool.handler({ imageId: build.imageId }, toolContext);
 
-        if (!scanResult.ok) {
-          console.log('Scan skipped (Trivy may not be installed)');
-        } else {
-          expect(scanResult.value).toBeDefined();
-        }
+        expect(scanResult.ok).toBe(true);
+        expect(scanResult.value).toBeDefined();
 
         // Step 5: Tag image
         const tagResult = await tagImageTool.handler(
@@ -241,9 +238,9 @@ CMD ["python", "app.py"]`,
             toolContext,
           );
 
-          if (!tagResult.ok) {
-            console.log('Tagging failed:', tagResult.error);
-            return;
+          expect(tagResult.ok).toBe(true);
+          if (tagResult.ok) {
+            expect(tagResult.value).toBeDefined();
           }
         }
       },
@@ -337,8 +334,11 @@ CMD ["python", "app.py"]`,
           // Continue with scan and tag
           const scanResult = await scanImageTool.handler({ imageId: build.imageId }, toolContext);
 
-          // Scan may fail if Trivy not available - that's OK
-          expect(scanResult.ok !== undefined).toBe(true);
+          // Scan image
+          expect(scanResult.ok).toBe(true);
+          if (scanResult.ok) {
+            expect(scanResult.value).toBeDefined();
+          }
 
           // Tag the image
           const tagResult = await tagImageTool.handler(
@@ -349,9 +349,9 @@ CMD ["python", "app.py"]`,
             toolContext,
           );
 
-          if (!tagResult.ok) {
-            console.log('Tagging failed:', tagResult.error);
-            return;
+          expect(tagResult.ok).toBe(true);
+          if (tagResult.ok) {
+            expect(tagResult.value).toBeDefined();
           }
         }
       },
