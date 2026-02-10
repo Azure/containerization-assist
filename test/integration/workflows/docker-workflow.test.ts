@@ -146,6 +146,9 @@ describe('Docker Workflow Integration', () => {
         // Step 4: Scan image
         const scanResult = await scanImageTool.handler({ imageId: build.imageId }, toolContext);
 
+        if (!scanResult.ok) {
+          console.log('Scan failed:', scanResult.error);
+        }
         expect(scanResult.ok).toBe(true);
         if (scanResult.ok) {
           expect(scanResult.value).toBeDefined();
@@ -349,6 +352,9 @@ CMD ["python", "app.py"]`,
           const scanResult = await scanImageTool.handler({ imageId: build.imageId }, toolContext);
 
           // Scan image
+          if (!scanResult.ok) {
+            console.log('Scan failed:', scanResult.error);
+          }
           expect(scanResult.ok).toBe(true);
           if (scanResult.ok) {
             expect(scanResult.value).toBeDefined();
