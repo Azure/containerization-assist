@@ -54,7 +54,6 @@ export interface BuildImageResult {
   securityWarnings?: string[];
 }
 
-
 /**
  * Prepare build arguments by merging user-provided args with default build metadata
  */
@@ -88,6 +87,12 @@ function combineImageNameAndTag(imageName: string | undefined, tag: string): str
 
   // Combine imageName with tag
   return `${imageName}:${tag}`;
+}
+
+function isSha256ImageId(imageId: string): boolean {
+  if (!imageId) return false;
+  const normalized = imageId.startsWith('sha256:') ? imageId.slice('sha256:'.length) : imageId;
+  return /^[a-f0-9]{64}$/.test(normalized);
 }
 
 /**
@@ -227,10 +232,7 @@ async function handleBuildImage(
     }
 
     // Log the final tags that will be applied
-    logger.info(
-      { finalTags, originalTags: tags, imageName },
-      'Determined final tags for build',
-    );
+    logger.info({ finalTags, originalTags: tags, imageName }, 'Determined final tags for build');
 
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
@@ -281,7 +283,24 @@ async function handleBuildImage(
 
     // Generate summary
     const successfulTags = finalTags.filter((tag) => !failedTags.includes(tag));
-    const imageTag = successfulTags[0] || buildResult.value.imageId;
+    let resolvedImageId = buildResult.value.imageId;
+    if (!isSha256ImageId(resolvedImageId) && successfulTags[0]) {
+      const inspectResult = await dockerClient.inspectImage(successfulTags[0]);
+      if (inspectResult.ok && inspectResult.value.Id) {
+        resolvedImageId = inspectResult.value.Id;
+      } else {
+        logger.warn(
+          {
+            imageId: resolvedImageId,
+            imageTag: successfulTags[0],
+            error: inspectResult.ok ? undefined : inspectResult.error,
+          },
+          'Unable to resolve image ID from tag',
+        );
+      }
+    }
+
+    const imageTag = successfulTags[0] || resolvedImageId;
     const sizeText = buildResult.value.size ? ` (${formatSize(buildResult.value.size)})` : '';
     const timeText = buildResult.value.buildTime
       ? ` Build completed in ${formatDuration(Math.round(buildResult.value.buildTime / 1000))}.`
@@ -297,7 +316,7 @@ async function handleBuildImage(
     const result: BuildImageResult = {
       summary,
       success: true,
-      imageId: buildResult.value.imageId,
+      imageId: resolvedImageId,
       requestedTags: finalTags,
       createdTags: successfulTags,
       size: buildResult.value.size,
