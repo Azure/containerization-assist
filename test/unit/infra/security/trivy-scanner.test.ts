@@ -140,7 +140,7 @@ describe('Trivy Scanner', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('version could not be determined');
+        expect(result.error).toContain('version could not be parsed');
       }
     });
   });

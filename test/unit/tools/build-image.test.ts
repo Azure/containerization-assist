@@ -108,6 +108,13 @@ jest.mock('node:fs', () => ({
 
 // Mock lib modules
 const mockDockerClient = {
+  ping: jest.fn() as jest.MockedFunction<
+    () => Promise<{
+      ok: boolean;
+      value?: any;
+      error?: string;
+    }>
+  >,
   buildImage: jest.fn() as jest.MockedFunction<
     (options: any) => Promise<{
       ok: boolean;
@@ -184,6 +191,8 @@ CMD ["node", "index.js"]`;
     mockFs.stat.mockResolvedValue({ isFile: () => true, isDirectory: () => false } as any);
     mockFs.readFile.mockResolvedValue(mockDockerfile);
     mockFs.writeFile.mockResolvedValue(undefined);
+
+    mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
 
     // Default successful Docker build
     mockDockerClient.buildImage.mockResolvedValue(
@@ -502,11 +511,12 @@ CMD ["node", "index.js"]`;
         // Verify error message contains main error
         expect(result.error).toContain('RUN command failed');
 
-        // Verify error includes build logs section
-        expect(result.error).toContain('Build logs:');
-        expect(result.error).toContain('FROM node:18-alpine');
-        expect(result.error).toContain('npm ERR! Cannot find module "express"');
-        expect(result.error).toContain('returned a non-zero code: 1');
+        // Verify build logs are preserved in guidance details
+        expect(result.guidance?.details?.buildLogs).toBeDefined();
+        const buildLogs = result.guidance?.details?.buildLogs as string[];
+        expect(buildLogs.some((log: string) => log.includes('FROM node:18-alpine'))).toBe(true);
+        expect(buildLogs.some((log: string) => log.includes('npm ERR! Cannot find module "express"'))).toBe(true);
+        expect(buildLogs.some((log: string) => log.includes('returned a non-zero code: 1'))).toBe(true);
 
         // Verify guidance is preserved
         expect(result.guidance?.hint).toBe('npm install failed');

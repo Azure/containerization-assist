@@ -25,6 +25,9 @@
       "@/config/*": [
         "src/config/*"
       ],
+      "@/core/*": [
+        "src/core/*"
+      ],
       "@/infra/*": [
         "src/infra/*"
       ],

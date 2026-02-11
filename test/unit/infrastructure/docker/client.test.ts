@@ -135,7 +135,7 @@ describe('Docker Client', () => {
 
         // Verify enhanced followProgress callback is implemented
         expect(content).toContain('Docker push followProgress error');
-        expect(content).toContain('Docker push error event received');
+        expect(content).toContain('Docker push error event (may be intermediate)');
       });
     });
   });

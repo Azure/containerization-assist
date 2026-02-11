@@ -12,6 +12,7 @@ import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
 import { autoDetectDockerSocket } from './socket-validation';
 import { getDockerBuildFiles } from '@/lib/dockerignore-parser';
+import { createProgressTracker, type ProgressCallback } from './progress';
 
 /**
  * Docker client configuration options.
@@ -26,6 +27,11 @@ export interface DockerClientConfig {
   /** Connection timeout in milliseconds */
   timeout?: number;
 }
+
+/**
+ * Callback for Docker build progress events
+ */
+export type DockerBuildProgressCallback = ProgressCallback;
 
 /**
  * Options for building a Docker image.
@@ -45,6 +51,8 @@ export interface DockerBuildOptions {
   buildArgs?: Record<string, string>;
   /** Target platform for multi-platform builds (e.g., 'linux/amd64') */
   platform?: string;
+  /** Optional callback for build progress events */
+  onProgress?: DockerBuildProgressCallback;
 }
 
 /**
@@ -182,6 +190,12 @@ export interface DockerClient {
     all?: boolean;
     filters?: Record<string, string[]>;
   }) => Promise<Result<DockerContainerInfo[]>>;
+
+  /**
+   * Pings the Docker daemon to verify connectivity.
+   * @returns Result indicating whether Docker daemon is available
+   */
+  ping: () => Promise<Result<void>>;
 }
 
 /**
@@ -276,6 +290,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         interface DockerBuildEvent {
           stream?: string;
           aux?: { ID?: string };
+          id?: string;
           error?: string;
           errorDetail?: Record<string, unknown>;
         }
@@ -285,6 +300,13 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         }
 
         let buildError: string | null = null;
+
+        // Create progress tracker for BuildKit trace decoding and progress notifications
+        const trackerOptions: { onProgress?: ProgressCallback; logger: Logger } = { logger };
+        if (options.onProgress) {
+          trackerOptions.onProgress = options.onProgress;
+        }
+        const progressTracker = createProgressTracker(trackerOptions);
 
         const result = await new Promise<DockerBuildResponse[]>((resolve, reject) => {
           docker.modem.followProgress(
@@ -315,13 +337,12 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
               }
             },
             (event: DockerBuildEvent) => {
-              logger.debug(event, 'Docker build progress');
-
-              if (event.stream) {
-                const logLine = event.stream.trimEnd();
-                if (logLine) {
-                  buildLogs.push(logLine);
-                  logger.info(logLine);
+              // For BuildKit progress events, decode and send build status updates
+              if (event.id === 'moby.buildkit.trace') {
+                const buildKitMessage = progressTracker.processBuildKitTrace(event.aux);
+                // Also capture BuildKit messages in build logs
+                if (buildKitMessage) {
+                  buildLogs.push(buildKitMessage);
                 }
               }
 
@@ -674,6 +695,39 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         );
 
         return Failure(errorMessage, guidance);
+      }
+    },
+
+    async ping(): Promise<Result<void>> {
+      try {
+        logger.debug('Pinging Docker daemon');
+
+        await docker.ping();
+
+        logger.debug('Docker daemon is available');
+        return Success(undefined);
+      } catch (error) {
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Docker daemon is not available: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
+            originalError: error,
+          },
+          'Docker ping failed',
+        );
+
+        return Failure(errorMessage, {
+          message: guidance.message,
+          hint: 'Docker daemon is not running or not accessible',
+          resolution:
+            'Ensure Docker is installed and running. On Windows, check Docker Desktop is started. On Mac, ensure Docker Desktop or Colima is running.',
+          ...(guidance.details && { details: guidance.details }),
+        });
       }
     },
   };

@@ -48,6 +48,7 @@ describe('opsTool', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         const data = result.value as any;
+        expect(data.kind).toBe('ping');
         expect(data.success).toBe(true);
         expect(data.message).toBe('pong: test-ping');
         expect(data.timestamp).toBeDefined();
@@ -105,6 +106,7 @@ describe('opsTool', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         const data = result.value as any;
+        expect(data.kind).toBe('status');
         expect(data.success).toBe(true);
         expect(data.version).toBe('2.0.0');
         expect(data.uptime).toBeGreaterThanOrEqual(0);

@@ -5,6 +5,7 @@
  */
 
 import type { Logger } from 'pino';
+import type { ProgressInput } from './context.js';
 
 /**
  * Progress notification data structure
@@ -32,8 +33,10 @@ export type EnhancedProgressReporter = (
   metadata?: Record<string, unknown>,
 ) => Promise<void>;
 
+// ===== TYPE GUARDS =====
+
 /**
- * Type guard to check if value is a record object
+ * Type guard to check if value is a record object (non-null, non-array object)
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -164,24 +167,26 @@ async function sendProgressNotification(
 }
 
 /**
- * Extract progress reporter from various input types
+ * Extract progress reporter from progress token.
+ *
+ * Takes a simple progress token (string/number) and creates a progress reporter
+ * that sends MCP notifications.
+ *
+ * @param progress - Progress token from MCP protocol
+ * @param logger - Logger for creating progress reporter
+ * @param sendNotification - MCP notification callback for progress updates
+ * @returns ProgressReporter function or undefined
  */
 export function extractProgressReporter(
-  progress: unknown,
+  progress: ProgressInput,
   logger: Logger,
   sendNotification?: (notification: unknown) => Promise<void>,
 ): EnhancedProgressReporter | undefined {
   if (!progress) return undefined;
 
-  // Already a function
-  if (typeof progress === 'function') {
-    return progress as EnhancedProgressReporter;
-  }
-
-  // Extract token and create reporter
-  const progressToken = extractProgressToken(progress);
-  if (progressToken) {
-    return createProgressReporter(progressToken, logger, sendNotification);
+  // Simple progress token (string or number) - wrap it in a reporter
+  if (typeof progress === 'string' || typeof progress === 'number') {
+    return createProgressReporter(progress, logger, sendNotification);
   }
 
   return undefined;

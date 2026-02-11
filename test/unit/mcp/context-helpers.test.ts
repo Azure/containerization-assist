@@ -182,23 +182,14 @@ describe('MCP Context Helpers', () => {
       expect(reporter).toBeUndefined();
     });
 
-    it('should return existing function', () => {
-      const existingReporter = jest.fn();
-      const reporter = extractProgressReporter(existingReporter, mockLogger);
-      expect(reporter).toBe(existingReporter);
+    it('should return undefined when null provided', () => {
+      const reporter = extractProgressReporter(null, mockLogger);
+      expect(reporter).toBeUndefined();
     });
 
-    it('should extract token from params._meta and create reporter', async () => {
+    it('should create reporter from string token', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const request = {
-        params: {
-          _meta: {
-            progressToken: 'extracted-token',
-          },
-        },
-      };
-
-      const reporter = extractProgressReporter(request, mockLogger, mockSendNotification);
+      const reporter = extractProgressReporter('extracted-token', mockLogger, mockSendNotification);
 
       expect(reporter).toBeDefined();
       await reporter!('Test message', 1, 1);
@@ -213,17 +204,9 @@ describe('MCP Context Helpers', () => {
       );
     });
 
-    it('should extract token from nested _meta and create reporter', async () => {
+    it('should create reporter from number token', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const request = {
-        params: {
-          _meta: {
-            progressToken: 'nested-extracted-token',
-          },
-        },
-      };
-
-      const reporter = extractProgressReporter(request, mockLogger, mockSendNotification);
+      const reporter = extractProgressReporter(12345, mockLogger, mockSendNotification);
 
       expect(reporter).toBeDefined();
       await reporter!('Nested test', 5, 10);
@@ -232,7 +215,7 @@ describe('MCP Context Helpers', () => {
         expect.objectContaining({
           method: 'notifications/progress',
           params: expect.objectContaining({
-            progressToken: 'nested-extracted-token',
+            progressToken: '12345',
             progress: 5,
             total: 10,
           }),
@@ -244,15 +227,8 @@ describe('MCP Context Helpers', () => {
   describe('Integration: Full progress notification flow', () => {
     it('should handle complete progress reporting lifecycle', async () => {
       const mockSendNotification = jest.fn<(notification: unknown) => Promise<void>>().mockResolvedValue(undefined);
-      const request = {
-        params: {
-          _meta: {
-            progressToken: 'lifecycle-token',
-          },
-        },
-      };
 
-      const reporter = extractProgressReporter(request, mockLogger, mockSendNotification);
+      const reporter = extractProgressReporter('lifecycle-token', mockLogger, mockSendNotification);
       expect(reporter).toBeDefined();
 
       // Simulate multi-step progress reporting

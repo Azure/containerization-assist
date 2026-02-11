@@ -8,10 +8,15 @@ import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import { getModuleUrl } from '@/lib/module-url';
 import { resolveModulePaths } from '@/lib/module-path-resolver';
-import { createToolContext, type ToolContext } from '@/mcp/context';
+import { createToolContext, type ToolContext, type ContextOptions } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ERROR_MESSAGES } from '@/lib/errors';
-import { type ToolOrchestrator, type OrchestratorConfig, type ExecuteRequest, CHAINHINTSMODE } from './orchestrator-types';
+import {
+  type ToolOrchestrator,
+  type OrchestratorConfig,
+  type ExecuteRequest,
+  CHAINHINTSMODE,
+} from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
@@ -94,7 +99,10 @@ export function discoverUserPolicies(logger: Logger): string[] {
       .map((file) => resolve(join(policiesUserDir, file)));
 
     if (files.length > 0) {
-      logger.info({ policiesUserDir, count: files.length }, 'Discovered user policies from policies.user/');
+      logger.info(
+        { policiesUserDir, count: files.length },
+        'Discovered user policies from policies.user/',
+      );
     }
 
     return files;
@@ -206,12 +214,25 @@ function createContextForTool(
     'Creating tool context',
   );
 
-  return createToolContext(logger, {
-    ...(metadata?.signal && { signal: metadata.signal }),
-    ...(metadata?.progress !== undefined && { progress: metadata.progress }),
-    ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
-    ...(policy && { policy }),
-  });
+  const contextOptions: ContextOptions = {};
+  if (metadata?.signal) contextOptions.signal = metadata.signal;
+
+  if (metadata?.progress !== undefined) {
+    const progress = metadata.progress;
+    if (
+      typeof progress === 'string' ||
+      typeof progress === 'number' ||
+      progress === null ||
+      progress === undefined
+    ) {
+      contextOptions.progress = progress;
+    }
+  }
+
+  if (metadata?.sendNotification) contextOptions.sendNotification = metadata.sendNotification;
+  if (policy) contextOptions.policy = policy;
+
+  return createToolContext(logger, contextOptions);
 }
 
 interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
@@ -297,10 +318,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
           // Reset promise to allow retry on next execution
           policyLoadPromise = undefined;
 
-          logger.error(
-            { error },
-            'Failed to load policies - will retry on next tool execution',
-          );
+          logger.error({ error }, 'Failed to load policies - will retry on next tool execution');
 
           // Re-throw to signal failure
           throw error;
@@ -316,12 +334,17 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
       logger.warn('Policy loading failed, continuing tool execution without policies');
     }
 
-    return await executeWithOrchestration(tool, request, {
-      registry,
-      logger: contextualLogger,
-      config,
-      ...(server && { server }),
-    }, policyCache);
+    return await executeWithOrchestration(
+      tool,
+      request,
+      {
+        registry,
+        logger: contextualLogger,
+        config,
+        ...(server && { server }),
+      },
+      policyCache,
+    );
   }
 
   function close(): void {

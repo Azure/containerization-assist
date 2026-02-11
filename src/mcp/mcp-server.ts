@@ -13,12 +13,18 @@ import {
   ErrorCode,
   type ServerRequest,
   type ServerNotification,
+  type RequestId,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
-import { type ExecuteRequest, type ExecuteMetadata, type ChainHintsMode, CHAINHINTSMODE } from '@/app/orchestrator-types';
+import {
+  type ExecuteRequest,
+  type ExecuteMetadata,
+  type ChainHintsMode,
+  CHAINHINTSMODE,
+} from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
@@ -58,22 +64,6 @@ const ERROR_FORMAT = {
   RESOLUTION_PREFIX: '🔧',
   DEFAULT_RESOLUTION: 'Check logs for more information',
 } as const;
-
-/**
- * Type definitions for metadata extraction
- */
-interface MetaParams {
-  requestId?: string;
-  invocationId?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Type guard to check if a value is valid metadata params
- */
-function isMetaParams(value: unknown): value is MetaParams {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 /**
  * Server options
@@ -261,80 +251,105 @@ export function createMCPServer<TTool extends Tool>(
 }
 
 /**
+ * Create tool handler function with proper typing to avoid deep type instantiation
+ */
+function getHandler(
+  toolName: string,
+  transport: string,
+  outputFormat: OutputFormat,
+  chainHintsMode: ChainHintsMode,
+  execute: ToolExecutor,
+) {
+  return async (
+    rawParams: Record<string, unknown> | undefined,
+    extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  ) => {
+    const params = rawParams ?? {};
+
+    try {
+      const { sanitizedParams, metadata } = prepareExecutionPayload(
+        toolName,
+        params,
+        transport,
+        extra,
+      );
+
+      const result = await execute({
+        toolName,
+        params: sanitizedParams,
+        metadata,
+      });
+
+      if (!result.ok) {
+        // Format error with guidance if available
+        const errorMessage = formatErrorWithGuidance(result.error, result.guidance);
+        throw new McpError(ErrorCode.InternalError, errorMessage);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: formatOutput(result.value, outputFormat, chainHintsMode),
+          },
+        ],
+      };
+    } catch (error) {
+      throw error instanceof McpError
+        ? error
+        : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
+    }
+  };
+}
+
+/**
  * Register tools against an MCP server instance, delegating to the orchestrator executor.
  * Each tool is registered with its name, description, and input schema. Tool execution is
  * delegated to the orchestrator's execute function.
  * @param options - Registration options including server, tools, and executor
  */
 export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
-  const { server, tools, transport, execute, outputFormat, chainHintsMode = CHAINHINTSMODE.ENABLED } = options;
+  const {
+    server,
+    tools,
+    transport,
+    execute,
+    outputFormat,
+    chainHintsMode = CHAINHINTSMODE.ENABLED,
+  } = options;
 
   for (const tool of tools) {
-    server.tool(
+    const handler = getHandler(tool.name, transport, outputFormat, chainHintsMode, execute);
+
+    // Type assertion to avoid deep type instantiation issues with MCP SDK
+    // The MCP SDK's complex generic constraints on tool() cause TS2589 errors
+    // Runtime safety is preserved by Zod schema validation
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (server as McpServer & { tool: any }).tool(
       tool.name,
       tool.description,
       tool.inputSchema,
-      async (rawParams: Record<string, unknown> | undefined, extra) => {
-        const params = rawParams ?? {};
-
-        try {
-          const { sanitizedParams, metadata } = prepareExecutionPayload(
-            tool.name,
-            params,
-            transport,
-            extra,
-          );
-
-          const result = await execute({
-            toolName: tool.name,
-            params: sanitizedParams,
-            metadata,
-          });
-
-          if (!result.ok) {
-            // Format error with guidance if available
-            const errorMessage = formatErrorWithGuidance(result.error, result.guidance);
-            throw new McpError(ErrorCode.InternalError, errorMessage);
-          }
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: formatOutput(result.value, outputFormat, chainHintsMode),
-              },
-            ],
-          };
-        } catch (error) {
-          throw error instanceof McpError
-            ? error
-            : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
-        }
-      },
+      handler,
     );
   }
 }
 
 /**
- * Creates logger context from tool name, transport, and metadata
+ * Creates logger context from tool name, transport, and MCP request metadata
  * @param toolName - Name of the tool being executed
  * @param transport - Transport type (e.g., 'stdio')
- * @param meta - Optional metadata parameters
+ * @param requestId - JSON-RPC request ID from MCP SDK
  * @returns Logger context object
  */
 function createLoggerContext(
   toolName: string,
   transport: string,
-  meta?: MetaParams,
+  requestId?: RequestId,
 ): Record<string, unknown> {
   return {
     transport,
     tool: toolName,
-    ...(meta?.requestId && typeof meta.requestId === 'string' && { requestId: meta.requestId }),
-    ...(meta?.invocationId &&
-      typeof meta.invocationId === 'string' && {
-      invocationId: meta.invocationId,
-    }),
+    ...(requestId !== undefined && { requestId: String(requestId) }),
   };
 }
 
@@ -353,24 +368,20 @@ function createNotificationAdapter(
 }
 
 /**
- * Creates execution metadata from parameters and request context
+ * Creates execution metadata from MCP request context
  * @param toolName - Name of the tool being executed
- * @param params - Tool parameters
  * @param transport - Transport type
  * @param extra - Request handler extras from MCP SDK
  * @returns ExecuteMetadata object
  */
 function createExecuteMetadata(
   toolName: string,
-  params: Record<string, unknown>,
   transport: string,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
 ): ExecuteMetadata {
-  const meta = extractMeta(params);
-
   return {
-    progress: params,
-    loggerContext: createLoggerContext(toolName, transport, meta),
+    progress: extra._meta?.progressToken,
+    loggerContext: createLoggerContext(toolName, transport, extra.requestId),
     ...(extra.sendNotification && {
       sendNotification: createNotificationAdapter(extra.sendNotification),
     }),
@@ -396,18 +407,8 @@ function prepareExecutionPayload(
 } {
   return {
     sanitizedParams: sanitizeParams(params),
-    metadata: createExecuteMetadata(toolName, params, transport, extra),
+    metadata: createExecuteMetadata(toolName, transport, extra),
   };
-}
-
-/**
- * Extracts metadata from tool parameters
- * @param params - Raw tool parameters
- * @returns Metadata object or undefined if not present/invalid
- */
-function extractMeta(params: Record<string, unknown>): MetaParams | undefined {
-  const meta = params._meta;
-  return isMetaParams(meta) ? meta : undefined;
 }
 
 /**
@@ -505,7 +506,10 @@ export function formatOutput(
  *
  * Falls back to summary field or JSON for other tool types.
  */
-function formatAsNaturalLanguage(output: unknown, chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED): string {
+function formatAsNaturalLanguage(
+  output: unknown,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
   if (!output || typeof output !== 'object') {
     return String(output);
   }
@@ -587,7 +591,6 @@ function isDockerfilePlan(output: object): output is DockerfilePlan {
     'buildStrategy' in recommendations
   );
 }
-
 
 function isBuildImageResult(output: object): output is BuildImageResult {
   return 'imageId' in output && 'buildTime' in output;

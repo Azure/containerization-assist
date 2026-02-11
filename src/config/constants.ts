@@ -91,8 +91,8 @@ export const LIMITS = {
   MAX_MANIFEST_SIZE: 10_485_760,
   /** Maximum log lines to retain */
   MAX_LOG_LINES: 1000,
-  /** Maximum buffer size for scan results: 10MB */
-  MAX_SCAN_BUFFER: 10 * 1024 * 1024,
+  /** Maximum buffer size for scan results: 50MB (large for highly vulnerable test images) */
+  MAX_SCAN_BUFFER: 50 * 1024 * 1024,
   /** Maximum characters for AI prompt context */
   MAX_PROMPT_CHARS: 5000,
   /** Maximum snippets for AI prompt context */

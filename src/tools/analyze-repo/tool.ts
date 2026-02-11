@@ -2,12 +2,13 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { z } from 'zod';
 import { Success, Failure, type Result } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { validatePathOrFail } from '@/lib/validation-helpers';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
 import { pluralize } from '@/lib/summary-helpers';
+import { analyzeRepoToolDefinition } from './types';
 import {
   parsePackageJson,
   parseGradle,
@@ -281,18 +282,6 @@ async function handleAnalyzeRepo(
 }
 
 export default tool({
-  name: 'analyze-repo',
-  description: 'Analyze repository structure and detect technologies by parsing config files',
-  category: 'analysis',
-  version: '4.0.0',
-  schema: analyzeRepoSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
-  chainHints: {
-    success:
-      'Repository analysis completed successfully. Continue by calling the generate-dockerfile or fix-dockerfile tools to create or fix your Dockerfile.',
-    failure: 'Repository analysis failed. Please check the logs for details.',
-  },
+  ...analyzeRepoToolDefinition,
   handler: handleAnalyzeRepo,
 });

@@ -15,6 +15,15 @@ import { extractErrorMessage } from '@/lib/errors';
 import { Result, Success, Failure } from '@/types';
 import type { BasicScanResult } from './scanner';
 import { DEFAULT_TIMEOUTS, LIMITS } from '@/config/constants';
+import {
+  validateImageId,
+  SeverityCounter,
+  normalizeSeverity,
+  parseVersion,
+  logScanStart,
+  logScanComplete,
+  ScannerErrors,
+} from './scanner-common';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -52,70 +61,17 @@ interface TrivyOutput {
 }
 
 /**
- * Map Trivy severity to our standardized severity levels
- * Preserves UNKNOWN and NEGLIGIBLE as separate levels to maintain fidelity
- * between uncertain severity (UNKNOWN) and low-risk findings (NEGLIGIBLE)
- */
-function mapTrivySeverity(
-  trivySeverity: string,
-): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'NEGLIGIBLE' | 'UNKNOWN' {
-  const severity = trivySeverity.toUpperCase();
-  switch (severity) {
-    case 'CRITICAL':
-      return 'CRITICAL';
-    case 'HIGH':
-      return 'HIGH';
-    case 'MEDIUM':
-      return 'MEDIUM';
-    case 'LOW':
-      return 'LOW';
-    case 'NEGLIGIBLE':
-      return 'NEGLIGIBLE';
-    case 'UNKNOWN':
-      return 'UNKNOWN';
-    default:
-      return 'UNKNOWN';
-  }
-}
-
-/**
  * Parse Trivy JSON output to our BasicScanResult format
  */
 function parseTrivyOutput(trivyOutput: TrivyOutput, imageId: string): BasicScanResult {
   const vulnerabilities: BasicScanResult['vulnerabilities'] = [];
-  let criticalCount = 0;
-  let highCount = 0;
-  let mediumCount = 0;
-  let lowCount = 0;
-  let negligibleCount = 0;
-  let unknownCount = 0;
+  const counter = new SeverityCounter();
 
   // Iterate through all results and their vulnerabilities
   for (const result of trivyOutput.Results || []) {
     for (const vuln of result.Vulnerabilities || []) {
-      const severity = mapTrivySeverity(vuln.Severity);
-
-      // Count by severity
-      switch (severity) {
-        case 'CRITICAL':
-          criticalCount++;
-          break;
-        case 'HIGH':
-          highCount++;
-          break;
-        case 'MEDIUM':
-          mediumCount++;
-          break;
-        case 'LOW':
-          lowCount++;
-          break;
-        case 'NEGLIGIBLE':
-          negligibleCount++;
-          break;
-        case 'UNKNOWN':
-          unknownCount++;
-          break;
-      }
+      const severity = normalizeSeverity(vuln.Severity);
+      counter.increment(severity);
 
       // Build vulnerability entry
       const vulnEntry: BasicScanResult['vulnerabilities'][number] = {
@@ -138,47 +94,30 @@ function parseTrivyOutput(trivyOutput: TrivyOutput, imageId: string): BasicScanR
   return {
     imageId,
     vulnerabilities,
-    totalVulnerabilities: vulnerabilities.length,
-    criticalCount,
-    highCount,
-    mediumCount,
-    lowCount,
-    negligibleCount,
-    unknownCount,
     scanDate: new Date(),
+    ...counter.getCounts(),
   };
-}
-
-/**
- * Validate imageId against allowlist pattern to prevent command injection
- * Allows: alphanumeric, dots, colons, slashes, at-signs, underscores, and hyphens
- */
-function validateImageId(imageId: string): boolean {
-  const allowedPattern = /^[a-zA-Z0-9._:/@-]+$/;
-  return allowedPattern.test(imageId);
 }
 
 /**
  * Get Trivy version
  * @throws Error if Trivy is not installed or execution fails
  */
-async function getTrivyVersion(logger: Logger): Promise<string | undefined> {
+async function getTrivyVersion(logger: Logger): Promise<Result<string>> {
   try {
     const { stdout } = await execAsync('trivy --version', { timeout: DEFAULT_TIMEOUTS.trivyVersionCheck });
     // Trivy version output format: "Version: X.Y.Z"
-    const match = stdout.match(/Version:\s*([^\s\n]+)/);
-    if (!match) {
+    const version = parseVersion(stdout, /Version:\s*([^\s\n]+)/);
+    if (!version) {
       logger.debug({ stdout }, 'Could not parse Trivy version from output');
+      return ScannerErrors.versionParseError('Trivy', 'trivy --version');
     }
-    return match ? match[1] : undefined;
+    return Success(version);
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (err?.code === 'ETIMEDOUT') {
-      logger.error(
-        { error },
-        'Trivy version check timed out. The trivy process may be unresponsive or misconfigured.',
-      );
-      return undefined;
+      logger.error({ error }, 'Trivy version check timed out');
+      return ScannerErrors.versionCheckTimeout('Trivy', 'trivy --version');
     }
     throw error;
   }
@@ -189,23 +128,16 @@ async function getTrivyVersion(logger: Logger): Promise<string | undefined> {
  */
 export async function checkTrivyAvailability(logger: Logger): Promise<Result<string>> {
   try {
-    const version = await getTrivyVersion(logger);
-    if (!version) {
-      return Failure('Trivy is installed but version could not be determined', {
-        message: 'Trivy version check failed',
-        hint: 'Trivy CLI may not be properly configured',
-        resolution: 'Try running: trivy --version',
-      });
+    const versionResult = await getTrivyVersion(logger);
+    if (!versionResult.ok) {
+      return versionResult;
     }
-    return Success(version);
-  } catch (error) {
-    return Failure('Trivy not installed or not in PATH', {
-      message: 'Trivy CLI not found',
-      hint: 'Trivy CLI is required for security scanning',
-      resolution:
-        'Install Trivy: https://aquasecurity.github.io/trivy/latest/getting-started/installation/',
-      details: { error: extractErrorMessage(error) },
-    });
+    return Success(versionResult.value);
+  } catch {
+    return ScannerErrors.scannerNotInstalled(
+      'Trivy',
+      'https://aquasecurity.github.io/trivy/latest/getting-started/installation/',
+    );
   }
 }
 
@@ -218,12 +150,7 @@ export async function scanImageWithTrivy(
 ): Promise<Result<BasicScanResult>> {
   // Validate imageId to prevent command injection
   if (!validateImageId(imageId)) {
-    return Failure('Invalid imageId format', {
-      message: 'ImageId contains invalid characters',
-      hint: 'ImageId must contain only alphanumeric characters, dots, colons, slashes, at-signs, underscores, and hyphens',
-      resolution: 'Verify the imageId is a valid Docker image identifier',
-      details: { imageId },
-    });
+    return ScannerErrors.invalidImageId(imageId);
   }
 
   // Check if Trivy is available
@@ -233,7 +160,7 @@ export async function scanImageWithTrivy(
   }
 
   const trivyVersion = availabilityCheck.value;
-  logger.info({ trivyVersion, imageId }, 'Starting Trivy scan');
+  logScanStart(logger, 'Trivy', trivyVersion, imageId);
 
   try {
     // Run Trivy scan with JSON output using execFile to prevent command injection
@@ -252,45 +179,39 @@ export async function scanImageWithTrivy(
       logger.debug({ stderr }, 'Trivy stderr output');
     }
 
+    // Validate output size before parsing
+    if (stdout.length === 0) {
+      return ScannerErrors.emptyOutput('Trivy', imageId);
+    }
+
     // Parse JSON output
     let trivyOutput: TrivyOutput;
     try {
       trivyOutput = JSON.parse(stdout);
     } catch (parseError) {
-      return Failure('Failed to parse Trivy output', {
-        message: 'Trivy output parsing failed',
-        hint: 'Trivy may have returned invalid JSON',
-        resolution: `Try running Trivy manually to verify: trivy image ${imageId}`,
-        details: {
-          parseError: extractErrorMessage(parseError),
-          outputPreview: stdout.substring(0, 200),
-        },
-      });
+      return ScannerErrors.jsonParseError(
+        'Trivy',
+        extractErrorMessage(parseError),
+        stdout.substring(0, 200),
+      );
     }
 
     // Parse the Trivy output into our format
     const scanResult = parseTrivyOutput(trivyOutput, imageId);
 
-    logger.info(
-      {
-        imageId,
-        totalVulnerabilities: scanResult.totalVulnerabilities,
-        criticalCount: scanResult.criticalCount,
-        highCount: scanResult.highCount,
-      },
-      'Trivy scan completed successfully',
+    logScanComplete(
+      logger,
+      'Trivy',
+      imageId,
+      scanResult.totalVulnerabilities,
+      scanResult.criticalCount,
+      scanResult.highCount,
     );
 
     return Success(scanResult);
   } catch (error) {
     const errorMessage = extractErrorMessage(error);
     logger.error({ error: errorMessage, imageId }, 'Trivy scan failed');
-
-    return Failure(`Trivy scan failed: ${errorMessage}`, {
-      message: 'Security scan execution failed',
-      hint: 'Trivy encountered an error while scanning the image',
-      resolution: `Check image exists and is accessible: docker image ls | grep ${imageId}`,
-      details: { error: errorMessage },
-    });
+    return ScannerErrors.scanExecutionError('Trivy', imageId, errorMessage);
   }
 }

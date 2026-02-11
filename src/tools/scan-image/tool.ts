@@ -6,14 +6,15 @@
  */
 
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 
 import { createSecurityScanner } from '@/infra/security/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import { scanImageSchema, type ScanImageParams } from './schema';
+import { type ScanImageParams } from './schema';
 import { formatVulnerabilities, buildStatusSummary, pluralize } from '@/lib/summary-helpers';
+import { scanImageToolDefinition } from './types';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -47,6 +48,7 @@ export interface ScanImageResult {
    */
   summary?: string;
   success: boolean;
+  scanner: string;
   remediationGuidance?: Array<{
     vulnerability: string;
     recommendation: string;
@@ -82,7 +84,7 @@ async function handleScanImage(
   }
   const { logger, timer } = setupToolContext(context, 'scan-image');
 
-  const { scanner = 'trivy', severity } = params;
+  const { scanner = 'osv', severity } = params;
 
   // Map severity parameter to threshold
   const finalSeverityThreshold = severity
@@ -225,14 +227,15 @@ async function handleScanImage(
 
     const summary = buildStatusSummary(
       passed,
-      `🔒 Security scan passed. ${vulnSummary}.${remediationText}`,
-      `🔒 Security scan failed. ${vulnSummary}.${remediationText}`,
+      `🔒 Security scan passed (${scanner}). ${vulnSummary}.${remediationText}`,
+      `🔒 Security scan failed (${scanner}). ${vulnSummary}.${remediationText}`,
     );
 
     // Prepare the result
     const result: ScanImageResult = {
       summary,
       success: true,
+      scanner,
       ...(remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {
         critical: scanResult.criticalCount,
@@ -272,7 +275,8 @@ async function handleScanImage(
     return Failure(errorMessage, {
       message: errorMessage,
       hint: 'An unexpected error occurred during the security scan',
-      resolution: 'Verify that the scanner (Trivy) is installed and accessible, the image exists, and you have proper permissions',
+      resolution:
+        'Verify that the scanner is installed and accessible, the image exists, and you have proper permissions',
     });
   }
 }
@@ -285,20 +289,6 @@ export const scanImage = handleScanImage;
 import { tool } from '@/types/tool';
 
 export default tool({
-  name: 'scan-image',
-  description:
-    'Scan Docker images for security vulnerabilities with knowledge-based remediation guidance',
-  category: 'security',
-  version: '2.0.0',
-  schema: scanImageSchema,
-  metadata: {
-    knowledgeEnhanced: true,
-  },
-  chainHints: {
-    success:
-      'Security scan passed! Proceed with push-image to push to a registry, or continue with deployment preparation.',
-    failure:
-      'Security scan found vulnerabilities. Use fix-dockerfile to address security issues in your base images and dependencies.',
-  },
+  ...scanImageToolDefinition,
   handler: handleScanImage,
 });

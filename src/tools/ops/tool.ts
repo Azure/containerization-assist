@@ -22,16 +22,28 @@ import * as os from 'os';
 import { extractErrorMessage } from '@/lib/errors';
 import { setupToolContext } from '@/lib/tool-context-helpers';
 import { Success, Failure, type Result } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { opsToolSchema } from './schema';
 import type { z } from 'zod';
 import { formatDuration, formatTimestamp } from '@/lib/summary-helpers';
+import { opsToolDefinition } from './types';
 
 interface PingConfig {
   message?: string;
 }
 
+/**
+ * Result of a ping operation.
+ *
+ * Uses a discriminant field `kind` to enable type-safe narrowing
+ * when working with the OpsResult union type.
+ */
 export interface PingResult {
+  /**
+   * Discriminant field for type narrowing.
+   * Always 'ping' for PingResult.
+   */
+  readonly kind: 'ping';
   /**
    * Natural language summary for user display.
    * 1-3 sentences describing the ping result.
@@ -69,6 +81,7 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
     const summary = `✅ Server is responsive. Ping successful at ${formatTimestamp(timestamp)}.`;
 
     const result: PingResult = {
+      kind: 'ping' as const,
       summary,
       success: true,
       message: `pong: ${message}`,
@@ -102,7 +115,18 @@ interface ServerStatusConfig {
   details?: boolean;
 }
 
+/**
+ * Result of a server status operation.
+ *
+ * Uses a discriminant field `kind` to enable type-safe narrowing
+ * when working with the OpsResult union type.
+ */
 export interface ServerStatusResult {
+  /**
+   * Discriminant field for type narrowing.
+   * Always 'status' for ServerStatusResult.
+   */
+  readonly kind: 'status';
   /**
    * Natural language summary for user display.
    * 1-3 sentences describing the server status.
@@ -167,6 +191,7 @@ export async function serverStatus(
     const summary = `✅ Server healthy. Running for ${uptimeStr}. Memory: ${memPercentage}% used, CPU: ${cpus.length} cores.`;
 
     const status: ServerStatusResult = {
+      kind: 'status' as const,
       summary,
       success: true,
       version,
@@ -258,13 +283,6 @@ async function handleOps(
 import { tool } from '@/types/tool';
 
 export default tool({
-  name: 'ops',
-  description: 'MCP server diagnostics: ping for connectivity testing, status for health metrics (memory, CPU, uptime). Use this for server monitoring, not application containerization.',
-  category: 'utility',
-  version: '2.0.0',
-  schema: opsToolSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
+  ...opsToolDefinition,
   handler: handleOps,
 });

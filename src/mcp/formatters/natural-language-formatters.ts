@@ -56,6 +56,8 @@ export function formatScanImageNarrative(
   const icon = result.passed ? '✅' : '❌';
   const status = result.passed ? 'PASSED' : 'FAILED';
   parts.push(`${icon} Security Scan ${status}\n`);
+  const scanner = result.scanner ?? 'unknown scanner';
+  parts.push(`Scanner: ${scanner}\n`);
 
   // Vulnerability summary
   const vulnText = formatVulnerabilities({
@@ -281,7 +283,6 @@ export function formatDockerfilePlanNarrative(
 
   return parts.join('\n');
 }
-
 
 /**
  * Format build-image result as natural language narrative
@@ -970,8 +971,12 @@ export function formatPrepareClusterNarrative(
     parts.push(`  External URL: ${result.localRegistry.externalUrl}`);
     parts.push(`  Internal Endpoint: ${result.localRegistry.internalEndpoint}`);
     parts.push(`  Container Name: ${result.localRegistry.containerName}`);
-    parts.push(`  Health Status: ${healthIcon} ${result.localRegistry.healthy ? 'Healthy' : 'Unhealthy'}`);
-    parts.push(`  Reachable from Cluster: ${reachableIcon} ${result.localRegistry.reachableFromCluster ? 'Yes' : 'No'}`);
+    parts.push(
+      `  Health Status: ${healthIcon} ${result.localRegistry.healthy ? 'Healthy' : 'Unhealthy'}`,
+    );
+    parts.push(
+      `  Reachable from Cluster: ${reachableIcon} ${result.localRegistry.reachableFromCluster ? 'Yes' : 'No'}`,
+    );
   }
 
   // Next steps (only if chainHintsMode is enabled)

@@ -15,15 +15,17 @@
 import path from 'path';
 import { normalizePath } from '@/lib/platform';
 import { setupToolContext } from '@/lib/tool-context-helpers';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@/core/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
 import { validatePathOrFail, parseImageName } from '@/lib/validation-helpers';
 import { readDockerfile } from '@/lib/file-utils';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
-import { type BuildImageParams, buildImageSchema } from './schema';
+import { type BuildImageParams } from './schema';
 import { formatSize, formatDuration } from '@/lib/summary-helpers';
+import { tool } from '@/types/tool';
+import { buildImageToolDefinition } from './types';
 
 export interface BuildImageResult {
   /**
@@ -201,6 +203,19 @@ async function handleBuildImage(
 
     const dockerClient = createDockerClient(logger);
 
+    // Verify Docker daemon is available
+    logger.debug('Checking Docker daemon availability');
+    const pingResult = await dockerClient.ping();
+    if (!pingResult.ok) {
+      return Failure('Docker daemon is not available', {
+        message: pingResult.error,
+        hint: 'Docker daemon is not running or not accessible',
+        resolution:
+          'Ensure Docker is installed and running. On Windows, verify Docker Desktop is started and running in Linux container mode.',
+      });
+    }
+    logger.debug('Docker daemon is available');
+
     // Read Dockerfile for security analysis
     const dockerfileContentResult = await readDockerfile({
       path: finalDockerfilePath,
@@ -243,8 +258,14 @@ async function handleBuildImage(
       ...(finalTags.length > 0 && finalTags[0] && { t: finalTags[0] }),
     };
 
-    // Build the image
-    logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
+    if (context.progress) {
+      buildOptions.onProgress = (message: string) => {
+        context.progress?.(message).catch((err) => {
+          logger.warn({ error: err, message }, 'Failed to send progress notification');
+        });
+      };
+    }
+
     const buildResult = await dockerClient.buildImage(buildOptions);
 
     if (!buildResult.ok) {
@@ -252,14 +273,8 @@ async function handleBuildImage(
 
       // Propagate Docker error guidance from infrastructure layer
       const guidance = buildResult.guidance;
-      const buildLogs = (guidance?.details?.buildLogs as string[]) || [];
 
-      let detailedError = `Failed to build image: ${errorMessage}`;
-      if (buildLogs.length > 0) {
-        detailedError += `\n\nBuild logs:\n${buildLogs.join('\n')}`;
-      }
-
-      return Failure(detailedError, guidance);
+      return Failure(`Failed to build image: ${errorMessage}`, guidance);
     }
 
     // Apply additional tags to the built image
@@ -343,15 +358,7 @@ async function handleBuildImage(
 
 export const buildImage = handleBuildImage;
 
-import { tool } from '@/types/tool';
-
 export default tool({
-  name: 'build-image',
-  description: 'Build Docker images from Dockerfiles with security analysis',
-  version: '2.0.0',
-  schema: buildImageSchema,
-  metadata: {
-    knowledgeEnhanced: false,
-  },
+  ...buildImageToolDefinition,
   handler: handleBuildImage,
 });

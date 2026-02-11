@@ -1,6 +1,6 @@
 {
   "name": "containerization-assist-mcp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -27,6 +27,12 @@
       "require": "./dist-cjs/src/tools/index.js",
       "default": "./dist/src/tools/index.js"
     },
+    "./tools/types": {
+      "types": "./dist/src/tools/types.d.ts",
+      "import": "./dist/src/tools/types.js",
+      "require": "./dist-cjs/src/tools/types.js",
+      "default": "./dist/src/tools/types.js"
+    },
     "./types": {
       "types": "./dist/src/types/index.d.ts",
       "import": "./dist/src/types/index.js",
@@ -38,6 +44,24 @@
       "import": "./dist/src/config/index.js",
       "require": "./dist-cjs/src/config/index.js",
       "default": "./dist/src/config/index.js"
+    },
+    "./sdk": {
+      "types": "./dist/src/sdk/index.d.ts",
+      "import": "./dist/src/sdk/index.js",
+      "require": "./dist-cjs/src/sdk/index.js",
+      "default": "./dist/src/sdk/index.js"
+    },
+    "./sdk/types": {
+      "types": "./dist/src/sdk/types.d.ts",
+      "import": "./dist/src/sdk/types.js",
+      "require": "./dist-cjs/src/sdk/types.js",
+      "default": "./dist/src/sdk/types.js"
+    },
+    "./knowledge": {
+      "types": "./dist/src/knowledge/index.d.ts",
+      "import": "./dist/src/knowledge/index.js",
+      "require": "./dist-cjs/src/knowledge/index.js",
+      "default": "./dist/src/knowledge/index.js"
     }
   },
   "bin": {
@@ -61,10 +85,11 @@
   ],
   "scripts": {
     "clean": "rm -rf dist dist-cjs coverage .tsbuildinfo*",
-    "build": "npm run clean && npm run build:policies && npm run build:esm && npm run build:cjs",
+    "build": "npm run clean && npm run build:knowledge && npm run build:policies && npm run build:esm && npm run build:cjs",
+    "build:knowledge": "tsx scripts/generate-embedded-packs.ts",
     "build:policies": "tsx scripts/build-policies.ts",
     "build:esm": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json --resolve-full-paths && chmod +x dist/src/cli/cli.js",
-    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json && printf '{\"type\": \"commonjs\"}\\n' > dist-cjs/package.json",
     "build:watch": "tsc --project tsconfig.json --watch",
     "build:verify": "tsx scripts/verify-build.ts",
     "dev": "tsx watch src/cli/cli.ts",
@@ -98,7 +123,7 @@
     "@iarna/toml": "^2.2.5",
     "@kubernetes-models/apimachinery": "^2.2.0",
     "@kubernetes/client-node": "^1.4.0",
-    "@modelcontextprotocol/sdk": "1.17.3",
+    "@modelcontextprotocol/sdk": "~1.26.0",
     "@open-policy-agent/opa-wasm": "^1.10.0",
     "@types/xml2js": "^0.4.14",
     "commander": "^14.0.1",
@@ -109,11 +134,14 @@
     "js-yaml": "^4.1.0",
     "kubernetes-models": "^4.5.1",
     "pino": "^9.14.0",
+    "protobufjs": "^8.0.0",
+    "tar": "^7.5.2",
     "tmp": "^0.2.5",
     "validate-dockerfile": "^1.8.1",
     "xml2js": "^0.6.2",
     "yaml": "^2.8.1",
-    "zod": "^3.25.6"
+    "zod": "^3.25.6",
+    "zod-to-json-schema": "^3.25.0"
   },
   "devDependencies": {
     "@ai-sdk/azure": "^2.0.54",
@@ -135,7 +163,6 @@
     "jest": "^30.2.0",
     "lint-staged": "^16.2.6",
     "prettier": "^3.6.2",
-    "tar": "^7.5.2",
     "ts-jest": "^29.4.5",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",
