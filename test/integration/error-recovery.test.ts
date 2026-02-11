@@ -31,6 +31,7 @@ function createMockToolContext() {
 
 const mockDockerClient = {
   buildImage: jest.fn(),
+  inspectImage: jest.fn(),
   tagImage: jest.fn(),
   pushImage: jest.fn(),
   ping: jest.fn(),
@@ -56,7 +57,9 @@ jest.mock('../../src/lib/logger', () => ({
 }));
 
 jest.mock('../../src/lib/validation', () => ({
-  validatePath: jest.fn().mockImplementation(async (pathStr: string) => ({ ok: true, value: pathStr })),
+  validatePath: jest
+    .fn()
+    .mockImplementation(async (pathStr: string) => ({ ok: true, value: pathStr })),
   validateImageName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
   validateNamespace: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
 }));
@@ -79,6 +82,11 @@ describe('Error Recovery', () => {
     jest.clearAllMocks();
 
     mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
+    mockDockerClient.inspectImage.mockResolvedValue(
+      createSuccessResult({
+        Id: 'sha256:abc',
+      }),
+    );
   });
 
   describe('Error Handling Pattern', () => {
@@ -87,7 +95,13 @@ describe('Error Recovery', () => {
 
       await expect(
         buildImage(
-          { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+          {
+            path: '/test',
+            dockerfile: 'Dockerfile',
+            imageName: 'test:latest',
+            tags: [],
+            buildArgs: {},
+          },
           createMockToolContext(),
         ),
       ).resolves.not.toThrow();
@@ -97,7 +111,13 @@ describe('Error Recovery', () => {
       mockDockerClient.buildImage.mockRejectedValue(new Error('Network error'));
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -113,7 +133,13 @@ describe('Error Recovery', () => {
       mockDockerClient.buildImage.mockRejectedValue(originalError);
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -133,28 +159,42 @@ describe('Error Recovery', () => {
         if (callCount === 1) {
           return Promise.reject(new Error('ETIMEDOUT'));
         }
-        return Promise.resolve(createSuccessResult({
-          imageId: 'sha256:abc',
-          digest: 'sha256:def',
-          tags: ['test:latest'],
-          size: 100000,
-          layers: 5,
-          buildTime: 1000,
-          logs: [],
-          warnings: [],
-        }));
+        return Promise.resolve(
+          createSuccessResult({
+            imageId: 'sha256:abc',
+            digest: 'sha256:def',
+            tags: ['test:latest'],
+            size: 100000,
+            layers: 5,
+            buildTime: 1000,
+            logs: [],
+            warnings: [],
+          }),
+        );
       });
 
       // First call fails
       const firstResult = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
       expect(firstResult.ok).toBe(false);
 
       // Second call succeeds (simulating retry)
       const secondResult = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
       expect(secondResult.ok).toBe(true);
@@ -165,7 +205,13 @@ describe('Error Recovery', () => {
       // Test the retry pattern with build-image tool instead
       mockDockerClient.buildImage.mockRejectedValueOnce(new Error('Service unavailable'));
       const firstResult = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
       expect(firstResult.ok).toBe(false);
@@ -173,7 +219,13 @@ describe('Error Recovery', () => {
       // After service restart - service becomes available again
       mockDockerClient.buildImage.mockRejectedValueOnce(new Error('Service unavailable'));
       const secondResult = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
       // May still fail until service fully restarts - that's ok
@@ -190,7 +242,13 @@ describe('Error Recovery', () => {
       );
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -206,7 +264,13 @@ describe('Error Recovery', () => {
       mockDockerClient.buildImage.mockRejectedValue(permError);
 
       const result = await buildImage(
-        { path: '/protected', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/protected',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -227,7 +291,13 @@ describe('Error Recovery', () => {
       );
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -246,7 +316,13 @@ describe('Error Recovery', () => {
       );
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'myapp:v1.0', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'myapp:v1.0',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -264,7 +340,13 @@ describe('Error Recovery', () => {
       for (const error of errors) {
         mockDockerClient.buildImage.mockRejectedValueOnce(new Error(error));
         const result = await buildImage(
-          { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+          {
+            path: '/test',
+            dockerfile: 'Dockerfile',
+            imageName: 'test:latest',
+            tags: [],
+            buildArgs: {},
+          },
           createMockToolContext(),
         );
         expect(result.ok).toBe(false);
@@ -274,7 +356,13 @@ describe('Error Recovery', () => {
     it('should recover after errors', async () => {
       mockDockerClient.buildImage.mockRejectedValueOnce(new Error('Temporary error'));
       const failResult = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
       expect(failResult.ok).toBe(false);
@@ -292,7 +380,13 @@ describe('Error Recovery', () => {
         }),
       );
       const successResult = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
       expect(successResult.ok).toBe(true);

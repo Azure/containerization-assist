@@ -93,6 +93,11 @@ describe('Docker Error Scenarios', () => {
     mockFs.writeFile.mockResolvedValue(undefined);
 
     mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
+    mockDockerClient.inspectImage.mockResolvedValue(
+      createSuccessResult({
+        Id: 'sha256:abc',
+      }),
+    );
   });
 
   describe('Error Handling Pattern', () => {
@@ -140,7 +145,13 @@ describe('Docker Error Scenarios', () => {
       mockDockerClient.buildImage.mockResolvedValue(createFailureResult(testError.message));
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -158,7 +169,13 @@ describe('Docker Error Scenarios', () => {
       mockDockerClient.buildImage.mockRejectedValue(err);
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -171,7 +188,13 @@ describe('Docker Error Scenarios', () => {
       mockDockerClient.buildImage.mockRejectedValue(err);
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -184,7 +207,13 @@ describe('Docker Error Scenarios', () => {
       mockDockerClient.buildImage.mockRejectedValue(err);
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -197,7 +226,13 @@ describe('Docker Error Scenarios', () => {
       mockDockerClient.buildImage.mockResolvedValue(createFailureResult('Build failed'));
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -208,7 +243,13 @@ describe('Docker Error Scenarios', () => {
       mockDockerClient.buildImage.mockResolvedValue(createFailureResult('Operation failed'));
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -226,7 +267,13 @@ describe('Docker Error Scenarios', () => {
       );
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
@@ -259,7 +306,13 @@ describe('Docker Error Scenarios', () => {
       );
 
       const result = await buildImage(
-        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        {
+          path: '/test',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+        },
         createMockToolContext(),
       );
 
