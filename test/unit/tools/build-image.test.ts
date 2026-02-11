@@ -123,6 +123,13 @@ const mockDockerClient = {
       guidance?: ErrorGuidance;
     }>
   >,
+  inspectImage: jest.fn() as jest.MockedFunction<
+    (imageId: string) => Promise<{
+      ok: boolean;
+      value?: { Id?: string };
+      error?: string;
+    }>
+  >,
   tagImage: jest.fn() as jest.MockedFunction<
     (
       imageId: string,
@@ -205,6 +212,11 @@ CMD ["node", "index.js"]`;
         buildTime: 5000,
         logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
         warnings: [],
+      }),
+    );
+    mockDockerClient.inspectImage.mockResolvedValue(
+      createSuccessResult({
+        Id: 'sha256:mock-image-id',
       }),
     );
     mockDockerClient.tagImage.mockResolvedValue(createSuccessResult(undefined));
