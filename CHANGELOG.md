@@ -1,5 +1,11 @@
 # Change Log
 
+## [1.2.0-dev.1]
+
+- export tool constants separately from implementation (#581)
+- add embedded knowledge pack exports (#579)
+- dependency updates: @modelcontextprotocol/sdk, @isaacs/brace-expansion, and GitHub Actions workflows (#580, #578, #575, #576, #582, #584, #585, #586)
+
 ## [1.1.0]
 
 - add new `osv` parser for scan-image tool that has no CLI dependencies
