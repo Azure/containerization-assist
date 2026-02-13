@@ -267,6 +267,26 @@ describe('telemetry-utils', () => {
       expect(metrics).not.toHaveProperty('buildConfig'); // Contains sensitive data
     });
 
+    it('should ignore legacy build execution fields for build-image-context', () => {
+      const metrics = extractSafeTelemetryMetrics('build-image-context' as ToolName, {
+        buildTime: 1200,
+        size: 1024,
+        imageId: 'sha256:abc',
+        tags: ['myapp:latest'],
+        securityAnalysis: {
+          warnings: [],
+          riskLevel: 'low',
+        },
+      });
+
+      expect(metrics.securityWarningCount).toBe(0);
+      expect(metrics.riskLevel).toBe('low');
+      expect(metrics).not.toHaveProperty('buildTime');
+      expect(metrics).not.toHaveProperty('size');
+      expect(metrics).not.toHaveProperty('imageId');
+      expect(metrics).not.toHaveProperty('tags');
+    });
+
     it('should extract safe metrics from scan-image results', () => {
       const metrics = extractSafeTelemetryMetrics('scan-image' as ToolName, {
         summary: { critical: 2, high: 5, medium: 10, low: 20 },
