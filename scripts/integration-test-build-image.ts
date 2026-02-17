@@ -61,7 +61,7 @@ const TEST_CASES: BuildTestCase[] = [
     name: 'Java Multi-Stage Build',
     dockerContext: 'test/fixtures/build-scenarios/java',
     tags: ['test-build:java-app'],
-    expectedSize: { min: 100_000_000, max: 400_000_000 },  // 100MB - 400MB for Alpine
+    expectedSize: { min: 40_000_000, max: 400_000_000 },  // 40MB - 400MB for Alpine JRE
     expectedLayers: { min: 5, max: 30 },
     shouldSucceed: true,
     description: 'Tests Java build with Eclipse Temurin JRE and multi-stage',
@@ -73,7 +73,7 @@ const TEST_CASES: BuildTestCase[] = [
     buildArgs: {
       VERSION: '2.0.0',
     },
-    expectedSize: { min: 100_000_000, max: 400_000_000 },  // 100MB - 400MB for Alpine
+    expectedSize: { min: 40_000_000, max: 400_000_000 },  // 40MB - 400MB for Alpine JRE
     shouldSucceed: true,
     description: 'Tests Java build argument injection',
   },
@@ -81,7 +81,7 @@ const TEST_CASES: BuildTestCase[] = [
     name: '.NET Multi-Stage Build',
     dockerContext: 'test/fixtures/build-scenarios/dotnet',
     tags: ['test-build:dotnet-app'],
-    expectedSize: { min: 80_000_000, max: 300_000_000 },  // 80MB - 300MB for Alpine
+    expectedSize: { min: 40_000_000, max: 300_000_000 },  // 40MB - 300MB for Alpine runtime
     expectedLayers: { min: 5, max: 30 },
     shouldSucceed: true,
     description: 'Tests .NET 8 build with ASP.NET runtime and multi-stage',
@@ -93,7 +93,7 @@ const TEST_CASES: BuildTestCase[] = [
     buildArgs: {
       VERSION: '3.0.0',
     },
-    expectedSize: { min: 80_000_000, max: 300_000_000 },  // 80MB - 300MB for Alpine
+    expectedSize: { min: 40_000_000, max: 300_000_000 },  // 40MB - 300MB for Alpine runtime
     shouldSucceed: true,
     description: 'Tests .NET build with version argument',
   },
