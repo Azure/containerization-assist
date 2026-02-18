@@ -216,7 +216,20 @@ async function handleScanImage(
   }
   const { logger, timer } = setupToolContext(context, 'scan-image');
 
-  const { scanner = 'osv', severity } = params;
+  const {
+    scanner = 'osv',
+    severity,
+    scanType = 'vulnerability',
+    enableAISuggestions = true,
+  } = params;
+
+  if (scanType !== 'vulnerability') {
+    return Failure(`Scan type '${scanType}' is not supported`, {
+      message: 'Only vulnerability scans are currently supported',
+      hint: 'Use scanType="vulnerability" for image vulnerability checks',
+      resolution: 'Update scanType to "vulnerability" and retry',
+    });
+  }
 
   // Map severity parameter to threshold
   const finalSeverityThreshold = severity
@@ -225,7 +238,7 @@ async function handleScanImage(
 
   try {
     logger.info(
-      { scanner, severityThreshold: finalSeverityThreshold },
+      { scanner, severityThreshold: finalSeverityThreshold, scanType },
       'Starting image security scan',
     );
 
@@ -240,7 +253,7 @@ async function handleScanImage(
         resolution: 'Add imageId parameter with the Docker image ID or name to scan',
       });
     }
-    logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
+    logger.info({ imageId, scanner, scanType }, 'Scanning image for vulnerabilities');
 
     // Scan image using security scanner
     const scanResultWrapper = await securityScanner.scanImage(imageId);
@@ -306,7 +319,11 @@ async function handleScanImage(
 
     // Get knowledge-based remediation guidance for vulnerabilities
     let remediationGuidance: ScanImageResult['remediationGuidance'] = [];
-    if (dockerScanResult.vulnerabilities && dockerScanResult.vulnerabilities.length > 0) {
+    if (
+      enableAISuggestions &&
+      dockerScanResult.vulnerabilities &&
+      dockerScanResult.vulnerabilities.length > 0
+    ) {
       try {
         // Create a summary of vulnerabilities for knowledge query
         const vulnSummary = dockerScanResult.vulnerabilities
@@ -376,7 +393,7 @@ async function handleScanImage(
         : undefined;
 
     const recommendedActions =
-      vulnerabilityDetails && vulnerabilityDetails.length > 0
+      enableAISuggestions && vulnerabilityDetails && vulnerabilityDetails.length > 0
         ? analyzeFixActions(vulnerabilityDetails)
         : undefined;
 

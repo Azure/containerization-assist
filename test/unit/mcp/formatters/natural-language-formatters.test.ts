@@ -387,6 +387,72 @@ describe('natural-language-formatters', () => {
       const fixableIndex = narrative.indexOf('**Fixable Vulnerabilities:**');
       expect(actionsIndex).toBeLessThan(fixableIndex);
     });
+
+    it('should avoid printing unknown vulnerability IDs', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 0,
+          high: 0,
+          medium: 1,
+          low: 0,
+          negligible: 0,
+          unknown: 0,
+          total: 1,
+        },
+        vulnerabilityDetails: [
+          {
+            id: 'UNKNOWN',
+            severity: 'MEDIUM',
+            package: 'curl',
+            version: '7.80.0',
+            description: 'Medium severity issue',
+            fixedVersion: '7.88.0',
+          },
+        ],
+        scanTime: '2025-01-22T11:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).not.toContain('ID: UNKNOWN');
+    });
+
+    it('should report low severity in recommended actions', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 2,
+          negligible: 0,
+          unknown: 0,
+          total: 2,
+        },
+        recommendedActions: [
+          {
+            type: 'UPGRADE_PACKAGE',
+            action: 'Upgrade curl',
+            current: 'curl: 7.80.0',
+            recommended: 'curl: 7.88.0',
+            package: 'curl',
+            vulnerabilitiesFixed: 2,
+            severityCounts: { critical: 0, high: 0, medium: 0, low: 2, negligible: 0, unknown: 0 },
+            vulnerabilityIds: ['CVE-2024-0001', 'CVE-2024-0002'],
+          },
+        ],
+        scanTime: '2025-01-22T11:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).toContain('Fixes 2 (2 low)');
+    });
   });
 
   describe('formatDockerfilePlanNarrative', () => {

@@ -154,7 +154,7 @@ export function formatScanImageNarrative(
         parts.push(
           `  ${idx + 1}. [${vuln.severity}] ${vuln.package}: ${vuln.version} → ${vuln.fixedVersion}`,
         );
-        if (vuln.id) {
+        if (vuln.id && vuln.id !== 'UNKNOWN') {
           parts.push(`     ID: ${vuln.id}`);
         }
       });
