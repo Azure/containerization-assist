@@ -91,7 +91,15 @@ describe('scanImage - Success and Error Scenarios', () => {
 
     jest.clearAllMocks();
 
-    mockGetKnowledgeForCategory.mockResolvedValue([]);
+    mockGetKnowledgeForCategory.mockResolvedValue([
+      {
+        entry: {
+          recommendation: 'Upgrade to patched version',
+          severity: 'HIGH',
+          example: 'npm update package-name',
+        },
+      },
+    ]);
 
     // Default successful scan
     mockSecurityScanner.scanImage.mockResolvedValue(
