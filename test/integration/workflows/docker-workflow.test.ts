@@ -13,7 +13,8 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { createLogger } from '@/lib/logger';
 import type { ToolContext } from '@/mcp/context';
 import { join } from 'node:path';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdtempSync, rmSync, cpSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { DockerTestCleaner } from '../../__support__/utilities/docker-test-cleaner';
 import { createDockerClient } from '@/infra/docker/client';
 
@@ -219,79 +220,86 @@ describe('Docker Workflow Integration', () => {
           return;
         }
 
-        // Step 1: Analyze
-        const analyzeResult = await analyzeRepoTool.handler(
-          { repositoryPath: testRepo },
-          toolContext,
-        );
+        const tempRepo = mkdtempSync(join(tmpdir(), 'python-flask-'));
+        cpSync(testRepo, tempRepo, { recursive: true });
+
+        try {
+          // Step 1: Analyze
+          const analyzeResult = await analyzeRepoTool.handler(
+            { repositoryPath: tempRepo },
+            toolContext,
+          );
 
         if (!analyzeResult.ok) {
           console.log('Analysis failed:', analyzeResult.error);
           return;
         }
 
-        const analysis = analyzeResult.value as RepositoryAnalysis;
-        expect(analysis.modules).toBeDefined();
+          const analysis = analyzeResult.value as RepositoryAnalysis;
+          expect(analysis.modules).toBeDefined();
 
         // Step 2: Generate or use existing Dockerfile
-        const dockerfilePath = join(testRepo, 'Dockerfile');
+          const dockerfilePath = join(tempRepo, 'Dockerfile');
 
         // Create a simple test Dockerfile if none exists
-        if (!existsSync(dockerfilePath)) {
-          writeFileSync(
-            dockerfilePath,
-            `FROM python:3.11-slim
+          if (!existsSync(dockerfilePath)) {
+            writeFileSync(
+              dockerfilePath,
+              `FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt* ./
 RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || true
 COPY . .
 EXPOSE 5000
 CMD ["python", "app.py"]`,
-          );
-        }
+            );
+          }
 
         // Step 3: Build image
         const imageName = `docker-workflow-python:${Date.now()}`;
-        const buildResult = await buildImageTool.handler(
-          {
-            path: testRepo,
-            dockerfile: 'Dockerfile',
-            imageName,
-          },
-          toolContext,
-        );
+          const buildResult = await buildImageTool.handler(
+            {
+              path: tempRepo,
+              dockerfile: 'Dockerfile',
+              imageName,
+            },
+            toolContext,
+          );
 
-        if (buildResult.ok) {
-          const build = buildResult.value as BuildImageResult;
-          testCleaner.trackImage(build.imageId);
+          if (buildResult.ok) {
+            const build = buildResult.value as BuildImageResult;
+            testCleaner.trackImage(build.imageId);
 
-          // Step 4: Tag the image (with retry for potential race condition)
-          let tagResult;
-          const maxRetries = 3;
+            // Step 4: Tag the image (with retry for potential race condition)
+            let tagResult;
+            const maxRetries = 3;
 
-          for (let attempt = 0; attempt < maxRetries; attempt++) {
-            tagResult = await tagImageTool.handler(
-              {
-                imageId: build.imageId,
-                tag: `docker-workflow-python:latest`,
-              },
-              toolContext,
-            );
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+              tagResult = await tagImageTool.handler(
+                {
+                  imageId: build.imageId,
+                  tag: `docker-workflow-python:latest`,
+                },
+                toolContext,
+              );
 
-            if (tagResult.ok) {
-              break;
+              if (tagResult.ok) {
+                break;
+              }
+
+              if (attempt < maxRetries - 1) {
+                console.log(`Tag attempt ${attempt + 1} failed, retrying...`);
+                await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+              }
             }
 
-            if (attempt < maxRetries - 1) {
-              console.log(`Tag attempt ${attempt + 1} failed, retrying...`);
-              await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+            if (!tagResult.ok) {
+              console.log('Tagging failed:', tagResult.error);
+              return;
             }
           }
-
-          if (!tagResult.ok) {
-            console.log('Tagging failed:', tagResult.error);
-            return;
-          }
+        } finally {
+          rmSync(tempRepo, { recursive: true, force: true });
         }
       },
       testTimeout,

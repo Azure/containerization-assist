@@ -190,13 +190,19 @@ function pullImage(remoteImage: string, localTag: string, maxRetries = 3): boole
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const isRetryable = errorMessage.includes('500') || errorMessage.includes('Internal Server Error');
+      const stderrMessage =
+        error && typeof error === 'object' && 'stderr' in error
+          ? String((error as { stderr?: unknown }).stderr ?? '')
+          : '';
+      const combinedError = `${errorMessage}\n${stderrMessage}`;
+      const isRetryable =
+        combinedError.includes('500') || combinedError.includes('Internal Server Error');
 
       if (attempt < maxRetries && isRetryable) {
         console.log(`   ⚠️  Attempt ${attempt}/${maxRetries} failed (transient error), retrying...`);
         // Exponential backoff: 2s, 4s, 8s
         const backoffMs = Math.pow(2, attempt) * 1000;
-        execSync(`sleep ${backoffMs / 1000}`, { stdio: 'pipe' });
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, backoffMs);
       } else {
         console.log(`   ❌ Failed to pull ${remoteImage}${attempt > 1 ? ` after ${attempt} attempts` : ''}`);
         if (error instanceof Error) {
