@@ -143,11 +143,19 @@ describe('Docker Workflow Integration', () => {
         expect(build.createdTags).toContain(imageName);
         testCleaner.trackImage(build.imageId);
 
-        // Step 4: Scan image (may fail if Trivy not installed)
-        const scanResult = await scanImageTool.handler({ imageId: build.imageId }, toolContext);
+        // Step 4: Scan image (may fail if Trivy/OSV not available)
+        const scanResult = await scanImageTool.handler(
+          {
+            imageId: build.imageId,
+            scanner: 'osv',
+            scanType: 'vulnerability',
+            enableAISuggestions: false,
+          },
+          toolContext,
+        );
 
         if (!scanResult.ok) {
-          console.log('Scan skipped (Trivy may not be installed)');
+          console.log('Scan skipped (scanner unavailable or offline)');
         } else {
           expect(scanResult.value).toBeDefined();
         }
@@ -374,9 +382,17 @@ CMD ["python", "app.py"]`,
           testCleaner.trackImage(build.imageId);
 
           // Continue with scan and tag
-          const scanResult = await scanImageTool.handler({ imageId: build.imageId }, toolContext);
+          const scanResult = await scanImageTool.handler(
+            {
+              imageId: build.imageId,
+              scanner: 'osv',
+              scanType: 'vulnerability',
+              enableAISuggestions: false,
+            },
+            toolContext,
+          );
 
-          // Scan may fail if Trivy not available - that's OK
+          // Scan may fail if scanner not available - that's OK
           expect(scanResult.ok !== undefined).toBe(true);
 
           // Tag with retry for potential race condition

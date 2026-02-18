@@ -141,8 +141,13 @@ describe('Error Scenario Coverage', () => {
 
     it('should reject scan-image with nonexistent image', async () => {
       const result = await scanImageTool.handler(
-        { imageId: 'nonexistent-image:12345' },
-        toolContext
+        {
+          imageId: 'nonexistent-image:12345',
+          scanner: 'osv',
+          scanType: 'vulnerability',
+          enableAISuggestions: false,
+        },
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -297,8 +302,13 @@ describe('Error Scenario Coverage', () => {
     it('should handle Trivy scanner unavailable', async () => {
       // Scan will fail if Trivy not installed
       const result = await scanImageTool.handler(
-        { imageId: 'alpine:latest' },
-        toolContext
+        {
+          imageId: 'alpine:latest',
+          scanner: 'trivy',
+          scanType: 'vulnerability',
+          enableAISuggestions: false,
+        },
+        toolContext,
       );
 
       if (!result.ok) {

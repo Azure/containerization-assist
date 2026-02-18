@@ -28,7 +28,12 @@ import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
-import { formatSize, formatDuration, formatVulnerabilities } from '@/lib/summary-helpers';
+import {
+  formatSize,
+  formatDuration,
+  formatVulnerabilities,
+  pluralize,
+} from '@/lib/summary-helpers';
 import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
 
 /**
@@ -92,17 +97,29 @@ export function formatScanImageNarrative(
       (sum, action) => sum + action.vulnerabilitiesFixed,
       0,
     );
-    parts.push(
-      `\n**Recommended Actions:** (${result.recommendedActions.length} actions fix ${totalFixed} vulnerabilities)`,
-    );
+    const actionLabel = pluralize(result.recommendedActions.length, 'action');
+    const vulnerabilityLabel = pluralize(totalFixed, 'vulnerability', 'vulnerabilities');
+    const actionVerb = result.recommendedActions.length === 1 ? 'fixes' : 'fix';
+    parts.push(`\n**Recommended Actions:** (${actionLabel} ${actionVerb} ${vulnerabilityLabel})`);
 
     result.recommendedActions.forEach((action, idx) => {
-      const severityText =
-        action.severityCounts.critical > 0
-          ? `${action.severityCounts.critical} critical`
-          : action.severityCounts.high > 0
-            ? `${action.severityCounts.high} high`
-            : `${action.severityCounts.medium} medium`;
+      const severityOrder: Array<keyof typeof action.severityCounts> = [
+        'critical',
+        'high',
+        'medium',
+        'low',
+        'negligible',
+        'unknown',
+      ];
+
+      let severityText = 'no vulnerabilities with known severity';
+      for (const severity of severityOrder) {
+        const count = action.severityCounts[severity];
+        if (count > 0) {
+          severityText = `${count} ${severity.toLowerCase()}`;
+          break;
+        }
+      }
 
       parts.push(
         `\n  ${idx + 1}. ${action.action} - Fixes ${action.vulnerabilitiesFixed} (${severityText})`,
@@ -138,7 +155,7 @@ export function formatScanImageNarrative(
           `  ${idx + 1}. [${vuln.severity}] ${vuln.package}: ${vuln.version} → ${vuln.fixedVersion}`,
         );
         if (vuln.id) {
-          parts.push(`     CVE: ${vuln.id}`);
+          parts.push(`     ID: ${vuln.id}`);
         }
       });
 

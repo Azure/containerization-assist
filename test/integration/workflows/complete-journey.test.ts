@@ -178,14 +178,19 @@ describe('Complete Containerization Journey', () => {
       // ===== STEP 4: Scan Image =====
       journeyLog.push('Step 4: Scanning image for vulnerabilities...');
       const scanResult = await scanImageTool.handler(
-        { imageId: build.imageId },
-        toolContext
+        {
+          imageId: build.imageId,
+          scanner: 'osv',
+          scanType: 'vulnerability',
+          enableAISuggestions: false,
+        },
+        toolContext,
       );
 
       if (scanResult.ok) {
         journeyLog.push('✓ Security scan completed');
       } else {
-        journeyLog.push('⚠ Scan skipped (Trivy may not be installed)');
+        journeyLog.push('⚠ Scan skipped (scanner unavailable or offline)');
       }
 
       // ===== STEP 5: Tag Image =====

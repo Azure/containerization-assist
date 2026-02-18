@@ -55,8 +55,10 @@ export interface FixAction {
     high: number;
     medium: number;
     low: number;
+    negligible: number;
+    unknown: number;
   };
-  cveIds: string[];
+  vulnerabilityIds: string[];
 }
 
 export interface ScanImageResult {
@@ -109,27 +111,61 @@ function analyzeFixActions(
     fixedVersion?: string;
   }>,
 ): FixAction[] {
-  const fixable = vulnerabilities.filter((v) => v.fixedVersion);
+  const fixable = vulnerabilities.filter((v) => v.fixedVersion !== undefined);
   if (fixable.length === 0) return [];
 
-  const byPackage = new Map<string, typeof fixable>();
+  const normalizeVersion = (value: string | undefined): string => {
+    if (value === undefined) return 'unknown';
+    return value.trim() === '' ? 'unknown' : value;
+  };
+
+  const byPackageVersion = new Map<string, typeof fixable>();
   for (const vuln of fixable) {
-    const pkg = byPackage.get(vuln.package) || [];
-    pkg.push(vuln);
-    byPackage.set(vuln.package, pkg);
+    const currentVersion = normalizeVersion(vuln.version);
+    const fixedVersion = normalizeVersion(vuln.fixedVersion);
+    const key = `${vuln.package}::${currentVersion}::${fixedVersion}`;
+    const grouped = byPackageVersion.get(key) || [];
+    grouped.push(vuln);
+    byPackageVersion.set(key, grouped);
   }
 
-  const actions: FixAction[] = Array.from(byPackage.entries()).map(([packageName, vulns]) => {
+  const actions: FixAction[] = Array.from(byPackageVersion.entries()).map(([, vulns]) => {
     const severityCounts = {
-      critical: vulns.filter((v) => v.severity === 'CRITICAL').length,
-      high: vulns.filter((v) => v.severity === 'HIGH').length,
-      medium: vulns.filter((v) => v.severity === 'MEDIUM').length,
-      low: vulns.filter((v) => v.severity === 'LOW').length,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      negligible: 0,
+      unknown: 0,
     };
 
-    const cveIds = [...new Set(vulns.map((v) => v.id))].slice(0, 5);
-    const currentVersion = vulns[0]?.version ?? 'unknown';
-    const fixedVersion = vulns[0]?.fixedVersion ?? 'latest';
+    for (const vuln of vulns) {
+      switch (vuln.severity) {
+        case 'CRITICAL':
+          severityCounts.critical += 1;
+          break;
+        case 'HIGH':
+          severityCounts.high += 1;
+          break;
+        case 'MEDIUM':
+          severityCounts.medium += 1;
+          break;
+        case 'LOW':
+          severityCounts.low += 1;
+          break;
+        case 'NEGLIGIBLE':
+          severityCounts.negligible += 1;
+          break;
+        case 'UNKNOWN':
+          severityCounts.unknown += 1;
+          break;
+      }
+    }
+
+    const vulnerabilityIds = [...new Set(vulns.map((v) => v.id))].slice(0, 5);
+    const packageName = vulns[0]?.package ?? 'unknown';
+    const currentVersion = normalizeVersion(vulns[0]?.version);
+    const fixedVersion = normalizeVersion(vulns[0]?.fixedVersion);
 
     return {
       type: 'UPGRADE_PACKAGE',
@@ -139,16 +175,24 @@ function analyzeFixActions(
       package: packageName,
       vulnerabilitiesFixed: vulns.length,
       severityCounts,
-      cveIds,
+      vulnerabilityIds,
     };
   });
 
+  const severityOrder: Array<keyof FixAction['severityCounts']> = [
+    'critical',
+    'high',
+    'medium',
+    'low',
+    'negligible',
+    'unknown',
+  ];
+
   actions.sort((a, b) => {
-    if (b.severityCounts.critical !== a.severityCounts.critical) {
-      return b.severityCounts.critical - a.severityCounts.critical;
-    }
-    if (b.severityCounts.high !== a.severityCounts.high) {
-      return b.severityCounts.high - a.severityCounts.high;
+    for (const severity of severityOrder) {
+      if (b.severityCounts[severity] !== a.severityCounts[severity]) {
+        return b.severityCounts[severity] - a.severityCounts[severity];
+      }
     }
     return b.vulnerabilitiesFixed - a.vulnerabilitiesFixed;
   });
@@ -327,7 +371,7 @@ async function handleScanImage(
             package: v.package ?? 'unknown',
             version: v.version ?? 'unknown',
             description: v.description ?? 'No description available',
-            ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
+            ...(v.fixedVersion !== undefined && { fixedVersion: v.fixedVersion }),
           }))
         : undefined;
 

@@ -229,13 +229,19 @@ CMD ["node", "index.js"]`
         }
 
         // Scan image
-        const scanResult = await scanImageTool.handler({
-          imageId: build.imageId,
-        }, toolContext);
+        const scanResult = await scanImageTool.handler(
+          {
+            imageId: build.imageId,
+            scanner: 'osv',
+            scanType: 'vulnerability',
+            enableAISuggestions: false,
+          },
+          toolContext,
+        );
 
         // Scan may fail if Trivy not installed - that's OK
         if (!scanResult.ok) {
-          console.log('Scan skipped (Trivy may not be installed)');
+          console.log('Scan skipped (scanner unavailable or offline)');
         } else {
           expect(scanResult.value).toBeDefined();
         }

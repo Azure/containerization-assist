@@ -185,7 +185,7 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('❌ Security Scan FAILED');
       expect(narrative).toContain('**Fixable Vulnerabilities:** (3 of 20)');
       expect(narrative).toContain('[CRITICAL] openssl: 1.1.1 → 1.1.1t');
-      expect(narrative).toContain('CVE: CVE-2023-1234');
+      expect(narrative).toContain('ID: CVE-2023-1234');
       expect(narrative).toContain('[HIGH] libssl: 3.0.0 → 3.0.8');
       expect(narrative).toContain('[MEDIUM] curl: 7.68.0 → 7.88.0');
       expect(narrative).not.toContain('zlib');
@@ -350,8 +350,8 @@ describe('natural-language-formatters', () => {
             recommended: 'openssl: 1.1.1t',
             package: 'openssl',
             vulnerabilitiesFixed: 2,
-            severityCounts: { critical: 1, high: 1, medium: 0, low: 0 },
-            cveIds: ['CVE-2023-1', 'CVE-2023-2'],
+            severityCounts: { critical: 1, high: 1, medium: 0, low: 0, negligible: 0, unknown: 0 },
+            vulnerabilityIds: ['CVE-2023-1', 'CVE-2023-2'],
           },
         ],
         vulnerabilityDetails: [
@@ -378,7 +378,7 @@ describe('natural-language-formatters', () => {
 
       const narrative = formatScanImageNarrative(result);
 
-      expect(narrative).toContain('**Recommended Actions:** (1 actions fix 2 vulnerabilities)');
+      expect(narrative).toContain('**Recommended Actions:** (1 action fixes 2 vulnerabilities)');
       expect(narrative).toContain('1. Upgrade openssl - Fixes 2 (1 critical)');
       expect(narrative).toContain('openssl: 1.1.1');
       expect(narrative).toContain('→ openssl: 1.1.1t');
