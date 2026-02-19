@@ -91,15 +91,15 @@ describe('scanImage - Success and Error Scenarios', () => {
 
     jest.clearAllMocks();
 
-      mockGetKnowledgeForCategory.mockResolvedValue([
-        {
-          entry: {
-            recommendation: 'Upgrade to patched version',
-            severity: 'HIGH',
-            example: 'npm update package-name',
-          },
+    mockGetKnowledgeForCategory.mockResolvedValue([
+      {
+        entry: {
+          recommendation: 'Upgrade to patched version',
+          severity: 'HIGH',
+          example: 'npm update package-name',
         },
-      ]);
+      },
+    ]);
 
     // Default successful scan
     mockSecurityScanner.scanImage.mockResolvedValue(
@@ -130,6 +130,7 @@ describe('scanImage - Success and Error Scenarios', () => {
     });
 
     it('should detect vulnerabilities and provide remediation guidance', async () => {
+      const aiConfig = { ...config, enableAISuggestions: true };
       mockSecurityScanner.scanImage.mockResolvedValue(
         createSuccessResult({
           vulnerabilities: [
@@ -153,7 +154,7 @@ describe('scanImage - Success and Error Scenarios', () => {
         }),
       );
 
-      const result = await scanImage(config, createMockToolContext());
+      const result = await scanImage(aiConfig, createMockToolContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -163,7 +164,7 @@ describe('scanImage - Success and Error Scenarios', () => {
       }
     });
 
-    it('should skip remediation guidance when AI suggestions disabled', async () => {
+    it('should skip remediation guidance when AI suggestions disabled but still provide recommendedActions', async () => {
       const noAiConfig = {
         ...config,
         enableAISuggestions: false,
@@ -197,7 +198,8 @@ describe('scanImage - Success and Error Scenarios', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.remediationGuidance).toBeUndefined();
-        expect(result.value.recommendedActions).toBeUndefined();
+        // recommendedActions is pure computation (not AI), so it should still be present
+        expect(result.value.recommendedActions).toBeDefined();
       }
     });
 
@@ -368,7 +370,9 @@ describe('scanImage - Success and Error Scenarios', () => {
       if (result.ok) {
         expect(result.value.recommendedActions).toBeDefined();
         expect(result.value.recommendedActions).toHaveLength(2);
-        const recommendations = result.value.recommendedActions!.map((action) => action.recommended);
+        const recommendations = result.value.recommendedActions!.map(
+          (action) => action.recommended,
+        );
         expect(recommendations).toContain('openssl: 1.1.1k');
         expect(recommendations).toContain('openssl: 1.1.1t');
       }

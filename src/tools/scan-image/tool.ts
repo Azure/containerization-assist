@@ -393,7 +393,7 @@ async function handleScanImage(
         : undefined;
 
     const recommendedActions =
-      enableAISuggestions && vulnerabilityDetails && vulnerabilityDetails.length > 0
+      vulnerabilityDetails && vulnerabilityDetails.length > 0
         ? analyzeFixActions(vulnerabilityDetails)
         : undefined;
 
