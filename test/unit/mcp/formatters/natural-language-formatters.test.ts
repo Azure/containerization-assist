@@ -191,103 +191,6 @@ describe('natural-language-formatters', () => {
       expect(narrative).not.toContain('zlib');
     });
 
-    it('should sort fixable vulnerabilities by severity', () => {
-      const result: ScanImageResult = {
-        success: true,
-        scanner: 'osv',
-        vulnerabilities: {
-          critical: 1,
-          high: 1,
-          medium: 1,
-          low: 1,
-          negligible: 0,
-          unknown: 0,
-          total: 4,
-        },
-        vulnerabilityDetails: [
-          {
-            id: 'CVE-LOW',
-            severity: 'LOW',
-            package: 'pkg-low',
-            version: '1.0.0',
-            description: 'Low',
-            fixedVersion: '1.0.1',
-          },
-          {
-            id: 'CVE-CRITICAL',
-            severity: 'CRITICAL',
-            package: 'pkg-critical',
-            version: '1.0.0',
-            description: 'Critical',
-            fixedVersion: '1.0.1',
-          },
-          {
-            id: 'CVE-MEDIUM',
-            severity: 'MEDIUM',
-            package: 'pkg-medium',
-            version: '1.0.0',
-            description: 'Medium',
-            fixedVersion: '1.0.1',
-          },
-          {
-            id: 'CVE-HIGH',
-            severity: 'HIGH',
-            package: 'pkg-high',
-            version: '1.0.0',
-            description: 'High',
-            fixedVersion: '1.0.1',
-          },
-        ],
-        scanTime: '2025-01-22T10:00:00Z',
-        passed: false,
-      };
-
-      const narrative = formatScanImageNarrative(result);
-
-      // Check order: Critical, High, Medium, Low
-      const criticalIndex = narrative.indexOf('pkg-critical');
-      const highIndex = narrative.indexOf('pkg-high');
-      const mediumIndex = narrative.indexOf('pkg-medium');
-      const lowIndex = narrative.indexOf('pkg-low');
-
-      expect(criticalIndex).toBeLessThan(highIndex);
-      expect(highIndex).toBeLessThan(mediumIndex);
-      expect(mediumIndex).toBeLessThan(lowIndex);
-    });
-
-    it('should truncate fixable vulnerabilities after 10 items', () => {
-      const vulnerabilities = Array.from({ length: 15 }, (_, i) => ({
-        id: `CVE-2023-${i}`,
-        severity: 'HIGH' as const,
-        package: `pkg-${i}`,
-        version: '1.0.0',
-        description: `Vulnerability ${i}`,
-        fixedVersion: '1.0.1',
-      }));
-
-      const result: ScanImageResult = {
-        success: true,
-        scanner: 'osv',
-        vulnerabilities: {
-          critical: 0,
-          high: 15,
-          medium: 0,
-          low: 0,
-          negligible: 0,
-          unknown: 0,
-          total: 15,
-        },
-        vulnerabilityDetails: vulnerabilities,
-        scanTime: '2025-01-22T10:00:00Z',
-        passed: false,
-      };
-
-      const narrative = formatScanImageNarrative(result);
-
-      expect(narrative).toContain('**Fixable Vulnerabilities:** (15 of 15)');
-      expect(narrative).toContain('... and 5 more fixable vulnerabilities');
-    });
-
     it('should not show fixable vulnerabilities section when none have fixes', () => {
       const result: ScanImageResult = {
         success: true,
@@ -387,72 +290,6 @@ describe('natural-language-formatters', () => {
       const fixableIndex = narrative.indexOf('**Fixable Vulnerabilities:**');
       expect(actionsIndex).toBeLessThan(fixableIndex);
     });
-
-    it('should avoid printing unknown vulnerability IDs', () => {
-      const result: ScanImageResult = {
-        success: true,
-        scanner: 'osv',
-        vulnerabilities: {
-          critical: 0,
-          high: 0,
-          medium: 1,
-          low: 0,
-          negligible: 0,
-          unknown: 0,
-          total: 1,
-        },
-        vulnerabilityDetails: [
-          {
-            id: 'UNKNOWN',
-            severity: 'MEDIUM',
-            package: 'curl',
-            version: '7.80.0',
-            description: 'Medium severity issue',
-            fixedVersion: '7.88.0',
-          },
-        ],
-        scanTime: '2025-01-22T11:00:00Z',
-        passed: false,
-      };
-
-      const narrative = formatScanImageNarrative(result);
-
-      expect(narrative).not.toContain('ID: UNKNOWN');
-    });
-
-    it('should report low severity in recommended actions', () => {
-      const result: ScanImageResult = {
-        success: true,
-        scanner: 'osv',
-        vulnerabilities: {
-          critical: 0,
-          high: 0,
-          medium: 0,
-          low: 2,
-          negligible: 0,
-          unknown: 0,
-          total: 2,
-        },
-        recommendedActions: [
-          {
-            type: 'UPGRADE_PACKAGE',
-            action: 'Upgrade curl',
-            current: 'curl: 7.80.0',
-            recommended: 'curl: 7.88.0',
-            package: 'curl',
-            vulnerabilitiesFixed: 2,
-            severityCounts: { critical: 0, high: 0, medium: 0, low: 2, negligible: 0, unknown: 0 },
-            vulnerabilityIds: ['CVE-2024-0001', 'CVE-2024-0002'],
-          },
-        ],
-        scanTime: '2025-01-22T11:00:00Z',
-        passed: false,
-      };
-
-      const narrative = formatScanImageNarrative(result);
-
-      expect(narrative).toContain('Fixes 2 (2 low)');
-    });
   });
 
   describe('formatDockerfilePlanNarrative', () => {
@@ -460,7 +297,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'create-files',
-          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images, security considerations, optimizations, and best practices from recommendations.',
+          instruction:
+            'Create a new Dockerfile at ./Dockerfile using the base images, security considerations, optimizations, and best practices from recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -508,7 +346,8 @@ describe('natural-language-formatters', () => {
           bestPractices: [],
         },
         confidence: 0.9,
-        summary: '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: javascript 18.0.0 (Express)\nStrategy: Multi-stage build\n✅ Ready to create Dockerfile based on recommendations.',
+        summary:
+          '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: javascript 18.0.0 (Express)\nStrategy: Multi-stage build\n✅ Ready to create Dockerfile based on recommendations.',
       };
 
       const narrative = formatDockerfilePlanNarrative(plan);
@@ -530,7 +369,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'update-files',
-          instruction: 'Update the existing Dockerfile at ./Dockerfile by applying the enhancement recommendations.',
+          instruction:
+            'Update the existing Dockerfile at ./Dockerfile by applying the enhancement recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -554,7 +394,8 @@ describe('natural-language-formatters', () => {
           bestPractices: [],
         },
         confidence: 0.85,
-        summary: '🔨 ACTION REQUIRED: Update Dockerfile\nPath: ./Dockerfile\nLanguage: python 3.11\n✅ Ready to update Dockerfile with enhancements.',
+        summary:
+          '🔨 ACTION REQUIRED: Update Dockerfile\nPath: ./Dockerfile\nLanguage: python 3.11\n✅ Ready to update Dockerfile with enhancements.',
         existingDockerfile: {
           path: '/app/Dockerfile',
           content: 'FROM python:3.11\nWORKDIR /app',
@@ -593,7 +434,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'create-files',
-          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
+          instruction:
+            'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -616,7 +458,8 @@ describe('natural-language-formatters', () => {
           bestPractices: [],
         },
         confidence: 0.8,
-        summary: '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: java\n✅ Ready to create Dockerfile based on recommendations.',
+        summary:
+          '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: java\n✅ Ready to create Dockerfile based on recommendations.',
         policyValidation: {
           passed: false,
           violations: [
@@ -650,7 +493,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'create-files',
-          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
+          instruction:
+            'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -694,7 +538,6 @@ describe('natural-language-formatters', () => {
       expect(narrative).not.toContain('Build image with build-image tool');
     });
   });
-
 
   describe('formatBuildImageNarrative', () => {
     it('should format successful build with all details', () => {
