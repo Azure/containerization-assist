@@ -128,6 +128,168 @@ describe('natural-language-formatters', () => {
       expect(narrative).not.toContain('Next Steps:');
       expect(narrative).not.toContain('Review and address critical/high vulnerabilities');
     });
+
+    it('should display fixable vulnerabilities with upgrade paths', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 2,
+          high: 3,
+          medium: 5,
+          low: 10,
+          negligible: 0,
+          unknown: 0,
+          total: 20,
+        },
+        vulnerabilityDetails: [
+          {
+            id: 'CVE-2023-1234',
+            severity: 'CRITICAL',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'Critical vulnerability',
+            fixedVersion: '1.1.1t',
+          },
+          {
+            id: 'CVE-2023-5678',
+            severity: 'HIGH',
+            package: 'libssl',
+            version: '3.0.0',
+            description: 'High severity vulnerability',
+            fixedVersion: '3.0.8',
+          },
+          {
+            id: 'CVE-2023-9999',
+            severity: 'MEDIUM',
+            package: 'curl',
+            version: '7.68.0',
+            description: 'Medium severity vulnerability',
+            fixedVersion: '7.88.0',
+          },
+          {
+            id: 'CVE-2023-8888',
+            severity: 'LOW',
+            package: 'zlib',
+            version: '1.2.11',
+            description: 'Low severity without fix',
+            // No fixedVersion
+          },
+        ],
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).toContain('❌ Security Scan FAILED');
+      expect(narrative).toContain('**Fixable Vulnerabilities:** (3 of 20)');
+      expect(narrative).toContain('[CRITICAL] openssl: 1.1.1 → 1.1.1t');
+      expect(narrative).toContain('ID: CVE-2023-1234');
+      expect(narrative).toContain('[HIGH] libssl: 3.0.0 → 3.0.8');
+      expect(narrative).toContain('[MEDIUM] curl: 7.68.0 → 7.88.0');
+      expect(narrative).not.toContain('zlib');
+    });
+
+    it('should not show fixable vulnerabilities section when none have fixes', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 2,
+          high: 3,
+          medium: 0,
+          low: 0,
+          negligible: 0,
+          unknown: 0,
+          total: 5,
+        },
+        vulnerabilityDetails: [
+          {
+            id: 'CVE-2023-1234',
+            severity: 'CRITICAL',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'Critical vulnerability without fix',
+            // No fixedVersion
+          },
+          {
+            id: 'CVE-2023-5678',
+            severity: 'HIGH',
+            package: 'libssl',
+            version: '3.0.0',
+            description: 'High severity vulnerability without fix',
+            // No fixedVersion
+          },
+        ],
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).toContain('❌ Security Scan FAILED');
+      expect(narrative).not.toContain('**Fixable Vulnerabilities:**');
+    });
+
+    it('should display recommendedActions before detailed vulnerabilities', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 1,
+          high: 1,
+          medium: 0,
+          low: 0,
+          negligible: 0,
+          unknown: 0,
+          total: 2,
+        },
+        recommendedActions: [
+          {
+            type: 'UPGRADE_PACKAGE',
+            action: 'Upgrade openssl',
+            current: 'openssl: 1.1.1',
+            recommended: 'openssl: 1.1.1t',
+            package: 'openssl',
+            vulnerabilitiesFixed: 2,
+            severityCounts: { critical: 1, high: 1, medium: 0, low: 0, negligible: 0, unknown: 0 },
+            vulnerabilityIds: ['CVE-2023-1', 'CVE-2023-2'],
+          },
+        ],
+        vulnerabilityDetails: [
+          {
+            id: 'CVE-2023-1',
+            severity: 'CRITICAL',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'Critical',
+            fixedVersion: '1.1.1t',
+          },
+          {
+            id: 'CVE-2023-2',
+            severity: 'HIGH',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'High',
+            fixedVersion: '1.1.1t',
+          },
+        ],
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).toContain('**Recommended Actions:** (1 action fixes 2 vulnerabilities)');
+      expect(narrative).toContain('1. Upgrade openssl - Fixes 2 (1 critical)');
+      expect(narrative).toContain('openssl: 1.1.1');
+      expect(narrative).toContain('→ openssl: 1.1.1t');
+
+      const actionsIndex = narrative.indexOf('**Recommended Actions:**');
+      const fixableIndex = narrative.indexOf('**Fixable Vulnerabilities:**');
+      expect(actionsIndex).toBeLessThan(fixableIndex);
+    });
   });
 
   describe('formatDockerfilePlanNarrative', () => {

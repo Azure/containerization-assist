@@ -1,6 +1,6 @@
 /**
- * Unit Tests: Scan Image Tool - Error Scenarios
- * Tests the scan-image tool error handling and edge cases
+ * Unit Tests: Scan Image Tool - Success and Error Scenarios
+ * Tests the scan-image tool behavior and edge cases
  */
 
 import { jest } from '@jest/globals';
@@ -35,25 +35,19 @@ function createMockLogger() {
 
 // Mock security scanner
 const mockSecurityScanner = {
-  scanImage: jest.fn(),
-};
+  scanImage: jest.fn() as jest.Mock,
+} as any;
 
 const mockTimer = {
   end: jest.fn(),
   error: jest.fn(),
 };
 
+const mockGetKnowledgeForCategory = jest.fn() as any;
+
 // Mock knowledge system
 jest.mock('../../../src/knowledge/index', () => ({
-  getKnowledgeForCategory: jest.fn().mockResolvedValue([
-    {
-      entry: {
-        recommendation: 'Upgrade to patched version',
-        severity: 'HIGH',
-        example: 'npm update package-name',
-      },
-    },
-  ]),
+  getKnowledgeForCategory: mockGetKnowledgeForCategory,
 }));
 
 // Mock infra modules
@@ -74,7 +68,7 @@ jest.mock('../../../src/lib/tool-helpers', () => ({
 // Import these after mocks are set up
 import { scanImage } from '../../../src/tools/scan-image/tool';
 import type { ScanImageParams } from '../../../src/tools/scan-image/schema';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '../../../src/mcp/context';
 
 // Create mock ToolContext
 function createMockToolContext(): ToolContext {
@@ -83,17 +77,29 @@ function createMockToolContext(): ToolContext {
   };
 }
 
-describe('scanImage - Error Scenarios', () => {
+describe('scanImage - Success and Error Scenarios', () => {
   let config: ScanImageParams;
 
   beforeEach(() => {
     config = {
       imageId: 'test-app:latest',
       scanner: 'trivy',
+      scanType: 'vulnerability',
+      enableAISuggestions: false,
       severity: 'high',
     };
 
     jest.clearAllMocks();
+
+    mockGetKnowledgeForCategory.mockResolvedValue([
+      {
+        entry: {
+          recommendation: 'Upgrade to patched version',
+          severity: 'HIGH',
+          example: 'npm update package-name',
+        },
+      },
+    ]);
 
     // Default successful scan
     mockSecurityScanner.scanImage.mockResolvedValue(
@@ -124,6 +130,7 @@ describe('scanImage - Error Scenarios', () => {
     });
 
     it('should detect vulnerabilities and provide remediation guidance', async () => {
+      const aiConfig = { ...config, enableAISuggestions: true };
       mockSecurityScanner.scanImage.mockResolvedValue(
         createSuccessResult({
           vulnerabilities: [
@@ -147,13 +154,149 @@ describe('scanImage - Error Scenarios', () => {
         }),
       );
 
-      const result = await scanImage(config, createMockToolContext());
+      const result = await scanImage(aiConfig, createMockToolContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.vulnerabilities.high).toBe(1);
         expect(result.value.remediationGuidance).toBeDefined();
         expect(result.value.passed).toBe(false); // Should fail with high severity
+      }
+    });
+
+    it('should skip remediation guidance when AI suggestions disabled but still provide recommendedActions', async () => {
+      const noAiConfig = {
+        ...config,
+        enableAISuggestions: false,
+      };
+
+      mockSecurityScanner.scanImage.mockResolvedValue(
+        createSuccessResult({
+          vulnerabilities: [
+            {
+              id: 'CVE-2023-1234',
+              severity: 'HIGH' as const,
+              package: 'openssl',
+              version: '1.1.1',
+              description: 'Security vulnerability',
+              fixedVersion: '1.1.1k',
+            },
+          ],
+          criticalCount: 0,
+          highCount: 1,
+          mediumCount: 0,
+          lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
+          totalVulnerabilities: 1,
+          scanDate: new Date(),
+        }),
+      );
+
+      const result = await scanImage(noAiConfig, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.remediationGuidance).toBeUndefined();
+        // recommendedActions is pure computation (not AI), so it should still be present
+        expect(result.value.recommendedActions).toBeDefined();
+      }
+    });
+
+    it('should generate recommendedActions grouped by package/version/fix', async () => {
+      mockSecurityScanner.scanImage.mockResolvedValue(
+        createSuccessResult({
+          vulnerabilities: [
+            {
+              id: 'CVE-2023-1',
+              severity: 'CRITICAL' as const,
+              package: 'openssl',
+              version: '1.1.1',
+              description: 'Critical vulnerability 1',
+              fixedVersion: '1.1.1t',
+            },
+            {
+              id: 'CVE-2023-2',
+              severity: 'HIGH' as const,
+              package: 'openssl',
+              version: '1.1.1',
+              description: 'High vulnerability 2',
+              fixedVersion: '1.1.1t',
+            },
+            {
+              id: 'CVE-2023-3',
+              severity: 'MEDIUM' as const,
+              package: 'curl',
+              version: '7.68.0',
+              description: 'Medium vulnerability',
+              fixedVersion: '7.88.0',
+            },
+          ],
+          criticalCount: 1,
+          highCount: 1,
+          mediumCount: 1,
+          lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
+          totalVulnerabilities: 3,
+          scanDate: new Date(),
+        }),
+      );
+
+      const result = await scanImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendedActions).toBeDefined();
+        expect(result.value.recommendedActions).toHaveLength(2);
+
+        const action1 = result.value.recommendedActions![0];
+        expect(action1.action).toBe('Upgrade openssl');
+        expect(action1.package).toBe('openssl');
+        expect(action1.vulnerabilitiesFixed).toBe(2);
+        expect(action1.severityCounts.critical).toBe(1);
+        expect(action1.severityCounts.high).toBe(1);
+        expect(action1.current).toBe('openssl: 1.1.1');
+        expect(action1.recommended).toBe('openssl: 1.1.1t');
+        expect(action1.vulnerabilityIds).toContain('CVE-2023-1');
+        expect(action1.vulnerabilityIds).toContain('CVE-2023-2');
+
+        const action2 = result.value.recommendedActions![1];
+        expect(action2.action).toBe('Upgrade curl');
+        expect(action2.package).toBe('curl');
+        expect(action2.vulnerabilitiesFixed).toBe(1);
+        expect(action2.severityCounts.medium).toBe(1);
+      }
+    });
+
+    it('should not generate recommendedActions when no fixes available', async () => {
+      mockSecurityScanner.scanImage.mockResolvedValue(
+        createSuccessResult({
+          vulnerabilities: [
+            {
+              id: 'CVE-2023-9999',
+              severity: 'CRITICAL' as const,
+              package: 'oldpkg',
+              version: '1.0.0',
+              description: 'No fix available',
+            },
+          ],
+          criticalCount: 1,
+          highCount: 0,
+          mediumCount: 0,
+          lowCount: 0,
+          negligibleCount: 0,
+          unknownCount: 0,
+          totalVulnerabilities: 1,
+          scanDate: new Date(),
+        }),
+      );
+
+      const result = await scanImage(config, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.recommendedActions).toBeUndefined();
       }
     });
   });
@@ -278,9 +421,27 @@ describe('scanImage - Error Scenarios', () => {
       }
     });
 
+    it('should reject unsupported scan types', async () => {
+      const invalidConfig = {
+        imageId: 'test-app:latest',
+        scanner: 'osv',
+        scanType: 'config',
+        enableAISuggestions: false,
+      } as any;
+
+      const result = await scanImage(invalidConfig, createMockToolContext());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Scan type');
+      }
+    });
+
     it('should fail when imageId is missing', async () => {
       const invalidConfig = {
         scanner: 'trivy',
+        scanType: 'vulnerability',
+        enableAISuggestions: false,
         severity: 'high',
       } as any;
 
@@ -293,9 +454,11 @@ describe('scanImage - Error Scenarios', () => {
     });
 
     it('should fail when imageId is empty string', async () => {
-      const invalidConfig = {
+      const invalidConfig: ScanImageParams = {
         imageId: '',
         scanner: 'trivy',
+        scanType: 'vulnerability',
+        enableAISuggestions: false,
       };
 
       const result = await scanImage(invalidConfig, createMockToolContext());

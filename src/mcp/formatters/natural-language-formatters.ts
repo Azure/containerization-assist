@@ -28,7 +28,7 @@ import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
-import { formatDuration, formatVulnerabilities } from '@/lib/summary-helpers';
+import { formatDuration, formatVulnerabilities, pluralize } from '@/lib/summary-helpers';
 import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
 
 /**
@@ -83,6 +83,80 @@ export function formatScanImageNarrative(
     }
     if (result.vulnerabilities.low > 0) {
       parts.push(`  🟢 Low: ${result.vulnerabilities.low}`);
+    }
+  }
+
+  // Recommended actions
+  if (result.recommendedActions && result.recommendedActions.length > 0) {
+    const totalFixed = result.recommendedActions.reduce(
+      (sum, action) => sum + action.vulnerabilitiesFixed,
+      0,
+    );
+    const actionLabel = pluralize(result.recommendedActions.length, 'action');
+    const vulnerabilityLabel = pluralize(totalFixed, 'vulnerability', 'vulnerabilities');
+    const actionVerb = result.recommendedActions.length === 1 ? 'fixes' : 'fix';
+    parts.push(`\n**Recommended Actions:** (${actionLabel} ${actionVerb} ${vulnerabilityLabel})`);
+
+    result.recommendedActions.forEach((action, idx) => {
+      const severityOrder: Array<keyof typeof action.severityCounts> = [
+        'critical',
+        'high',
+        'medium',
+        'low',
+        'negligible',
+        'unknown',
+      ];
+
+      let severityText = 'no vulnerabilities with known severity';
+      for (const severity of severityOrder) {
+        const count = action.severityCounts[severity];
+        if (count > 0) {
+          severityText = `${count} ${severity.toLowerCase()}`;
+          break;
+        }
+      }
+
+      parts.push(
+        `\n  ${idx + 1}. ${action.action} - Fixes ${action.vulnerabilitiesFixed} (${severityText})`,
+      );
+      parts.push(`     ${action.current}`);
+      parts.push(`     → ${action.recommended}`);
+    });
+  }
+
+  // Fixable vulnerabilities
+  if (result.vulnerabilityDetails && result.vulnerabilityDetails.length > 0) {
+    const fixableVulns = result.vulnerabilityDetails.filter((v) => v.fixedVersion);
+
+    if (fixableVulns.length > 0) {
+      const severityWeight: Record<string, number> = {
+        CRITICAL: 4,
+        HIGH: 3,
+        MEDIUM: 2,
+        LOW: 1,
+        NEGLIGIBLE: 0,
+        UNKNOWN: 0,
+      };
+
+      const sortedFixable = fixableVulns
+        .sort((a, b) => (severityWeight[b.severity] ?? 0) - (severityWeight[a.severity] ?? 0))
+        .slice(0, 10);
+
+      parts.push(
+        `\n**Fixable Vulnerabilities:** (${fixableVulns.length} of ${result.vulnerabilities.total})`,
+      );
+      sortedFixable.forEach((vuln, idx) => {
+        parts.push(
+          `  ${idx + 1}. [${vuln.severity}] ${vuln.package}: ${vuln.version} → ${vuln.fixedVersion}`,
+        );
+        if (vuln.id && vuln.id !== 'UNKNOWN') {
+          parts.push(`     ID: ${vuln.id}`);
+        }
+      });
+
+      if (fixableVulns.length > 10) {
+        parts.push(`  ... and ${fixableVulns.length - 10} more fixable vulnerabilities`);
+      }
     }
   }
 
