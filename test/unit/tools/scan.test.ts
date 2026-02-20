@@ -67,6 +67,8 @@ describe('scanImage', () => {
     config = {
       imageId: 'sha256:mock-image-id',
       scanner: 'trivy',
+      scanType: 'vulnerability',
+      enableAISuggestions: false,
       severity: 'HIGH',
     };
 
@@ -161,6 +163,9 @@ describe('scanImage', () => {
     it('should use default scanner and threshold when not specified', async () => {
       const minimalConfig: ScanImageParams = {
         imageId: 'sha256:mock-image-id',
+        scanType: 'vulnerability',
+        scanner: 'osv',
+        enableAISuggestions: false,
       };
 
       const mockContext = createMockToolContext();
@@ -175,6 +180,8 @@ describe('scanImage', () => {
     it('should return error when no imageId provided', async () => {
       const configWithoutImage: ScanImageParams = {
         scanner: 'trivy',
+        scanType: 'vulnerability',
+        enableAISuggestions: false,
       } as any; // Cast to bypass type checking for test
 
       const mockContext = createMockToolContext();

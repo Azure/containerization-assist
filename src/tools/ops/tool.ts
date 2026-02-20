@@ -11,7 +11,7 @@
  * - Server diagnostics and metadata
  *
  * **NOT for:**
- * - Application containerization (use build-image, etc.)
+ * - Application containerization (use build-image-context, etc.)
  * - Docker operations (use Docker tools)
  * - Kubernetes operations (use K8s tools)
  *
@@ -272,7 +272,8 @@ async function handleOps(
       return Failure(`Unknown operation: ${input.operation}`, {
         message: `Unknown operation: ${input.operation}`,
         hint: 'The requested operation is not supported',
-        resolution: 'Use one of the supported operations: "ping" for connectivity testing or "status" for server information',
+        resolution:
+          'Use one of the supported operations: "ping" for connectivity testing or "status" for server information',
       });
   }
 }

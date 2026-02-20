@@ -1,24 +1,9 @@
 /**
  * Unit Tests: Docker Error Scenarios
- * Tests Docker error handling patterns without being prescriptive about exact error messages
+ * Tests Docker error handling patterns for build-image context preparation
  */
 
 import { jest } from '@jest/globals';
-
-function createSuccessResult<T>(value: T) {
-  return {
-    ok: true as const,
-    value,
-  };
-}
-
-function createFailureResult(error: string, guidance?: { resolution?: string; hints?: string[] }) {
-  return {
-    ok: false as const,
-    error,
-    guidance,
-  };
-}
 
 function createMockLogger() {
   return {
@@ -38,19 +23,6 @@ function createMockToolContext() {
   } as any;
 }
 
-const mockDockerClient = {
-  buildImage: jest.fn(),
-  tagImage: jest.fn(),
-  pushImage: jest.fn(),
-  pullImage: jest.fn(),
-  inspectImage: jest.fn(),
-  ping: jest.fn(),
-};
-
-jest.mock('../../../src/infra/docker/client', () => ({
-  createDockerClient: jest.fn(() => mockDockerClient),
-}));
-
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({
     end: jest.fn(),
@@ -59,52 +31,41 @@ jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
-jest.mock('../../../src/lib/validation', () => ({
-  validatePath: jest.fn().mockImplementation(async (pathStr: string) => {
+jest.mock('../../../src/lib/validation-helpers', () => ({
+  validatePathOrFail: jest.fn().mockImplementation(async (pathStr: string) => {
     return { ok: true, value: pathStr };
   }),
-  validateImageName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
 }));
 
-jest.mock('node:fs', () => ({
-  promises: {
-    access: jest.fn(),
-    readFile: jest.fn(),
-    writeFile: jest.fn(),
-    stat: jest.fn(),
-    constants: { R_OK: 4, W_OK: 2, X_OK: 1, F_OK: 0 },
-  },
-  constants: { R_OK: 4, W_OK: 2, X_OK: 1, F_OK: 0 },
+// Mock file-utils which is what the tool actually uses
+const mockReadDockerfile = jest.fn<() => Promise<{ ok: true; value: string } | { ok: false; error: string }>>();
+
+jest.mock('../../../src/lib/file-utils', () => ({
+  readDockerfile: mockReadDockerfile,
 }));
 
-import { promises as fs } from 'node:fs';
-import { buildImage } from '../../../src/tools/build-image/tool';
+// Mock fs/promises for path resolution
+jest.mock('fs/promises', () => ({
+  access: jest.fn().mockResolvedValue(undefined),
+  stat: jest.fn().mockResolvedValue({ isFile: () => true, isDirectory: () => false }),
+  readFile: jest.fn(),
+}));
 
-const mockFs = fs as jest.Mocked<typeof fs>;
+import { buildImageContext } from '../../../src/tools/build-image-context/tool';
 
-describe('Docker Error Scenarios', () => {
+describe('Build Image Error Scenarios', () => {
   const mockDockerfile = `FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nUSER appuser\nCMD ["node", "index.js"]`;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFs.access.mockResolvedValue(undefined);
-    mockFs.stat.mockResolvedValue({ isFile: () => true, isDirectory: () => false } as any);
-    mockFs.readFile.mockResolvedValue(mockDockerfile);
-    mockFs.writeFile.mockResolvedValue(undefined);
-
-    mockDockerClient.ping.mockResolvedValue(createSuccessResult(undefined));
-    mockDockerClient.inspectImage.mockResolvedValue(
-      createSuccessResult({
-        Id: 'sha256:abc',
-      }),
-    );
+    mockReadDockerfile.mockResolvedValue({ ok: true, value: mockDockerfile });
   });
 
   describe('Error Handling Pattern', () => {
-    it('should return Result<T> on Docker client errors', async () => {
-      mockDockerClient.buildImage.mockRejectedValue(new Error('Docker error'));
+    it('should return Result<T> on filesystem errors', async () => {
+      mockReadDockerfile.mockResolvedValue({ ok: false, error: 'Permission denied' });
 
-      const result = await buildImage(
+      const result = await buildImageContext(
         {
           path: '/test/repo',
           dockerfile: 'Dockerfile',
@@ -124,10 +85,10 @@ describe('Docker Error Scenarios', () => {
     });
 
     it('should never throw exceptions', async () => {
-      mockDockerClient.buildImage.mockRejectedValue(new Error('Unexpected error'));
+      mockReadDockerfile.mockRejectedValue(new Error('Unexpected error'));
 
       await expect(
-        buildImage(
+        buildImageContext(
           {
             path: '/test/repo',
             dockerfile: 'Dockerfile',
@@ -140,20 +101,8 @@ describe('Docker Error Scenarios', () => {
       ).resolves.not.toThrow();
     });
 
-    it('should propagate errors through Result without throwing', async () => {
-      const testError = new Error('Test error');
-      mockDockerClient.buildImage.mockResolvedValue(createFailureResult(testError.message));
-
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
-        createMockToolContext(),
-      );
+    it('should return failure for invalid parameters', async () => {
+      const result = await buildImageContext(null as any, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -162,39 +111,12 @@ describe('Docker Error Scenarios', () => {
     });
   });
 
-  describe('Connection Errors', () => {
-    it('should handle ECONNREFUSED errors', async () => {
-      const err = new Error('ECONNREFUSED');
-      (err as any).code = 'ECONNREFUSED';
-      mockDockerClient.buildImage.mockRejectedValue(err);
-
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-
+  describe('Filesystem Errors', () => {
     it('should handle EACCES errors', async () => {
-      const err = new Error('EACCES');
-      (err as any).code = 'EACCES';
-      mockDockerClient.buildImage.mockRejectedValue(err);
+      mockReadDockerfile.mockResolvedValue({ ok: false, error: 'EACCES: permission denied' });
 
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
+      const result = await buildImageContext(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
         createMockToolContext(),
       );
 
@@ -202,54 +124,21 @@ describe('Docker Error Scenarios', () => {
     });
 
     it('should handle ENOENT errors', async () => {
-      const err = new Error('ENOENT');
-      (err as any).code = 'ENOENT';
-      mockDockerClient.buildImage.mockRejectedValue(err);
+      mockReadDockerfile.mockResolvedValue({ ok: false, error: 'ENOENT: no such file or directory' });
 
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
-        createMockToolContext(),
-      );
-
-      expect(result.ok).toBe(false);
-    });
-  });
-
-  describe('Operation Errors', () => {
-    it('should handle build failures', async () => {
-      mockDockerClient.buildImage.mockResolvedValue(createFailureResult('Build failed'));
-
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
+      const result = await buildImageContext(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
         createMockToolContext(),
       );
 
       expect(result.ok).toBe(false);
     });
 
-    it('should handle different operation failures', async () => {
-      mockDockerClient.buildImage.mockResolvedValue(createFailureResult('Operation failed'));
+    it('should handle EISDIR errors', async () => {
+      mockReadDockerfile.mockResolvedValue({ ok: false, error: 'EISDIR: illegal operation on a directory' });
 
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
+      const result = await buildImageContext(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
         createMockToolContext(),
       );
 
@@ -258,65 +147,66 @@ describe('Docker Error Scenarios', () => {
   });
 
   describe('Guidance Structure', () => {
-    it('should optionally provide guidance on errors', async () => {
-      mockDockerClient.buildImage.mockResolvedValue(
-        createFailureResult('Error', {
-          resolution: 'Fix the issue',
-          hints: ['Hint 1', 'Hint 2'],
-        }),
-      );
+    it('should provide guidance on errors', async () => {
+      mockReadDockerfile.mockResolvedValue({ ok: false, error: 'File not found' });
 
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
+      const result = await buildImageContext(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
         createMockToolContext(),
       );
 
       expect(result.ok).toBe(false);
-      // Guidance is optional, but if present should have correct structure
-      if (!result.ok && result.guidance) {
-        if (result.guidance.resolution) {
-          expect(typeof result.guidance.resolution).toBe('string');
-        }
-        if (result.guidance.hints) {
-          expect(Array.isArray(result.guidance.hints)).toBe(true);
-        }
+      // Note: guidance is optional and may not be provided for all errors
+      if (!result.ok) {
+        expect(result.error).toBeDefined();
       }
     });
   });
 
   describe('Success Cases', () => {
-    it('should succeed when Docker operations work', async () => {
-      mockDockerClient.buildImage.mockResolvedValue(
-        createSuccessResult({
-          imageId: 'sha256:abc',
-          digest: 'sha256:def',
-          tags: ['test:latest'],
-          size: 100000,
-          layers: 5,
-          buildTime: 1000,
-          logs: ['Success'],
-          warnings: [],
-        }),
-      );
-
-      const result = await buildImage(
-        {
-          path: '/test',
-          dockerfile: 'Dockerfile',
-          imageName: 'test:latest',
-          tags: [],
-          buildArgs: {},
-        },
+    it('should succeed when Dockerfile is readable', async () => {
+      const result = await buildImageContext(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: ['v1.0.0'], buildArgs: {} },
         createMockToolContext(),
       );
 
       expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.summary).toBeDefined();
+        expect(result.value.nextAction.buildCommand.command).toBeDefined();
+      }
+    });
+
+    it('should detect security issues in Dockerfile', async () => {
+      // Dockerfile running as root
+      mockReadDockerfile.mockResolvedValue({ 
+        ok: true, 
+        value: 'FROM node:18\nWORKDIR /app\nCOPY . .\nCMD ["node", "index.js"]' 
+      });
+
+      const result = await buildImageContext(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should detect running as root (no USER directive)
+        expect(result.value.securityAnalysis.warnings.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should include BuildKit analysis', async () => {
+      const result = await buildImageContext(
+        { path: '/test', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.buildKitAnalysis).toBeDefined();
+        expect(result.value.buildKitAnalysis.features).toBeDefined();
+      }
     });
   });
 });

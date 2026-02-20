@@ -33,16 +33,16 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
     failure: 'Repository analysis failed. Please check the logs for details.',
   },
 
-  [TOOL_NAME.BUILD_IMAGE]: {
+  [TOOL_NAME.BUILD_IMAGE_CONTEXT]: {
     success:
-      'Image built successfully. Next: Call scan-image to check for security vulnerabilities.',
-    failure: 'Image build failed. Use fix-dockerfile to resolve issues, then retry build-image.',
+      'Build context prepared. Next: Execute the provided build command, then call scan-image to check for security vulnerabilities.',
+    failure:
+      'Build context preparation failed. Use fix-dockerfile to resolve issues, then retry build-image-context.',
   },
-
 
   [TOOL_NAME.FIX_DOCKERFILE]: {
     success:
-      'Dockerfile fixes applied successfully. Next: Call build-image to test the fixed Dockerfile.',
+      'Dockerfile fixes applied successfully. Next: Call build-image-context to test the fixed Dockerfile.',
     failure: 'Dockerfile fix failed. Review validation errors and try manual fixes.',
   },
 
@@ -53,7 +53,8 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
   },
 
   [TOOL_NAME.PREPARE_CLUSTER]: {
-    success: 'Cluster preparation successful. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
+    success:
+      'Cluster preparation successful. Next: Use `kubectl apply -f <manifest-folder>` to deploy your manifests to the cluster, then call verify-deploy to check deployment status.',
     failure:
       'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
   },

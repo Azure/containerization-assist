@@ -48,7 +48,7 @@ jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
-import { buildImage } from '../../../src/tools/build-image/tool';
+import { buildImageContext } from '../../../src/tools/build-image-context/tool';
 
 describe('Validation Error Scenarios', () => {
   beforeEach(() => {
@@ -57,12 +57,17 @@ describe('Validation Error Scenarios', () => {
 
   describe('Path Validation', () => {
     it('should validate path parameter', async () => {
-      mockValidation.validatePath.mockResolvedValue(
-        createFailureResult('Invalid path'),
-      );
+      mockValidation.validatePath.mockResolvedValue(createFailureResult('Invalid path'));
 
-      const result = await buildImage(
-        { path: '', dockerfile: 'Dockerfile', imageName: 'test:latest', tags: [], buildArgs: {} },
+      const result = await buildImageContext(
+        {
+          path: '',
+          dockerfile: 'Dockerfile',
+          imageName: 'test:latest',
+          tags: [],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
         createMockToolContext(),
       );
 
@@ -70,9 +75,7 @@ describe('Validation Error Scenarios', () => {
     });
 
     it('should accept valid paths', async () => {
-      mockValidation.validatePath.mockResolvedValue(
-        createSuccessResult('/valid/path'),
-      );
+      mockValidation.validatePath.mockResolvedValue(createSuccessResult('/valid/path'));
 
       const result = await mockValidation.validatePath('/valid/path');
 
@@ -83,18 +86,14 @@ describe('Validation Error Scenarios', () => {
 
   describe('Image Name Validation', () => {
     it('should validate image name format', () => {
-      mockValidation.validateImageName.mockReturnValue(
-        createFailureResult('Invalid image name'),
-      );
+      mockValidation.validateImageName.mockReturnValue(createFailureResult('Invalid image name'));
 
       const result = mockValidation.validateImageName('Invalid@Name');
       expect(result.ok).toBe(false);
     });
 
     it('should accept valid image names', () => {
-      mockValidation.validateImageName.mockReturnValue(
-        createSuccessResult('valid-image:latest'),
-      );
+      mockValidation.validateImageName.mockReturnValue(createSuccessResult('valid-image:latest'));
 
       const result = mockValidation.validateImageName('valid-image:latest');
       expect(result.ok).toBe(true);
@@ -103,18 +102,14 @@ describe('Validation Error Scenarios', () => {
 
   describe('Namespace Validation', () => {
     it('should validate namespace format', () => {
-      mockValidation.validateNamespace.mockReturnValue(
-        createFailureResult('Invalid namespace'),
-      );
+      mockValidation.validateNamespace.mockReturnValue(createFailureResult('Invalid namespace'));
 
       const result = mockValidation.validateNamespace('Invalid_Namespace');
       expect(result.ok).toBe(false);
     });
 
     it('should accept valid namespaces', () => {
-      mockValidation.validateNamespace.mockReturnValue(
-        createSuccessResult('valid-namespace'),
-      );
+      mockValidation.validateNamespace.mockReturnValue(createSuccessResult('valid-namespace'));
 
       const result = mockValidation.validateNamespace('valid-namespace');
       expect(result.ok).toBe(true);
@@ -123,18 +118,14 @@ describe('Validation Error Scenarios', () => {
 
   describe('K8s Resource Name Validation', () => {
     it('should validate K8s resource names', () => {
-      mockValidation.validateK8sName.mockReturnValue(
-        createFailureResult('Invalid resource name'),
-      );
+      mockValidation.validateK8sName.mockReturnValue(createFailureResult('Invalid resource name'));
 
       const result = mockValidation.validateK8sName('Invalid_Name');
       expect(result.ok).toBe(false);
     });
 
     it('should accept valid K8s names', () => {
-      mockValidation.validateK8sName.mockReturnValue(
-        createSuccessResult('valid-name'),
-      );
+      mockValidation.validateK8sName.mockReturnValue(createSuccessResult('valid-name'));
 
       const result = mockValidation.validateK8sName('valid-name');
       expect(result.ok).toBe(true);
@@ -164,9 +155,7 @@ describe('Validation Error Scenarios', () => {
     });
 
     it('should return Result<T> on validation success', () => {
-      mockValidation.validateImageName.mockReturnValue(
-        createSuccessResult('valid:image'),
-      );
+      mockValidation.validateImageName.mockReturnValue(createSuccessResult('valid:image'));
 
       const result = mockValidation.validateImageName('valid:image');
 

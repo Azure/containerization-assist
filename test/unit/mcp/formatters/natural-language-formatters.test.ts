@@ -11,7 +11,7 @@ import {
 } from '@/mcp/formatters/natural-language-formatters';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { BuildImageResult } from '@/tools/build-image/tool';
+import type { BuildImageResult } from '@/tools/build-image-context/schema';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 
 describe('natural-language-formatters', () => {
@@ -128,6 +128,168 @@ describe('natural-language-formatters', () => {
       expect(narrative).not.toContain('Next Steps:');
       expect(narrative).not.toContain('Review and address critical/high vulnerabilities');
     });
+
+    it('should display fixable vulnerabilities with upgrade paths', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 2,
+          high: 3,
+          medium: 5,
+          low: 10,
+          negligible: 0,
+          unknown: 0,
+          total: 20,
+        },
+        vulnerabilityDetails: [
+          {
+            id: 'CVE-2023-1234',
+            severity: 'CRITICAL',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'Critical vulnerability',
+            fixedVersion: '1.1.1t',
+          },
+          {
+            id: 'CVE-2023-5678',
+            severity: 'HIGH',
+            package: 'libssl',
+            version: '3.0.0',
+            description: 'High severity vulnerability',
+            fixedVersion: '3.0.8',
+          },
+          {
+            id: 'CVE-2023-9999',
+            severity: 'MEDIUM',
+            package: 'curl',
+            version: '7.68.0',
+            description: 'Medium severity vulnerability',
+            fixedVersion: '7.88.0',
+          },
+          {
+            id: 'CVE-2023-8888',
+            severity: 'LOW',
+            package: 'zlib',
+            version: '1.2.11',
+            description: 'Low severity without fix',
+            // No fixedVersion
+          },
+        ],
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).toContain('❌ Security Scan FAILED');
+      expect(narrative).toContain('**Fixable Vulnerabilities:** (3 of 20)');
+      expect(narrative).toContain('[CRITICAL] openssl: 1.1.1 → 1.1.1t');
+      expect(narrative).toContain('ID: CVE-2023-1234');
+      expect(narrative).toContain('[HIGH] libssl: 3.0.0 → 3.0.8');
+      expect(narrative).toContain('[MEDIUM] curl: 7.68.0 → 7.88.0');
+      expect(narrative).not.toContain('zlib');
+    });
+
+    it('should not show fixable vulnerabilities section when none have fixes', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 2,
+          high: 3,
+          medium: 0,
+          low: 0,
+          negligible: 0,
+          unknown: 0,
+          total: 5,
+        },
+        vulnerabilityDetails: [
+          {
+            id: 'CVE-2023-1234',
+            severity: 'CRITICAL',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'Critical vulnerability without fix',
+            // No fixedVersion
+          },
+          {
+            id: 'CVE-2023-5678',
+            severity: 'HIGH',
+            package: 'libssl',
+            version: '3.0.0',
+            description: 'High severity vulnerability without fix',
+            // No fixedVersion
+          },
+        ],
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).toContain('❌ Security Scan FAILED');
+      expect(narrative).not.toContain('**Fixable Vulnerabilities:**');
+    });
+
+    it('should display recommendedActions before detailed vulnerabilities', () => {
+      const result: ScanImageResult = {
+        success: true,
+        scanner: 'osv',
+        vulnerabilities: {
+          critical: 1,
+          high: 1,
+          medium: 0,
+          low: 0,
+          negligible: 0,
+          unknown: 0,
+          total: 2,
+        },
+        recommendedActions: [
+          {
+            type: 'UPGRADE_PACKAGE',
+            action: 'Upgrade openssl',
+            current: 'openssl: 1.1.1',
+            recommended: 'openssl: 1.1.1t',
+            package: 'openssl',
+            vulnerabilitiesFixed: 2,
+            severityCounts: { critical: 1, high: 1, medium: 0, low: 0, negligible: 0, unknown: 0 },
+            vulnerabilityIds: ['CVE-2023-1', 'CVE-2023-2'],
+          },
+        ],
+        vulnerabilityDetails: [
+          {
+            id: 'CVE-2023-1',
+            severity: 'CRITICAL',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'Critical',
+            fixedVersion: '1.1.1t',
+          },
+          {
+            id: 'CVE-2023-2',
+            severity: 'HIGH',
+            package: 'openssl',
+            version: '1.1.1',
+            description: 'High',
+            fixedVersion: '1.1.1t',
+          },
+        ],
+        scanTime: '2025-01-22T10:00:00Z',
+        passed: false,
+      };
+
+      const narrative = formatScanImageNarrative(result);
+
+      expect(narrative).toContain('**Recommended Actions:** (1 action fixes 2 vulnerabilities)');
+      expect(narrative).toContain('1. Upgrade openssl - Fixes 2 (1 critical)');
+      expect(narrative).toContain('openssl: 1.1.1');
+      expect(narrative).toContain('→ openssl: 1.1.1t');
+
+      const actionsIndex = narrative.indexOf('**Recommended Actions:**');
+      const fixableIndex = narrative.indexOf('**Fixable Vulnerabilities:**');
+      expect(actionsIndex).toBeLessThan(fixableIndex);
+    });
   });
 
   describe('formatDockerfilePlanNarrative', () => {
@@ -135,7 +297,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'create-files',
-          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images, security considerations, optimizations, and best practices from recommendations.',
+          instruction:
+            'Create a new Dockerfile at ./Dockerfile using the base images, security considerations, optimizations, and best practices from recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -183,7 +346,8 @@ describe('natural-language-formatters', () => {
           bestPractices: [],
         },
         confidence: 0.9,
-        summary: '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: javascript 18.0.0 (Express)\nStrategy: Multi-stage build\n✅ Ready to create Dockerfile based on recommendations.',
+        summary:
+          '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: javascript 18.0.0 (Express)\nStrategy: Multi-stage build\n✅ Ready to create Dockerfile based on recommendations.',
       };
 
       const narrative = formatDockerfilePlanNarrative(plan);
@@ -205,7 +369,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'update-files',
-          instruction: 'Update the existing Dockerfile at ./Dockerfile by applying the enhancement recommendations.',
+          instruction:
+            'Update the existing Dockerfile at ./Dockerfile by applying the enhancement recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -229,7 +394,8 @@ describe('natural-language-formatters', () => {
           bestPractices: [],
         },
         confidence: 0.85,
-        summary: '🔨 ACTION REQUIRED: Update Dockerfile\nPath: ./Dockerfile\nLanguage: python 3.11\n✅ Ready to update Dockerfile with enhancements.',
+        summary:
+          '🔨 ACTION REQUIRED: Update Dockerfile\nPath: ./Dockerfile\nLanguage: python 3.11\n✅ Ready to update Dockerfile with enhancements.',
         existingDockerfile: {
           path: '/app/Dockerfile',
           content: 'FROM python:3.11\nWORKDIR /app',
@@ -268,7 +434,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'create-files',
-          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
+          instruction:
+            'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -291,7 +458,8 @@ describe('natural-language-formatters', () => {
           bestPractices: [],
         },
         confidence: 0.8,
-        summary: '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: java\n✅ Ready to create Dockerfile based on recommendations.',
+        summary:
+          '🔨 ACTION REQUIRED: Create Dockerfile\nPath: ./Dockerfile\nLanguage: java\n✅ Ready to create Dockerfile based on recommendations.',
         policyValidation: {
           passed: false,
           violations: [
@@ -325,7 +493,8 @@ describe('natural-language-formatters', () => {
       const plan: DockerfilePlan = {
         nextAction: {
           action: 'create-files',
-          instruction: 'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
+          instruction:
+            'Create a new Dockerfile at ./Dockerfile using the base images and recommendations.',
           files: [
             {
               path: './Dockerfile',
@@ -366,72 +535,209 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('✨ CREATE DOCKERFILE');
       expect(narrative).toContain('node:18-alpine');
       expect(narrative).not.toContain('Next Steps:');
-      expect(narrative).not.toContain('Build image with build-image tool');
+      expect(narrative).not.toContain('Build image with build-image-context tool');
     });
   });
-
 
   describe('formatBuildImageNarrative', () => {
     it('should format successful build with all details', () => {
       const result: BuildImageResult = {
-        success: true,
-        imageId: 'sha256:abc123def456',
-        requestedTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
-        createdTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
-        size: 245000000,
-        buildTime: 45000,
-        layers: 12,
-        logs: [],
+        summary: 'Build context ready for myapp with 3 tags',
+        context: {
+          buildContextPath: '/app',
+          dockerfilePath: '/app/Dockerfile',
+          dockerfileRelative: 'Dockerfile',
+          hasDockerignore: true,
+        },
+        securityAnalysis: {
+          warnings: [
+            {
+              id: 'ROOT_USER',
+              severity: 'medium',
+              message: 'Running as root user',
+              line: 15,
+              remediation: 'Add USER directive',
+            },
+          ],
+          riskLevel: 'medium',
+          recommendations: ['Add non-root user'],
+        },
+        buildConfig: {
+          finalTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
+        buildKitAnalysis: {
+          features: {
+            cacheMount: false,
+            secretMount: false,
+            sshMount: false,
+            multiStage: true,
+            stageCount: 2,
+            copyFrom: true,
+            heredoc: false,
+          },
+          recommended: true,
+          recommendations: ['Use BuildKit for multi-stage builds'],
+        },
+        dockerfileAnalysis: {
+          baseImages: ['node:18-alpine'],
+          exposedPorts: [3000],
+          finalUser: undefined,
+          hasHealthcheck: true,
+          layerCount: 12,
+        },
+        nextAction: {
+          action: 'execute-build',
+          preChecks: ['Verify Docker daemon is running'],
+          buildCommand: {
+            command: 'docker build -t myapp:latest -t myapp:1.0.0 -t myapp:production .',
+            parts: {
+              executable: 'docker',
+              subcommand: 'build',
+              flags: ['-t', 'myapp:latest'],
+              context: '.',
+            },
+            environment: { DOCKER_BUILDKIT: '1' },
+          },
+          postBuildSteps: ['Scan for vulnerabilities'],
+        },
       };
 
       const narrative = formatBuildImageNarrative(result);
 
-      expect(narrative).toContain('✅ Image Built Successfully');
-      expect(narrative).toContain('**Image:** sha256:abc123def456');
-      expect(narrative).toContain('**Tags Created:** myapp:latest, myapp:1.0.0, myapp:production');
-      expect(narrative).toContain('**Size:** 234MB'); // 245000000 bytes = 234MB
-      expect(narrative).toContain('**Build Time:** 45s');
-      expect(narrative).toContain('**Layers:** 12');
+      expect(narrative).toContain('📦 Build Context Ready');
+      expect(narrative).toContain('**Tags:** myapp:latest, myapp:1.0.0, myapp:production');
+      expect(narrative).toContain('**Platform:** linux/amd64');
+      expect(narrative).toContain('Estimated Layers: 12');
       expect(narrative).toContain('Next Steps:');
-      expect(narrative).toContain('Scan image for vulnerabilities');
+      expect(narrative).toContain('Scan built image for vulnerabilities');
     });
 
     it('should handle minimal build result', () => {
       const result: BuildImageResult = {
-        success: true,
-        imageId: 'sha256:minimal',
-        requestedTags: [],
-        createdTags: [],
-        size: 100000000,
-        buildTime: 30000,
-        logs: [],
+        summary: 'Minimal build context ready',
+        context: {
+          buildContextPath: '/app',
+          dockerfilePath: '/app/Dockerfile',
+          dockerfileRelative: 'Dockerfile',
+          hasDockerignore: false,
+        },
+        securityAnalysis: {
+          warnings: [],
+          riskLevel: 'low',
+          recommendations: [],
+        },
+        buildConfig: {
+          finalTags: [],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
+        buildKitAnalysis: {
+          features: {
+            cacheMount: false,
+            secretMount: false,
+            sshMount: false,
+            multiStage: false,
+            stageCount: 1,
+            copyFrom: false,
+            heredoc: false,
+          },
+          recommended: false,
+          recommendations: [],
+        },
+        dockerfileAnalysis: {
+          baseImages: ['alpine:latest'],
+          exposedPorts: [],
+          hasHealthcheck: false,
+          layerCount: 3,
+        },
+        nextAction: {
+          action: 'execute-build',
+          preChecks: [],
+          buildCommand: {
+            command: 'docker build .',
+            parts: {
+              executable: 'docker',
+              subcommand: 'build',
+              flags: [],
+              context: '.',
+            },
+            environment: {},
+          },
+          postBuildSteps: [],
+        },
       };
 
       const narrative = formatBuildImageNarrative(result);
 
-      expect(narrative).toContain('✅ Image Built Successfully');
-      expect(narrative).toContain('**Image:** sha256:minimal');
-      expect(narrative).not.toContain('**Tags Created:**');
-      expect(narrative).not.toContain('**Layers:**');
+      expect(narrative).toContain('📦 Build Context Ready');
+      expect(narrative).toContain('**Summary:** Minimal build context ready');
+      expect(narrative).not.toContain('**Tags:**');
+      expect(narrative).toContain('Estimated Layers: 3');
     });
 
     it('should omit next steps when chainHintsMode is disabled', () => {
       const result: BuildImageResult = {
-        success: true,
-        imageId: 'sha256:abc123def456',
-        tags: ['myapp:latest'],
-        size: 245000000,
-        buildTime: 45000,
-        layers: 12,
-        logs: [],
+        summary: 'Build context ready',
+        context: {
+          buildContextPath: '/app',
+          dockerfilePath: '/app/Dockerfile',
+          dockerfileRelative: 'Dockerfile',
+          hasDockerignore: true,
+        },
+        securityAnalysis: {
+          warnings: [],
+          riskLevel: 'low',
+          recommendations: [],
+        },
+        buildConfig: {
+          finalTags: ['myapp:latest'],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
+        buildKitAnalysis: {
+          features: {
+            cacheMount: false,
+            secretMount: false,
+            sshMount: false,
+            multiStage: false,
+            stageCount: 1,
+            copyFrom: false,
+            heredoc: false,
+          },
+          recommended: false,
+          recommendations: [],
+        },
+        dockerfileAnalysis: {
+          baseImages: ['node:18-alpine'],
+          exposedPorts: [3000],
+          hasHealthcheck: false,
+          layerCount: 8,
+        },
+        nextAction: {
+          action: 'execute-build',
+          preChecks: ['Verify Docker daemon'],
+          buildCommand: {
+            command: 'docker build -t myapp:latest .',
+            parts: {
+              executable: 'docker',
+              subcommand: 'build',
+              flags: ['-t', 'myapp:latest'],
+              context: '.',
+            },
+            environment: {},
+          },
+          postBuildSteps: [],
+        },
       };
 
       const narrative = formatBuildImageNarrative(result, 'disabled');
 
-      expect(narrative).toContain('✅ Image Built Successfully');
-      expect(narrative).toContain('**Image:** sha256:abc123def456');
+      expect(narrative).toContain('📦 Build Context Ready');
+      expect(narrative).toContain('**Tags:** myapp:latest');
       expect(narrative).not.toContain('Next Steps:');
-      expect(narrative).not.toContain('Scan image for vulnerabilities');
+      expect(narrative).not.toContain('Scan built image for vulnerabilities');
     });
   });
 

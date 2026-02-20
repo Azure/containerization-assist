@@ -236,18 +236,55 @@ describe('telemetry-utils', () => {
       expect(metrics).not.toHaveProperty('path');
     });
 
-    it('should extract safe metrics from build-image results', () => {
-      const metrics = extractSafeTelemetryMetrics('build-image' as ToolName, {
-        imageId: 'sha256:abc123',
-        size: 245678234,
-        buildTime: 45000,
-        tags: ['myapp:latest'],
+    it('should extract safe metrics from build-image-context results', () => {
+      const metrics = extractSafeTelemetryMetrics('build-image-context' as ToolName, {
+        securityAnalysis: {
+          warnings: [{ id: 'warn1' }, { id: 'warn2' }],
+          riskLevel: 'medium',
+        },
+        buildKitAnalysis: {
+          recommended: true,
+        },
+        dockerfileAnalysis: {
+          layerCount: 12,
+          hasHealthcheck: false,
+        },
+        context: {
+          hasDockerignore: true,
+        },
+        buildConfig: {
+          finalTags: ['myapp:latest'], // Should not be extracted (sensitive)
+        },
       });
 
-      expect(metrics.imageSizeBytes).toBe(245678234);
-      expect(metrics.buildTimeMs).toBe(45000);
-      expect(metrics).not.toHaveProperty('imageId'); // Sensitive
-      expect(metrics).not.toHaveProperty('tags'); // Sensitive
+      expect(metrics.securityWarningCount).toBe(2);
+      expect(metrics.riskLevel).toBe('medium');
+      expect(metrics.buildKitRecommended).toBe(true);
+      expect(metrics.layerCount).toBe(12);
+      expect(metrics.hasHealthcheck).toBe(false);
+      expect(metrics.hasDockerignore).toBe(true);
+      expect(metrics).not.toHaveProperty('finalTags'); // Sensitive
+      expect(metrics).not.toHaveProperty('buildConfig'); // Contains sensitive data
+    });
+
+    it('should ignore legacy build execution fields for build-image-context', () => {
+      const metrics = extractSafeTelemetryMetrics('build-image-context' as ToolName, {
+        buildTime: 1200,
+        size: 1024,
+        imageId: 'sha256:abc',
+        tags: ['myapp:latest'],
+        securityAnalysis: {
+          warnings: [],
+          riskLevel: 'low',
+        },
+      });
+
+      expect(metrics.securityWarningCount).toBe(0);
+      expect(metrics.riskLevel).toBe('low');
+      expect(metrics).not.toHaveProperty('buildTime');
+      expect(metrics).not.toHaveProperty('size');
+      expect(metrics).not.toHaveProperty('imageId');
+      expect(metrics).not.toHaveProperty('tags');
     });
 
     it('should extract safe metrics from scan-image results', () => {
@@ -305,34 +342,45 @@ describe('telemetry-utils', () => {
   describe('createSafeTelemetryEvent', () => {
     it('should create complete safe telemetry event for success', () => {
       const event = createSafeTelemetryEvent(
-        'build-image' as ToolName,
+        'build-image-context' as ToolName,
         { path: '/home/user/app', imageName: 'myapp' },
-        { ok: true, value: { imageId: 'abc', size: 1000, buildTime: 5000, tags: [] } },
+        {
+          ok: true,
+          value: {
+            securityAnalysis: { warnings: [{ id: 'w1' }], riskLevel: 'low' },
+            buildKitAnalysis: { recommended: false },
+            dockerfileAnalysis: { layerCount: 5, hasHealthcheck: true },
+            context: { hasDockerignore: false },
+          },
+        },
         5000,
       );
 
-      expect(event.toolName).toBe('build-image');
+      expect(event.toolName).toBe('build-image-context');
       expect(event.success).toBe(true);
       expect(event.durationMs).toBe(5000);
       // Path has 3 segments, so all should be hashed
       expect(event.sanitizedInput.path).not.toContain('home');
       expect(event.sanitizedInput.path).not.toContain('user');
       expect(event.sanitizedInput.path).not.toContain('app');
-      expect(event.metrics.imageSizeBytes).toBe(1000);
-      expect(event.metrics.buildTimeMs).toBe(5000);
-      expect(event.metrics).not.toHaveProperty('imageId');
+      expect(event.metrics.securityWarningCount).toBe(1);
+      expect(event.metrics.riskLevel).toBe('low');
+      expect(event.metrics.buildKitRecommended).toBe(false);
+      expect(event.metrics.layerCount).toBe(5);
+      expect(event.metrics.hasHealthcheck).toBe(true);
+      expect(event.metrics.hasDockerignore).toBe(false);
       expect(event.errorType).toBeUndefined();
     });
 
     it('should create complete safe telemetry event for error', () => {
       const event = createSafeTelemetryEvent(
-        'build-image' as ToolName,
+        'build-image-context' as ToolName,
         { path: '/home/user/app', imageName: 'myapp' },
         { ok: false, error: 'Build failed: file not found' },
         2000,
       );
 
-      expect(event.toolName).toBe('build-image');
+      expect(event.toolName).toBe('build-image-context');
       expect(event.success).toBe(false);
       expect(event.durationMs).toBe(2000);
       // Path has 3 segments, so all should be hashed
@@ -401,31 +449,51 @@ describe('telemetry-utils', () => {
 
     it('should never expose customer identifiers in metrics', () => {
       const sensitiveResult = {
-        imageId: 'sha256:abc123def456',
-        tags: ['acme-corp/secret-app:v1.2.3', 'acme-corp/secret-app:latest'],
-        namespace: 'acme-production',
-        deploymentName: 'secret-api-v2',
-        size: 123456789,
-        buildTime: 45000,
+        // New schema fields
+        securityAnalysis: {
+          warnings: [{ id: 'warn1' }, { id: 'warn2' }],
+          riskLevel: 'high',
+        },
+        buildKitAnalysis: {
+          recommended: true,
+        },
+        dockerfileAnalysis: {
+          layerCount: 8,
+          hasHealthcheck: false,
+        },
+        context: {
+          hasDockerignore: true,
+          // Sensitive paths that should NOT be extracted
+          buildContextPath: '/home/acme-corp/secret-app',
+          dockerfilePath: '/home/acme-corp/secret-app/Dockerfile',
+        },
+        buildConfig: {
+          // Sensitive data that should NOT be extracted
+          finalTags: ['acme-corp/secret-app:v1.2.3', 'acme-corp/secret-app:latest'],
+        },
       };
 
-      const metrics = extractSafeTelemetryMetrics('build-image' as ToolName, sensitiveResult);
+      const metrics = extractSafeTelemetryMetrics(
+        'build-image-context' as ToolName,
+        sensitiveResult,
+      );
 
       // Verify only safe metrics are included
       const metricsStr = JSON.stringify(metrics);
-      expect(metricsStr).not.toContain('sha256');
       expect(metricsStr).not.toContain('acme-corp');
       expect(metricsStr).not.toContain('secret-app');
-      expect(metricsStr).not.toContain('secret-api');
 
       // Verify safe metrics are present
-      expect(metrics.imageSizeBytes).toBe(123456789);
-      expect(metrics.buildTimeMs).toBe(45000);
+      expect(metrics.securityWarningCount).toBe(2);
+      expect(metrics.riskLevel).toBe('high');
+      expect(metrics.buildKitRecommended).toBe(true);
+      expect(metrics.layerCount).toBe(8);
+      expect(metrics.hasDockerignore).toBe(true);
     });
 
     it('should create telemetry events with no customer data leakage', () => {
       const event = createSafeTelemetryEvent(
-        'build-image' as ToolName,
+        'build-image-context' as ToolName,
         {
           path: '/home/john.doe/acme-corp/payment-service',
           imageName: 'acme-corp/payment-api:v2.1.0',
@@ -433,10 +501,24 @@ describe('telemetry-utils', () => {
         {
           ok: true,
           value: {
-            imageId: 'sha256:payment123',
-            tags: ['acme-corp/payment-api:v2.1.0'],
-            size: 250000000,
-            buildTime: 55000,
+            securityAnalysis: {
+              warnings: [{ id: 'w1' }],
+              riskLevel: 'medium',
+            },
+            buildKitAnalysis: {
+              recommended: true,
+            },
+            dockerfileAnalysis: {
+              layerCount: 10,
+              hasHealthcheck: true,
+            },
+            context: {
+              hasDockerignore: false,
+              buildContextPath: '/home/john.doe/acme-corp/payment-service',
+            },
+            buildConfig: {
+              finalTags: ['acme-corp/payment-api:v2.1.0'],
+            },
           },
         },
       );
@@ -447,11 +529,12 @@ describe('telemetry-utils', () => {
       expect(eventStr).not.toContain('acme-corp');
       // Path has 4 segments, so all should be hashed (including payment-service)
       expect(eventStr).not.toContain('payment-service');
-      expect(eventStr).not.toContain('sha256');
 
       // Verify safe metrics are present
-      expect(event.metrics.imageSizeBytes).toBe(250000000);
-      expect(event.metrics.buildTimeMs).toBe(55000);
+      expect(event.metrics.securityWarningCount).toBe(1);
+      expect(event.metrics.riskLevel).toBe('medium');
+      expect(event.metrics.buildKitRecommended).toBe(true);
+      expect(event.metrics.layerCount).toBe(10);
 
       // Verify imageName is hashed (not exposed in metrics)
       expect(event.sanitizedInput.imageName).not.toContain('acme-corp');

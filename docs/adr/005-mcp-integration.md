@@ -95,7 +95,7 @@ export function createMCPServer<TTool extends Tool>(
 
 2. **Developer Experience**
    - Natural language interface: "Build and scan my Java application"
-   - AI automatically routes to correct tools (analyze-repo → generate-dockerfile → build-image → scan-image)
+   - AI automatically routes to correct tools (analyze-repo → generate-dockerfile → build-image-context → scan-image)
    - Real-time progress updates during long operations
 
 3. **Discoverability**

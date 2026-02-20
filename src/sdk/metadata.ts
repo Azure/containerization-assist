@@ -66,9 +66,7 @@ export interface ExternalDependency {
  * @returns Comma-separated string of dependency names
  */
 export function getRequiredDepsString(deps: readonly ExternalDependency[]): string {
-  return deps
-    .map((dep) => (dep.optional ? `${dep.id} (optional)` : dep.id))
-    .join(', ');
+  return deps.map((dep) => (dep.optional ? `${dep.id} (optional)` : dep.id)).join(', ');
 }
 
 /**
@@ -188,7 +186,7 @@ The plan is returned as structured data, NOT the actual Dockerfile content. The 
       'Generate Dockerfile plan for:\n\n`{{repositoryPath}}`\n\nTarget: {{targetPlatform}}',
     isReadOnly: true,
   },
-  suggestedNextTools: ['build_image'],
+  suggestedNextTools: ['build_image_context'],
   category: 'dockerfile',
   requiresExternalDeps: [] as const,
 };
@@ -215,41 +213,39 @@ Does NOT modify the file - returns recommendations for the LLM to apply.`,
     messageTemplate: 'Analyze Dockerfile at:\n\n`{{dockerfilePath}}`',
     isReadOnly: true,
   },
-  suggestedNextTools: ['build_image', 'scan_image'],
+  suggestedNextTools: ['build_image_context', 'scan_image'],
   category: 'dockerfile',
   requiresExternalDeps: [] as const,
 };
 
 /**
- * Metadata for build-image tool.
+ * Metadata for build-image-context tool.
  */
-export const buildImageMetadata: ToolMetadata = {
-  name: 'build_image',
-  displayName: 'Build Docker Image',
-  toolReferenceName: 'containerization-build',
-  modelDescription: `Builds a Docker image from a Dockerfile. REQUIRES Docker daemon to be running. Use after generating or fixing a Dockerfile. Accepts either:
-- A path to an existing Dockerfile (dockerfilePath)
-- Dockerfile content as a string (dockerfile)
+export const buildImageContextMetadata: ToolMetadata = {
+  name: 'build_image_context',
+  displayName: 'Prepare Docker Build Context',
+  toolReferenceName: 'containerization-build-context',
+  modelDescription: `Prepares Docker build context with security analysis and optimized build commands. Does NOT execute the build - returns structured guidance for the agent to execute.
 
-Returns build results including:
-- Image ID and tags
-- Build duration and image size
-- Build logs (truncated if very long)
-- Success/failure status with error details
+Returns comprehensive build context including:
+- Security analysis with warnings and risk level
+- BuildKit feature detection and recommendations
+- Dockerfile analysis (base images, ports, layers, healthcheck)
+- Pre-generated build command ready to execute
+- Pre-checks and post-build suggestions
 
-On failure, provides actionable error messages. Consider running scan_image after successful builds.`,
-  userDescription: 'Build a Docker image from a Dockerfile',
+The agent should execute the returned buildCommand.command to perform the actual build.`,
+  userDescription: 'Analyze Dockerfile and prepare optimized build commands',
   icon: '$(package)',
   canBeReferencedInPrompt: true,
   confirmation: {
-    title: 'Build Docker Image',
-    messageTemplate: 'Build Docker image:\n\n**Context**: `{{path}}`\n**Image**: `{{imageName}}`',
-    isReadOnly: false,
-    warning: 'This will execute Docker build commands.',
+    title: 'Prepare Build Context',
+    messageTemplate: 'Analyze build context:\n\n**Path**: `{{path}}`\n**Image**: `{{imageName}}`',
+    isReadOnly: true,
   },
   suggestedNextTools: ['scan_image', 'tag_image'],
   category: 'image',
-  requiresExternalDeps: [{ id: ExternalDeps.DOCKER }],
+  requiresExternalDeps: [],
 };
 
 /**
@@ -276,10 +272,7 @@ Requires Trivy to be installed. If Trivy is not available, returns a limited ana
   },
   suggestedNextTools: ['fix_dockerfile', 'tag_image', 'push_image'],
   category: 'image',
-  requiresExternalDeps: [
-    { id: ExternalDeps.DOCKER },
-    { id: ExternalDeps.TRIVY, optional: true },
-  ],
+  requiresExternalDeps: [{ id: ExternalDeps.DOCKER }, { id: ExternalDeps.TRIVY, optional: true }],
 };
 
 /**
@@ -333,10 +326,7 @@ The image name must include the registry (unless pushing to Docker Hub). Example
   },
   suggestedNextTools: ['generate_k8s_manifests'],
   category: 'image',
-  requiresExternalDeps: [
-    { id: ExternalDeps.DOCKER },
-    { id: ExternalDeps.REGISTRY_AUTH },
-  ],
+  requiresExternalDeps: [{ id: ExternalDeps.DOCKER }, { id: ExternalDeps.REGISTRY_AUTH }],
 };
 
 /**
@@ -390,10 +380,7 @@ Use before deploying to ensure the target namespace exists and the cluster is ac
   },
   suggestedNextTools: ['verify_deploy'],
   category: 'kubernetes',
-  requiresExternalDeps: [
-    { id: ExternalDeps.KUBECTL },
-    { id: ExternalDeps.CLUSTER_ACCESS },
-  ],
+  requiresExternalDeps: [{ id: ExternalDeps.KUBECTL }, { id: ExternalDeps.CLUSTER_ACCESS }],
 };
 
 /**
@@ -421,10 +408,7 @@ Includes configurable timeout for waiting on deployment readiness.`,
   },
   suggestedNextTools: [],
   category: 'kubernetes',
-  requiresExternalDeps: [
-    { id: ExternalDeps.KUBECTL },
-    { id: ExternalDeps.CLUSTER_ACCESS },
-  ],
+  requiresExternalDeps: [{ id: ExternalDeps.KUBECTL }, { id: ExternalDeps.CLUSTER_ACCESS }],
 };
 
 /**
@@ -462,7 +446,7 @@ interface ToolMetadataRegistry {
   analyzeRepo: ToolMetadata;
   generateDockerfile: ToolMetadata;
   fixDockerfile: ToolMetadata;
-  buildImage: ToolMetadata;
+  buildImageContext: ToolMetadata;
   scanImage: ToolMetadata;
   tagImage: ToolMetadata;
   pushImage: ToolMetadata;
@@ -497,7 +481,7 @@ export const toolMetadata = {
   analyzeRepo: analyzeRepoMetadata,
   generateDockerfile: generateDockerfileMetadata,
   fixDockerfile: fixDockerfileMetadata,
-  buildImage: buildImageMetadata,
+  buildImageContext: buildImageContextMetadata,
   scanImage: scanImageMetadata,
   tagImage: tagImageMetadata,
   pushImage: pushImageMetadata,
@@ -525,7 +509,7 @@ export type ToolMetadataName = keyof typeof toolMetadata;
 export const standardWorkflow: readonly ToolMetadataName[] = [
   'analyzeRepo',
   'generateDockerfile',
-  'buildImage',
+  'buildImageContext',
   'scanImage',
   'tagImage',
   'pushImage',

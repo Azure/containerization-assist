@@ -47,7 +47,7 @@ describe('VS Code Extension Integration Exports', () => {
         'analyzeRepo',
         'generateDockerfile',
         'fixDockerfile',
-        'buildImage',
+        'buildImageContext',
         'scanImage',
         'tagImage',
         'pushImage',
@@ -74,8 +74,8 @@ describe('VS Code Extension Integration Exports', () => {
       expect(properties).toHaveProperty('repositoryPath');
     });
 
-    it('buildImage schema has required properties', () => {
-      const schema = jsonSchemas.buildImage as Record<string, unknown>;
+    it('buildImageContext schema has required properties', () => {
+      const schema = jsonSchemas.buildImageContext as Record<string, unknown>;
       const properties = schema.properties as Record<string, unknown>;
       expect(properties).toHaveProperty('path');
       expect(properties).toHaveProperty('imageName');
@@ -92,7 +92,7 @@ describe('VS Code Extension Integration Exports', () => {
         'analyzeRepo',
         'generateDockerfile',
         'fixDockerfile',
-        'buildImage',
+        'buildImageContext',
         'scanImage',
         'tagImage',
         'pushImage',
@@ -119,54 +119,55 @@ describe('VS Code Extension Integration Exports', () => {
 
     it('metadata has user-friendly display names', () => {
       expect(toolMetadata.analyzeRepo.displayName).toBe('Analyze Repository');
-      expect(toolMetadata.buildImage.displayName).toBe('Build Docker Image');
+      expect(toolMetadata.buildImageContext.displayName).toBe('Prepare Docker Build Context');
       expect(toolMetadata.scanImage.displayName).toBe('Scan Docker Image');
     });
 
     it('metadata includes confirmation config', () => {
-      const meta = toolMetadata.buildImage;
+      const meta = toolMetadata.buildImageContext;
       expect(meta.confirmation).toBeDefined();
       expect(meta.confirmation.title).toBeDefined();
       expect(meta.confirmation.messageTemplate).toBeDefined();
-      expect(meta.confirmation.isReadOnly).toBe(false);
-      expect(meta.confirmation.warning).toBeDefined();
+      expect(meta.confirmation.isReadOnly).toBe(true);
     });
 
     it('read-only operations are marked correctly', () => {
       expect(toolMetadata.analyzeRepo.confirmation.isReadOnly).toBe(true);
       expect(toolMetadata.scanImage.confirmation.isReadOnly).toBe(true);
-      expect(toolMetadata.buildImage.confirmation.isReadOnly).toBe(false);
+      expect(toolMetadata.buildImageContext.confirmation.isReadOnly).toBe(true);
       expect(toolMetadata.pushImage.confirmation.isReadOnly).toBe(false);
     });
 
     it('metadata includes suggested next tools', () => {
       expect(toolMetadata.analyzeRepo.suggestedNextTools).toContain('generate_dockerfile');
-      expect(toolMetadata.buildImage.suggestedNextTools).toContain('scan_image');
+      expect(toolMetadata.buildImageContext.suggestedNextTools).toContain('scan_image');
     });
 
     it('metadata includes category', () => {
       expect(toolMetadata.analyzeRepo.category).toBe('analysis');
-      expect(toolMetadata.buildImage.category).toBe('image');
+      expect(toolMetadata.buildImageContext.category).toBe('image');
       expect(toolMetadata.generateK8sManifests.category).toBe('kubernetes');
     });
 
     it('metadata includes external dependencies info', () => {
       expect(toolMetadata.analyzeRepo.requiresExternalDeps).toEqual([]);
-      // buildImage requires docker (structured format)
-      expect(toolMetadata.buildImage.requiresExternalDeps).toContainEqual(
-        expect.objectContaining({ id: 'docker' })
+      // buildImageContext doesn't require external deps (context prep only)
+      expect(toolMetadata.buildImageContext.requiresExternalDeps).toEqual([]);
+      // scanImage requires docker
+      expect(toolMetadata.scanImage.requiresExternalDeps).toContainEqual(
+        expect.objectContaining({ id: 'docker' }),
       );
     });
 
     it('standardWorkflow has correct order', () => {
       expect(standardWorkflow[0]).toBe('analyzeRepo');
-      expect(standardWorkflow).toContain('buildImage');
+      expect(standardWorkflow).toContain('buildImageContext');
       expect(standardWorkflow).toContain('generateK8sManifests');
       expect(standardWorkflow.indexOf('analyzeRepo')).toBeLessThan(
-        standardWorkflow.indexOf('generateDockerfile')
+        standardWorkflow.indexOf('generateDockerfile'),
       );
-      expect(standardWorkflow.indexOf('buildImage')).toBeLessThan(
-        standardWorkflow.indexOf('scanImage')
+      expect(standardWorkflow.indexOf('buildImageContext')).toBeLessThan(
+        standardWorkflow.indexOf('scanImage'),
       );
     });
 
@@ -191,7 +192,7 @@ describe('VS Code Extension Integration Exports', () => {
         'analyzeRepo',
         'generateDockerfile',
         'fixDockerfile',
-        'buildImage',
+        'buildImageContext',
         'scanImage',
         'tagImage',
         'pushImage',
@@ -208,7 +209,7 @@ describe('VS Code Extension Integration Exports', () => {
 
     it('formatters are functions', () => {
       expect(typeof resultFormatters.analyzeRepo).toBe('function');
-      expect(typeof resultFormatters.buildImage).toBe('function');
+      expect(typeof resultFormatters.buildImageContext).toBe('function');
       expect(typeof resultFormatters.scanImage).toBe('function');
     });
   });
@@ -332,7 +333,9 @@ describe('VS Code Extension Integration Exports', () => {
       it('returns absolute Windows path unchanged', () => {
         // Only test on Windows - on Unix, Windows paths aren't recognized as absolute
         if (process.platform === 'win32') {
-          expect(resolveWorkspacePath('C:\\absolute\\path', '/workspace')).toBe('C:\\absolute\\path');
+          expect(resolveWorkspacePath('C:\\absolute\\path', '/workspace')).toBe(
+            'C:\\absolute\\path',
+          );
         }
       });
 
@@ -425,7 +428,7 @@ describe('VS Code Extension Integration Exports', () => {
         'analyzeRepo',
         'generateDockerfile',
         'fixDockerfile',
-        'buildImage',
+        'buildImageContext',
         'scanImage',
         'tagImage',
         'pushImage',

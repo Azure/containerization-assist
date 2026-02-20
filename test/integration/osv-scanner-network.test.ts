@@ -225,7 +225,8 @@ CMD ["echo", "Test image for OSV scanning"]
         return;
       }
 
-      // Use the comprehensive vulnerable pom.xml fixture
+      // Simplified pom.xml with single known vulnerable dependency
+      // to reduce Docker build time and API calls while still testing the full flow
       const pomXml = `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
@@ -240,31 +241,10 @@ CMD ["echo", "Test image for OSV scanning"]
       <artifactId>log4j-core</artifactId>
       <version>2.14.1</version>
     </dependency>
-    
-    <!-- Spring Framework 5.2.0 - Has multiple CVEs -->
-    <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-core</artifactId>
-      <version>5.2.0.RELEASE</version>
-    </dependency>
-    
-    <!-- Jackson Databind 2.9.8 - Has known CVEs -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>2.9.8</version>
-    </dependency>
-    
-    <!-- Commons Collections 3.2.1 - Has CVE-2015-6420 -->
-    <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
-      <version>3.2.1</version>
-    </dependency>
   </dependencies>
 </project>`;
 
-      const imageTag = 'osv-test:multiple-vulns';
+      const imageTag = 'osv-test:log4j-vuln';
       await buildTestImage(pomXml, imageTag);
 
       const result = await osvScanner.scanImage(imageTag);
@@ -277,34 +257,19 @@ CMD ["echo", "Test image for OSV scanning"]
 
       const { vulnerabilities, totalVulnerabilities, criticalCount, highCount } = result.value;
 
-      // Should find vulnerabilities across all packages
-      expect(totalVulnerabilities).toBeGreaterThan(3); // At least one per vulnerable package
+      // Should find Log4Shell vulnerability (CVE-2021-44228)
+      expect(totalVulnerabilities).toBeGreaterThanOrEqual(1);
 
-      // Check that we found vulnerabilities for each package
-      const packageNames = new Set(vulnerabilities.map((v) => v.package));
+      // Check that we found log4j-core vulnerability
+      const log4jVuln = vulnerabilities.find((v) => v.package.includes('log4j'));
+      expect(log4jVuln).toBeDefined();
 
-      // Should include at least some of these packages (depending on what OSV returns)
-      const expectedPackages = [
-        'log4j-core',
-        'spring-core',
-        'jackson-databind',
-        'commons-collections',
-      ];
-      const foundExpectedPackages = expectedPackages.filter((pkg) =>
-        Array.from(packageNames).some((p) => p.includes(pkg)),
-      );
-
-      expect(foundExpectedPackages.length).toBeGreaterThan(0);
-
-      // Note: OSV API may return UNKNOWN severity when CVSS vector parsing fails
-      // or when severity data is not available in CVSS format.
-      // We verify that we found vulnerabilities, even if severity extraction is incomplete.
       console.log(
-        `Found ${totalVulnerabilities} total vulnerabilities (${criticalCount} CRITICAL, ${highCount} HIGH, ${vulnerabilities.filter((v) => v.severity === 'UNKNOWN').length} UNKNOWN)`,
+        `Found ${totalVulnerabilities} vulnerabilities (${criticalCount} CRITICAL, ${highCount} HIGH)`,
       );
 
-      // Should have found vulnerabilities (regardless of severity classification)
-      expect(totalVulnerabilities).toBeGreaterThan(3);
-    }, 90000); // Longer timeout for build + multiple API calls
+      // Log4Shell should be detected as critical
+      expect(criticalCount).toBeGreaterThanOrEqual(1);
+    }, 60000); // Reduced timeout - single dependency
   });
 });

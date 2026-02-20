@@ -98,7 +98,7 @@ This decision complements, not replaces, ADR-005 (MCP Protocol Integration):
    - Only pull in what you need
 
 4. **Simpler Mental Model**
-   - SDK: `import { buildImage } from 'pkg/sdk'; await buildImage({...})`
+   - SDK: `import { buildImageContext } from 'pkg/sdk'; await buildImageContext({...})`
    - MCP: Full server with protocol, transport, notifications
    - Clear separation of concerns
 
@@ -220,14 +220,14 @@ See `docs/implementation-plans/sdk-decoupling-from-mcp-detailed.md` for step-by-
 import {
   analyzeRepo,
   generateDockerfile,
-  buildImage,
+  buildImageContext,
   scanImage,
   // ... all 11 tools
 } from 'containerization-assist-mcp/sdk';
 
 // Simple function calls
 const analysis = await analyzeRepo({ repositoryPath: './myapp' });
-const build = await buildImage({ path: './myapp', imageName: 'myapp:v1' });
+const buildCtx = await buildImageContext({ path: './myapp', imageName: 'myapp:v1' });
 
 // With options
 const result = await scanImage(
@@ -240,7 +240,7 @@ const result = await scanImage(
 
 // Advanced: direct tool access
 import { tools, executeTool } from 'containerization-assist-mcp/sdk';
-const result = await executeTool(tools.buildImage, params, options);
+const result = await executeTool(tools.buildImageContext, params, options);
 ```
 
 ## Related Decisions

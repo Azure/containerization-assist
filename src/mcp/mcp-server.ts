@@ -28,7 +28,7 @@ import {
 import type { Result, ErrorGuidance } from '@/types';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { BuildImageResult } from '@/tools/build-image/tool';
+import type { BuildImageResult } from '@/tools/build-image-context/schema';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
 import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
@@ -501,7 +501,7 @@ export function formatOutput(
  * - scan-image: Security scan results with severity breakdown
  * - generate-dockerfile: Planning with base images and recommendations
  * - deploy: Deployment status with endpoints and conditions
- * - build-image: Build results with metrics
+ * - build-image-context: Build results with metrics
  * - analyze-repo: Repository analysis with module detection
  *
  * Falls back to summary field or JSON for other tool types.
@@ -593,7 +593,7 @@ function isDockerfilePlan(output: object): output is DockerfilePlan {
 }
 
 function isBuildImageResult(output: object): output is BuildImageResult {
-  return 'imageId' in output && 'buildTime' in output;
+  return 'buildConfig' in output && 'nextAction' in output && 'dockerfileAnalysis' in output;
 }
 
 function isAnalyzeRepoResult(output: object): output is RepositoryAnalysis {

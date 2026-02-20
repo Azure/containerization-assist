@@ -17,6 +17,11 @@
  * - Docker installed and running
  * - Trivy installed (brew install trivy / apt install trivy)
  *
+ * Reliability Features:
+ * - Automatic retry with exponential backoff for transient Docker Hub failures
+ * - Handles HTTP 500 errors from Docker registries
+ * - Up to 3 attempts per image pull
+ *
  * Usage:
  *   npm run build
  *   tsx scripts/integration-test-scan-image.ts
@@ -163,30 +168,52 @@ function verifyToolInstalled(toolName: string, versionCommand: string): boolean 
 
 /**
  * Pull a Docker image and optionally tag it locally
+ * Implements retry logic for transient Docker Hub failures (HTTP 500 errors)
  */
-function pullImage(remoteImage: string, localTag: string): boolean {
+function pullImage(remoteImage: string, localTag: string, maxRetries = 3): boolean {
   console.log(`   Pulling ${remoteImage}...`);
-  try {
-    const startTime = Date.now();
-    execSync(`docker pull ${remoteImage}`, {
-      stdio: 'pipe',
-      cwd: process.cwd(),
-    });
-    // Tag with local name for consistent test references
-    execSync(`docker tag ${remoteImage} ${localTag}`, {
-      stdio: 'pipe',
-      cwd: process.cwd(),
-    });
-    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`   ✅ Pulled and tagged as ${localTag} (${duration}s)`);
-    return true;
-  } catch (error) {
-    console.log(`   ❌ Failed to pull ${remoteImage}`);
-    if (error instanceof Error) {
-      console.log(`      Error: ${error.message}`);
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const startTime = Date.now();
+      execSync(`docker pull ${remoteImage}`, {
+        stdio: 'pipe',
+        cwd: process.cwd(),
+      });
+      // Tag with local name for consistent test references
+      execSync(`docker tag ${remoteImage} ${localTag}`, {
+        stdio: 'pipe',
+        cwd: process.cwd(),
+      });
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`   ✅ Pulled and tagged as ${localTag} (${duration}s)`);
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const stderrMessage =
+        error && typeof error === 'object' && 'stderr' in error
+          ? String((error as { stderr?: unknown }).stderr ?? '')
+          : '';
+      const combinedError = `${errorMessage}\n${stderrMessage}`;
+      const isRetryable =
+        combinedError.includes('500') || combinedError.includes('Internal Server Error');
+
+      if (attempt < maxRetries && isRetryable) {
+        console.log(`   ⚠️  Attempt ${attempt}/${maxRetries} failed (transient error), retrying...`);
+        // Exponential backoff: 2s, 4s, 8s
+        const backoffMs = Math.pow(2, attempt) * 1000;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, backoffMs);
+      } else {
+        console.log(`   ❌ Failed to pull ${remoteImage}${attempt > 1 ? ` after ${attempt} attempts` : ''}`);
+        if (error instanceof Error) {
+          console.log(`      Error: ${error.message}`);
+        }
+        return false;
+      }
     }
-    return false;
   }
+
+  return false;
 }
 
 /**

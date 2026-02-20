@@ -10,7 +10,7 @@ import {
   analyzeRepo,
   generateDockerfile,
   fixDockerfile,
-  buildImage,
+  buildImageContext,
   scanImage,
   tagImage,
   pushImage,
@@ -39,8 +39,8 @@ describe('SDK Exports', () => {
       expect(typeof fixDockerfile).toBe('function');
     });
 
-    test('exports buildImage function', () => {
-      expect(typeof buildImage).toBe('function');
+    test('exports buildImageContext function', () => {
+      expect(typeof buildImageContext).toBe('function');
     });
 
     test('exports scanImage function', () => {
@@ -92,9 +92,9 @@ describe('SDK Exports', () => {
       expect(tools.fixDockerfile.name).toBe('fix-dockerfile');
     });
 
-    test('exports tools.buildImage', () => {
-      expect(tools.buildImage).toBeDefined();
-      expect(tools.buildImage.name).toBe('build-image');
+    test('exports tools.buildImageContext', () => {
+      expect(tools.buildImageContext).toBeDefined();
+      expect(tools.buildImageContext.name).toBe('build-image-context');
     });
 
     test('exports tools.scanImage', () => {

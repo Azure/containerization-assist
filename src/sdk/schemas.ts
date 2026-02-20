@@ -22,7 +22,7 @@ export { convertZodToJsonSchema } from './json-schema-converter.js';
 import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 import { generateDockerfileSchema } from '@/tools/generate-dockerfile/schema';
 import { fixDockerfileSchema } from '@/tools/fix-dockerfile/schema';
-import { buildImageSchema } from '@/tools/build-image/schema';
+import { buildImageSchema } from '@/tools/build-image-context/schema';
 import { scanImageSchema } from '@/tools/scan-image/schema';
 import { tagImageSchema } from '@/tools/tag-image/schema';
 import { pushImageSchema } from '@/tools/push-image/schema';
@@ -49,9 +49,9 @@ export const generateDockerfileJsonSchema = convertZodToJsonSchema(generateDocke
 export const fixDockerfileJsonSchema = convertZodToJsonSchema(fixDockerfileSchema);
 
 /**
- * JSON Schema for build-image tool input.
+ * JSON Schema for build-image-context tool input.
  */
-export const buildImageJsonSchema = convertZodToJsonSchema(buildImageSchema);
+export const buildImageContextJsonSchema = convertZodToJsonSchema(buildImageSchema);
 
 /**
  * JSON Schema for scan-image tool input.
@@ -111,7 +111,7 @@ export const jsonSchemas = {
   analyzeRepo: analyzeRepoJsonSchema,
   generateDockerfile: generateDockerfileJsonSchema,
   fixDockerfile: fixDockerfileJsonSchema,
-  buildImage: buildImageJsonSchema,
+  buildImageContext: buildImageContextJsonSchema,
   scanImage: scanImageJsonSchema,
   tagImage: tagImageJsonSchema,
   pushImage: pushImageJsonSchema,

@@ -1,11 +1,11 @@
 # Containerization Assist MCP Server
 
 [![Test Pipeline](https://github.com/Azure/containerization-assist/actions/workflows/test-pipeline.yml/badge.svg?branch=main)](https://github.com/Azure/containerization-assist/actions/workflows/test-pipeline.yml)
-[![Version](https://img.shields.io/badge/version-1.1.0-orange.svg)](https://github.com/Azure/containerization-assist/releases)
-[![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.25-blueviolet.svg)](https://github.com/modelcontextprotocol/typescript-sdk)
-[![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/github/package-json/v/Azure/containerization-assist?color=orange)](https://github.com/Azure/containerization-assist/releases)
+[![MCP SDK](https://img.shields.io/github/package-json/dependency-version/Azure/containerization-assist/@modelcontextprotocol/sdk?color=blueviolet&label=MCP%20SDK)](https://github.com/modelcontextprotocol/typescript-sdk)
+[![Node](https://img.shields.io/github/package-json/engines-node/Azure/containerization-assist?color=brightgreen&label=node)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/github/package-json/dependency-version/Azure/containerization-assist/dev/typescript?color=blue&label=TypeScript)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/github/license/Azure/containerization-assist?color=green)](LICENSE)
 
 An AI-powered containerization assistant that helps you build, scan, and deploy Docker containers through VS Code and other MCP-compatible tools.
 
@@ -77,7 +77,8 @@ Restart VS Code to enable the MCP server in GitHub Copilot.
 For direct tool usage without MCP protocol (e.g., VS Code extensions, programmatic access):
 
 ```typescript
-import { analyzeRepo, buildImage, scanImage } from 'containerization-assist-mcp/sdk';
+import { analyzeRepo, buildImageContext, scanImage } from 'containerization-assist-mcp/sdk';
+import { execSync } from 'child_process';
 
 // Simple function calls - no MCP server needed
 const analysis = await analyzeRepo({ repositoryPath: './myapp' });
@@ -85,7 +86,19 @@ if (analysis.ok) {
   console.log('Detected:', analysis.value.modules);
 }
 
-const build = await buildImage({ path: './myapp', imageName: 'myapp:v1' });
+// buildImageContext returns build context with security analysis and commands
+const buildContext = await buildImageContext({ path: './myapp', imageName: 'myapp:v1', platform: 'linux/amd64' });
+if (buildContext.ok) {
+  const { securityAnalysis, nextAction } = buildContext.value;
+  console.log('Security risk:', securityAnalysis.riskLevel);
+  
+  // Execute the generated build command from the build context directory
+  execSync(nextAction.buildCommand.command, {
+    cwd: buildContext.value.context.buildContextPath,
+    env: { ...process.env, ...nextAction.buildCommand.environment }
+  });
+}
+
 const scan = await scanImage({ imageId: 'myapp:v1' });
 ```
 
@@ -212,7 +225,7 @@ The server provides 13 MCP tools organized by functionality:
 ### Image Operations
 | Tool | Description |
 |------|-------------|
-| `build-image` | Build Docker images from Dockerfiles with security analysis |
+| `build-image-context` | Prepare Docker build context with security analysis and return build commands |
 | `scan-image` | Scan Docker images for security vulnerabilities with remediation guidance (uses Trivy CLI) |
 | `tag-image` | Tag Docker images with version and registry information |
 | `push-image` | Push Docker images to a registry |

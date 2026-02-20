@@ -22,7 +22,7 @@ The SDK provides everything needed to create VS Code Language Model Tools:
 
 | Export | Purpose |
 |--------|---------|
-| `analyzeRepo()`, `buildImage()`, etc. | Core tool functions |
+| `analyzeRepo()`, `buildImageContext()`, etc. | Core tool functions |
 | `jsonSchemas` | JSON Schemas for package.json `inputSchema` |
 | `toolMetadata` | Descriptions, icons, confirmations for tool config |
 | `resultFormatters` | Convert results to LLM-friendly text |
@@ -196,7 +196,7 @@ Register all tools in your extension's `activate` function:
 // src/extension.ts
 import * as vscode from 'vscode';
 import { AnalyzeRepoTool } from './tools/analyze-repo';
-import { BuildImageTool } from './tools/build-image';
+import { BuildImageContextTool } from './tools/build-image-context';
 import { GenerateDockerfileTool } from './tools/generate-dockerfile';
 import { FixDockerfileTool } from './tools/fix-dockerfile';
 import { ScanImageTool } from './tools/scan-image';
@@ -211,7 +211,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Register all containerization tools
   const tools = [
     ['analyze_repo', new AnalyzeRepoTool()],
-    ['build_image', new BuildImageTool()],
+    ['build_image_context', new BuildImageContextTool()],
     ['generate_dockerfile', new GenerateDockerfileTool()],
     ['fix_dockerfile', new FixDockerfileTool()],
     ['scan_image', new ScanImageTool()],
@@ -242,20 +242,20 @@ export function deactivate() {}
 ```typescript
 import * as vscode from 'vscode';
 import {
-  buildImage,
+  buildImageContext,
   toolMetadata,
   resultFormatters,
   createAbortSignalFromToken,
   formatErrorForLLM,
   resolveWorkspacePath,
-  type BuildImageInput,
+  type BuildImageContextInput,
 } from 'containerization-assist-mcp/sdk';
 
-export class BuildImageTool
-  implements vscode.LanguageModelTool<BuildImageInput>
+export class BuildImageContextTool
+  implements vscode.LanguageModelTool<BuildImageContextInput>
 {
   async invoke(
-    options: vscode.LanguageModelToolInvocationOptions<BuildImageInput>,
+    options: vscode.LanguageModelToolInvocationOptions<BuildImageContextInput>,
     token: vscode.CancellationToken
   ): Promise<vscode.LanguageModelToolResult> {
     const { signal, dispose } = createAbortSignalFromToken(token);
@@ -269,12 +269,12 @@ export class BuildImageTool
         input.path = resolveWorkspacePath(input.path, workspaceRoot);
       }
 
-      // Show progress (VS Code doesn't have built-in progress for tools)
-      const result = await buildImage(input, {
+      // Get build context (returns command to execute, doesn't build directly)
+      const result = await buildImageContext(input, {
         signal,
         onProgress: (message, progress, total) => {
           // Could show in output channel if needed
-          console.log(`Build: ${message} (${progress}/${total})`);
+          console.log(`Build context: ${message} (${progress}/${total})`);
         },
       });
 
@@ -284,7 +284,7 @@ export class BuildImageTool
 
       return new vscode.LanguageModelToolResult([
         new vscode.LanguageModelTextPart(
-          resultFormatters.buildImage(result.value)
+          resultFormatters.buildImageContext(result.value)
         ),
       ]);
     } finally {
@@ -293,10 +293,10 @@ export class BuildImageTool
   }
 
   async prepareInvocation(
-    options: vscode.LanguageModelToolInvocationPrepareOptions<BuildImageInput>,
+    options: vscode.LanguageModelToolInvocationPrepareOptions<BuildImageContextInput>,
     _token: vscode.CancellationToken
   ): Promise<vscode.PreparedToolInvocation> {
-    const meta = toolMetadata.buildImage;
+    const meta = toolMetadata.buildImageContext;
     const { path, imageName } = options.input;
 
     return {
@@ -469,7 +469,7 @@ describe('AnalyzeRepoTool', () => {
 | `analyzeRepo(input, options?)` | Analyze repository structure |
 | `generateDockerfile(input, options?)` | Generate Dockerfile plan |
 | `fixDockerfile(input, options?)` | Fix existing Dockerfile |
-| `buildImage(input, options?)` | Build Docker image |
+| `buildImageContext(input, options?)` | Get build context/command |
 | `scanImage(input, options?)` | Scan for vulnerabilities |
 | `tagImage(input, options?)` | Tag Docker image |
 | `pushImage(input, options?)` | Push to registry |
@@ -485,7 +485,7 @@ import { jsonSchemas } from 'containerization-assist-mcp/sdk';
 
 // Access individual schemas
 jsonSchemas.analyzeRepo      // JSON Schema for analyze-repo input
-jsonSchemas.buildImage       // JSON Schema for build-image input
+jsonSchemas.buildImageContext       // JSON Schema for build-image-context input
 // ... etc
 ```
 
@@ -556,7 +556,7 @@ import { standardWorkflow, toolMetadata } from 'containerization-assist-mcp/sdk'
 // standardWorkflow = [
 //   'analyzeRepo',
 //   'generateDockerfile',
-//   'buildImage',
+//   'buildImageContext',
 //   'scanImage',
 //   'tagImage',
 //   'pushImage',
@@ -567,7 +567,7 @@ import { standardWorkflow, toolMetadata } from 'containerization-assist-mcp/sdk'
 
 // Each tool's suggestedNextTools points to the next step
 toolMetadata.analyzeRepo.suggestedNextTools // ['generate_dockerfile']
-toolMetadata.buildImage.suggestedNextTools  // ['scan_image', 'tag_image']
+toolMetadata.buildImageContext.suggestedNextTools  // ['scan_image', 'tag_image']
 ```
 
 ---
@@ -609,7 +609,7 @@ Ensure proper cleanup when operations are cancelled:
 const { signal, dispose } = createAbortSignalFromToken(token);
 
 try {
-  const result = await buildImage(input, { signal });
+  const result = await buildImageContext(input, { signal });
   // ...
 } catch (error) {
   if (signal.aborted) {

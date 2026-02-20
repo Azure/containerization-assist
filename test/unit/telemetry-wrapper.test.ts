@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, jest } from '@jest/globals';
-import { buildImageTool, analyzeRepoTool } from '../../src/tools/index';
+import { buildImageContextTool, analyzeRepoTool } from '../../src/tools/index';
 import type { ToolContext } from '../../src/mcp/context';
 
 // Mock tool context for testing
@@ -27,24 +27,24 @@ describe('Telemetry Wrapper Pattern', () => {
   describe('Tool Interface Properties', () => {
     it('should expose all required properties for telemetry wrapping', () => {
       // Verify build-image tool has all required properties
-      expect(buildImageTool).toHaveProperty('name');
-      expect(buildImageTool).toHaveProperty('description');
-      expect(buildImageTool).toHaveProperty('inputSchema');
-      expect(buildImageTool).toHaveProperty('parse');
-      expect(buildImageTool).toHaveProperty('handler');
-      expect(buildImageTool).toHaveProperty('schema');
-      expect(buildImageTool).toHaveProperty('metadata');
+      expect(buildImageContextTool).toHaveProperty('name');
+      expect(buildImageContextTool).toHaveProperty('description');
+      expect(buildImageContextTool).toHaveProperty('inputSchema');
+      expect(buildImageContextTool).toHaveProperty('parse');
+      expect(buildImageContextTool).toHaveProperty('handler');
+      expect(buildImageContextTool).toHaveProperty('schema');
+      expect(buildImageContextTool).toHaveProperty('metadata');
 
       // Verify property types
-      expect(typeof buildImageTool.name).toBe('string');
-      expect(typeof buildImageTool.description).toBe('string');
-      expect(typeof buildImageTool.inputSchema).toBe('object');
-      expect(typeof buildImageTool.parse).toBe('function');
-      expect(typeof buildImageTool.handler).toBe('function');
+      expect(typeof buildImageContextTool.name).toBe('string');
+      expect(typeof buildImageContextTool.description).toBe('string');
+      expect(typeof buildImageContextTool.inputSchema).toBe('object');
+      expect(typeof buildImageContextTool.parse).toBe('function');
+      expect(typeof buildImageContextTool.handler).toBe('function');
     });
 
     it('should expose properties for all tools', () => {
-      const tools = [buildImageTool, analyzeRepoTool];
+      const tools = [buildImageContextTool, analyzeRepoTool];
 
       for (const tool of tools) {
         expect(tool).toHaveProperty('name');
@@ -63,18 +63,18 @@ describe('Telemetry Wrapper Pattern', () => {
 
   describe('inputSchema Property', () => {
     it('should expose ZodRawShape for MCP SDK registration', () => {
-      expect(buildImageTool.inputSchema).toBeDefined();
-      expect(typeof buildImageTool.inputSchema).toBe('object');
+      expect(buildImageContextTool.inputSchema).toBeDefined();
+      expect(typeof buildImageContextTool.inputSchema).toBe('object');
 
       // inputSchema should have the shape properties
-      expect(buildImageTool.inputSchema).toHaveProperty('path');
+      expect(buildImageContextTool.inputSchema).toHaveProperty('path');
     });
 
     it('should be directly usable with MCP server.tool()', () => {
       // This simulates how App Mod team will use it
-      const { name, description, inputSchema } = buildImageTool;
+      const { name, description, inputSchema } = buildImageContextTool;
 
-      expect(name).toBe('build-image');
+      expect(name).toBe('build-image-context');
       expect(typeof description).toBe('string');
       expect(typeof inputSchema).toBe('object');
       expect(inputSchema).toHaveProperty('path');
@@ -89,7 +89,7 @@ describe('Telemetry Wrapper Pattern', () => {
         buildArgs: { NODE_ENV: 'production' },
       };
 
-      const typedInput = buildImageTool.parse(validParams);
+      const typedInput = buildImageContextTool.parse(validParams);
 
       expect(typedInput).toMatchObject({
         path: '/app',
@@ -105,7 +105,7 @@ describe('Telemetry Wrapper Pattern', () => {
       };
 
       expect(() => {
-        buildImageTool.parse(invalidParams);
+        buildImageContextTool.parse(invalidParams);
       }).toThrow(); // Zod will throw ZodError
     });
 
@@ -116,20 +116,19 @@ describe('Telemetry Wrapper Pattern', () => {
 
       // Should not throw - parse should handle optional params
       expect(() => {
-        buildImageTool.parse(minimalParams);
+        buildImageContextTool.parse(minimalParams);
       }).not.toThrow();
     });
 
     it('should throw on invalid input types', () => {
       expect(() => {
-        buildImageTool.parse({ path: 123 }); // path should be string
+        buildImageContextTool.parse({ path: 123 }); // path should be string
       }).toThrow();
 
       expect(() => {
-        buildImageTool.parse({ imageName: ['not', 'a', 'string'] }); // imageName should be string
+        buildImageContextTool.parse({ imageName: ['not', 'a', 'string'] }); // imageName should be string
       }).toThrow();
     });
-
   });
 
   describe('handler Method', () => {
@@ -144,11 +143,11 @@ describe('Telemetry Wrapper Pattern', () => {
         imageName: 'test:v1',
       };
 
-      const typedInput = buildImageTool.parse(validParams);
+      const typedInput = buildImageContextTool.parse(validParams);
 
       // Handler should accept the typed input
       // We expect it to fail due to missing Dockerfile, but that's ok
-      const result = await buildImageTool.handler(typedInput, mockContext);
+      const result = await buildImageContextTool.handler(typedInput, mockContext);
 
       expect(result).toBeDefined();
       expect(result).toHaveProperty('ok');
@@ -166,21 +165,21 @@ describe('Telemetry Wrapper Pattern', () => {
 
         try {
           // Step 1: Parse to strongly-typed input (uses Zod validation)
-          const typedInput = buildImageTool.parse(args);
+          const typedInput = buildImageContextTool.parse(args);
 
           // Step 2: Record telemetry with typed input properties
           telemetryData.push({
-            toolName: buildImageTool.name,
+            toolName: buildImageContextTool.name,
             parameters: typedInput,
             timestamp: startTime,
           });
 
           // Step 3: Execute tool handler with typed input
-          const result = await buildImageTool.handler(typedInput, mockContext);
+          const result = await buildImageContextTool.handler(typedInput, mockContext);
 
           // Step 4: Record result metrics
           telemetryData.push({
-            toolName: buildImageTool.name,
+            toolName: buildImageContextTool.name,
             success: result.ok,
             duration: Date.now() - startTime,
           });
@@ -188,7 +187,7 @@ describe('Telemetry Wrapper Pattern', () => {
           return result;
         } catch (error) {
           telemetryData.push({
-            toolName: buildImageTool.name,
+            toolName: buildImageContextTool.name,
             error: true,
             duration: Date.now() - startTime,
           });
@@ -206,7 +205,7 @@ describe('Telemetry Wrapper Pattern', () => {
 
       // Verify telemetry was recorded
       expect(telemetryData.length).toBeGreaterThanOrEqual(2);
-      expect(telemetryData[0]).toHaveProperty('toolName', 'build-image');
+      expect(telemetryData[0]).toHaveProperty('toolName', 'build-image-context');
       expect(telemetryData[0]).toHaveProperty('parameters');
       expect(telemetryData[1]).toHaveProperty('success');
       expect(telemetryData[1]).toHaveProperty('duration');
@@ -221,7 +220,7 @@ describe('Telemetry Wrapper Pattern', () => {
       };
 
       // Parse returns typed input
-      const typedInput = buildImageTool.parse(params);
+      const typedInput = buildImageContextTool.parse(params);
 
       // TypeScript should infer the correct type for typedInput
       expect(typedInput).toHaveProperty('path');
@@ -242,7 +241,7 @@ describe('Telemetry Wrapper Pattern', () => {
         platform: 'linux/amd64',
       };
 
-      const typedInput = buildImageTool.parse(params);
+      const typedInput = buildImageContextTool.parse(params);
 
       // Extract telemetry properties (what App Mod team will do)
       const telemetryProps = {
@@ -268,11 +267,11 @@ describe('Telemetry Wrapper Pattern', () => {
 
       const trackErrors = async (args: any) => {
         try {
-          const typedInput = buildImageTool.parse(args);
-          return await buildImageTool.handler(typedInput, mockContext);
+          const typedInput = buildImageContextTool.parse(args);
+          return await buildImageContextTool.handler(typedInput, mockContext);
         } catch (error) {
           errorLog.push({
-            tool: buildImageTool.name,
+            tool: buildImageContextTool.name,
             error: error instanceof Error ? error.message : String(error),
             args,
           });
@@ -288,27 +287,27 @@ describe('Telemetry Wrapper Pattern', () => {
       }
 
       expect(errorLog.length).toBeGreaterThan(0);
-      expect(errorLog[0]).toHaveProperty('tool', 'build-image');
+      expect(errorLog[0]).toHaveProperty('tool', 'build-image-context');
       expect(errorLog[0]).toHaveProperty('error');
     });
   });
 
   describe('Metadata Property', () => {
     it('should expose metadata for all tools', () => {
-      expect(buildImageTool.metadata).toBeDefined();
-      expect(buildImageTool.metadata).toHaveProperty('knowledgeEnhanced');
-      expect(typeof buildImageTool.metadata.knowledgeEnhanced).toBe('boolean');
+      expect(buildImageContextTool.metadata).toBeDefined();
+      expect(buildImageContextTool.metadata).toHaveProperty('knowledgeEnhanced');
+      expect(typeof buildImageContextTool.metadata.knowledgeEnhanced).toBe('boolean');
     });
 
     it('should allow telemetry to track tool capabilities', () => {
       // Telemetry can use metadata to categorize tools
       const toolCapabilities = {
-        name: buildImageTool.name,
-        knowledgeEnhanced: buildImageTool.metadata.knowledgeEnhanced,
+        name: buildImageContextTool.name,
+        knowledgeEnhanced: buildImageContextTool.metadata.knowledgeEnhanced,
       };
 
       expect(toolCapabilities).toMatchObject({
-        name: 'build-image',
+        name: 'build-image-context',
         knowledgeEnhanced: false,
       });
     });
