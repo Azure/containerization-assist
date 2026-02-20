@@ -10,7 +10,6 @@ describe('Docker Client', () => {
 
       expect(content).toContain('createDockerClient');
       expect(content).toContain('DockerClient');
-      expect(content).toContain('buildImage');
       expect(content).toContain('getImage');
       expect(content).toContain('tagImage');
       expect(content).toContain('pushImage');
@@ -20,10 +19,9 @@ describe('Docker Client', () => {
       const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
       const content = readFileSync(clientPath, 'utf-8');
 
-      expect(content).toContain('DockerBuildOptions');
-      expect(content).toContain('DockerBuildResult');
       expect(content).toContain('DockerPushResult');
       expect(content).toContain('DockerImageInfo');
+      expect(content).toContain('DockerContainerInfo');
     });
 
     it('should use Result pattern for error handling', () => {
@@ -45,14 +43,14 @@ describe('Docker Client', () => {
   });
 
   describe('Client Configuration', () => {
-    it('should support build configuration options', () => {
+    it('should support socket configuration options', () => {
       const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
       const content = readFileSync(clientPath, 'utf-8');
 
-      expect(content).toContain('dockerfile');
-      expect(content).toContain('buildargs');
-      expect(content).toContain('context');
-      expect(content).toContain('platform');
+      expect(content).toContain('socketPath');
+      expect(content).toContain('host');
+      expect(content).toContain('port');
+      expect(content).toContain('timeout');
     });
 
     it('should support logging integration', () => {
@@ -116,19 +114,7 @@ describe('Docker Client', () => {
       });
     });
 
-    describe('Progress Error Handling', () => {
-      it('should contain enhanced progress error handling for buildImage', () => {
-        const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
-        const content = readFileSync(clientPath, 'utf-8');
-
-        // Verify enhanced followProgress callback is implemented
-        expect(content).toContain('Docker build followProgress error');
-        expect(content).toContain('errorDetails: guidance.details');
-        expect(content).toContain('hint: guidance.hint');
-        expect(content).toContain('resolution: guidance.resolution');
-        expect(content).toContain('Docker build error event received');
-      });
-
+    describe('Push Error Handling', () => {
       it('should contain enhanced progress error handling for pushImage', () => {
         const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
         const content = readFileSync(clientPath, 'utf-8');
@@ -136,6 +122,42 @@ describe('Docker Client', () => {
         // Verify enhanced followProgress callback is implemented
         expect(content).toContain('Docker push followProgress error');
         expect(content).toContain('Docker push error event (may be intermediate)');
+      });
+    });
+
+    describe('Image Operations', () => {
+      it('should have getImage operation', () => {
+        const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+        const content = readFileSync(clientPath, 'utf-8');
+
+        expect(content).toContain('async getImage');
+        expect(content).toContain('Docker get image failed');
+      });
+
+      it('should have tagImage operation', () => {
+        const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+        const content = readFileSync(clientPath, 'utf-8');
+
+        expect(content).toContain('async tagImage');
+        expect(content).toContain('Image tagged successfully');
+        expect(content).toContain('Docker tag image failed');
+      });
+
+      it('should have removeImage operation', () => {
+        const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+        const content = readFileSync(clientPath, 'utf-8');
+
+        expect(content).toContain('async removeImage');
+        expect(content).toContain('Docker remove image failed');
+      });
+
+      it('should have ping operation for daemon health check', () => {
+        const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+        const content = readFileSync(clientPath, 'utf-8');
+
+        expect(content).toContain('async ping');
+        expect(content).toContain('Docker daemon is available');
+        expect(content).toContain('Docker ping failed');
       });
     });
   });

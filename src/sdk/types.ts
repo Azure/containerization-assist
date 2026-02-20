@@ -68,10 +68,9 @@ export type {
   FixRecommendation,
 } from '@/tools/fix-dockerfile/schema';
 
-// ===== BUILD-IMAGE TYPES =====
+// ===== BUILD-IMAGE-CONTEXT TYPES =====
 
-export type { BuildImageParams } from '@/tools/build-image/schema';
-export type { BuildImageResult } from '@/tools/build-image/tool';
+export type { BuildImageParams, BuildImageResult } from '@/tools/build-image-context/schema';
 
 // ===== SCAN-IMAGE TYPES =====
 

@@ -146,7 +146,6 @@ describe('registerToolsWithServer', () => {
   });
 });
 
-
 describe('formatOutput', () => {
   it('formats as JSON when format is JSON', () => {
     const input = { name: 'test', version: 1 };
@@ -295,25 +294,67 @@ describe('formatOutput', () => {
       expect(result).toContain('Next Steps:');
     });
 
-    it('detects and formats build-image results', () => {
+    it('detects and formats build-image-context results', () => {
       const buildResult = {
-        summary: '✅ Built image',
-        success: true,
-        imageId: 'sha256:abc123',
-        requestedTags: ['myapp:latest', 'myapp:1.0.0'],
-        createdTags: ['myapp:latest', 'myapp:1.0.0'],
-        size: 245000000,
-        buildTime: 45000,
-        logs: [],
+        summary: 'Build context ready for myapp',
+        context: {
+          buildContextPath: '/app',
+          dockerfilePath: '/app/Dockerfile',
+          dockerfileRelative: 'Dockerfile',
+          hasDockerignore: true,
+        },
+        securityAnalysis: {
+          warnings: [],
+          riskLevel: 'low',
+          recommendations: [],
+        },
+        buildConfig: {
+          finalTags: ['myapp:latest', 'myapp:1.0.0'],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
+        buildKitAnalysis: {
+          features: {
+            cacheMount: false,
+            secretMount: false,
+            sshMount: false,
+            multiStage: false,
+            stageCount: 1,
+            copyFrom: false,
+            heredoc: false,
+          },
+          recommended: false,
+          recommendations: [],
+        },
+        dockerfileAnalysis: {
+          baseImages: ['node:18-alpine'],
+          exposedPorts: [3000],
+          hasHealthcheck: false,
+          layerCount: 8,
+        },
+        nextAction: {
+          action: 'execute-build',
+          preChecks: ['Verify Docker daemon'],
+          buildCommand: {
+            command: 'docker build -t myapp:latest -t myapp:1.0.0 .',
+            parts: {
+              executable: 'docker',
+              subcommand: 'build',
+              flags: ['-t', 'myapp:latest'],
+              context: '.',
+            },
+            environment: {},
+          },
+          postBuildSteps: [],
+        },
       };
 
       const result = formatOutput(buildResult, OUTPUTFORMAT.NATURAL_LANGUAGE);
 
-      expect(result).toContain('Image Built Successfully');
-      expect(result).toContain('**Image:**');
-      expect(result).toContain('**Tags Created:**');
-      expect(result).toContain('**Size:**');
-      expect(result).toContain('**Build Time:**');
+      expect(result).toContain('Build Context Ready');
+      expect(result).toContain('**Tags:**');
+      expect(result).toContain('**Platform:**');
+      expect(result).toContain('**Dockerfile Analysis:**');
       expect(result).toContain('Next Steps:');
     });
 

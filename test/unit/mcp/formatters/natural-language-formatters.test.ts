@@ -11,7 +11,7 @@ import {
 } from '@/mcp/formatters/natural-language-formatters';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { BuildImageResult } from '@/tools/build-image/tool';
+import type { BuildImageResult } from '@/tools/build-image-context/schema';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 
 describe('natural-language-formatters', () => {
@@ -535,71 +535,209 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('✨ CREATE DOCKERFILE');
       expect(narrative).toContain('node:18-alpine');
       expect(narrative).not.toContain('Next Steps:');
-      expect(narrative).not.toContain('Build image with build-image tool');
+      expect(narrative).not.toContain('Build image with build-image-context tool');
     });
   });
 
   describe('formatBuildImageNarrative', () => {
     it('should format successful build with all details', () => {
       const result: BuildImageResult = {
-        success: true,
-        imageId: 'sha256:abc123def456',
-        requestedTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
-        createdTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
-        size: 245000000,
-        buildTime: 45000,
-        layers: 12,
-        logs: [],
+        summary: 'Build context ready for myapp with 3 tags',
+        context: {
+          buildContextPath: '/app',
+          dockerfilePath: '/app/Dockerfile',
+          dockerfileRelative: 'Dockerfile',
+          hasDockerignore: true,
+        },
+        securityAnalysis: {
+          warnings: [
+            {
+              id: 'ROOT_USER',
+              severity: 'medium',
+              message: 'Running as root user',
+              line: 15,
+              remediation: 'Add USER directive',
+            },
+          ],
+          riskLevel: 'medium',
+          recommendations: ['Add non-root user'],
+        },
+        buildConfig: {
+          finalTags: ['myapp:latest', 'myapp:1.0.0', 'myapp:production'],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
+        buildKitAnalysis: {
+          features: {
+            cacheMount: false,
+            secretMount: false,
+            sshMount: false,
+            multiStage: true,
+            stageCount: 2,
+            copyFrom: true,
+            heredoc: false,
+          },
+          recommended: true,
+          recommendations: ['Use BuildKit for multi-stage builds'],
+        },
+        dockerfileAnalysis: {
+          baseImages: ['node:18-alpine'],
+          exposedPorts: [3000],
+          finalUser: undefined,
+          hasHealthcheck: true,
+          layerCount: 12,
+        },
+        nextAction: {
+          action: 'execute-build',
+          preChecks: ['Verify Docker daemon is running'],
+          buildCommand: {
+            command: 'docker build -t myapp:latest -t myapp:1.0.0 -t myapp:production .',
+            parts: {
+              executable: 'docker',
+              subcommand: 'build',
+              flags: ['-t', 'myapp:latest'],
+              context: '.',
+            },
+            environment: { DOCKER_BUILDKIT: '1' },
+          },
+          postBuildSteps: ['Scan for vulnerabilities'],
+        },
       };
 
       const narrative = formatBuildImageNarrative(result);
 
-      expect(narrative).toContain('✅ Image Built Successfully');
-      expect(narrative).toContain('**Image:** sha256:abc123def456');
-      expect(narrative).toContain('**Tags Created:** myapp:latest, myapp:1.0.0, myapp:production');
-      expect(narrative).toContain('**Size:** 234MB'); // 245000000 bytes = 234MB
-      expect(narrative).toContain('**Build Time:** 45s');
-      expect(narrative).toContain('**Layers:** 12');
+      expect(narrative).toContain('📦 Build Context Ready');
+      expect(narrative).toContain('**Tags:** myapp:latest, myapp:1.0.0, myapp:production');
+      expect(narrative).toContain('**Platform:** linux/amd64');
+      expect(narrative).toContain('Estimated Layers: 12');
       expect(narrative).toContain('Next Steps:');
-      expect(narrative).toContain('Scan image for vulnerabilities');
+      expect(narrative).toContain('Scan built image for vulnerabilities');
     });
 
     it('should handle minimal build result', () => {
       const result: BuildImageResult = {
-        success: true,
-        imageId: 'sha256:minimal',
-        requestedTags: [],
-        createdTags: [],
-        size: 100000000,
-        buildTime: 30000,
-        logs: [],
+        summary: 'Minimal build context ready',
+        context: {
+          buildContextPath: '/app',
+          dockerfilePath: '/app/Dockerfile',
+          dockerfileRelative: 'Dockerfile',
+          hasDockerignore: false,
+        },
+        securityAnalysis: {
+          warnings: [],
+          riskLevel: 'low',
+          recommendations: [],
+        },
+        buildConfig: {
+          finalTags: [],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
+        buildKitAnalysis: {
+          features: {
+            cacheMount: false,
+            secretMount: false,
+            sshMount: false,
+            multiStage: false,
+            stageCount: 1,
+            copyFrom: false,
+            heredoc: false,
+          },
+          recommended: false,
+          recommendations: [],
+        },
+        dockerfileAnalysis: {
+          baseImages: ['alpine:latest'],
+          exposedPorts: [],
+          hasHealthcheck: false,
+          layerCount: 3,
+        },
+        nextAction: {
+          action: 'execute-build',
+          preChecks: [],
+          buildCommand: {
+            command: 'docker build .',
+            parts: {
+              executable: 'docker',
+              subcommand: 'build',
+              flags: [],
+              context: '.',
+            },
+            environment: {},
+          },
+          postBuildSteps: [],
+        },
       };
 
       const narrative = formatBuildImageNarrative(result);
 
-      expect(narrative).toContain('✅ Image Built Successfully');
-      expect(narrative).toContain('**Image:** sha256:minimal');
-      expect(narrative).not.toContain('**Tags Created:**');
-      expect(narrative).not.toContain('**Layers:**');
+      expect(narrative).toContain('📦 Build Context Ready');
+      expect(narrative).toContain('**Summary:** Minimal build context ready');
+      expect(narrative).not.toContain('**Tags:**');
+      expect(narrative).toContain('Estimated Layers: 3');
     });
 
     it('should omit next steps when chainHintsMode is disabled', () => {
       const result: BuildImageResult = {
-        success: true,
-        imageId: 'sha256:abc123def456',
-        tags: ['myapp:latest'],
-        size: 245000000,
-        buildTime: 45000,
-        layers: 12,
-        logs: [],
+        summary: 'Build context ready',
+        context: {
+          buildContextPath: '/app',
+          dockerfilePath: '/app/Dockerfile',
+          dockerfileRelative: 'Dockerfile',
+          hasDockerignore: true,
+        },
+        securityAnalysis: {
+          warnings: [],
+          riskLevel: 'low',
+          recommendations: [],
+        },
+        buildConfig: {
+          finalTags: ['myapp:latest'],
+          buildArgs: {},
+          platform: 'linux/amd64',
+        },
+        buildKitAnalysis: {
+          features: {
+            cacheMount: false,
+            secretMount: false,
+            sshMount: false,
+            multiStage: false,
+            stageCount: 1,
+            copyFrom: false,
+            heredoc: false,
+          },
+          recommended: false,
+          recommendations: [],
+        },
+        dockerfileAnalysis: {
+          baseImages: ['node:18-alpine'],
+          exposedPorts: [3000],
+          hasHealthcheck: false,
+          layerCount: 8,
+        },
+        nextAction: {
+          action: 'execute-build',
+          preChecks: ['Verify Docker daemon'],
+          buildCommand: {
+            command: 'docker build -t myapp:latest .',
+            parts: {
+              executable: 'docker',
+              subcommand: 'build',
+              flags: ['-t', 'myapp:latest'],
+              context: '.',
+            },
+            environment: {},
+          },
+          postBuildSteps: [],
+        },
       };
 
       const narrative = formatBuildImageNarrative(result, 'disabled');
 
-      expect(narrative).toContain('✅ Image Built Successfully');
-      expect(narrative).toContain('**Image:** sha256:abc123def456');
+      expect(narrative).toContain('📦 Build Context Ready');
+      expect(narrative).toContain('**Tags:** myapp:latest');
       expect(narrative).not.toContain('Next Steps:');
-      expect(narrative).not.toContain('Scan image for vulnerabilities');
+      expect(narrative).not.toContain('Scan built image for vulnerabilities');
     });
   });
 

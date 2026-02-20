@@ -16,7 +16,7 @@ import type { Logger } from 'pino';
  */
 const ALL_TOOLS = [
   'analyze-repo',
-  'build-image',
+  'build-image-context',
   'fix-dockerfile',
   'generate-dockerfile',
   'generate-k8s-manifests',
@@ -51,7 +51,7 @@ describe('Standardized Logging Regression Tests', () => {
   describe('Tool logging format validation', () => {
     it('should define all expected tools', () => {
       expect(ALL_TOOLS.length).toBeGreaterThan(8);
-      expect(ALL_TOOLS).toContain('build-image');
+      expect(ALL_TOOLS).toContain('build-image-context');
       expect(ALL_TOOLS).toContain('verify-deploy');
     });
 
@@ -201,7 +201,7 @@ describe('Standardized Logging Regression Tests', () => {
       // Tools should use their directory name as the tool identifier
       const expectedToolNames = [
         'analyze-repo',
-        'build-image',
+        'build-image-context',
         'fix-dockerfile',
         'push-image',
         'scan-image',
@@ -220,7 +220,7 @@ describe('Standardized Logging Regression Tests', () => {
       const criticalTools = [
         'analyze-repo',
         'fix-dockerfile',
-        'build-image',
+        'build-image-context',
         'scan-image',
         'tag-image',
         'push-image',

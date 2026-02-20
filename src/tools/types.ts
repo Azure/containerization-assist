@@ -1,5 +1,5 @@
 import { analyzeRepoToolDefinition } from './analyze-repo/types';
-import { buildImageToolDefinition } from './build-image/types';
+import { buildImageContextToolDefinition } from './build-image-context/types';
 import { fixDockerfileToolDefinition } from './fix-dockerfile/types';
 import { generateDockerfileToolDefinition } from './generate-dockerfile/types';
 import { generateK8sManifestsToolDefinition } from './generate-k8s-manifests/types';
@@ -12,7 +12,7 @@ import { verifyDeployToolDefinition } from './verify-deploy/types';
 
 export {
   analyzeRepoToolDefinition,
-  buildImageToolDefinition,
+  buildImageContextToolDefinition,
   fixDockerfileToolDefinition,
   generateDockerfileToolDefinition,
   generateK8sManifestsToolDefinition,
@@ -29,7 +29,7 @@ export type { ToolName } from './shared/toolDefinition';
 
 export const ALL_TOOL_DEFINITIONS = [
   analyzeRepoToolDefinition,
-  buildImageToolDefinition,
+  buildImageContextToolDefinition,
   fixDockerfileToolDefinition,
   generateDockerfileToolDefinition,
   generateK8sManifestsToolDefinition,

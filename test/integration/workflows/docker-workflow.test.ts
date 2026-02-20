@@ -2,7 +2,7 @@
  * Integration Test: Docker Workflow
  *
  * Tests the complete Docker containerization workflow:
- * analyze-repo → generate-dockerfile → build-image → scan-image → tag-image
+ * analyze-repo → generate-dockerfile → build-image-context → scan-image → tag-image
  *
  * Prerequisites:
  * - Docker daemon running
@@ -13,21 +13,21 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { createLogger } from '@/lib/logger';
 import type { ToolContext } from '@/mcp/context';
 import { join } from 'node:path';
-import { existsSync, writeFileSync, mkdtempSync, rmSync, cpSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, writeFileSync } from 'node:fs';
 import { DockerTestCleaner } from '../../__support__/utilities/docker-test-cleaner';
 import { createDockerClient } from '@/infra/docker/client';
 
 // Import tools
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
-import buildImageTool from '@/tools/build-image/tool';
+import buildImageContextTool from '@/tools/build-image-context/tool';
 import scanImageTool from '@/tools/scan-image/tool';
 import tagImageTool from '@/tools/tag-image/tool';
 
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { GenerateDockerfileResult } from '@/tools/generate-dockerfile/schema';
-import type { BuildImageResult } from '@/tools/build-image/tool';
+import type { BuildImageResult } from '@/tools/build-image-context/schema';
+import { execSync } from 'child_process';
 
 describe('Docker Workflow Integration', () => {
   let testCleaner: DockerTestCleaner;
@@ -122,9 +122,9 @@ describe('Docker Workflow Integration', () => {
           return;
         }
 
-        // Step 3: Build image
+        // Step 3: Build image - now returns context preparation, we execute the command
         const imageName = `docker-workflow-test:${Date.now()}`;
-        const buildResult = await buildImageTool.handler(
+        const buildResult = await buildImageContextTool.handler(
           {
             path: testRepo,
             dockerfile: dockerfileToUse.replace(testRepo + '/', ''),
@@ -135,35 +135,47 @@ describe('Docker Workflow Integration', () => {
 
         expect(buildResult.ok).toBe(true);
         if (!buildResult.ok) {
-          console.log('Build failed:', buildResult.error);
+          console.log('Build preparation failed:', buildResult.error);
           return;
         }
 
         const build = buildResult.value as BuildImageResult;
-        expect(build.imageId).toBeDefined();
-        expect(build.createdTags).toContain(imageName);
-        testCleaner.trackImage(build.imageId);
+        expect(build.summary).toBeDefined();
+        expect(build.nextAction.buildCommand.command).toBeDefined();
 
-        // Step 4: Scan image (may fail if Trivy/OSV not available)
-        const scanResult = await scanImageTool.handler(
-          {
-            imageId: build.imageId,
-            scanner: 'osv',
-            scanType: 'vulnerability',
-            enableAISuggestions: false,
-          },
-          toolContext,
-        );
+        // Execute the build command
+        let builtImageTag: string | undefined;
+        try {
+          execSync(build.nextAction.buildCommand.command, {
+            cwd: testRepo,
+            encoding: 'utf-8',
+            env: { ...process.env, ...build.nextAction.buildCommand.environment },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+          builtImageTag = build.buildConfig.finalTags[0];
+          if (builtImageTag) {
+            testCleaner.trackImage(builtImageTag);
+          }
+        } catch (error) {
+          console.log('Build execution failed:', error);
+          return;
+        }
+
+        if (!builtImageTag) {
+          console.log('No image tag available after build');
+          return;
+        }
+
+        // Step 4: Scan image (may fail if Trivy not installed)
+        const scanResult = await scanImageTool.handler({ imageId: builtImageTag }, toolContext);
 
         if (!scanResult.ok) {
-          console.log('Scan skipped (scanner unavailable or offline)');
+          console.log('Scan skipped (Trivy may not be installed)');
         } else {
           expect(scanResult.value).toBeDefined();
         }
 
         // Step 5: Tag image (with retry for potential race condition after build)
-        // Use the created tag name rather than raw imageId for better compatibility across Docker configurations
-        const sourceImage = build.createdTags[0] || build.imageId;
         const newTag = `docker-workflow-test:v1.0`;
         let tagResult;
         const maxRetries = 3;
@@ -171,7 +183,7 @@ describe('Docker Workflow Integration', () => {
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           tagResult = await tagImageTool.handler(
             {
-              imageId: sourceImage,
+              imageId: builtImageTag,
               tag: newTag,
             },
             toolContext,
@@ -185,8 +197,7 @@ describe('Docker Workflow Integration', () => {
           console.log(`Tag attempt ${attempt + 1} failed:`, {
             error: tagResult.error,
             guidance: tagResult.guidance,
-            imageId: sourceImage,
-            tag: newTag,
+            imageId: builtImageTag,
           });
 
           // If tag failed and we have retries left, wait briefly and retry
@@ -220,56 +231,70 @@ describe('Docker Workflow Integration', () => {
           return;
         }
 
-        const tempRepo = mkdtempSync(join(tmpdir(), 'python-flask-'));
-        cpSync(testRepo, tempRepo, { recursive: true });
-
-        try {
-          // Step 1: Analyze
-          const analyzeResult = await analyzeRepoTool.handler(
-            { repositoryPath: tempRepo },
-            toolContext,
-          );
+        // Step 1: Analyze
+        const analyzeResult = await analyzeRepoTool.handler(
+          { repositoryPath: testRepo },
+          toolContext,
+        );
 
         if (!analyzeResult.ok) {
           console.log('Analysis failed:', analyzeResult.error);
           return;
         }
 
-          const analysis = analyzeResult.value as RepositoryAnalysis;
-          expect(analysis.modules).toBeDefined();
+        const analysis = analyzeResult.value as RepositoryAnalysis;
+        expect(analysis.modules).toBeDefined();
 
         // Step 2: Generate or use existing Dockerfile
-          const dockerfilePath = join(tempRepo, 'Dockerfile');
+        const dockerfilePath = join(testRepo, 'Dockerfile');
 
         // Create a simple test Dockerfile if none exists
-          if (!existsSync(dockerfilePath)) {
-            writeFileSync(
-              dockerfilePath,
-              `FROM python:3.11-slim
+        if (!existsSync(dockerfilePath)) {
+          writeFileSync(
+            dockerfilePath,
+            `FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt* ./
 RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || true
 COPY . .
 EXPOSE 5000
 CMD ["python", "app.py"]`,
-            );
-          }
+          );
+        }
 
         // Step 3: Build image
         const imageName = `docker-workflow-python:${Date.now()}`;
-          const buildResult = await buildImageTool.handler(
-            {
-              path: tempRepo,
-              dockerfile: 'Dockerfile',
-              imageName,
-            },
-            toolContext,
-          );
+        const buildResult = await buildImageContextTool.handler(
+          {
+            path: testRepo,
+            dockerfile: 'Dockerfile',
+            imageName,
+          },
+          toolContext,
+        );
 
-          if (buildResult.ok) {
-            const build = buildResult.value as BuildImageResult;
-            testCleaner.trackImage(build.imageId);
+        if (buildResult.ok) {
+          const build = buildResult.value as BuildImageResult;
 
+          // Execute build command
+          let builtImageTag: string | undefined;
+          try {
+            execSync(build.nextAction.buildCommand.command, {
+              cwd: testRepo,
+              encoding: 'utf-8',
+              env: { ...process.env, ...build.nextAction.buildCommand.environment },
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            builtImageTag = build.buildConfig.finalTags[0];
+            if (builtImageTag) {
+              testCleaner.trackImage(builtImageTag);
+            }
+          } catch (error) {
+            console.log('Build execution failed:', error);
+            return;
+          }
+
+          if (builtImageTag) {
             // Step 4: Tag the image (with retry for potential race condition)
             let tagResult;
             const maxRetries = 3;
@@ -277,7 +302,7 @@ CMD ["python", "app.py"]`,
             for (let attempt = 0; attempt < maxRetries; attempt++) {
               tagResult = await tagImageTool.handler(
                 {
-                  imageId: build.imageId,
+                  imageId: builtImageTag,
                   tag: `docker-workflow-python:latest`,
                 },
                 toolContext,
@@ -293,13 +318,11 @@ CMD ["python", "app.py"]`,
               }
             }
 
-            if (!tagResult.ok) {
-              console.log('Tagging failed:', tagResult.error);
+            if (!tagResult?.ok) {
+              console.log('Tagging failed:', tagResult?.error);
               return;
             }
           }
-        } finally {
-          rmSync(tempRepo, { recursive: true, force: true });
         }
       },
       testTimeout,
@@ -321,7 +344,7 @@ CMD ["python", "app.py"]`,
       }
 
       // Test build error - invalid Dockerfile
-      const buildResult = await buildImageTool.handler(
+      const buildResult = await buildImageContextTool.handler(
         {
           dockerfilePath: '/nonexistent/Dockerfile',
           context: fixtureBasePath,
@@ -376,7 +399,7 @@ CMD ["python", "app.py"]`,
 
         // Start directly with build
         const imageName = `partial-workflow-test:${Date.now()}`;
-        const buildResult = await buildImageTool.handler(
+        const buildResult = await buildImageContextTool.handler(
           {
             path: testRepo,
             dockerfile: 'Dockerfile',
@@ -387,48 +410,59 @@ CMD ["python", "app.py"]`,
 
         if (buildResult.ok) {
           const build = buildResult.value as BuildImageResult;
-          testCleaner.trackImage(build.imageId);
 
-          // Continue with scan and tag
-          const scanResult = await scanImageTool.handler(
-            {
-              imageId: build.imageId,
-              scanner: 'osv',
-              scanType: 'vulnerability',
-              enableAISuggestions: false,
-            },
-            toolContext,
-          );
-
-          // Scan may fail if scanner not available - that's OK
-          expect(scanResult.ok !== undefined).toBe(true);
-
-          // Tag with retry for potential race condition
-          let tagResult;
-          const maxRetries = 3;
-
-          for (let attempt = 0; attempt < maxRetries; attempt++) {
-            tagResult = await tagImageTool.handler(
-              {
-                imageId: build.imageId,
-                tag: `partial-workflow-test:latest`,
-              },
-              toolContext,
-            );
-
-            if (tagResult.ok) {
-              break;
+          // Execute build command
+          let builtImageTag: string | undefined;
+          try {
+            execSync(build.nextAction.buildCommand.command, {
+              cwd: testRepo,
+              encoding: 'utf-8',
+              env: { ...process.env, ...build.nextAction.buildCommand.environment },
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            builtImageTag = build.buildConfig.finalTags[0];
+            if (builtImageTag) {
+              testCleaner.trackImage(builtImageTag);
             }
-
-            if (attempt < maxRetries - 1) {
-              console.log(`Tag attempt ${attempt + 1} failed, retrying...`);
-              await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
-            }
+          } catch (error) {
+            console.log('Build execution failed:', error);
+            return;
           }
 
-          if (!tagResult.ok) {
-            console.log('Tagging failed:', tagResult.error);
-            return;
+          if (builtImageTag) {
+            // Continue with scan and tag
+            const scanResult = await scanImageTool.handler({ imageId: builtImageTag }, toolContext);
+
+            // Scan may fail if Trivy not available - that's OK
+            expect(scanResult.ok !== undefined).toBe(true);
+
+            // Tag with retry for potential race condition
+            let tagResult;
+            const maxRetries = 3;
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+              tagResult = await tagImageTool.handler(
+                {
+                  imageId: builtImageTag,
+                  tag: `partial-workflow-test:latest`,
+                },
+                toolContext,
+              );
+
+              if (tagResult.ok) {
+                break;
+              }
+
+              if (attempt < maxRetries - 1) {
+                console.log(`Tag attempt ${attempt + 1} failed, retrying...`);
+                await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+              }
+            }
+
+            if (!tagResult?.ok) {
+              console.log('Tagging failed:', tagResult?.error);
+              return;
+            }
           }
         }
       },
@@ -468,7 +502,7 @@ CMD ["python", "app.py"]`,
         // Build both concurrently (Docker handles this well)
         const timestamp = Date.now();
         const [nodeResult, pythonResult] = await Promise.all([
-          buildImageTool.handler(
+          buildImageContextTool.handler(
             {
               path: nodeRepo,
               dockerfile: 'Dockerfile',
@@ -476,7 +510,7 @@ CMD ["python", "app.py"]`,
             },
             toolContext,
           ),
-          buildImageTool.handler(
+          buildImageContextTool.handler(
             {
               path: pythonRepo,
               dockerfile: 'Dockerfile',
@@ -486,15 +520,22 @@ CMD ["python", "app.py"]`,
           ),
         ]);
 
-        // Track images for cleanup
+        // Track images for cleanup (these are now context-providing, but the test is skipped)
+        // After executing builds, we would track the built tags
         if (nodeResult?.ok) {
           const build = nodeResult.value as BuildImageResult;
-          testCleaner.trackImage(build.imageId);
+          const builtTag = build.buildConfig.finalTags[0];
+          if (builtTag) {
+            testCleaner.trackImage(builtTag);
+          }
         }
 
         if (pythonResult?.ok) {
           const build = pythonResult.value as BuildImageResult;
-          testCleaner.trackImage(build.imageId);
+          const builtTag = build.buildConfig.finalTags[0];
+          if (builtTag) {
+            testCleaner.trackImage(builtTag);
+          }
         }
 
         // At least one should succeed (both should if Docker is healthy)

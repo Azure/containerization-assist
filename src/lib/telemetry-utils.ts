@@ -157,11 +157,33 @@ export function extractSafeTelemetryMetrics(
       if ('moduleCount' in result) metrics.moduleCount = result.moduleCount;
       break;
 
-    case 'build-image':
-      // Safe: Build duration, image size (aggregates)
-      if ('buildTime' in result) metrics.buildTimeMs = result.buildTime;
-      if ('size' in result) metrics.imageSizeBytes = result.size;
-      // Unsafe: imageId, tags (contain customer names)
+    case 'build-image-context':
+      // Safe: Security analysis metrics, BuildKit recommendations (aggregates)
+      if ('securityAnalysis' in result && result.securityAnalysis) {
+        const security = result.securityAnalysis as {
+          warnings?: unknown[];
+          riskLevel?: string;
+        };
+        metrics.securityWarningCount = security.warnings?.length || 0;
+        metrics.riskLevel = security.riskLevel;
+      }
+      if ('buildKitAnalysis' in result && result.buildKitAnalysis) {
+        const buildKit = result.buildKitAnalysis as { recommended?: boolean };
+        metrics.buildKitRecommended = buildKit.recommended;
+      }
+      if ('dockerfileAnalysis' in result && result.dockerfileAnalysis) {
+        const dockerfile = result.dockerfileAnalysis as {
+          layerCount?: number;
+          hasHealthcheck?: boolean;
+        };
+        metrics.layerCount = dockerfile.layerCount;
+        metrics.hasHealthcheck = dockerfile.hasHealthcheck;
+      }
+      if ('context' in result && result.context) {
+        const context = result.context as { hasDockerignore?: boolean };
+        metrics.hasDockerignore = context.hasDockerignore;
+      }
+      // Unsafe: paths, image names, tags (contain customer identifiers)
       break;
 
     case 'scan-image':

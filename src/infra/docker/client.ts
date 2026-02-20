@@ -5,14 +5,10 @@
  */
 
 import Docker, { DockerOptions } from 'dockerode';
-import tar from 'tar-fs';
-import path from 'path';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
 import { autoDetectDockerSocket } from './socket-validation';
-import { getDockerBuildFiles } from '@/lib/dockerignore-parser';
-import { createProgressTracker, type ProgressCallback } from './progress';
 
 /**
  * Docker client configuration options.
@@ -26,55 +22,6 @@ export interface DockerClientConfig {
   port?: number;
   /** Connection timeout in milliseconds */
   timeout?: number;
-}
-
-/**
- * Callback for Docker build progress events
- */
-export type DockerBuildProgressCallback = ProgressCallback;
-
-/**
- * Options for building a Docker image.
- */
-export interface DockerBuildOptions {
-  /** Path to Dockerfile relative to context */
-  dockerfile?: string;
-  /** Primary tag for the built image */
-  t?: string;
-  /** Additional tags to apply to the built image */
-  tags?: string[];
-  /** Build context directory (default: current directory) */
-  context?: string;
-  /** Build-time variables (Docker ARG values) */
-  buildargs?: Record<string, string>;
-  /** Alternative property name for build arguments */
-  buildArgs?: Record<string, string>;
-  /** Target platform for multi-platform builds (e.g., 'linux/amd64') */
-  platform?: string;
-  /** Optional callback for build progress events */
-  onProgress?: DockerBuildProgressCallback;
-}
-
-/**
- * Result of a Docker image build operation.
- */
-export interface DockerBuildResult {
-  /** Unique identifier of the built image */
-  imageId: string;
-  /** Content-addressable digest of the built image */
-  digest: string;
-  /** Size of the built image in bytes */
-  size: number;
-  /** Number of layers in the image */
-  layers?: number;
-  /** Total build time in milliseconds */
-  buildTime: number;
-  /** Build process log messages */
-  logs: string[];
-  /** Tags applied to the built image */
-  tags?: string[];
-  /** Build-time warnings */
-  warnings: string[];
 }
 
 /**
@@ -121,13 +68,6 @@ export interface DockerImageInfo {
  * Docker client interface for container operations.
  */
 export interface DockerClient {
-  /**
-   * Builds a Docker image from a Dockerfile.
-   * @param options - Build configuration options
-   * @returns Result containing build details or error
-   */
-  buildImage: (options: DockerBuildOptions) => Promise<Result<DockerBuildResult>>;
-
   /**
    * Retrieves information about a Docker image.
    * @param id - Image ID or tag
@@ -199,30 +139,6 @@ export interface DockerClient {
 }
 
 /**
- * Generate a digest from an image ID
- * @param imageId - The Docker image ID
- * @param logger - Logger instance
- * @returns A SHA-256 digest string or empty string if invalid
- */
-function generateDigestFromImageId(imageId: string, logger: Logger): string {
-  // If already prefixed, validate the hash portion
-  if (imageId.startsWith('sha256:')) {
-    const hash = imageId.substring(7);
-    if (/^[a-f0-9]{64}$/.test(hash)) {
-      return imageId;
-    }
-  } else {
-    // If not prefixed, validate and add prefix
-    if (/^[a-f0-9]{64}$/.test(imageId)) {
-      return `sha256:${imageId}`;
-    }
-  }
-
-  logger.warn({ imageId }, 'Image ID is not a valid SHA-256 hash, cannot generate digest');
-  return '';
-}
-
-/**
  * Create base Docker client implementation
  */
 function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
@@ -261,185 +177,6 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
   };
 
   return {
-    async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
-      const buildLogs: string[] = [];
-      const buildWarnings: string[] = [];
-      const startTime = Date.now();
-
-      try {
-        logger.debug({ options }, 'Starting Docker build');
-
-        const contextPath = options.context || '.';
-        const dockerfilePath = options.dockerfile
-          ? path.resolve(contextPath, options.dockerfile)
-          : undefined;
-        const files = await getDockerBuildFiles(contextPath, dockerfilePath);
-
-        const tarStream = tar.pack(contextPath, {
-          entries: files,
-        });
-
-        const stream = await docker.buildImage(tarStream, {
-          t: options.t || options.tags?.[0],
-          dockerfile: options.dockerfile,
-          buildargs: options.buildargs || options.buildArgs,
-          ...(options.platform && { platform: options.platform }),
-          version: '2', // Use BuildKit backend for cross-platform builds
-        });
-
-        interface DockerBuildEvent {
-          stream?: string;
-          aux?: { ID?: string };
-          id?: string;
-          error?: string;
-          errorDetail?: Record<string, unknown>;
-        }
-
-        interface DockerBuildResponse {
-          aux?: { ID?: string };
-        }
-
-        let buildError: string | null = null;
-
-        // Create progress tracker for BuildKit trace decoding and progress notifications
-        const trackerOptions: { onProgress?: ProgressCallback; logger: Logger } = { logger };
-        if (options.onProgress) {
-          trackerOptions.onProgress = options.onProgress;
-        }
-        const progressTracker = createProgressTracker(trackerOptions);
-
-        const result = await new Promise<DockerBuildResponse[]>((resolve, reject) => {
-          docker.modem.followProgress(
-            stream,
-            (err: Error | null, res: DockerBuildResponse[]) => {
-              if (err) {
-                // Log detailed error information before rejecting
-                const guidance = extractDockerErrorGuidance(err);
-                logger.error(
-                  {
-                    error: guidance.message,
-                    hint: guidance.hint,
-                    resolution: guidance.resolution,
-                    errorDetails: guidance.details,
-                    originalError: err,
-                    options,
-                  },
-                  'Docker build followProgress error',
-                );
-                reject(err);
-              } else if (buildError) {
-                // If we detected an error during build progress, treat it as a failure
-                const errorObj = new Error(buildError);
-                logger.error({ buildError, options }, 'Docker build failed with error event');
-                reject(errorObj);
-              } else {
-                resolve(res);
-              }
-            },
-            (event: DockerBuildEvent) => {
-              // For BuildKit progress events, decode and send build status updates
-              if (event.id === 'moby.buildkit.trace') {
-                const buildKitMessage = progressTracker.processBuildKitTrace(event.aux);
-                // Also capture BuildKit messages in build logs
-                if (buildKitMessage) {
-                  buildLogs.push(buildKitMessage);
-                }
-              }
-
-              if (event.error || event.errorDetail) {
-                logger.error({ errorEvent: event }, 'Docker build error event received');
-                const errorMsg = event.error || 'Build step failed';
-                const errorLogLine = `ERROR: ${errorMsg}`;
-                buildLogs.push(errorLogLine);
-                logger.error(errorLogLine);
-
-                // Capture the first error encountered during the build
-                if (!buildError) {
-                  buildError =
-                    event.error ||
-                    (event.errorDetail &&
-                    typeof event.errorDetail === 'object' &&
-                    'message' in event.errorDetail
-                      ? String(event.errorDetail.message)
-                      : 'Build step failed');
-                }
-              }
-            },
-          );
-        });
-
-        const imageId = result[result.length - 1]?.aux?.ID || '';
-        const buildTime = Date.now() - startTime;
-
-        // Inspect the image to get size, digest, and layers
-        let size = 0;
-        let digest = '';
-        let layers: number | undefined;
-
-        if (imageId) {
-          try {
-            const image = docker.getImage(imageId);
-            const inspect = await image.inspect();
-
-            size = inspect.Size || 0;
-            // Use RepoDigests if available, otherwise fallback to image ID if it looks like a valid SHA-256 hash
-            if (inspect.RepoDigests?.[0]) {
-              digest = inspect.RepoDigests[0];
-            } else {
-              digest = generateDigestFromImageId(inspect.Id, logger);
-            }
-            layers = inspect.RootFS?.Layers?.length;
-          } catch (inspectError) {
-            logger.warn({ error: inspectError, imageId }, 'Could not inspect image after build');
-            buildWarnings.push('Could not retrieve complete image metadata');
-            // Use fallback digest from image ID
-            digest = generateDigestFromImageId(imageId, logger);
-          }
-        }
-
-        const buildResult: DockerBuildResult = {
-          imageId,
-          digest,
-          size,
-          ...(layers !== undefined && { layers }),
-          buildTime,
-          logs: buildLogs,
-          tags: options.tags || [],
-          warnings: buildWarnings,
-        };
-
-        logger.debug({ buildResult }, 'Docker build completed successfully');
-        return Success(buildResult);
-      } catch (error) {
-        const guidance = extractDockerErrorGuidance(error);
-        const errorMessage = `Build failed: ${guidance.message}`;
-
-        logger.error(
-          {
-            error: errorMessage,
-            hint: guidance.hint,
-            resolution: guidance.resolution,
-            errorDetails: guidance.details,
-            originalError: error,
-            options,
-            buildLogs,
-          },
-          'Docker build failed',
-        );
-
-        const enhancedGuidance = {
-          ...guidance,
-          details: {
-            ...guidance.details,
-            buildLogs: buildLogs.length > 0 ? buildLogs : ['No build logs captured'],
-            buildTime: Date.now() - startTime,
-          },
-        };
-
-        return Failure(errorMessage, enhancedGuidance);
-      }
-    },
-
     async getImage(id: string): Promise<Result<DockerImageInfo>> {
       return fetchImageInfo(id);
     },
@@ -737,7 +474,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
  * Create a Docker client with core operations
  * @param logger - Logger instance for debug output
  * @param config - Optional Docker client configuration
- * @returns DockerClient with build, get, tag, and push operations
+ * @returns DockerClient with get, tag, push, and management operations
  */
 export const createDockerClient = (logger: Logger, config?: DockerClientConfig): DockerClient => {
   // Determine the socket path to use

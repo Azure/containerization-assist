@@ -19,7 +19,7 @@
 
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
-import type { BuildImageResult } from '@/tools/build-image/tool';
+import type { BuildImageResult } from '@/tools/build-image-context/schema';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
 import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
@@ -28,12 +28,7 @@ import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
-import {
-  formatSize,
-  formatDuration,
-  formatVulnerabilities,
-  pluralize,
-} from '@/lib/summary-helpers';
+import { formatDuration, formatVulnerabilities, pluralize } from '@/lib/summary-helpers';
 import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
 
 /**
@@ -351,11 +346,11 @@ export function formatDockerfilePlanNarrative(
     parts.push('\n**Next Steps:**');
     if (plan.nextAction.action === 'create-files') {
       parts.push('  1. Create Dockerfile using the base images and recommendations above');
-      parts.push('  2. Build image with build-image tool');
+      parts.push('  2. Build image with build-image-context tool');
       parts.push('  3. Scan for vulnerabilities with scan-image');
     } else {
       parts.push('  1. Update Dockerfile preserving good patterns and applying improvements');
-      parts.push('  2. Rebuild image with build-image tool');
+      parts.push('  2. Rebuild image with build-image-context tool');
       parts.push('  3. Re-scan with scan-image to verify fixes');
     }
   }
@@ -364,20 +359,20 @@ export function formatDockerfilePlanNarrative(
 }
 
 /**
- * Format build-image result as natural language narrative
+ * Format build-image-context result as natural language narrative
  *
- * @param result - Build result with image details and metrics
+ * @param result - Build context preparation result with analysis and command
  * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
- * @returns Formatted narrative with image details, metrics, and next steps
+ * @returns Formatted narrative with context analysis, security warnings, and build command
  *
  * @description
- * Produces a concise build report including:
- * - Success status with icon
- * - Image ID and applied tags
- * - Image size (formatted in MB/GB)
- * - Build time (formatted in seconds/minutes)
- * - Layer count (if available)
- * - Standard next steps for containerization workflow (when chainHintsMode is 'enabled')
+ * Produces a concise build preparation report including:
+ * - Summary of build context analysis
+ * - Dockerfile analysis (base images, ports, layers)
+ * - Security warnings with severity
+ * - BuildKit feature recommendations
+ * - Ready-to-execute build command
+ * - Next steps for executing the build (when chainHintsMode is 'enabled')
  */
 export function formatBuildImageNarrative(
   result: BuildImageResult,
@@ -386,34 +381,57 @@ export function formatBuildImageNarrative(
   const parts: string[] = [];
 
   // Header
-  parts.push('✅ Image Built Successfully\n');
+  parts.push('📦 Build Context Ready\n');
 
-  // Build info
-  parts.push(`**Image:** ${result.imageId}`);
-  if (result.createdTags && result.createdTags.length > 0) {
-    parts.push(`**Tags Created:** ${result.createdTags.join(', ')}`);
+  // Summary
+  parts.push(`**Summary:** ${result.summary}`);
+
+  // Build configuration
+  if (result.buildConfig.finalTags.length > 0) {
+    parts.push(`**Tags:** ${result.buildConfig.finalTags.join(', ')}`);
   }
-  if (result.failedTags && result.failedTags.length > 0) {
-    parts.push(`**Failed Tags:** ${result.failedTags.join(', ')}`);
+  parts.push(`**Platform:** ${result.buildConfig.platform}`);
+
+  // Dockerfile analysis
+  const analysis = result.dockerfileAnalysis;
+  parts.push(`\n**Dockerfile Analysis:**`);
+  parts.push(`  Base Images: ${analysis.baseImages.join(', ') || 'None'}`);
+  if (analysis.exposedPorts.length > 0) {
+    parts.push(`  Exposed Ports: ${analysis.exposedPorts.join(', ')}`);
   }
-  if (result.size) {
-    parts.push(`**Size:** ${formatSize(result.size)}`);
+  parts.push(`  Estimated Layers: ${analysis.layerCount}`);
+  if (analysis.finalUser) {
+    parts.push(`  Final USER: ${analysis.finalUser}`);
   }
-  if (result.buildTime) {
-    parts.push(`**Build Time:** ${formatDuration(Math.round(result.buildTime / 1000))}`);
+  parts.push(`  HEALTHCHECK: ${analysis.hasHealthcheck ? 'Yes' : 'No'}`);
+
+  // Security warnings
+  if (result.securityAnalysis.warnings.length > 0) {
+    parts.push(`\n**Security Warnings:**`);
+    result.securityAnalysis.warnings.forEach((w) => {
+      parts.push(`  ⚠️ [${w.severity.toUpperCase()}] ${w.message}`);
+    });
+    parts.push(`  Risk Level: ${result.securityAnalysis.riskLevel}`);
   }
 
-  // Layer information
-  if (result.layers) {
-    parts.push(`**Layers:** ${result.layers}`);
+  // BuildKit recommendations
+  if (result.buildKitAnalysis.recommended) {
+    parts.push(`\n**BuildKit:** Recommended for this Dockerfile`);
   }
+
+  // Build command
+  parts.push(`\n**Build Command:**`);
+  parts.push(`\`\`\`bash\n${result.nextAction.buildCommand.command}\n\`\`\``);
 
   // Next steps (only if chainHintsMode is enabled)
   if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push('\n**Next Steps:**');
-    parts.push('  → Scan image for vulnerabilities with scan-image');
+    result.nextAction.preChecks.forEach((check) => {
+      parts.push(`  □ ${check}`);
+    });
+    parts.push('  → Execute the build command above');
+    parts.push('  → Scan built image for vulnerabilities with scan-image');
     parts.push('  → Tag image for registry with tag-image');
-    parts.push('  → Push to registry with push-image');
   }
 
   return parts.join('\n');
@@ -746,7 +764,7 @@ export function formatFixDockerfileNarrative(
     if (result.validationGrade === 'A' || result.validationGrade === 'B') {
       parts.push('  → Dockerfile is in good shape with minor improvements available');
       parts.push('  → Review fix recommendations for optimization');
-      parts.push('  → Proceed with build-image');
+      parts.push('  → Proceed with build-image-context');
     } else {
       parts.push('  → Address high-priority security issues first');
       parts.push('  → Apply recommended fixes to improve validation score');

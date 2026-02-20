@@ -202,7 +202,7 @@ src/
 ├── image-building/
 │   ├── docker-client.ts
 │   ├── generate-dockerfile.ts
-│   ├── build-image.ts
+│   ├── build-image-context.ts
 │   └── scan-image.ts
 └── deployment/
     ├── kubernetes-client.ts
@@ -282,7 +282,7 @@ src/
 │   ├── tool-helpers.ts      # Tool execution helpers
 │   └── platform.ts          # Platform detection
 ├── tools/                   # MCP tools
-│   ├── build-image/
+│   ├── build-image-context/
 │   │   ├── tool.ts          # Uses @infra/docker + @lib/*
 │   │   ├── schema.ts
 │   │   └── index.ts
@@ -311,9 +311,9 @@ src/
 }
 ```
 
-### Example: Build Image Tool
+### Example: Build Image Context Tool
 
-**src/tools/build-image/tool.ts:**
+**src/tools/build-image-context/tool.ts:**
 ```typescript
 // Infrastructure imports
 import { createDockerClient, type DockerBuildOptions } from '@infra/docker/client';
@@ -329,12 +329,12 @@ import type { ToolContext } from '@mcp/context';
 import { type Result, Success, Failure } from '@types';
 
 // Local imports
-import { type BuildImageParams, buildImageSchema } from './schema';
+import { type BuildImageContextParams, buildImageContextSchema } from './schema';
 
 async function run(
-  input: BuildImageParams,
+  input: BuildImageContextParams,
   ctx: ToolContext
-): Promise<Result<BuildImageResult>> {
+): Promise<Result<BuildImageContextResult>> {
   // 1. Use @lib utilities for validation
   const pathValidation = await validatePathOrFail(input.path);
   if (!pathValidation.ok) return pathValidation;
@@ -346,7 +346,7 @@ async function run(
   const docker = dockerResult.value;
 
   // 3. Orchestrate infrastructure and utilities
-  const buildResult = await docker.buildImage({ ... });
+  const buildContext = await docker.prepareBuildContext({ ... });
 
   return Success({ ... });
 }
@@ -393,7 +393,7 @@ The architecture is enforced through:
 - [CLAUDE.md](../../CLAUDE.md) - Path alias conventions and import guidelines
 - [src/infra/docker/client.ts](../../src/infra/docker/client.ts) - Example infrastructure client
 - [src/lib/validation-helpers.ts](../../src/lib/validation-helpers.ts) - Example pure utility
-- [src/tools/build-image/tool.ts](../../src/tools/build-image/tool.ts) - Example tool orchestration
+- [src/tools/build-image-context/tool.ts](../../src/tools/build-image-context/tool.ts) - Example tool orchestration
 - [ADR-002: Unified Tool Interface](./002-tool-interface.md) - Related decision on tool structure
 
 ## Related Decisions

@@ -24,12 +24,12 @@ interface Tool<TSchema extends z.ZodType<any>, TOut> {
   ) => Promise<Result<TOut>>;
 }
 
-// src/tools/build-image/tool.ts
-const tool: Tool<typeof buildImageSchema, BuildImageResult> = {
-  name: 'build-image',
-  description: 'Build Docker image with progress tracking',
+// src/tools/build-image-context/tool.ts
+const tool: Tool<typeof buildImageContextSchema, BuildImageContextResult> = {
+  name: 'build-image-context',
+  description: 'Prepare Docker build context with build command',
   version: '2.0.0',
-  schema: buildImageSchema,
+  schema: buildImageContextSchema,
   run: async (input, ctx) => {
     // Implementation
     return Success(result);
@@ -43,7 +43,7 @@ export default tool;
 
 ```
 src/tools/
-├── build-image/
+├── build-image-context/
 │   ├── tool.ts          # Tool implementation
 │   ├── schema.ts        # Zod schema
 │   └── index.ts         # Re-export

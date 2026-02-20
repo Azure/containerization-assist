@@ -4,9 +4,9 @@
  * Tests the complete flow of:
  * 1. Building Java application with multi-stage Dockerfile
  * 2. Building .NET application with multi-stage Dockerfile
- * 3. Verifying build success, image metadata, and layer counts
- * 4. Testing build arguments injection
- * 5. Validating image sizes are reasonable
+ * 3. Verifying build context output, security analysis, and build command generation
+ * 4. Validating security warnings and BuildKit recommendations
+ * 5. Ensuring generated docker build command passes validation and includes expected flags
  *
  * Prerequisites:
  * - Docker installed and running
@@ -16,13 +16,13 @@
  *   tsx scripts/integration-test-build-image.ts
  */
 
+import { join } from 'node:path';
+import { existsSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+
 import { createToolContext } from '../dist/src/mcp/context.js';
-import buildImageTool from '../dist/src/tools/build-image/tool.js';
-import { execSync } from 'child_process';
+import buildImageContextTool from '../dist/src/tools/build-image-context/tool.js';
 import { createLogger } from '../dist/src/lib/logger.js';
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { writeFileSync } from 'fs';
 
 const logger = createLogger({ name: 'build-image-test', level: 'error' });
 
@@ -33,11 +33,12 @@ interface BuildTestCase {
   name: string;
   dockerContext: string;
   dockerfile?: string;
+  imageName?: string;
   tags: string[];
   buildArgs?: Record<string, string>;
-  expectedSize?: { min: number; max: number }; // bytes
-  expectedLayers?: { min: number; max?: number };
-  shouldSucceed: boolean;
+  expectedWarnings?: string[];
+  expectBuildKit?: boolean;
+  expectedCommandFlags?: string[];
   description: string;
 }
 
@@ -48,23 +49,30 @@ interface TestResult {
   name: string;
   passed: boolean;
   message: string;
-  imageSize?: number;
-  layers?: number;
-  buildTime?: number;
+  warnings?: number;
+  buildKit?: boolean;
+  command?: string;
 }
 
 /**
- * Test cases for multi-language builds
+ * Test cases for context-only builds
+ *
+ * These tests validate the build-image tool's context preparation output:
+ * - Security analysis (warnings)
+ * - BuildKit feature detection
+ * - Generated docker build command
+ *
+ * No actual Docker builds are performed - only output validation.
  */
 const TEST_CASES: BuildTestCase[] = [
   {
-    name: 'Java Multi-Stage Build',
+    name: 'Java Multi-Stage Context',
     dockerContext: 'test/fixtures/build-scenarios/java',
     tags: ['test-build:java-app'],
-    expectedSize: { min: 40_000_000, max: 400_000_000 },  // 40MB - 400MB for Alpine JRE
-    expectedLayers: { min: 5, max: 30 },
-    shouldSucceed: true,
-    description: 'Tests Java build with Eclipse Temurin JRE and multi-stage',
+    expectBuildKit: true,
+    // Java fixture uses pinned images and non-root user, so no security warnings expected
+    expectedCommandFlags: ['docker build', '-t test-build:java-app'],
+    description: 'Validates Java multi-stage Dockerfile analysis and BuildKit recommendation',
   },
   {
     name: 'Java with Build Args',
@@ -73,175 +81,132 @@ const TEST_CASES: BuildTestCase[] = [
     buildArgs: {
       VERSION: '2.0.0',
     },
-    expectedSize: { min: 40_000_000, max: 400_000_000 },  // 40MB - 400MB for Alpine JRE
-    shouldSucceed: true,
-    description: 'Tests Java build argument injection',
+    expectedCommandFlags: ['--build-arg VERSION=2.0.0'],
+    description: 'Validates build args are included in generated build command',
   },
   {
-    name: '.NET Multi-Stage Build',
+    name: '.NET Multi-Stage Context',
     dockerContext: 'test/fixtures/build-scenarios/dotnet',
     tags: ['test-build:dotnet-app'],
-    expectedSize: { min: 40_000_000, max: 300_000_000 },  // 40MB - 300MB for Alpine runtime
-    expectedLayers: { min: 5, max: 30 },
-    shouldSucceed: true,
-    description: 'Tests .NET 8 build with ASP.NET runtime and multi-stage',
+    expectBuildKit: true,
+    // .NET fixture uses pinned images and non-root user, so no security warnings expected
+    expectedCommandFlags: ['docker build', '-t test-build:dotnet-app'],
+    description: 'Validates .NET multi-stage Dockerfile analysis and BuildKit recommendation',
   },
   {
-    name: '.NET with Build Args',
+    name: '.NET Custom Image Name',
     dockerContext: 'test/fixtures/build-scenarios/dotnet',
-    tags: ['test-build:dotnet-args'],
-    buildArgs: {
-      VERSION: '3.0.0',
-    },
-    expectedSize: { min: 40_000_000, max: 300_000_000 },  // 40MB - 300MB for Alpine runtime
-    shouldSucceed: true,
-    description: 'Tests .NET build with version argument',
+    imageName: 'custom/dotnet-app',
+    tags: ['v3.1.0'],
+    expectedCommandFlags: ['-t custom/dotnet-app:v3.1.0'],
+    description: 'Validates imageName + tag composition in final build command',
   },
 ];
 
 /**
- * Verify Docker is installed and running
+ * Check if Docker is available (optional - not required for context-only tests)
  */
-function verifyDockerInstalled(): boolean {
-  console.log('   Checking Docker...');
+function checkDockerAvailable(): boolean {
   try {
     const output = execSync('docker --version', { encoding: 'utf-8', stdio: 'pipe' });
-    console.log(`   ✅ Docker: ${output.trim()}`);
-    
-    // Verify Docker daemon is running
-    execSync('docker info', { stdio: 'pipe' });
-    console.log('   ✅ Docker daemon is running');
+    console.log(`   ℹ️  Docker available: ${output.trim()}`);
     return true;
   } catch {
-    console.log('   ❌ Docker not found or not running');
+    console.log('   ℹ️  Docker not available (not required for context tests)');
     return false;
   }
 }
 
 /**
- * Get image metadata (size, layers)
+ * Validate security warnings include expected IDs
  */
-function getImageMetadata(imageTag: string): { size: number; layers: number } | null {
-  try {
-    // Get image size
-    const sizeOutput = execSync(
-      `docker inspect --format='{{.Size}}' ${imageTag}`,
-      { encoding: 'utf-8', stdio: 'pipe' },
-    );
-    const size = parseInt(sizeOutput.trim(), 10);
-
-    // Get layer count (count lines in JavaScript instead of shell pipeline)
-    const layersOutput = execSync(
-      `docker history ${imageTag} --format='{{.ID}}'`,
-      { encoding: 'utf-8', stdio: 'pipe' },
-    );
-    const layers = layersOutput
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0).length;
-
-    return { size, layers };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Format bytes to human-readable size
- */
-function formatSize(bytes: number): string {
-  if (bytes >= 1_000_000_000) {
-    return `${(bytes / 1_000_000_000).toFixed(2)}GB`;
-  }
-  if (bytes >= 1_000_000) {
-    return `${(bytes / 1_000_000).toFixed(2)}MB`;
-  }
-  if (bytes >= 1_000) {
-    return `${(bytes / 1_000).toFixed(2)}KB`;
-  }
-  return `${bytes}B`;
-}
-
-/**
- * Cleanup test images
- */
-function cleanupTestImages(tags: string[]): void {
-  console.log('   Removing test images...');
-  for (const tag of tags) {
-    try {
-      execSync(`docker rmi -f ${tag}`, { stdio: 'pipe' });
-    } catch {
-      // Ignore cleanup errors
-    }
-  }
-  console.log(`   ✅ Cleaned up ${tags.length} test images`);
-}
-
-/**
- * Validate image against expected constraints
- */
-function validateImage(
+function validateWarnings(
   testCase: BuildTestCase,
-  metadata: { size: number; layers: number },
-): { passed: boolean; messages: string[] } {
-  const messages: string[] = [];
-  let passed = true;
-
-  // Validate size
-  if (testCase.expectedSize) {
-    const { min, max } = testCase.expectedSize;
-    if (metadata.size < min) {
-      messages.push(`Image size ${formatSize(metadata.size)} is smaller than expected min ${formatSize(min)}`);
-      passed = false;
-    }
-    if (metadata.size > max) {
-      messages.push(`Image size ${formatSize(metadata.size)} exceeds expected max ${formatSize(max)}`);
-      passed = false;
-    }
+  warnings: { id: string }[],
+): {
+  passed: boolean;
+  messages: string[];
+} {
+  if (!testCase.expectedWarnings || testCase.expectedWarnings.length === 0) {
+    return { passed: true, messages: [] };
   }
 
-  // Validate layers
-  if (testCase.expectedLayers) {
-    const { min, max } = testCase.expectedLayers;
-    if (metadata.layers < min) {
-      messages.push(`Layer count ${metadata.layers} is less than expected min ${min}`);
-      passed = false;
-    }
-    if (max !== undefined && metadata.layers > max) {
-      messages.push(`Layer count ${metadata.layers} exceeds expected max ${max}`);
-      passed = false;
-    }
+  const warningIds = warnings.map((w) => w.id);
+  const missing = testCase.expectedWarnings.filter((id) => !warningIds.includes(id));
+  if (missing.length === 0) {
+    return { passed: true, messages: [] };
   }
+  return {
+    passed: false,
+    messages: missing.map((id) => `Missing expected warning: ${id}`),
+  };
+}
 
-  return { passed, messages };
+/**
+ * Validate build command contains expected flags
+ */
+function validateCommandFlags(
+  testCase: BuildTestCase,
+  command: string,
+): {
+  passed: boolean;
+  messages: string[];
+} {
+  if (!testCase.expectedCommandFlags || testCase.expectedCommandFlags.length === 0) {
+    return { passed: true, messages: [] };
+  }
+  const missing = testCase.expectedCommandFlags.filter((flag) => !command.includes(flag));
+  if (missing.length === 0) {
+    return { passed: true, messages: [] };
+  }
+  return {
+    passed: false,
+    messages: missing.map((flag) => `Build command missing flag: ${flag}`),
+  };
+}
+
+/**
+ * Create JSON summary payload for CI upload
+ */
+function writeResultsSummary(results: TestResult[]) {
+  const summary = {
+    total: results.length,
+    passed: results.filter((r) => r.passed).length,
+    failed: results.filter((r) => !r.passed).length,
+    timestamp: new Date().toISOString(),
+    results,
+  };
+
+  writeFileSync('build-image-context-test-results.json', JSON.stringify(summary, null, 2));
 }
 
 /**
  * Main test execution
  */
 async function main() {
-  console.log('🔨 Testing build-image with Multi-Language Scenarios\n');
+  console.log('🔨 Testing build-image context generation scenarios\n');
   console.log('='.repeat(60));
 
   const results: TestResult[] = [];
   let passCount = 0;
   let failCount = 0;
-  const builtTags: string[] = [];
 
   // ─────────────────────────────────────────────────────────────
   // Step 1: Verify Prerequisites
   // ─────────────────────────────────────────────────────────────
   console.log('\n📋 Step 1: Verifying prerequisites...\n');
 
-  if (!verifyDockerInstalled()) {
-    console.error('\n❌ Docker is required but not installed or running.');
-    process.exit(1);
-  }
+  // Docker check is informational only - not required for context tests
+  checkDockerAvailable();
 
   // Verify test fixtures exist
   console.log('\n   Checking test fixtures...');
   for (const testCase of TEST_CASES) {
-    const dockerfilePath = join(process.cwd(), testCase.dockerContext, 'Dockerfile');
+    const dockerfilePath = join(
+      process.cwd(),
+      testCase.dockerContext,
+      testCase.dockerfile || 'Dockerfile',
+    );
     if (!existsSync(dockerfilePath)) {
       console.error(`   ❌ Missing Dockerfile: ${dockerfilePath}`);
       process.exit(1);
@@ -249,15 +214,15 @@ async function main() {
     console.log(`   ✅ ${testCase.name}: Dockerfile found`);
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Step 2: Run Build Tests
-  // ─────────────────────────────────────────────────────────────
-  console.log('\n🔨 Step 2: Running build tests...\n');
-
   const ctx = createToolContext(logger);
 
+  // ─────────────────────────────────────────────────────────────
+  // Step 2: Run Context Tests
+  // ─────────────────────────────────────────────────────────────
+  console.log('\n🧱 Step 2: Running build context tests...\n');
+
   for (const testCase of TEST_CASES) {
-    console.log(`\n   📦 Building: ${testCase.name}`);
+    console.log(`\n   📦 Testing: ${testCase.name}`);
     console.log(`      Description: ${testCase.description}`);
     console.log(`      Context: ${testCase.dockerContext}`);
     console.log(`      Tags: ${testCase.tags.join(', ')}`);
@@ -265,145 +230,106 @@ async function main() {
       console.log(`      Build Args: ${JSON.stringify(testCase.buildArgs)}`);
     }
 
-    const startTime = Date.now();
+    const contextPath = join(process.cwd(), testCase.dockerContext);
+    const dockerfile = testCase.dockerfile || 'Dockerfile';
+
+    // Detect platform from system architecture
+    let platform: 'linux/amd64' | 'linux/arm64' = 'linux/amd64';
+    if (process.arch === 'arm64') {
+      platform = 'linux/arm64';
+    }
 
     try {
-      const contextPath = join(process.cwd(), testCase.dockerContext);
-
-      let platform: 'linux/amd64' | 'linux/arm64' = 'linux/amd64';
-      const dockerfile = testCase.dockerfile || 'Dockerfile';
-
-      try {
-        const arch = process.platform === 'win32'
-          ? 'x86_64'  // Windows Docker Desktop defaults to linux/amd64
-          : execSync('uname -m', { encoding: 'utf-8' }).trim();
-
-        if (arch === 'arm64' || arch === 'aarch64') {
-          platform = 'linux/arm64';
-        }
-
-        console.log(`      Platform: ${platform}`);
-      } catch {
-        // Default to linux/amd64
-      }
-
-      const result = await buildImageTool.handler(
+      const result = await buildImageContextTool.handler(
         {
           path: contextPath,
           dockerfilePath: join(contextPath, dockerfile),
+          imageName: testCase.imageName,
           tags: testCase.tags,
           buildArgs: testCase.buildArgs,
           platform,
-          strictPlatformValidation: false,
         },
         ctx,
       );
 
-      const buildTime = Date.now() - startTime;
-
       if (!result.ok) {
-        if (testCase.shouldSucceed) {
-          console.log(`      ❌ Build failed: ${result.error}`);
-          results.push({
-            name: testCase.name,
-            passed: false,
-            message: `Build error: ${result.error}`,
-            buildTime,
-          });
-          failCount++;
-        } else {
-          console.log(`      ✅ Build failed as expected`);
-          results.push({
-            name: testCase.name,
-            passed: true,
-            message: 'Build failed as expected',
-            buildTime,
-          });
-          passCount++;
-        }
-        continue;
-      }
-
-      if (!testCase.shouldSucceed) {
-        console.log(`      ❌ Build should have failed but succeeded`);
+        console.log(`      ❌ Tool failed: ${result.error}`);
+        failCount++;
         results.push({
           name: testCase.name,
           passed: false,
-          message: 'Expected build to fail',
-          buildTime,
+          message: result.error,
         });
-        failCount++;
         continue;
       }
 
-      // Track built images for cleanup
-      builtTags.push(...testCase.tags);
-
       const buildResult = result.value;
-      console.log(`      Build completed in ${(buildTime / 1000).toFixed(1)}s`);
-      console.log(`      Image ID: ${buildResult.imageId.substring(0, 20)}...`);
-      console.log(`      Image size: ${formatSize(buildResult.size)}`);
-      console.log(`      Layers: ${buildResult.layers || 'N/A'}`);
+      const warningValidation = validateWarnings(testCase, buildResult.securityAnalysis.warnings);
+      const commandValidation = validateCommandFlags(
+        testCase,
+        buildResult.nextAction.buildCommand.command,
+      );
+      const buildKitFlagPassed =
+        testCase.expectBuildKit === undefined
+          ? true
+          : buildResult.buildKitAnalysis.recommended === testCase.expectBuildKit;
 
-      // Get additional metadata from Docker
-      const metadata = getImageMetadata(testCase.tags[0]);
-      if (metadata) {
-        console.log(`      Docker size: ${formatSize(metadata.size)}`);
-        console.log(`      Docker layers: ${metadata.layers}`);
+      const failureMessages: string[] = [];
+      if (!warningValidation.passed) {
+        failureMessages.push(...warningValidation.messages);
+      }
+      if (!commandValidation.passed) {
+        failureMessages.push(...commandValidation.messages);
+      }
+      if (!buildKitFlagPassed) {
+        failureMessages.push(
+          `BuildKit recommendation mismatch. Expected: ${testCase.expectBuildKit}`,
+        );
       }
 
-      // Validate image constraints
-      const validation = validateImage(testCase, metadata || { size: buildResult.size, layers: buildResult.layers || 0 });
-
-      if (validation.passed) {
-        console.log(`      ✅ PASSED`);
+      if (failureMessages.length === 0) {
+        console.log('      ✅ PASSED');
+        passCount++;
         results.push({
           name: testCase.name,
           passed: true,
-          message: 'Build successful, all validations passed',
-          imageSize: metadata?.size || buildResult.size,
-          layers: metadata?.layers || buildResult.layers,
-          buildTime,
+          message: 'Context prepared successfully',
+          warnings: buildResult.securityAnalysis.warnings.length,
+          buildKit: buildResult.buildKitAnalysis.recommended,
+          command: buildResult.nextAction.buildCommand.command,
         });
-        passCount++;
       } else {
-        console.log(`      ❌ FAILED`);
-        for (const msg of validation.messages) {
+        console.log('      ❌ FAILED');
+        for (const msg of failureMessages) {
           console.log(`         - ${msg}`);
         }
+        failCount++;
         results.push({
           name: testCase.name,
           passed: false,
-          message: validation.messages.join('; '),
-          imageSize: metadata?.size || buildResult.size,
-          layers: metadata?.layers || buildResult.layers,
-          buildTime,
+          message: failureMessages.join('; '),
+          warnings: buildResult.securityAnalysis.warnings.length,
+          buildKit: buildResult.buildKitAnalysis.recommended,
+          command: buildResult.nextAction.buildCommand.command,
         });
-        failCount++;
       }
     } catch (error) {
-      const buildTime = Date.now() - startTime;
-      console.log(`      ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`      ❌ Error: ${message}`);
+      failCount++;
       results.push({
         name: testCase.name,
         passed: false,
-        message: `Exception: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        buildTime,
+        message,
       });
-      failCount++;
     }
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Step 3: Cleanup
+  // Step 3: Summary
   // ─────────────────────────────────────────────────────────────
-  console.log('\n🧹 Step 3: Cleaning up...\n');
-  cleanupTestImages(builtTags);
-
-  // ─────────────────────────────────────────────────────────────
-  // Step 4: Generate Summary
-  // ─────────────────────────────────────────────────────────────
-  console.log('\n' + '='.repeat(60));
+  console.log('\n'.repeat(2));
+  console.log('='.repeat(60));
   console.log('📊 TEST SUMMARY');
   console.log('='.repeat(60));
   console.log(`\n   Total:  ${results.length}`);
@@ -413,41 +339,21 @@ async function main() {
 
   for (const result of results) {
     const status = result.passed ? '✅ PASS' : '❌ FAIL';
-    const time = result.buildTime ? ` (${(result.buildTime / 1000).toFixed(1)}s)` : '';
-    const size = result.imageSize ? ` ${formatSize(result.imageSize)}` : '';
-    console.log(`   ${status} ${result.name}${time}${size}`);
+    console.log(`   ${status} ${result.name}`);
     if (!result.passed) {
       console.log(`         ${result.message}`);
     }
   }
 
-  // Write results to JSON for CI/CD reporting
-  const resultsJson = {
-    total: results.length,
-    passed: passCount,
-    failed: failCount,
-    timestamp: new Date().toISOString(),
-    results: results.map((r) => ({
-      name: r.name,
-      passed: r.passed,
-      message: r.message,
-      imageSize: r.imageSize,
-      layers: r.layers,
-      buildTimeMs: r.buildTime,
-    })),
-  };
-
-  writeFileSync('build-image-test-results.json', JSON.stringify(resultsJson, null, 2));
-  console.log('\n   Results written to build-image-test-results.json');
-
-  console.log('\n' + '='.repeat(60));
+  writeResultsSummary(results);
+  console.log('\n   Results written to build-image-context-test-results.json');
 
   if (failCount > 0) {
-    console.log('❌ Some tests failed. See above for details.');
+    console.log('\n❌ Some tests failed. See above for details.');
     process.exit(1);
   }
 
-  console.log('✅ All tests passed!');
+  console.log('\n✅ All context tests passed!');
 }
 
 main().catch((error) => {

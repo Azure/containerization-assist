@@ -22,7 +22,7 @@ import * as scannerModule from '@/infra/security/scanner';
 // Import tools
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
-import buildImageTool from '@/tools/build-image/tool';
+import buildImageContextTool from '@/tools/build-image-context/tool';
 import scanImageTool from '@/tools/scan-image/tool';
 import tagImageTool from '@/tools/tag-image/tool';
 import pushImageTool from '@/tools/push-image/tool';
@@ -86,7 +86,7 @@ describe('Error Scenario Coverage', () => {
     it('should reject analyze-repo with invalid path', async () => {
       const result = await analyzeRepoTool.handler(
         { repositoryPath: '/absolutely/nonexistent/path/12345' },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -99,7 +99,7 @@ describe('Error Scenario Coverage', () => {
     it('should reject generate-dockerfile with empty repository path', async () => {
       const result = await generateDockerfileTool.handler(
         { repositoryPath: '', environment: 'production', targetPlatform: 'linux/amd64' },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -109,13 +109,13 @@ describe('Error Scenario Coverage', () => {
     });
 
     it('should reject build-image with missing Dockerfile', async () => {
-      const result = await buildImageTool.handler(
+      const result = await buildImageContextTool.handler(
         {
           dockerfilePath: '/nonexistent/Dockerfile',
           context: '/tmp',
           imageName: 'test:latest',
         },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -130,7 +130,7 @@ describe('Error Scenario Coverage', () => {
           imageId: 'totally-invalid-image-id-12345',
           tag: 'test:v1',
         },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -141,12 +141,7 @@ describe('Error Scenario Coverage', () => {
 
     it('should reject scan-image with nonexistent image', async () => {
       const result = await scanImageTool.handler(
-        {
-          imageId: 'nonexistent-image:12345',
-          scanner: 'osv',
-          scanType: 'vulnerability',
-          enableAISuggestions: false,
-        },
+        { imageId: 'nonexistent-image:12345' },
         toolContext,
       );
 
@@ -162,7 +157,7 @@ describe('Error Scenario Coverage', () => {
           imageId: 'test:latest',
           registry: 'invalid://registry',
         },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -174,7 +169,7 @@ describe('Error Scenario Coverage', () => {
     it('should reject fix-dockerfile with nonexistent file', async () => {
       const result = await fixDockerfileTool.handler(
         { dockerfilePath: '/nonexistent/Dockerfile' },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -187,7 +182,7 @@ describe('Error Scenario Coverage', () => {
     it('should reject fix-dockerfile with invalid path', async () => {
       const result = await fixDockerfileTool.handler(
         { dockerfilePath: '/nonexistent/Dockerfile' },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -202,7 +197,7 @@ describe('Error Scenario Coverage', () => {
           analysis: '',
           imageName: 'test:latest',
         } as any,
-        toolContext
+        toolContext,
       );
 
       // May either fail or handle gracefully
@@ -212,7 +207,7 @@ describe('Error Scenario Coverage', () => {
     it('should reject prepare-cluster with invalid namespace', async () => {
       const result = await prepareClusterTool.handler(
         { namespace: '-invalid-namespace' },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -232,7 +227,7 @@ describe('Error Scenario Coverage', () => {
           analysis: '{invalid json[}',
           targetPlatform: 'linux/amd64',
         },
-        toolContext
+        toolContext,
       );
 
       // Should handle gracefully
@@ -249,7 +244,7 @@ describe('Error Scenario Coverage', () => {
           dockerfilePath,
           validationReport: 'not a valid report',
         },
-        toolContext
+        toolContext,
       );
 
       await cleanup();
@@ -259,10 +254,7 @@ describe('Error Scenario Coverage', () => {
     });
 
     it('should handle empty strings in required fields', async () => {
-      const result = await analyzeRepoTool.handler(
-        { repositoryPath: '' },
-        toolContext
-      );
+      const result = await analyzeRepoTool.handler({ repositoryPath: '' }, toolContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -278,13 +270,13 @@ describe('Error Scenario Coverage', () => {
       const dockerfilePath = join(dir.name, 'Dockerfile');
       writeFileSync(dockerfilePath, 'FROM node:18-alpine\nCMD ["node"]');
 
-      const result = await buildImageTool.handler(
+      const result = await buildImageContextTool.handler(
         {
           dockerfilePath,
           context: dir.name,
           imageName: 'test:latest',
         },
-        toolContext
+        toolContext,
       );
 
       await cleanup();
@@ -301,15 +293,7 @@ describe('Error Scenario Coverage', () => {
 
     it('should handle Trivy scanner unavailable', async () => {
       // Scan will fail if Trivy not installed
-      const result = await scanImageTool.handler(
-        {
-          imageId: 'alpine:latest',
-          scanner: 'trivy',
-          scanType: 'vulnerability',
-          enableAISuggestions: false,
-        },
-        toolContext,
-      );
+      const result = await scanImageTool.handler({ imageId: 'alpine:latest' }, toolContext);
 
       if (!result.ok) {
         expect(result.error).toBeDefined();
@@ -335,7 +319,7 @@ describe('Error Scenario Coverage', () => {
 
         const result = await analyzeRepoTool.handler(
           { repositoryPath: restrictedPath },
-          toolContext
+          toolContext,
         );
 
         // Restore permissions before cleanup
@@ -371,7 +355,7 @@ describe('Error Scenario Coverage', () => {
             outputPath: join(readOnlyDir, 'Dockerfile'),
             targetPlatform: 'linux/amd64',
           },
-          toolContext
+          toolContext,
         );
 
         chmodSync(readOnlyDir, 0o755);
@@ -393,10 +377,7 @@ describe('Error Scenario Coverage', () => {
       const { dir, cleanup } = createTestTempDir('missing-pkg-');
       writeFileSync(join(dir.name, 'index.js'), 'console.log("hi");');
 
-      const result = await analyzeRepoTool.handler(
-        { repositoryPath: dir.name },
-        toolContext
-      );
+      const result = await analyzeRepoTool.handler({ repositoryPath: dir.name }, toolContext);
 
       await cleanup();
 
@@ -410,10 +391,7 @@ describe('Error Scenario Coverage', () => {
       const { dir, cleanup } = createTestTempDir('missing-req-');
       writeFileSync(join(dir.name, 'app.py'), 'print("hello")');
 
-      const result = await analyzeRepoTool.handler(
-        { repositoryPath: dir.name },
-        toolContext
-      );
+      const result = await analyzeRepoTool.handler({ repositoryPath: dir.name }, toolContext);
 
       await cleanup();
 
@@ -422,7 +400,6 @@ describe('Error Scenario Coverage', () => {
         expect(result.value).toBeDefined();
       }
     });
-
   });
 
   describe('Validation Failures', () => {
@@ -431,10 +408,7 @@ describe('Error Scenario Coverage', () => {
       const dockerfilePath = join(dir.name, 'Dockerfile');
       writeFileSync(dockerfilePath, 'INVALID_INSTRUCTION node:18\nBAD SYNTAX');
 
-      const result = await fixDockerfileTool.handler(
-        { dockerfilePath },
-        toolContext
-      );
+      const result = await fixDockerfileTool.handler({ dockerfilePath }, toolContext);
 
       await cleanup();
 
@@ -455,13 +429,10 @@ describe('Error Scenario Coverage', () => {
 USER root
 RUN chmod 777 /app
 COPY . .
-CMD ["node", "app.js"]`
+CMD ["node", "app.js"]`,
       );
 
-      const result = await fixDockerfileTool.handler(
-        { dockerfilePath },
-        toolContext
-      );
+      const result = await fixDockerfileTool.handler({ dockerfilePath }, toolContext);
 
       await cleanup();
 
@@ -475,7 +446,7 @@ CMD ["node", "app.js"]`
     it('should reject invalid namespace format', async () => {
       const result = await prepareClusterTool.handler(
         { namespace: 'Invalid_Namespace_Name!' },
-        toolContext
+        toolContext,
       );
 
       expect(result.ok).toBe(false);
@@ -489,10 +460,7 @@ CMD ["node", "app.js"]`
     it('should handle very long file paths', async () => {
       const longPath = '/tmp/' + 'a'.repeat(200) + '/test';
 
-      const result = await analyzeRepoTool.handler(
-        { repositoryPath: longPath },
-        toolContext
-      );
+      const result = await analyzeRepoTool.handler({ repositoryPath: longPath }, toolContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -503,7 +471,7 @@ CMD ["node", "app.js"]`
     it('should handle special characters in paths', async () => {
       const result = await analyzeRepoTool.handler(
         { repositoryPath: '/tmp/test-app-with-special-chars-!@#$%' },
-        toolContext
+        toolContext,
       );
 
       // Should handle gracefully (will fail because path doesn't exist)
@@ -521,7 +489,7 @@ CMD ["node", "app.js"]`
         mkdirSync(appPath);
         writeFileSync(
           join(appPath, 'package.json'),
-          JSON.stringify({ name: `app${i}`, version: '1.0.0' })
+          JSON.stringify({ name: `app${i}`, version: '1.0.0' }),
         );
       }
 
@@ -534,7 +502,7 @@ CMD ["node", "app.js"]`
       await cleanup();
 
       expect(results).toHaveLength(3);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.ok !== undefined).toBe(true);
       });
     });
@@ -542,10 +510,7 @@ CMD ["node", "app.js"]`
 
   describe('Guidance Messages', () => {
     it('should provide error messages for common failures', async () => {
-      const result = await analyzeRepoTool.handler(
-        { repositoryPath: '/nonexistent' },
-        toolContext
-      );
+      const result = await analyzeRepoTool.handler({ repositoryPath: '/nonexistent' }, toolContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -562,10 +527,7 @@ CMD ["node", "app.js"]`
       const dockerfilePath = join(dir.name, 'Dockerfile');
       writeFileSync(dockerfilePath, 'FROM node:latest\n');
 
-      const result = await fixDockerfileTool.handler(
-        { dockerfilePath },
-        toolContext
-      );
+      const result = await fixDockerfileTool.handler({ dockerfilePath }, toolContext);
 
       await cleanup();
 

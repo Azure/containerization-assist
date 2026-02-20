@@ -5,7 +5,7 @@ import type { ChainHints } from '@/types/tool';
 
 export const TOOL_NAME = {
   ANALYZE_REPO: 'analyze-repo',
-  BUILD_IMAGE: 'build-image',
+  BUILD_IMAGE_CONTEXT: 'build-image-context',
   FIX_DOCKERFILE: 'fix-dockerfile',
   GENERATE_DOCKERFILE: 'generate-dockerfile',
   GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
