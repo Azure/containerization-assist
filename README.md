@@ -261,6 +261,7 @@ The following environment variables control server behavior:
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `DOCKER_SOCKET` | Docker socket path | `/var/run/docker.sock` (Linux/Mac)<br>`//./pipe/docker_engine` (Windows) | Yes (for Docker features) |
+| `DOCKER_HOST` | Docker host URI (`unix://`, `tcp://`, `http://`, `https://`, `npipe://`) | Auto-detected | No |
 | `DOCKER_TIMEOUT` | Docker operation timeout in milliseconds | `60000` (60s) | No |
 | `KUBECONFIG` | Path to Kubernetes config file | `~/.kube/config` | No |
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` | No |
