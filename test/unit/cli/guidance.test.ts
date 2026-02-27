@@ -22,7 +22,7 @@ describe('provideContextualGuidance', () => {
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('🔍 Error: Docker connection failed'));
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('💡 Docker-related issue detected:'));
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Ensure Docker Desktop/Engine is running'));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Ensure Docker Desktop/Engine/Rancher Desktop/OrbStack/Podman is running'));
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('docker version'));
   });
 
@@ -129,7 +129,7 @@ describe('provideContextualGuidance', () => {
     const error = new Error('Docker error');
     provideContextualGuidance(error, { dev: false });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('  • Ensure Docker Desktop/Engine is running'));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('  • Ensure Docker Desktop/Engine/Rancher Desktop/OrbStack/Podman is running'));
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('  • Verify Docker socket access permissions'));
   });
 });
