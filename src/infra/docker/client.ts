@@ -505,6 +505,9 @@ export const createDockerClient = (logger: Logger, config?: DockerClientConfig):
         if (parsed.type === 'tcp') {
           dockerOptions.host = parsed.host;
           dockerOptions.port = parsed.port;
+          if (parsed.value.startsWith('https://')) {
+            dockerOptions.protocol = 'https';
+          }
         }
       } catch {
         // Fallback to defaults if parsing fails

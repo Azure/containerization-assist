@@ -82,6 +82,12 @@ describe('Docker Socket Validation', () => {
       expect(result).toEqual({ type: 'tcp', value: 'https://docker.example.com:2376', host: 'docker.example.com', port: 2376 });
     });
 
+    it('should parse https:// without port (defaults to 2376)', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('https://docker.example.com');
+      expect(result).toEqual({ type: 'tcp', value: 'https://docker.example.com', host: 'docker.example.com', port: 2376 });
+    });
+
     it('should parse npipe:// scheme', async () => {
       const { parseDockerHost } = await import('@/infra/docker/socket-validation');
       const result = parseDockerHost('npipe:////./pipe/docker_engine');
@@ -277,6 +283,17 @@ describe('Docker Socket Validation', () => {
       expect(consoleErrorSpy).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should not match http://pipeline:2375 as a Windows pipe', async () => {
+      const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      // http://pipeline:2375 contains 'pipe' but is a TCP address, not a Windows pipe
+      const result = validateDockerSocket({ dockerSocket: 'http://pipeline:2375' }, true);
+
+      // Should be handled as TCP, not as a pipe
+      expect(result.dockerSocket).toBe('http://pipeline:2375');
+      expect(result.warnings).toEqual([]);
     });
 
     it('should use DOCKER_HOST when DOCKER_SOCKET is not set', async () => {

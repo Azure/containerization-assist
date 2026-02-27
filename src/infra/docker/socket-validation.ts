@@ -64,7 +64,7 @@ export function parseDockerHost(value: string): ParsedDockerHost {
       const urlStr = trimmed.replace(/^tcp:/, 'http:');
       const url = new URL(urlStr);
       const host = url.hostname || 'localhost';
-      const port = url.port ? parseInt(url.port, 10) : 2375;
+      const port = url.port ? parseInt(url.port, 10) : trimmed.startsWith('https:') ? 2376 : 2375;
       return { type: 'tcp', value: trimmed, host, port };
     } catch {
       throw new Error(`DOCKER_HOST has invalid URL: ${trimmed}`);
@@ -226,12 +226,8 @@ export function validateDockerSocket(
   } else if (process.env.DOCKER_HOST) {
     try {
       const parsed = parseDockerHost(process.env.DOCKER_HOST);
-      if (parsed.type === 'tcp') {
-        // For TCP, pass the original DOCKER_HOST value through so client.ts can handle it
-        dockerSocket = process.env.DOCKER_HOST;
-      } else {
-        dockerSocket = parsed.value;
-      }
+      // Use the parsed (trimmed) value for all types
+      dockerSocket = parsed.value;
     } catch (err) {
       warnings.push(`Invalid DOCKER_HOST: ${extractErrorMessage(err)}`);
       dockerSocket = defaultDockerSocket;
@@ -243,7 +239,11 @@ export function validateDockerSocket(
   // Validate the selected socket
   try {
     // Handle Windows named pipes specially - they can't be stat()'d
-    if (dockerSocket.includes('pipe')) {
+    if (
+      dockerSocket.startsWith('//./pipe/') ||
+      dockerSocket.startsWith('\\\\.\\pipe\\') ||
+      dockerSocket.startsWith('npipe://')
+    ) {
       // For Windows named pipes, assume they're valid and let Docker client handle validation
       if (shouldLogOutput(quiet)) {
         console.error(`✅ Using Docker named pipe: ${dockerSocket}`);
