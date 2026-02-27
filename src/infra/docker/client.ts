@@ -8,7 +8,7 @@ import Docker, { DockerOptions } from 'dockerode';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
-import { autoDetectDockerSocket } from './socket-validation';
+import { autoDetectDockerSocket, parseDockerHost } from './socket-validation';
 
 /**
  * Docker client configuration options.
@@ -490,12 +490,33 @@ export const createDockerClient = (logger: Logger, config?: DockerClientConfig):
   // Create Docker client with detected socket path
   const dockerOptions: DockerOptions = {};
 
-  if (socketPath.startsWith('tcp://') || socketPath.startsWith('http://')) {
-    // TCP connection
-    dockerOptions.host = config?.host || 'localhost';
-    dockerOptions.port = config?.port || 2375;
+  if (
+    socketPath.startsWith('tcp://') ||
+    socketPath.startsWith('http://') ||
+    socketPath.startsWith('https://')
+  ) {
+    // TCP connection — extract host/port from URL if no explicit config
+    if (config?.host) {
+      dockerOptions.host = config.host;
+      dockerOptions.port = config.port || 2375;
+    } else {
+      try {
+        const parsed = parseDockerHost(socketPath);
+        if (parsed.type === 'tcp') {
+          dockerOptions.host = parsed.host;
+          dockerOptions.port = parsed.port;
+          if (parsed.value.startsWith('https://')) {
+            dockerOptions.protocol = 'https';
+          }
+        }
+      } catch {
+        // Fallback to defaults if parsing fails
+        dockerOptions.host = 'localhost';
+        dockerOptions.port = 2375;
+      }
+    }
   } else {
-    // Unix socket connection
+    // Unix socket / named pipe connection
     dockerOptions.socketPath = socketPath;
   }
 

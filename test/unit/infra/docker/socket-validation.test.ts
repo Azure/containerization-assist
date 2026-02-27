@@ -34,9 +34,118 @@ describe('Docker Socket Validation', () => {
       expect(typeof autoDetectDockerSocket).toBe('function');
     });
 
+    it('should export parseDockerHost function', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      expect(typeof parseDockerHost).toBe('function');
+    });
+
     it('should export SocketValidationResult type', async () => {
       const module = await import('@/infra/docker/socket-validation');
       expect(module).toBeDefined();
+    });
+  });
+
+  describe('parseDockerHost', () => {
+    it('should parse unix:// scheme', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('unix:///var/run/docker.sock');
+      expect(result).toEqual({ type: 'unix', value: '/var/run/docker.sock' });
+    });
+
+    it('should parse unix:// with home path', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('unix:///home/user/.rd/docker.sock');
+      expect(result).toEqual({ type: 'unix', value: '/home/user/.rd/docker.sock' });
+    });
+
+    it('should parse tcp:// scheme', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('tcp://192.168.1.100:2375');
+      expect(result).toEqual({ type: 'tcp', value: 'tcp://192.168.1.100:2375', host: '192.168.1.100', port: 2375 });
+    });
+
+    it('should parse tcp:// without port (defaults to 2375)', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('tcp://myhost');
+      expect(result).toEqual({ type: 'tcp', value: 'tcp://myhost', host: 'myhost', port: 2375 });
+    });
+
+    it('should parse http:// scheme as tcp', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('http://localhost:2375');
+      expect(result).toEqual({ type: 'tcp', value: 'http://localhost:2375', host: 'localhost', port: 2375 });
+    });
+
+    it('should parse https:// scheme as tcp', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('https://docker.example.com:2376');
+      expect(result).toEqual({ type: 'tcp', value: 'https://docker.example.com:2376', host: 'docker.example.com', port: 2376 });
+    });
+
+    it('should parse https:// without port (defaults to 2376)', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('https://docker.example.com');
+      expect(result).toEqual({ type: 'tcp', value: 'https://docker.example.com', host: 'docker.example.com', port: 2376 });
+    });
+
+    it('should parse npipe:// scheme', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('npipe:////./pipe/docker_engine');
+      expect(result).toEqual({ type: 'npipe', value: '//./pipe/docker_engine' });
+    });
+
+    it('should parse raw absolute path as unix', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('/var/run/docker.sock');
+      expect(result).toEqual({ type: 'unix', value: '/var/run/docker.sock' });
+    });
+
+    it('should parse raw tilde path as unix', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('~/.rd/docker.sock');
+      expect(result).toEqual({ type: 'unix', value: '~/.rd/docker.sock' });
+    });
+
+    it('should parse raw Windows pipe path', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('//./pipe/docker_engine');
+      expect(result).toEqual({ type: 'npipe', value: '//./pipe/docker_engine' });
+    });
+
+    it('should throw on empty string', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      expect(() => parseDockerHost('')).toThrow('DOCKER_HOST is empty');
+    });
+
+    it('should throw on whitespace-only string', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      expect(() => parseDockerHost('   ')).toThrow('DOCKER_HOST is empty');
+    });
+
+    it('should throw on unsupported fd:// scheme', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      expect(() => parseDockerHost('fd://something')).toThrow('scheme not supported');
+    });
+
+    it('should throw on unsupported ssh:// scheme', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      expect(() => parseDockerHost('ssh://user@host')).toThrow('scheme not supported');
+    });
+
+    it('should throw on unix:// with no path', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      expect(() => parseDockerHost('unix://')).toThrow('has no path');
+    });
+
+    it('should throw on unrecognized value', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      expect(() => parseDockerHost('just-a-hostname')).toThrow('not recognized');
+    });
+
+    it('should trim whitespace from input', async () => {
+      const { parseDockerHost } = await import('@/infra/docker/socket-validation');
+      const result = parseDockerHost('  unix:///var/run/docker.sock  ');
+      expect(result).toEqual({ type: 'unix', value: '/var/run/docker.sock' });
     });
   });
 
@@ -174,6 +283,78 @@ describe('Docker Socket Validation', () => {
       expect(consoleErrorSpy).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should not match http://pipeline:2375 as a Windows pipe', async () => {
+      const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      // http://pipeline:2375 contains 'pipe' but is a TCP address, not a Windows pipe
+      const result = validateDockerSocket({ dockerSocket: 'http://pipeline:2375' }, true);
+
+      // Should be handled as TCP, not as a pipe
+      expect(result.dockerSocket).toBe('http://pipeline:2375');
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('should use DOCKER_HOST when DOCKER_SOCKET is not set', async () => {
+      delete process.env.DOCKER_SOCKET;
+      process.env.DOCKER_HOST = 'tcp://192.168.1.100:2375';
+
+      jest.resetModules();
+      const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      const result = validateDockerSocket({}, true);
+
+      expect(result.dockerSocket).toBe('tcp://192.168.1.100:2375');
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('should prefer DOCKER_SOCKET over DOCKER_HOST', async () => {
+      process.env.DOCKER_SOCKET = 'npipe://from-socket-env';
+      process.env.DOCKER_HOST = 'tcp://from-docker-host:2375';
+
+      jest.resetModules();
+      const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      const result = validateDockerSocket({}, true);
+
+      expect(result.dockerSocket).toBe('npipe://from-socket-env');
+    });
+
+    it('should prefer CLI option over DOCKER_HOST', async () => {
+      process.env.DOCKER_HOST = 'tcp://from-docker-host:2375';
+
+      const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      const result = validateDockerSocket({ dockerSocket: 'npipe://from-cli' }, true);
+
+      expect(result.dockerSocket).toBe('npipe://from-cli');
+    });
+
+    it('should handle invalid DOCKER_HOST with warning and fallback', async () => {
+      delete process.env.DOCKER_SOCKET;
+      process.env.DOCKER_HOST = 'fd://unsupported';
+
+      jest.resetModules();
+      const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      const result = validateDockerSocket({}, true);
+
+      // Should fall back to auto-detect and include a warning about invalid DOCKER_HOST
+      expect(result.warnings.some(w => w.includes('Invalid DOCKER_HOST'))).toBe(true);
+    });
+
+    it('should validate tcp:// DOCKER_HOST without file system check', async () => {
+      delete process.env.DOCKER_SOCKET;
+      process.env.DOCKER_HOST = 'tcp://remote-docker:2376';
+
+      jest.resetModules();
+      const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      const result = validateDockerSocket({}, true);
+
+      expect(result.dockerSocket).toBe('tcp://remote-docker:2376');
+      expect(result.warnings).toEqual([]);
     });
   });
 

@@ -24,12 +24,13 @@ const GUIDANCE_MESSAGES = {
   [ErrorCategory.Docker]: {
     title: '💡 Docker-related issue detected:',
     steps: [
-      'Ensure Docker Desktop/Engine is running',
+      'Ensure Docker Desktop/Engine/Rancher Desktop/OrbStack/Podman is running',
+      'Check DOCKER_HOST: echo $DOCKER_HOST',
       'Verify Docker socket access permissions',
       'Check Docker socket path with: docker context ls',
       'Test Docker connection: docker version',
       'Check Docker daemon is running',
-      'Specify custom socket: --docker-socket <path>',
+      'Specify custom socket: --docker-socket <path> or set DOCKER_HOST',
     ],
   },
   [ErrorCategory.Permission]: {

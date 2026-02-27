@@ -88,6 +88,7 @@ Environment Variables:
   LOG_LEVEL                                    Logging level (debug, info, warn, error)
   WORKSPACE_DIR                                Working directory for operations
   DOCKER_SOCKET                                Docker daemon socket path
+  DOCKER_HOST                                  Docker host URI (unix://, tcp://, http://, https://, npipe://)
   K8S_NAMESPACE                                Default Kubernetes namespace
   CUSTOM_POLICY_PATH                           Custom policy directory path (highest priority)
   NODE_ENV                                     Environment (development, production)
