@@ -41,7 +41,7 @@ jobs:
         run: npm pack
 
       - name: Upload SDK tarball
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: sdk-tarball
           path: '*.tgz'
@@ -163,7 +163,7 @@ jobs:
         run: npm run test
 
       - name: Upload webpack bundle
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: webpack-bundle
           path: test-project/dist/bundle.js
