@@ -1,0 +1,39 @@
+{
+  "name": "io.github.azure/containerization-assist",
+  "version_detail": {
+    "version": "1.2.0"
+  },
+  "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
+  "repository": {
+    "source": "github",
+    "url": "https://github.com/azure/containerization-assist"
+  },
+  "packages": [
+    {
+      "identifier": "containerization-assist-mcp",
+      "registryType": "npm",
+      "version": "1.2.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "start"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "DOCKER_SOCKET",
+          "description": "Docker socket path or named pipe",
+          "required": true
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Logging level (debug, info, warn, error)",
+          "required": false
+        }
+      ]
+    }
+  ]
+}
