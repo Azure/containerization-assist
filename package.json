@@ -1,7 +1,7 @@
 {
   "name": "containerization-assist-mcp",
   "version": "1.3.0",
-  "mcpName": "io.github.azure/containerization-assist",
+  "mcpName": "io.github.Azure/containerization-assist",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -193,10 +193,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/azure/containerization-assist"
+    "url": "https://github.com/Azure/containerization-assist"
   },
   "bugs": {
-    "url": "https://github.com/azure/containerization-assist/issues"
+    "url": "https://github.com/Azure/containerization-assist/issues"
   },
-  "homepage": "https://github.com/azure/containerization-assist#readme"
+  "homepage": "https://github.com/Azure/containerization-assist#readme"
 }
