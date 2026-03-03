@@ -1,18 +1,19 @@
 {
-  "name": "io.github.azure/containerization-assist",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Azure/containerization-assist",
   "version_detail": {
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "repository": {
     "source": "github",
-    "url": "https://github.com/azure/containerization-assist"
+    "url": "https://github.com/Azure/containerization-assist"
   },
   "packages": [
     {
       "identifier": "containerization-assist-mcp",
       "registryType": "npm",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "transport": {
         "type": "stdio"
       },
