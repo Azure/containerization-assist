@@ -3,7 +3,7 @@
 ## [1.3.0]
 
 - add vulnerability remediation recommendations to scan-image tool output (#587)
-- covert build-image to context providing tool (#571)
+- convert build-image to context providing tool (#571)
 - broaden socket auto-detection for Rancher, OrbStack, Podman, and DOCKER_HOST (#602)
 - mcp registry publish support (#605)
 - dependency updates (#591, #592, #593, #596, #598, #599, #601)
