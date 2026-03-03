@@ -118,7 +118,9 @@
     "mcp:packaged": "tsx scripts/toggle-mcp-mode.ts packaged",
     "mcp:status": "tsx scripts/toggle-mcp-mode.ts status",
     "smoke:journey": "tsx scripts/smoke-journey.ts",
-    "test:policies": "opa test policies/"
+    "test:policies": "opa test policies/",
+    "changelog-sync": "tsx scripts/changelog-sync.ts",
+    "postversion": "tsx scripts/postversion.ts"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
