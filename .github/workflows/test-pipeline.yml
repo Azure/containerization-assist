@@ -50,6 +50,9 @@ jobs:
           mv opa node_modules/.bin/opa
           node_modules/.bin/opa version
 
+      - name: Validate version sync
+        run: npx tsx scripts/validate-version-sync.ts
+
       - name: Build project
         run: npm run build
 

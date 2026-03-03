@@ -1,0 +1,101 @@
+name: Publish to MCP Registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (defaults to package.json version)'
+        required: false
+        type: string
+  schedule:
+    - cron: '0 12 * * *'  # Daily at noon UTC
+
+permissions:
+  id-token: write  # Required for OIDC authentication
+  contents: read
+
+jobs:
+  publish-mcp-registry:
+    name: Publish to MCP Registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.1
+      
+      - name: Determine version to publish
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            echo "Using workflow_dispatch version: $VERSION"
+          else
+            VERSION=$(jq -r '.version' package.json)
+            echo "Using package.json version: $VERSION"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+      
+      - name: Poll npm registry for package availability
+        id: npm_check
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          PACKAGE_NAME="containerization-assist-mcp"
+          REGISTRY_URL="https://registry.npmjs.org/${PACKAGE_NAME}/${VERSION}"
+          MAX_ATTEMPTS=6
+          SLEEP_SECONDS=10
+          
+          echo "Polling npm registry for ${PACKAGE_NAME}@${VERSION}"
+          echo "URL: ${REGISTRY_URL}"
+          
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $i/$MAX_ATTEMPTS..."
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$REGISTRY_URL" || true)
+            if [ "$STATUS_CODE" = "200" ]; then
+              echo "✓ Package ${PACKAGE_NAME}@${VERSION} is available on npm"
+              exit 0
+            fi
+            
+            if [ $i -lt $MAX_ATTEMPTS ]; then
+              echo "Package not yet available (HTTP $STATUS_CODE), waiting ${SLEEP_SECONDS}s..."
+              sleep $SLEEP_SECONDS
+            fi
+          done
+          
+          echo "✗ Package ${PACKAGE_NAME}@${VERSION} not available after $((MAX_ATTEMPTS * SLEEP_SECONDS))s"
+          
+          # Graceful exit for cron runs (retry next day)
+          # Error exit for manual runs (operator feedback)
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "Scheduled run: exiting gracefully to retry tomorrow"
+            exit 0
+          else
+            echo "Manual run: package not available on npm"
+            exit 1
+          fi
+      
+      - name: Install mcp-publisher CLI
+        run: |
+          echo "Installing mcp-publisher..."
+          ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          # TODO: Pin mcp-publisher to a specific version and verify checksum once a stable release is available
+          RELEASE_URL="https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}_${ARCH}.tar.gz"
+          
+          echo "Downloading from: $RELEASE_URL"
+          curl -L "$RELEASE_URL" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+          ./mcp-publisher --version
+      
+      - name: Authenticate with GitHub OIDC
+        run: |
+          echo "Authenticating with MCP Registry using GitHub OIDC..."
+          ./mcp-publisher login github-oidc
+      
+      - name: Publish to MCP Registry
+        run: |
+          echo "Publishing server.json to MCP Registry..."
+          ./mcp-publisher publish
+          echo "✓ Successfully published to MCP Registry"

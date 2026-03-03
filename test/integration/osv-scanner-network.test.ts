@@ -1,253 +1,223 @@
 /**
- * Integration tests for OSV Scanner with real network calls
+ * Integration tests for OSV Scanner with cached fixtures
  *
- * These tests make actual network requests to the OSV API (https://api.osv.dev)
- * to verify vulnerability detection with real-world data.
+ * These tests exercise the full OSV scanning pipeline without network or Docker:
+ *   - extractPackagesFromImage is mocked to return fixture data
+ *   - global fetch is mocked to return cached OSV API responses
  *
- * Note: These tests require:
- * - Network connectivity
- * - Docker daemon running
- * - OSV API availability
- *
- * The tests build Docker images with known vulnerable dependencies in pom.xml.
+ * This eliminates flakiness from Docker image builds, OSV API availability,
+ * and network timeouts while still validating the scan-result assembly logic.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, jest } from '@jest/globals';
 import { createLogger } from '@/lib/logger';
 import type { Logger } from 'pino';
-import { createSecurityScanner } from '@/infra/security/scanner';
-import { checkOSVAvailability } from '@/infra/security/osv-scanner/index';
-import Docker from 'dockerode';
-import { mkdir, writeFile, rm } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import { randomBytes } from 'crypto';
+import type { ExtractedPackage } from '@/infra/security/osv-scanner/maven/types';
+import type { OSVBatchResponse, OSVVulnerability } from '@/infra/security/osv-scanner/osv-api';
 
-describe('OSV Scanner Integration - Real Network Calls', () => {
-  let logger: Logger;
-  let osvScanner: ReturnType<typeof createSecurityScanner>;
-  let dockerClient: Docker;
-  let skipTests = false;
-  const testImages: string[] = [];
+// ---------------------------------------------------------------------------
+// Fixtures — cached responses representing a log4j-core 2.14.1 scan
+// ---------------------------------------------------------------------------
 
-  beforeAll(async () => {
-    // Create logger for tests
-    logger = createLogger({ level: 'warn' }); // Use warn to reduce test noise
+const FIXTURE_PACKAGES: ExtractedPackage[] = [
+  {
+    name: 'org.apache.logging.log4j:log4j-core',
+    version: '2.14.1',
+    ecosystem: 'Maven',
+    path: '/app/pom.xml',
+  },
+];
 
-    // Check if OSV API is available before running tests
-    const availabilityResult = await checkOSVAvailability(logger);
+/** Batch query response: maps the single package to two known vuln IDs */
+const FIXTURE_BATCH_RESPONSE: OSVBatchResponse = {
+  results: [
+    {
+      vulns: [
+        { id: 'GHSA-jfh8-c2jp-5v3q' }, // Log4Shell
+        { id: 'GHSA-7rjr-3q55-vv33' }, // Log4j RCE (related)
+      ],
+    },
+  ],
+};
 
-    if (!availabilityResult.ok) {
-      console.warn('OSV API not available, skipping integration tests');
-      console.warn(`Reason: ${availabilityResult.error}`);
-      skipTests = true;
-      return;
+/** Full vulnerability detail for GHSA-jfh8-c2jp-5v3q (Log4Shell) */
+const FIXTURE_VULN_LOG4SHELL: OSVVulnerability = {
+  id: 'GHSA-jfh8-c2jp-5v3q',
+  summary: 'Remote code injection in Apache Log4j (Log4Shell)',
+  details:
+    'Apache Log4j2 <=2.14.1 JNDI features used in configuration, log messages, ' +
+    'and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints.',
+  aliases: ['CVE-2021-44228'],
+  severity: [
+    {
+      type: 'CVSS_V3',
+      score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H',
+    },
+  ],
+  affected: [
+    {
+      package: {
+        name: 'org.apache.logging.log4j:log4j-core',
+        ecosystem: 'Maven',
+      },
+      ranges: [
+        {
+          type: 'ECOSYSTEM',
+          events: [{ introduced: '2.0' }, { fixed: '2.15.0' }],
+        },
+      ],
+    },
+  ],
+};
+
+/** Full vulnerability detail for GHSA-7rjr-3q55-vv33 */
+const FIXTURE_VULN_LOG4J_RCE: OSVVulnerability = {
+  id: 'GHSA-7rjr-3q55-vv33',
+  summary: 'Incomplete fix for Apache Log4j vulnerability',
+  details:
+    'Apache Log4j2 versions 2.0-beta7 through 2.17.0 (excluding security fix releases 2.3.1, 2.12.3, and 2.17.0) ' +
+    'are vulnerable to a remote code execution attack.',
+  aliases: ['CVE-2021-44832'],
+  severity: [
+    {
+      type: 'CVSS_V3',
+      score: 'CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:H/A:H',
+    },
+  ],
+  affected: [
+    {
+      package: {
+        name: 'org.apache.logging.log4j:log4j-core',
+        ecosystem: 'Maven',
+      },
+      ranges: [
+        {
+          type: 'ECOSYSTEM',
+          events: [{ introduced: '2.0' }, { fixed: '2.17.1' }],
+        },
+      ],
+    },
+  ],
+};
+
+const FIXTURE_VULNS: Record<string, OSVVulnerability> = {
+  'GHSA-jfh8-c2jp-5v3q': FIXTURE_VULN_LOG4SHELL,
+  'GHSA-7rjr-3q55-vv33': FIXTURE_VULN_LOG4J_RCE,
+};
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+// Mock package extractor — avoids Docker entirely
+jest.mock('@/infra/security/osv-scanner/package-extractor', () => ({
+  extractPackagesFromImage: jest
+    .fn<() => Promise<ExtractedPackage[]>>()
+    .mockResolvedValue(FIXTURE_PACKAGES),
+}));
+
+// Mock Docker socket detection — avoids accessing real Docker socket
+jest.mock('@/infra/docker/socket-validation', () => ({
+  autoDetectDockerSocket: jest.fn().mockReturnValue('/var/run/docker.sock'),
+}));
+
+// Mock dockerode — avoids real Docker connection
+jest.mock('dockerode', () => {
+  return jest.fn().mockImplementation(() => ({}));
+});
+
+// Save and restore real fetch
+const realFetch = globalThis.fetch;
+
+beforeAll(() => {
+  // Replace global fetch with a mock that returns cached OSV responses
+  globalThis.fetch = jest.fn<typeof fetch>().mockImplementation(async (input, _init?) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+
+    // OSV availability check (POST to /v1/query)
+    if (url === 'https://api.osv.dev/v1/query') {
+      return new Response(JSON.stringify({ vulns: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // Initialize Docker client
-    try {
-      dockerClient = new Docker();
-
-      // Test Docker connectivity
-      await dockerClient.ping();
-    } catch (error) {
-      console.warn('Docker not available, skipping integration tests');
-      console.warn(`Error: ${error}`);
-      skipTests = true;
-      return;
+    // Batch query (POST to /v1/querybatch)
+    if (url === 'https://api.osv.dev/v1/querybatch') {
+      return new Response(JSON.stringify(FIXTURE_BATCH_RESPONSE), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // Create OSV scanner instance
-    osvScanner = createSecurityScanner(logger, 'osv');
-  }, 30000); // 30 second timeout for initial setup
-
-  afterAll(async () => {
-    if (dockerClient && testImages.length > 0) {
-      // Clean up any test images
-      for (const imageName of testImages) {
-        try {
-          const image = dockerClient.getImage(imageName);
-          await image.remove({ force: true });
-        } catch (error) {
-          // Ignore cleanup errors
-        }
+    // Individual vulnerability details (GET /v1/vulns/{id})
+    const vulnMatch = url.match(/^https:\/\/api\.osv\.dev\/v1\/vulns\/(.+)$/);
+    if (vulnMatch) {
+      const vulnId = decodeURIComponent(vulnMatch[1]);
+      const vuln = FIXTURE_VULNS[vulnId];
+      if (vuln) {
+        return new Response(JSON.stringify(vuln), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }
+      return new Response('Not Found', { status: 404 });
     }
+
+    // Unexpected URL — fail loudly so we notice
+    throw new Error(`Unexpected fetch URL in OSV test: ${url}`);
+  });
+});
+
+afterAll(() => {
+  globalThis.fetch = realFetch;
+});
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('OSV Scanner Integration — Cached Fixtures', () => {
+  let logger: Logger;
+
+  beforeAll(() => {
+    logger = createLogger({ level: 'warn' });
   });
 
-  /**
-   * Helper function to build a Docker image with a given pom.xml
-   */
-  async function buildTestImage(pomContent: string, imageTag: string): Promise<void> {
-    const tempDir = join(tmpdir(), `osv-integration-test-${randomBytes(8).toString('hex')}`);
-    await mkdir(tempDir, { recursive: true });
-
-    try {
-      // Write pom.xml
-      await writeFile(join(tempDir, 'pom.xml'), pomContent, 'utf-8');
-
-      // Create a simple Dockerfile that copies pom.xml
-      const dockerfile = `FROM maven:3.9-eclipse-temurin-17
-WORKDIR /app
-COPY pom.xml .
-# Don't actually build, just copy pom.xml for scanning
-CMD ["echo", "Test image for OSV scanning"]
-`;
-      await writeFile(join(tempDir, 'Dockerfile'), dockerfile, 'utf-8');
-
-      // Build the image
-      const stream = await dockerClient.buildImage(
-        {
-          context: tempDir,
-          src: ['Dockerfile', 'pom.xml'],
-        },
-        {
-          t: imageTag,
-        },
-      );
-
-      // Wait for build to complete
-      await new Promise((resolve, reject) => {
-        const buildErrors: string[] = [];
-        dockerClient.modem.followProgress(
-          stream,
-          (err: Error | null) => {
-            if (err) {
-              console.error('Build error:', err);
-              reject(err);
-            } else {
-              if (buildErrors.length > 0) {
-                console.error('Build completed with errors:', buildErrors);
-                reject(new Error(`Build failed: ${buildErrors.join(', ')}`));
-              } else {
-                resolve(null);
-              }
-            }
-          },
-          (event: { error?: string; stream?: string }) => {
-            if (event.error) {
-              buildErrors.push(event.error);
-            }
-            if (event.stream) {
-              console.log('Build:', event.stream.trim());
-            }
-          },
-        );
-      });
-
-      testImages.push(imageTag);
-    } finally {
-      // Cleanup temp directory
-      await rm(tempDir, { recursive: true, force: true });
-    }
-  }
-
   describe('API Availability', () => {
-    it('should successfully connect to OSV API', async () => {
-      if (skipTests) {
-        console.log('Skipping test - OSV API or Docker not available');
-        return;
-      }
-
+    it('should confirm OSV API available (cached)', async () => {
+      // Dynamic import so mocks are applied first
+      const { checkOSVAvailability } = await import('@/infra/security/osv-scanner/index');
       const result = await checkOSVAvailability(logger);
+
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toBe('osv-api-available');
       }
-    }, 10000);
+    });
 
-    it('should query severity for known CVE GHSA-jfh8-c2jp-5v3q (Log4Shell)', async () => {
-      if (skipTests) {
-        console.log('Skipping test - OSV API or Docker not available');
-        return;
-      }
+    it('should return severity data for Log4Shell from cached response', () => {
+      const vuln = FIXTURE_VULN_LOG4SHELL;
 
-      // Query OSV API directly for the known Log4Shell vulnerability
-      const response = await fetch('https://api.osv.dev/v1/vulns/GHSA-jfh8-c2jp-5v3q', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      expect(vuln.id).toBe('GHSA-jfh8-c2jp-5v3q');
+      expect(vuln.summary).toContain('Log4');
 
-      expect(response.ok).toBe(true);
-      const vulnerability = await response.json();
+      // Verify CVSS vector is present
+      expect(vuln.severity).toBeDefined();
+      expect(vuln.severity!.length).toBeGreaterThan(0);
 
-      // Verify basic vulnerability details
-      expect(vulnerability.id).toBe('GHSA-jfh8-c2jp-5v3q');
-      expect(vulnerability.summary).toContain('Log4j');
-
-      // Check severity data
-      console.log('Vulnerability details:', {
-        id: vulnerability.id,
-        severity: vulnerability.severity,
-        database_specific: vulnerability.database_specific,
-        affected_count: vulnerability.affected?.length || 0,
-      });
-
-      // OSV vulnerabilities may have severity in different formats:
-      // 1. CVSS scores in vulnerability.severity array
-      // 2. database_specific.severity
-      // 3. affected[].database_specific.severity
-
-      let hasSeverityData = false;
-
-      // Check for CVSS scores
-      if (vulnerability.severity?.length > 0) {
-        console.log('CVSS scores found:', vulnerability.severity);
-        hasSeverityData = true;
-
-        // CVSS v3 score in OSV format is a vector string like:
-        // "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"
-        // The actual numeric score is not included, but we can verify it's present
-        const cvssV3 = vulnerability.severity.find(
-          (s: { type: string; score: string }) => s.type === 'CVSS_V3',
-        );
-
-        if (cvssV3) {
-          console.log('CVSS v3 vector:', cvssV3.score);
-          // Verify it's a valid CVSS vector string
-          expect(cvssV3.score).toMatch(/^CVSS:/);
-        }
-      }
-
-      // The OSV scanner now uses CVSS vector strings to calculate severity
-      // We verify that severity data is available (either CVSS vectors or database_specific)
-      // but we no longer rely on database_specific as the primary source
-
-      // At least some severity information should be available
-      expect(hasSeverityData).toBe(true);
-    }, 15000);
+      const cvssV3 = vuln.severity!.find((s) => s.type === 'CVSS_V3');
+      expect(cvssV3).toBeDefined();
+      expect(cvssV3!.score).toMatch(/^CVSS:/);
+    });
   });
 
-  describe('Multiple Dependencies with Vulnerabilities', () => {
-    it('should detect vulnerabilities across multiple packages in pom.xml', async () => {
-      if (skipTests) {
-        console.log('Skipping test - OSV API or Docker not available');
-        return;
-      }
+  describe('Full Scan Pipeline', () => {
+    it('should detect vulnerabilities in log4j-core 2.14.1 via cached fixtures', async () => {
+      const { createSecurityScanner } = await import('@/infra/security/scanner');
 
-      // Simplified pom.xml with single known vulnerable dependency
-      // to reduce Docker build time and API calls while still testing the full flow
-      const pomXml = `<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>com.example</groupId>
-  <artifactId>vulnerable-test-app</artifactId>
-  <version>1.0.0</version>
-  
-  <dependencies>
-    <!-- Log4j 2.14.1 - Has CVE-2021-44228 (Log4Shell) -->
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-core</artifactId>
-      <version>2.14.1</version>
-    </dependency>
-  </dependencies>
-</project>`;
-
-      const imageTag = 'osv-test:log4j-vuln';
-      await buildTestImage(pomXml, imageTag);
-
-      const result = await osvScanner.scanImage(imageTag);
+      const scanner = createSecurityScanner(logger, 'osv');
+      const result = await scanner.scanImage('osv-test:log4j-vuln');
 
       expect(result.ok).toBe(true);
       if (!result.ok) {
@@ -255,21 +225,23 @@ CMD ["echo", "Test image for OSV scanning"]
         return;
       }
 
-      const { vulnerabilities, totalVulnerabilities, criticalCount, highCount } = result.value;
+      const { vulnerabilities, totalVulnerabilities, criticalCount } = result.value;
 
-      // Should find Log4Shell vulnerability (CVE-2021-44228)
-      expect(totalVulnerabilities).toBeGreaterThanOrEqual(1);
+      // Should find both Log4Shell vulnerabilities
+      expect(totalVulnerabilities).toBeGreaterThanOrEqual(2);
 
       // Check that we found log4j-core vulnerability
       const log4jVuln = vulnerabilities.find((v) => v.package.includes('log4j'));
       expect(log4jVuln).toBeDefined();
 
-      console.log(
-        `Found ${totalVulnerabilities} vulnerabilities (${criticalCount} CRITICAL, ${highCount} HIGH)`,
-      );
-
-      // Log4Shell should be detected as critical
+      // Log4Shell should be detected as critical (CVSS 10.0)
       expect(criticalCount).toBeGreaterThanOrEqual(1);
-    }, 60000); // Reduced timeout - single dependency
+
+      // Verify fixed version is extracted
+      const log4shell = vulnerabilities.find((v) => v.id === 'GHSA-jfh8-c2jp-5v3q');
+      expect(log4shell).toBeDefined();
+      expect(log4shell!.fixedVersion).toBe('2.15.0');
+      expect(log4shell!.severity).toBe('CRITICAL');
+    }, 15000);
   });
 });
