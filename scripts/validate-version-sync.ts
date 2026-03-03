@@ -66,6 +66,10 @@ const lockPackagesVersion = lockPackages?.['']?.version;
 
 const versionDetail = server.version_detail as { version?: string };
 const serverVersionDetail = versionDetail?.version;
+if (!serverVersionDetail) {
+  console.error('✗ Error: .version_detail.version is required in server.json');
+  process.exit(1);
+}
 
 const serverPackages = server.packages as Array<{ version?: string }>;
 const serverPackagesVersion = serverPackages?.[0]?.version;
@@ -92,7 +96,7 @@ const sources: VersionSource[] = [
 for (const source of sources) {
   if (packageVersion !== source.version) {
     mismatches.push(
-      `${source.label} (package.json=${packageVersion}, ${source.label.split(' ')[0]}=${source.version})`,
+      `${source.label} (package.json=${packageVersion}, ${source.label}=${source.version})`,
     );
   }
 }

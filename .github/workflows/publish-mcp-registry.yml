@@ -52,13 +52,14 @@ jobs:
           
           for i in $(seq 1 $MAX_ATTEMPTS); do
             echo "Attempt $i/$MAX_ATTEMPTS..."
-            if curl -f -s -o /dev/null -w "%{http_code}" "$REGISTRY_URL" | grep -q "200"; then
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$REGISTRY_URL" || true)
+            if [ "$STATUS_CODE" = "200" ]; then
               echo "✓ Package ${PACKAGE_NAME}@${VERSION} is available on npm"
               exit 0
             fi
             
             if [ $i -lt $MAX_ATTEMPTS ]; then
-              echo "Package not yet available, waiting ${SLEEP_SECONDS}s..."
+              echo "Package not yet available (HTTP $STATUS_CODE), waiting ${SLEEP_SECONDS}s..."
               sleep $SLEEP_SECONDS
             fi
           done
@@ -80,6 +81,7 @@ jobs:
           echo "Installing mcp-publisher..."
           ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
           OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          # TODO: Pin mcp-publisher to a specific version and verify checksum once a stable release is available
           RELEASE_URL="https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}_${ARCH}.tar.gz"
           
           echo "Downloading from: $RELEASE_URL"
