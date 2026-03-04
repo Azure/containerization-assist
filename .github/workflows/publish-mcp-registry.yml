@@ -76,6 +76,15 @@ jobs:
             exit 1
           fi
       
+      - name: Inject version into server.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "Setting server.json version to ${VERSION}..."
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
+          echo "✓ server.json version set to ${VERSION}"
+          cat server.json
+
       - name: Install mcp-publisher CLI
         run: |
           echo "Installing mcp-publisher..."
@@ -89,6 +98,12 @@ jobs:
           chmod +x mcp-publisher
           ./mcp-publisher --version
       
+      - name: Validate server.json
+        run: |
+          echo "Validating server.json against MCP Registry schema..."
+          ./mcp-publisher validate
+          echo "✓ server.json validation passed"
+
       - name: Authenticate with GitHub OIDC
         run: |
           echo "Authenticating with MCP Registry using GitHub OIDC..."
