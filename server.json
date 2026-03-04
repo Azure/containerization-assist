@@ -25,7 +25,7 @@
         {
           "name": "DOCKER_SOCKET",
           "description": "Docker socket path or named pipe",
-          "required": true
+          "required": false
         },
         {
           "name": "LOG_LEVEL",
