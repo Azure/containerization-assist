@@ -5,7 +5,7 @@
  * Checks version synchronization across all four version carriers:
  * - package.json (.version, .mcpName)
  * - package-lock.json (.version, .packages[""].version)
- * - server.json (.version_detail.version, .packages[0].version, .name)
+ * - server.json (.version, .packages[0].version, .name)
  * - CHANGELOG.md (latest ## [x.y.z] heading)
  *
  * Exit codes:
@@ -64,10 +64,9 @@ const lockVersion = lock.version as string;
 const lockPackages = lock.packages as Record<string, { version?: string }>;
 const lockPackagesVersion = lockPackages?.['']?.version;
 
-const versionDetail = server.version_detail as { version?: string };
-const serverVersionDetail = versionDetail?.version;
-if (!serverVersionDetail) {
-  console.error('✗ Error: .version_detail.version is required in server.json');
+const serverVersion = server.version as string;
+if (!serverVersion) {
+  console.error('✗ Error: .version is required in server.json');
   process.exit(1);
 }
 
@@ -86,7 +85,7 @@ const changelogVersion = extractChangelogVersion('CHANGELOG.md');
 const mismatches: string[] = [];
 
 const sources: VersionSource[] = [
-  { label: 'server.json .version_detail.version', version: serverVersionDetail ?? '' },
+  { label: 'server.json .version', version: serverVersion ?? '' },
   { label: 'server.json .packages[0].version', version: serverPackagesVersion },
   { label: 'package-lock.json .version', version: lockVersion },
   { label: 'package-lock.json .packages[""].version', version: lockPackagesVersion ?? '' },

@@ -4,7 +4,7 @@
  *
  * Called after `npm version` (either manually or via changelog-sync).
  * Syncs the new version into server.json at both:
- *   .version_detail.version
+ *   .version
  *   .packages[0].version
  *
  * Then stages server.json so it's included in the version commit.
@@ -43,15 +43,14 @@ if (!newVersion) {
 const serverPath = join(root, 'server.json');
 const server = readJson('server.json');
 
-const versionDetail = server.version_detail as { version?: string } | undefined;
 const packages = server.packages as Array<{ version?: string }> | undefined;
 
-if (!versionDetail || !packages?.[0]) {
-  console.error('✗ server.json missing expected structure (.version_detail or .packages[0])');
+if (!packages?.[0]) {
+  console.error('✗ server.json missing expected structure (.packages[0])');
   process.exit(1);
 }
 
-versionDetail.version = newVersion;
+server.version = newVersion;
 packages[0].version = newVersion;
 
 try {
