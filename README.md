@@ -221,6 +221,36 @@ The server provides 11 MCP tools organized by functionality:
 - Maven, Gradle (Java)
 - dotnet CLI (.NET)
 
+## SDK Usage (Without MCP)
+
+Use `containerization-assist-mcp` as a TypeScript library to execute tools directly:
+
+```typescript
+import { createApp } from 'containerization-assist-mcp';
+
+const app = createApp();
+const result = await app.execute('analyze-repo', { path: './my-app' });
+
+if (result.ok) {
+  console.log('Language:', result.value.language);
+}
+```
+
+Or embed tools in your own MCP server:
+
+```typescript
+import { createApp, analyzeRepoTool, generateDockerfileTool } from 'containerization-assist-mcp';
+
+const app = createApp({
+  tools: [analyzeRepoTool, generateDockerfileTool],
+  outputFormat: 'natural-language',
+});
+
+app.bindToMCP(server);
+```
+
+See the [SDK Usage Guide](docs/guides/sdk-usage.md) for the full API reference, telemetry integration, and working examples.
+
 ## Configuration
 
 ### Environment Variables
