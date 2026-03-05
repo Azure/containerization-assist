@@ -58,7 +58,9 @@ export const generateK8sManifestsSchema = z
     // Common fields
     manifestType: z
       .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
-      .describe('Type of manifest to generate'),
+      .optional()
+      .default('kubernetes')
+      .describe('Type of manifest to generate (defaults to kubernetes)'),
     environment: environment.describe('Target environment (production, development, etc.)'),
     detectedDependencies: z
       .array(z.string())
@@ -75,11 +77,15 @@ export const generateK8sManifestsSchema = z
     trafficLevel: z
       .enum(['high', 'medium', 'low'])
       .optional()
-      .describe('Expected traffic level for dynamic defaults calculation (affects replica counts and scaling).'),
+      .describe(
+        'Expected traffic level for dynamic defaults calculation (affects replica counts and scaling).',
+      ),
     criticalityTier: z
       .enum(['tier-1', 'tier-2', 'tier-3'])
       .optional()
-      .describe('Criticality tier for dynamic defaults calculation (tier-1=mission-critical, tier-3=low-priority).'),
+      .describe(
+        'Criticality tier for dynamic defaults calculation (tier-1=mission-critical, tier-3=low-priority).',
+      ),
   })
   .superRefine((data, ctx) => {
     const hasAcaManifest = !!data.acaManifest;

@@ -7,6 +7,7 @@
 import { describe, it, expect } from '@jest/globals';
 import Ajv from 'ajv';
 import { jsonSchemas } from '../../../src/sdk';
+import { generateK8sManifestsSchema } from '../../../src/tools/generate-k8s-manifests/schema';
 
 describe('JSON Schema generation', () => {
   // Create Ajv instance with strict mode disabled for JSON Schema draft-07 compatibility
@@ -161,6 +162,58 @@ describe('JSON Schema generation', () => {
         namespace: 'production',
       });
       expect(valid).toBe(true);
+    });
+
+    it('defaults manifestType to kubernetes when omitted (Zod)', () => {
+      const result = generateK8sManifestsSchema.safeParse({
+        name: 'test',
+        modulePath: '/tmp',
+        environment: 'production',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.manifestType).toBe('kubernetes');
+      }
+    });
+
+    it('preserves explicit manifestType value (Zod)', () => {
+      const result = generateK8sManifestsSchema.safeParse({
+        name: 'test',
+        modulePath: '/tmp',
+        environment: 'production',
+        manifestType: 'helm',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.manifestType).toBe('helm');
+      }
+    });
+
+    it('validates input without manifestType (JSON Schema)', () => {
+      const validate = ajv.compile(jsonSchemas.generateK8sManifests);
+      const valid = validate({
+        name: 'myapp',
+        modulePath: '/path/to/repo',
+        environment: 'production',
+      });
+      expect(valid).toBe(true);
+      expect(validate.errors).toBeNull();
+    });
+
+    it('does not include manifestType in required fields (JSON Schema)', () => {
+      const schema = jsonSchemas.generateK8sManifests;
+      const required = (schema as Record<string, unknown>).required as string[] | undefined;
+      // required may be undefined if schema uses superRefine (no static required array)
+      if (required) {
+        expect(required).not.toContain('manifestType');
+      }
+    });
+
+    it('has correct default annotation for manifestType (JSON Schema)', () => {
+      const schema = jsonSchemas.generateK8sManifests;
+      const properties = (schema as Record<string, unknown>).properties as Record<string, Record<string, unknown>>;
+      expect(properties.manifestType).toBeDefined();
+      expect(properties.manifestType.default).toBe('kubernetes');
     });
   });
 
