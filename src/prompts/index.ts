@@ -1,0 +1,85 @@
+/**
+ * MCP Prompts Registration
+ *
+ * Registers all reusable prompts with the MCP server.
+ * Prompts return seeded conversation messages that guide an LLM through
+ * multi-step containerization workflows using the available MCP tools.
+ *
+ * NOTE: We register prompts with the zero-arg `server.prompt()` overload
+ * and then mutate `argsSchema` / `callback` on the returned RegisteredPrompt.
+ * This works around TS2589 ("Type instantiation is excessively deep") that
+ * the CJS build's moduleResolution:"node" triggers when generic schema
+ * inference flows through ShapeOutput<Args> in the MCP SDK type layer.
+ */
+
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { localKindDevLoopSchema, type LocalKindDevLoopArgs } from './local-kind-dev-loop/schema';
+import { buildLocalKindDevLoopPrompt } from './local-kind-dev-loop/prompt';
+import { aksRemoteDevLoopSchema, type AksRemoteDevLoopArgs } from './aks-remote-dev-loop/schema';
+import { buildAksRemoteDevLoopPrompt } from './aks-remote-dev-loop/prompt';
+
+/**
+ * Register all MCP prompts on the given server instance.
+ */
+export function registerPrompts(server: McpServer): void {
+  // --- local-kind-dev-loop ---
+  const kindPrompt = server.prompt(
+    'local-kind-dev-loop',
+    'Drive a full local Kind cluster development iteration loop: analyze, build, scan, deploy, and verify using containerization-assist tools',
+    (_extra) => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: buildLocalKindDevLoopPrompt({} as LocalKindDevLoopArgs),
+          },
+        },
+      ],
+    }),
+  );
+  // Assign schema and real callback at runtime to avoid TS2589 in CJS build.
+  // The SDK handler checks `argsSchema` and calls `callback(parsedArgs, extra)`.
+  kindPrompt.argsSchema = z.object(localKindDevLoopSchema) as never;
+  kindPrompt.callback = ((args: LocalKindDevLoopArgs) => ({
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text: buildLocalKindDevLoopPrompt(args),
+        },
+      },
+    ],
+  })) as never;
+
+  // --- aks-remote-dev-loop ---
+  const aksPrompt = server.prompt(
+    'aks-remote-dev-loop',
+    'Drive a full AKS remote cluster deployment iteration loop: analyze, build, scan, push to ACR, deploy, and verify using containerization-assist tools',
+    (_extra) => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: buildAksRemoteDevLoopPrompt({} as AksRemoteDevLoopArgs),
+          },
+        },
+      ],
+    }),
+  );
+  aksPrompt.argsSchema = z.object(aksRemoteDevLoopSchema) as never;
+  aksPrompt.callback = ((args: AksRemoteDevLoopArgs) => ({
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text: buildAksRemoteDevLoopPrompt(args),
+        },
+      },
+    ],
+  })) as never;
+}

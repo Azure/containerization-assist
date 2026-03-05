@@ -17,6 +17,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
+import { registerPrompts } from '@/prompts';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
 import {
@@ -201,6 +202,8 @@ export function createMCPServer<TTool extends Tool>(
       ],
     }),
   );
+
+  registerPrompts(server);
 
   return {
     async start(): Promise<void> {
