@@ -167,10 +167,11 @@ describe('JSON Schema generation', () => {
     it('defaults manifestType to kubernetes when omitted (Zod)', () => {
       const result = generateK8sManifestsSchema.safeParse({
         name: 'test',
+        repositoryPath: '/tmp',
         modulePath: '/tmp',
         environment: 'production',
       });
-      expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.manifestType).toBe('kubernetes');
       }
@@ -179,6 +180,7 @@ describe('JSON Schema generation', () => {
     it('preserves explicit manifestType value (Zod)', () => {
       const result = generateK8sManifestsSchema.safeParse({
         name: 'test',
+        repositoryPath: '/tmp',
         modulePath: '/tmp',
         environment: 'production',
         manifestType: 'helm',

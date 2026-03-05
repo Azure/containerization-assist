@@ -377,8 +377,8 @@ describe('generate-k8s-manifests with policy configuration', () => {
       if (result.ok) {
         const manifests = result.value;
         expect(manifests.summary).toBeDefined();
-        // Should not mention policy in summary
-        expect(manifests.summary.toLowerCase()).not.toContain('policy');
+        // Should not mention policy configuration in summary (app name may contain 'policy')
+        expect(manifests.summary.toLowerCase()).not.toContain('policy config');
       }
     });
   });

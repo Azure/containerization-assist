@@ -28,6 +28,7 @@ import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
 import yaml from 'js-yaml';
+import path from 'node:path';
 import { extractErrorMessage } from '@/lib/errors';
 import { pluralize } from '@/lib/summary-helpers';
 import type { RegoEvaluator } from '@/config/policy-rego';
@@ -39,6 +40,7 @@ import {
   type PolicyValidationResult,
 } from '@/lib/policy-helpers';
 import { generateK8sManifestsToolDefinition } from './types';
+import { validatePathOrFail } from '@/lib/validation-helpers';
 
 const { name } = generateK8sManifestsToolDefinition;
 
@@ -228,12 +230,7 @@ async function validatePlanAgainstPolicy(
   logger.debug({ manifestText }, 'Generated manifest text from plan for policy validation');
 
   // Use shared validation utility
-  return validateContentAgainstPolicy(
-    manifestText,
-    policyEvaluator,
-    logger,
-    'manifest plan',
-  );
+  return validateContentAgainstPolicy(manifestText, policyEvaluator, logger, 'manifest plan');
 }
 
 // Define category types for better type safety
@@ -362,7 +359,10 @@ const runPattern = createKnowledgeTool<
           files: manifestFiles,
         };
 
-        const totalContainers = analysis.containerApps.reduce((sum, app) => sum + app.containers, 0);
+        const totalContainers = analysis.containerApps.reduce(
+          (sum, app) => sum + app.containers,
+          0,
+        );
         const summary =
           `🔨 ACTION REQUIRED: Convert ACA manifest to Kubernetes\n` +
           `Container Apps: ${pluralize(analysis.containerApps.length, 'app')} (${pluralize(totalContainers, 'container')})\n` +
@@ -475,22 +475,23 @@ const runPattern = createKnowledgeTool<
         `🔨 ACTION REQUIRED: Create ${input.manifestType} manifests\n` +
         `Application: ${input.name || input.language || 'application'}${frameworksStr}\n` +
         `Manifests: ${manifestFiles.map((f) => f.path.split('/').pop()).join(', ')}\n${
-        policyConfigInfo
+          policyConfigInfo
         }Recommendations: ${knowledgeMatches.length} total (${securityMatches.length} security, ${resourceMatches.length} resources, ${bestPracticeMatches.length} best practices)\n\n` +
         `✅ Ready to create manifests in ./k8s directory.`;
 
       return {
         nextAction,
         repositoryInfo: {
+          repositoryPath: input.repositoryPath,
           name: input.name,
           modulePath: input.modulePath,
           language: input.language,
           languageVersion: input.languageVersion,
           frameworks: input.frameworks,
           buildSystem: input.buildSystem,
-          dependencies: input.dependencies,
           ports: input.ports,
           entryPoint: input.entryPoint,
+          targetPlatform: input.targetPlatform,
         } as RepositoryInfo,
         manifestType: input.manifestType,
         recommendations: {
@@ -525,20 +526,50 @@ async function handleGenerateK8sManifests(
           'Ensure the acaManifest parameter contains valid YAML or JSON content representing an ACA manifest',
       });
     }
+
+    // In ACA mode, manifestType must be 'kubernetes' (ACA conversion always produces k8s manifests)
+    if (input.manifestType && input.manifestType !== 'kubernetes') {
+      return Failure(
+        `manifestType '${input.manifestType}' is not supported in ACA conversion mode. ACA conversion always produces Kubernetes manifests.`,
+        {
+          message: `Invalid manifestType for ACA conversion: '${input.manifestType}'`,
+          hint: 'ACA manifest conversion only supports outputting Kubernetes manifests',
+          resolution: "Remove manifestType or set it to 'kubernetes' when using acaManifest",
+        },
+      );
+    }
+  }
+
+  // Validate repositoryPath exists on disk in repository mode
+  if (!input.acaManifest && input.repositoryPath) {
+    const pathResult = await validatePathOrFail(input.repositoryPath, {
+      mustExist: true,
+      mustBeDirectory: true,
+    });
+    if (!pathResult.ok) return pathResult as Result<ManifestPlan>;
+
+    // Default name from directory basename if not provided
+    if (!input.name) {
+      input.name = path.basename(pathResult.value);
+    }
+  }
+
+  // Normalize singular framework into frameworks array for backward compat
+  if (input.framework && (!input.frameworks || input.frameworks.length === 0)) {
+    input.frameworks = [{ name: input.framework }];
   }
 
   // Query policy for generation configuration (if policy is available)
   let k8sConfig: import('@/config/policy-generation-config').K8sGenerationConfig | null = null;
   if (ctx.policy) {
-    const configQuery = await ctx.queryConfig<{ kubernetes?: import('@/config/policy-generation-config').K8sGenerationConfig }>(
-      'containerization.generation_config',
-      {
-        language: input.language || 'auto-detect',
-        framework: input.frameworks?.[0]?.name,
-        environment: input.environment || 'production',
-        appName: input.name || 'app',
-      },
-    );
+    const configQuery = await ctx.queryConfig<{
+      kubernetes?: import('@/config/policy-generation-config').K8sGenerationConfig;
+    }>('containerization.generation_config', {
+      language: input.language || 'auto-detect',
+      framework: input.frameworks?.[0]?.name,
+      environment: input.environment || 'production',
+      appName: input.name || 'app',
+    });
 
     k8sConfig = configQuery?.kubernetes || null;
 
@@ -571,15 +602,14 @@ async function handleGenerateK8sManifests(
   // Query policy for template additions and dynamic defaults (Sprint 3)
   if (ctx.policy) {
     // Query for template additions
-    const templateQuery = await ctx.queryConfig<import('@/config/policy-generation-config').TemplateAdditions>(
-      'containerization.templates.templates',
-      {
-        language: input.language || 'auto-detect',
-        framework: input.frameworks?.[0]?.name,
-        environment: input.environment || 'production',
-        appName: input.name || 'app',
-      },
-    );
+    const templateQuery = await ctx.queryConfig<
+      import('@/config/policy-generation-config').TemplateAdditions
+    >('containerization.templates.templates', {
+      language: input.language || 'auto-detect',
+      framework: input.frameworks?.[0]?.name,
+      environment: input.environment || 'production',
+      appName: input.name || 'app',
+    });
 
     if (templateQuery) {
       logger.info(
@@ -591,28 +621,23 @@ async function handleGenerateK8sManifests(
 
       // Merge templates into plan using template merger
       const { mergeTemplatesIntoPlan } = await import('@/lib/template-merger');
-      const updatedPlan = mergeTemplatesIntoPlan(
-        plan,
-        templateQuery,
-        {
-          language: input.language,
-          environment: input.environment,
-          framework: input.frameworks?.[0]?.name,
-        },
-      );
+      const updatedPlan = mergeTemplatesIntoPlan(plan, templateQuery, {
+        language: input.language,
+        environment: input.environment,
+        framework: input.frameworks?.[0]?.name,
+      });
       Object.assign(plan, updatedPlan);
     }
 
     // Query for dynamic defaults (replicas, health checks, HPA)
-    const dynamicDefaultsQuery = await ctx.queryConfig<import('@/config/policy-generation-config').DynamicDefaults>(
-      'containerization.dynamic_defaults.defaults',
-      {
-        language: input.language || 'auto-detect',
-        environment: input.environment || 'production',
-        trafficLevel: input.trafficLevel,
-        criticalityTier: input.criticalityTier,
-      },
-    );
+    const dynamicDefaultsQuery = await ctx.queryConfig<
+      import('@/config/policy-generation-config').DynamicDefaults
+    >('containerization.dynamic_defaults.defaults', {
+      language: input.language || 'auto-detect',
+      environment: input.environment || 'production',
+      trafficLevel: input.trafficLevel,
+      criticalityTier: input.criticalityTier,
+    });
 
     if (dynamicDefaultsQuery) {
       logger.info(
@@ -634,7 +659,10 @@ async function handleGenerateK8sManifests(
           matchScore: 100,
           policyDriven: true,
         };
-        plan.recommendations.resourceManagement = [replicaInfo, ...(plan.recommendations.resourceManagement || [])];
+        plan.recommendations.resourceManagement = [
+          replicaInfo,
+          ...(plan.recommendations.resourceManagement || []),
+        ];
       }
 
       if (dynamicDefaultsQuery.healthChecks) {
@@ -646,7 +674,10 @@ async function handleGenerateK8sManifests(
           matchScore: 100,
           policyDriven: true,
         };
-        plan.recommendations.bestPractices = [healthCheckInfo, ...plan.recommendations.bestPractices];
+        plan.recommendations.bestPractices = [
+          healthCheckInfo,
+          ...plan.recommendations.bestPractices,
+        ];
       }
 
       if (dynamicDefaultsQuery.autoscaling) {
@@ -658,7 +689,10 @@ async function handleGenerateK8sManifests(
           matchScore: 100,
           policyDriven: true,
         };
-        plan.recommendations.resourceManagement = [...(plan.recommendations.resourceManagement || []), hpaInfo];
+        plan.recommendations.resourceManagement = [
+          ...(plan.recommendations.resourceManagement || []),
+          hpaInfo,
+        ];
       }
     }
   }
