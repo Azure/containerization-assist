@@ -183,4 +183,4 @@ Custom policies must override specific rules by package namespace. See `allow-al
 
 - [OPA Rego Language Reference](https://www.openpolicyagent.org/docs/latest/policy-language/)
 - [Built-in Policies Source](../policies/)
-- [MCP Configuration Guide](../docs/guides/mcp-configuration.md)
+- [Policy Getting Started Guide](../docs/guides/policy-getting-started.md)

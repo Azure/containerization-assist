@@ -235,4 +235,4 @@ npx tsc --noEmit docs/examples/*.ts
 ## More Information
 
 - [Main README](../../README.md) - Installation and usage guide
-- [CLAUDE.md](../../CLAUDE.md) - Development guidelines
+- [Contributing](../../CONTRIBUTING.md) - Development guidelines

@@ -47,7 +47,7 @@ See [Policy Authoring Guide](docs/guides/policy-authoring.md) for details.
 
 ## System Requirements
 
-- Node.js 20+
+- Node.js 22+
 - Docker or Docker Desktop
 - Optional: [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) (for security scanning features)
 - Optional: Kubernetes (for deployment features)
@@ -109,7 +109,7 @@ Before starting, ensure you have:
   - Valid kubeconfig at `~/.kube/config`
   - Cluster connectivity (`kubectl cluster-info` should work)
   - Appropriate RBAC permissions for deployments, services, namespaces
-- **Node.js**: Version 20 or higher
+- **Node.js**: Version 22 or higher
 - **MCP Client**: VS Code with Copilot, Claude Desktop, or another MCP-compatible client
 
 ### Example Workflow with Natural Language
@@ -178,7 +178,7 @@ The server detects and supports monorepo structures with multiple independently 
 
 ## Available Tools
 
-The server provides 13 MCP tools organized by functionality:
+The server provides 11 MCP tools organized by functionality:
 
 ### Analysis & Planning
 | Tool | Description |
@@ -422,8 +422,8 @@ npx containerization-assist-mcp list-policies
 # List policies and show merged result
 npx containerization-assist-mcp list-policies --show-merged
 
-# Validate Dockerfile with policies (automatic discovery)
-npx containerization-assist-mcp fix-dockerfile --path ./Dockerfile
+# The fix-dockerfile tool is an MCP tool invoked through your MCP client, not a CLI command.
+# It validates Dockerfiles against discovered policies and returns fix recommendations.
 ```
 
 **Creating Custom Policies:**
