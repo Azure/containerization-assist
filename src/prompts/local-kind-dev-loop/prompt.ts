@@ -14,7 +14,6 @@ import type { LocalKindDevLoopArgs } from './schema';
  * that references the MCP tools available in containerization-assist.
  */
 export function buildLocalKindDevLoopPrompt(args: LocalKindDevLoopArgs): string {
-  const repoPath = args.repositoryPath || '.';
   const nsClause = args.namespace
     ? `Use the namespace **${args.namespace}**.`
     : 'Generate a unique namespace name (e.g., `dev-<short-hash>`) for isolation.';
@@ -25,7 +24,7 @@ export function buildLocalKindDevLoopPrompt(args: LocalKindDevLoopArgs): string 
   return `You are driving a **local Kind cluster development iteration loop** using the containerization-assist MCP server tools.
 
 ## Context
-- Repository path: \`${repoPath}\`
+- Repository: use the **current working directory** (confirm with the user before proceeding).
 - ${nsClause}
 - ${imageClause}
 - Target environment: **development** (local Kind cluster with local image registry)
@@ -34,9 +33,9 @@ export function buildLocalKindDevLoopPrompt(args: LocalKindDevLoopArgs): string 
 ## Workflow — follow each step in order
 
 ### Step 1 — Analyze the repository
-Call **analyze-repo** with \`repositoryPath: "${repoPath}"\`.
-- Inspect the result for detected language, framework, modules, and existing Dockerfiles.
-- If the repository is a monorepo, note all independently deployable modules.
+Call **analyze-repo** using the current working directory as the repository path.
+- Confirm the detected repository, language, framework, modules, and existing Dockerfiles with the user before proceeding.
+- If the repository is a monorepo, list all independently deployable modules and ask the user which ones to target.
 
 ### Step 2 — Generate Dockerfile (if missing)
 If no Dockerfile exists for the target module(s):
