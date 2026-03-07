@@ -195,6 +195,7 @@ describe('JSON Schema generation', () => {
       const validate = ajv.compile(jsonSchemas.generateK8sManifests);
       const valid = validate({
         name: 'myapp',
+        repositoryPath: '/path/to/repo',
         modulePath: '/path/to/repo',
         environment: 'production',
       });

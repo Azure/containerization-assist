@@ -110,6 +110,19 @@ export const generateK8sManifestsSchema = z
           'Either provide acaManifest (for ACA conversion) or repositoryPath+modulePath (for repository analysis)',
         path: ['repositoryPath'],
       });
+    } else if (hasAcaManifest && hasRepoPath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Provide either acaManifest (for ACA conversion) or repositoryPath+modulePath (for repository analysis), but not both',
+        path: ['acaManifest'],
+      });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Provide either acaManifest (for ACA conversion) or repositoryPath+modulePath (for repository analysis), but not both',
+        path: ['repositoryPath'],
+      });
     }
 
     // Repository mode requires repositoryPath and modulePath

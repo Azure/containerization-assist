@@ -33,7 +33,7 @@ export function registerPrompts(server: McpServer): void {
           role: 'user' as const,
           content: {
             type: 'text' as const,
-            text: buildLocalKindDevLoopPrompt({} as LocalKindDevLoopArgs),
+            text: 'Use the kind-loop prompt with arguments to generate a local Kind cluster development workflow.',
           },
         },
       ],
@@ -64,7 +64,7 @@ export function registerPrompts(server: McpServer): void {
           role: 'user' as const,
           content: {
             type: 'text' as const,
-            text: buildAksRemoteDevLoopPrompt({} as AksRemoteDevLoopArgs),
+            text: 'Use the aks-loop prompt with arguments to generate an AKS remote deployment workflow.',
           },
         },
       ],

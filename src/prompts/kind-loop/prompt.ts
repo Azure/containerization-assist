@@ -52,24 +52,25 @@ If no Dockerfile exists for the target module(s):
 1. Call **scan-image** with the built image ID.
 2. Review vulnerabilities. If critical/high issues are found, call **fix-dockerfile** and rebuild (Step 3). Retry up to **2 times**.
 
-### Step 5 — Tag the image for the local registry
-1. Call **tag-image** to tag the image for the Kind local registry (typically \`localhost:5001/<image>:<tag>\`).
-2. Retry up to **2 times** on failure.
-
-### Step 6 — Prepare the Kind cluster
+### Step 5 — Prepare the Kind cluster
 1. Call **prepare-cluster** with:
    - \`clusterType: "kind"\` (this creates a local Kind cluster with a local registry)
    - \`namespace\`: the namespace from context above
    - \`targetPlatform\`: the local system architecture
-2. Note the local registry address from the result for pushing.
+2. Capture the **local registry address** (e.g., \`localhost:6xxx\`) from the result for use when tagging, pushing, and generating manifests.
 3. Retry up to **2 times** on failure.
+
+### Step 6 — Tag the image for the local registry
+1. Call **tag-image** to tag the image using the **local registry address returned by \`prepare-cluster\`** (e.g., \`<registry-address>/<image>:<tag>\`).
+2. Retry up to **2 times** on failure.
+
 ### Step 7 — Push the image to the local registry
-1. Call **push-image** to push the tagged image to the Kind local registry.
+1. Call **push-image** to push the tagged image to the **same local registry address returned by \`prepare-cluster\`**.
 2. Retry up to **2 times** on failure.
 
 ### Step 8 — Generate Kubernetes manifests (if missing)
 If no K8s manifests exist for the target module(s):
-1. Call **generate-k8s-manifests** with the repository path, image name (with local registry prefix), namespace, and analysis context.
+1. Call **generate-k8s-manifests** with the repository path, image name (with the local registry prefix returned by \`prepare-cluster\`), namespace, and analysis context.
 2. Follow the tool's guidance to create manifest files on disk.
 3. Retry up to **2 times** if generation fails.
 
