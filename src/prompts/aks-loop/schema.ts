@@ -1,5 +1,5 @@
 /**
- * Zod schema for the aks-remote-dev-loop prompt arguments.
+ * Zod schema for the aks-loop prompt arguments.
  *
  * MCP prompt arguments are always strings at the protocol level.
  * Optional fields default to sensible values in the prompt builder;

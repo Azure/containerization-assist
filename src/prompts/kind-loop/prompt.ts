@@ -1,5 +1,5 @@
 /**
- * local-kind-dev-loop prompt
+ * kind-loop prompt
  *
  * Returns a seeded user message that drives a full local Kind cluster
  * development iteration loop using the containerization-assist MCP tools.

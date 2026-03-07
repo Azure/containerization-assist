@@ -14,18 +14,18 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { localKindDevLoopSchema, type LocalKindDevLoopArgs } from './local-kind-dev-loop/schema';
-import { buildLocalKindDevLoopPrompt } from './local-kind-dev-loop/prompt';
-import { aksRemoteDevLoopSchema, type AksRemoteDevLoopArgs } from './aks-remote-dev-loop/schema';
-import { buildAksRemoteDevLoopPrompt } from './aks-remote-dev-loop/prompt';
+import { localKindDevLoopSchema, type LocalKindDevLoopArgs } from './kind-loop/schema';
+import { buildLocalKindDevLoopPrompt } from './kind-loop/prompt';
+import { aksRemoteDevLoopSchema, type AksRemoteDevLoopArgs } from './aks-loop/schema';
+import { buildAksRemoteDevLoopPrompt } from './aks-loop/prompt';
 
 /**
  * Register all MCP prompts on the given server instance.
  */
 export function registerPrompts(server: McpServer): void {
-  // --- local-kind-dev-loop ---
+  // --- kind-loop ---
   const kindPrompt = server.prompt(
-    'local-kind-dev-loop',
+    'kind-loop',
     'Drive a full local Kind cluster development iteration loop: analyze, build, scan, deploy, and verify using containerization-assist tools',
     (_extra) => ({
       messages: [
@@ -54,9 +54,9 @@ export function registerPrompts(server: McpServer): void {
     ],
   })) as never;
 
-  // --- aks-remote-dev-loop ---
+  // --- aks-loop ---
   const aksPrompt = server.prompt(
-    'aks-remote-dev-loop',
+    'aks-loop',
     'Drive a full AKS remote cluster deployment iteration loop: analyze, build, scan, push to ACR, deploy, and verify using containerization-assist tools',
     (_extra) => ({
       messages: [

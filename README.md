@@ -12,8 +12,8 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 ## Install
 
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D)
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D&quality=insiders)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=ca&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=ca&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D&quality=insiders)
 
 ## Features
 
@@ -65,7 +65,7 @@ Add the following to your VS Code settings or create `.vscode/mcp.json` in your 
 ```json
 {
   "servers": {
-    "containerization-assist": {
+    "ca": {
       "command": "npx",
       "args": ["-y", "containerization-assist-mcp", "start"],
       "env": {
@@ -359,7 +359,7 @@ cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-reg
 # 3. Configure environment variable in .vscode/mcp.json
 {
   "servers": {
-    "containerization-assist": {
+    "ca": {
       "env": {
         "CUSTOM_POLICY_PATH": "${env:HOME}/.config/containerization-assist/policies"
       }

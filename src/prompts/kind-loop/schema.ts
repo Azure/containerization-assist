@@ -1,5 +1,5 @@
 /**
- * Zod schema for the local-kind-dev-loop prompt arguments.
+ * Zod schema for the kind-loop prompt arguments.
  *
  * MCP prompt arguments are always strings at the protocol level.
  * Optional fields default to sensible values in the prompt builder.

@@ -1,5 +1,5 @@
 /**
- * aks-remote-dev-loop prompt
+ * aks-loop prompt
  *
  * Returns a seeded user message that drives a full AKS remote cluster
  * deployment iteration loop using the containerization-assist MCP tools.
