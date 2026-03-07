@@ -694,4 +694,227 @@ describe('prepareCluster', () => {
       expect(healthCheckAttempts).toBeGreaterThanOrEqual(3);
     });
   });
+
+  describe('Explicit clusterType field', () => {
+    beforeEach(() => {
+      mockK8sClient.ping.mockResolvedValue(true);
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
+      mockK8sClient.checkPermissions.mockResolvedValue(true);
+      mockK8sClient.applyManifest.mockResolvedValue({ success: true });
+      mockK8sClient.checkIngressController.mockResolvedValue(true);
+    });
+
+    it('should use generic cluster type for namespace + RBAC setup', async () => {
+      const genericConfig: PrepareClusterParams = {
+        clusterType: 'generic',
+        namespace: 'test-ns',
+        targetPlatform: 'linux/amd64',
+      };
+
+      const mockContext = createMockToolContext();
+      const result = await prepareCluster(genericConfig, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.checks.rbacConfigured).toBe(true);
+        // Should NOT set up kind/registry
+        expect(result.value.checks.kindInstalled).toBeFalsy();
+        expect(result.value.checks.kindClusterCreated).toBeFalsy();
+        expect(result.value.checks.localRegistryCreated).toBeFalsy();
+      }
+    });
+
+    it('should use kind cluster type for local Kind + registry setup', async () => {
+      const kindConfig: PrepareClusterParams = {
+        clusterType: 'kind',
+        namespace: 'default',
+        targetPlatform: 'linux/amd64',
+      };
+
+      // Mock Kind/registry commands
+      (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
+          return { stdout: 'amd64', stderr: '' };
+        }
+        if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
+          return { stdout: 'linux', stderr: '' };
+        }
+        if (cmd.includes('kind get clusters')) {
+          return { stdout: 'containerization-assist\n', stderr: '' };
+        }
+        if (cmd.includes('kind version')) {
+          return { stdout: 'kind v0.20.0 go1.20.5 linux/amd64', stderr: '' };
+        }
+        if (cmd.includes('docker ps -a') && cmd.includes('ca-registry')) {
+          return { stdout: 'ca-registry\n', stderr: '' };
+        }
+        if (cmd.includes('docker ps') && cmd.includes('ca-registry') && !cmd.includes('-a')) {
+          return { stdout: 'ca-registry\n', stderr: '' };
+        }
+        if (cmd.includes('docker network ls')) {
+          return { stdout: 'kind\n', stderr: '' };
+        }
+        if (cmd.includes('kubectl get nodes --no-headers')) {
+          return { stdout: 'node1   Ready   control-plane   1m   v1.27.3\n', stderr: '' };
+        }
+        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
+          return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
+        }
+        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
+          return { stdout: 'success', stderr: '' };
+        }
+        if (cmd.includes('curl') && cmd.includes('/v2/')) {
+          return { stdout: '{}', stderr: '' };
+        }
+        if (cmd.includes('kubectl delete pod')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (cmd.includes('docker network connect')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (cmd.includes('docker exec') && cmd.includes('config.toml')) {
+          return {
+            stdout: `
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:6000"]
+  endpoint = ["http://ca-registry:5000"]
+`,
+            stderr: '',
+          };
+        }
+        if (cmd.includes('docker inspect ca-registry')) {
+          if (cmd.includes('State.Status')) {
+            return { stdout: 'running', stderr: '' };
+          }
+          if (cmd.includes('NetworkSettings.Networks')) {
+            return { stdout: 'bridge kind', stderr: '' };
+          }
+          if (cmd.includes('NetworkSettings.Ports')) {
+            return { stdout: '6000', stderr: '' };
+          }
+        }
+        if (cmd.includes('kind export kubeconfig')) {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await prepareCluster(kindConfig, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.checks.kindInstalled).toBe(true);
+        expect(result.value.checks.kindClusterCreated).toBe(true);
+        expect(result.value.checks.localRegistryCreated).toBe(true);
+      }
+    });
+
+    it('should let clusterType override environment-based inference', async () => {
+      // Pass environment=development but clusterType=generic — clusterType wins
+      const overrideConfig: PrepareClusterParams = {
+        clusterType: 'generic',
+        environment: 'development',
+        namespace: 'override-ns',
+        targetPlatform: 'linux/amd64',
+      };
+
+      const mockContext = createMockToolContext();
+      const result = await prepareCluster(overrideConfig, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should behave as generic (RBAC), NOT kind
+        expect(result.value.checks.rbacConfigured).toBe(true);
+        expect(result.value.checks.kindInstalled).toBeFalsy();
+        expect(result.value.checks.kindClusterCreated).toBeFalsy();
+      }
+    });
+
+    it('should infer kind from environment=development when clusterType omitted (backwards compat)', async () => {
+      // This is the backwards-compat path — existing tests in 'Development environment' block
+      // also cover this, but this test makes the intent explicit
+      const legacyConfig: PrepareClusterParams = {
+        environment: 'development',
+        namespace: 'default',
+        targetPlatform: 'linux/amd64',
+      };
+
+      // Mock Kind/registry commands
+      (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
+          return { stdout: 'amd64', stderr: '' };
+        }
+        if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
+          return { stdout: 'linux', stderr: '' };
+        }
+        if (cmd.includes('kind get clusters')) {
+          return { stdout: 'containerization-assist\n', stderr: '' };
+        }
+        if (cmd.includes('kind version')) {
+          return { stdout: 'kind v0.20.0 go1.20.5 linux/amd64', stderr: '' };
+        }
+        if (cmd.includes('docker ps -a') && cmd.includes('ca-registry')) {
+          return { stdout: 'ca-registry\n', stderr: '' };
+        }
+        if (cmd.includes('docker ps') && cmd.includes('ca-registry') && !cmd.includes('-a')) {
+          return { stdout: 'ca-registry\n', stderr: '' };
+        }
+        if (cmd.includes('docker network ls')) {
+          return { stdout: 'kind\n', stderr: '' };
+        }
+        if (cmd.includes('kubectl get nodes --no-headers')) {
+          return { stdout: 'node1   Ready   control-plane   1m   v1.27.3\n', stderr: '' };
+        }
+        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
+          return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
+        }
+        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
+          return { stdout: 'success', stderr: '' };
+        }
+        if (cmd.includes('curl') && cmd.includes('/v2/')) {
+          return { stdout: '{}', stderr: '' };
+        }
+        if (cmd.includes('kubectl delete pod')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (cmd.includes('docker network connect')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (cmd.includes('docker exec') && cmd.includes('config.toml')) {
+          return {
+            stdout: `
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:6000"]
+  endpoint = ["http://ca-registry:5000"]
+`,
+            stderr: '',
+          };
+        }
+        if (cmd.includes('docker inspect ca-registry')) {
+          if (cmd.includes('State.Status')) {
+            return { stdout: 'running', stderr: '' };
+          }
+          if (cmd.includes('NetworkSettings.Networks')) {
+            return { stdout: 'bridge kind', stderr: '' };
+          }
+          if (cmd.includes('NetworkSettings.Ports')) {
+            return { stdout: '6000', stderr: '' };
+          }
+        }
+        if (cmd.includes('kind export kubeconfig')) {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const mockContext = createMockToolContext();
+      const result = await prepareCluster(legacyConfig, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.checks.kindInstalled).toBe(true);
+        expect(result.value.checks.kindClusterCreated).toBe(true);
+        expect(result.value.checks.localRegistryCreated).toBe(true);
+      }
+    });
+  });
 });

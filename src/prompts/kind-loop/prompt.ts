@@ -58,12 +58,11 @@ If no Dockerfile exists for the target module(s):
 
 ### Step 6 — Prepare the Kind cluster
 1. Call **prepare-cluster** with:
-   - \`environment: "development"\` (this creates a Kind cluster with a local registry)
+   - \`clusterType: "kind"\` (this creates a local Kind cluster with a local registry)
    - \`namespace\`: the namespace from context above
    - \`targetPlatform\`: the local system architecture
 2. Note the local registry address from the result for pushing.
 3. Retry up to **2 times** on failure.
-
 ### Step 7 — Push the image to the local registry
 1. Call **push-image** to push the tagged image to the Kind local registry.
 2. Retry up to **2 times** on failure.

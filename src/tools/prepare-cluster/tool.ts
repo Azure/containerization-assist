@@ -1455,11 +1455,16 @@ async function handlePrepareCluster(
   const { logger, timer } = setupToolContext(context, 'prepare-cluster');
 
   const {
+    clusterType: explicitClusterType,
     environment = 'development',
     namespace = 'default',
     targetPlatform = 'linux/amd64',
     strictPlatformValidation = true,
   } = params;
+
+  // Resolve effective cluster type: explicit clusterType wins, otherwise infer from environment for backwards compat
+  const effectiveClusterType =
+    explicitClusterType ?? (environment === 'development' ? 'kind' : 'generic');
 
   // Validate namespace
   const namespaceValidation = validateNamespace(namespace);
@@ -1467,13 +1472,13 @@ async function handlePrepareCluster(
     return namespaceValidation;
   }
 
-  const clusterName = environment === 'development' ? 'containerization-assist' : 'default';
-  const shouldCreateNamespace = environment === 'production';
-  const shouldSetupRbac = environment === 'production';
+  const clusterName = effectiveClusterType === 'kind' ? 'containerization-assist' : 'default';
+  const shouldCreateNamespace = effectiveClusterType === 'generic';
+  const shouldSetupRbac = effectiveClusterType === 'generic';
   const installIngress = false;
   const checkRequirements = true;
-  const shouldSetupKind = environment === 'development';
-  const shouldCreateLocalRegistry = environment === 'development';
+  const shouldSetupKind = effectiveClusterType === 'kind';
+  const shouldCreateLocalRegistry = effectiveClusterType === 'kind';
 
   try {
     logger.info({ environment, namespace }, 'Starting Kubernetes cluster preparation');

@@ -73,7 +73,7 @@ If no Dockerfile exists for the target module(s):
 
 ### Step 7 — Prepare the AKS cluster
 1. Call **prepare-cluster** with:
-   - \`environment: "production"\` (assumes existing AKS cluster)
+   - \`clusterType: "generic"\` (assumes existing AKS cluster)
    - \`namespace\`: the namespace from context above
    - \`targetPlatform: "linux/amd64"\`
 2. Retry up to **2 times** on failure.
