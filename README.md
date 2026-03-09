@@ -131,9 +131,8 @@ This MCP server guides you through a complete containerization workflow for a si
 4. **Scan Image** → Identify security vulnerabilities and get remediation guidance
 5. **Tag Image** → Apply appropriate version tags to your image
 6. **Generate K8s Manifests** → Create deployment configurations for Kubernetes
-7. **Prepare Cluster** → Set up namespace and prerequisites (if needed)
-8. **Deploy** → Deploy your application to Kubernetes
-9. **Verify** → Confirm deployment health and readiness
+7. **Prepare Cluster** → Set up namespace and prerequisites, then deploy with `kubectl apply`
+8. **Verify** → Confirm deployment health and readiness
 
 ### Prerequisites
 
@@ -215,7 +214,7 @@ The server detects and supports monorepo structures with multiple independently 
 
 ## Available Tools
 
-The server provides 13 MCP tools organized by functionality:
+The server provides 11 MCP tools organized by functionality:
 
 ### Analysis & Planning
 | Tool | Description |
@@ -247,6 +246,15 @@ The server provides 13 MCP tools organized by functionality:
 | Tool | Description |
 |------|-------------|
 | `ops` | Operational utilities for ping and server status |
+
+### MCP Prompts
+
+Interactive workflow prompts available as `/` slash commands in VS Code Copilot Chat:
+
+| Prompt | Description | Required Inputs |
+|--------|-------------|-----------------|
+| `kind-loop` | Local dev loop: analyze → build → scan → deploy to Kind | None (namespace, imageName optional) |
+| `aks-loop` | Remote dev loop: analyze → build → push → deploy to AKS | `registry`, `resourceGroup`, `clusterName` |
 
 ## Supported Technologies
 
