@@ -90,6 +90,9 @@ export const generateK8sManifestsSchema = z
         'Criticality tier for dynamic defaults calculation (tier-1=mission-critical, tier-3=low-priority).',
       ),
   })
+  // NOTE: zod-to-json-schema does not encode superRefine constraints into JSON Schema.
+  // SDK/VS Code JSON Schema validation may accept inputs that Zod rejects at runtime
+  // (e.g. providing both acaManifest and repositoryPath). Runtime validation catches these.
   .superRefine((data, ctx) => {
     const hasAcaManifest = !!data.acaManifest;
     const hasRepoPath = !!data.repositoryPath;

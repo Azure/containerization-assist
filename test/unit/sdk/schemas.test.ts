@@ -172,6 +172,7 @@ describe('JSON Schema generation', () => {
         environment: 'production',
       });
 
+      expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.manifestType).toBe('kubernetes');
       }

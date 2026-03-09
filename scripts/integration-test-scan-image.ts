@@ -155,18 +155,19 @@ const TEST_CASES: TestCase[] = [
     description: 'Verifies LTS image scans complete successfully (CVE counts may vary)',
   },
   {
-    name: 'Scratch Image Zero Vulnerabilities',
+    name: 'Scratch-Based Minimal Image Zero Vulnerabilities',
     buildInline: 'FROM scratch\nCOPY --from=busybox:uclibc /bin/true /true',
     localTag: 'test-scan:scratch',
     expectedSeverities: {
-      // scratch has no OS packages, no libraries, no filesystem — zero vulnerabilities guaranteed
+      // scratch base with a single static binary — no OS packages or libraries to scan.
+      // If scanner heuristics change to flag the copied binary, loosen these bounds.
       critical: { min: 0, max: 0 },
       high: { min: 0, max: 0 },
       medium: { min: 0, max: 0 },
     },
-    shouldPassThreshold: true, // Must pass — no packages means no vulnerabilities
+    shouldPassThreshold: true, // Expected to pass — no package manager or OS layer to scan
     scanner: 'trivy',
-    description: 'Control test - verifies zero-vulnerability baseline with empty scratch image',
+    description: 'Control test - scratch base with single static binary, expects zero vulnerabilities',
   },
 ];
 

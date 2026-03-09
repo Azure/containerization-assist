@@ -456,7 +456,7 @@ const runPattern = createKnowledgeTool<
 
       const nextAction: ToolNextAction = {
         action: 'create-files',
-        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, ports, and dependencies.${policyInstruction}`,
+        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, frameworks, ports, and entry point. Use detectedDependencies (if provided in input) for dependency-aware manifest configuration.${policyInstruction}`,
         files: manifestFiles,
       };
 
@@ -555,6 +555,16 @@ async function handleGenerateK8sManifests(
 
     // Use the validated absolute path for consistent plan output
     input.repositoryPath = pathResult.value;
+  }
+
+  // Validate modulePath exists on disk when provided
+  if (input.modulePath) {
+    const modulePathResult = await validatePathOrFail(input.modulePath, {
+      mustExist: true,
+      mustBeDirectory: true,
+    });
+    if (!modulePathResult.ok) return modulePathResult as Result<ManifestPlan>;
+    input.modulePath = modulePathResult.value;
   }
 
   // Normalize singular framework into frameworks array for backward compat
