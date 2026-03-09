@@ -552,6 +552,9 @@ async function handleGenerateK8sManifests(
     if (!input.name) {
       input.name = path.basename(pathResult.value);
     }
+
+    // Use the validated absolute path for consistent plan output
+    input.repositoryPath = pathResult.value;
   }
 
   // Normalize singular framework into frameworks array for backward compat

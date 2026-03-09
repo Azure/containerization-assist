@@ -70,7 +70,7 @@ If no Dockerfile exists for the target module(s):
 
 ### Step 8 — Generate Kubernetes manifests (if missing)
 If no K8s manifests exist for the target module(s):
-1. Call **generate-k8s-manifests** with the repository path, image name (with the local registry prefix returned by \`prepare-cluster\`), namespace, and analysis context.
+1. Call **generate-k8s-manifests** with the repository path, namespace, and analysis context. Set the image reference in the manifests to use the local registry prefix returned by \`prepare-cluster\` (e.g., \`<registry-address>/<image>:<tag>\`).
 2. Follow the tool's guidance to create manifest files on disk.
 3. Retry up to **2 times** if generation fails.
 

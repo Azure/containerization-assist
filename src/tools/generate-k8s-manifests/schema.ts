@@ -11,7 +11,7 @@ export const generateK8sManifestsSchema = z
     repositoryPath: repositoryPath
       .optional()
       .describe(
-        'Absolute path to the repository root. Required when generating from repository analysis. Paths are automatically normalized to forward slashes on all platforms.',
+        'Absolute path to the repository root. Required when generating from repository analysis.',
       ),
     name: z
       .string()
@@ -20,9 +20,7 @@ export const generateK8sManifestsSchema = z
     modulePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to module root. Required when generating from repository analysis. Paths are automatically normalized to forward slashes on all platforms.',
-      ),
+      .describe('Absolute path to module root. Required when generating from repository analysis.'),
     // dockerfilePath removed — not used by k8s manifest generation
     targetPlatform: platform.describe(
       'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). Defaults to linux/amd64 for maximum compatibility.',

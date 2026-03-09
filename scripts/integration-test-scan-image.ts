@@ -411,6 +411,11 @@ async function main() {
       const success = buildImage(testCase.buildInline, testCase.localTag);
       if (success) {
         readyTags.push(testCase.localTag);
+        // Track base images used in multi-stage builds for cleanup
+        const baseImageMatch = testCase.buildInline?.match(/--from=(\S+)/);
+        if (baseImageMatch) {
+          pulledRemotes.push(baseImageMatch[1]);
+        }
       } else {
         results.push({
           name: testCase.name,
