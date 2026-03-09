@@ -2,16 +2,18 @@
  * Integration Test: scan-image with Real Security Scanners
  *
  * Tests the complete flow of:
- * 1. Pulling test images with known vulnerabilities (no build step)
+ * 1. Pulling/building test images with known vulnerabilities
  * 2. Running scan-image tool with Trivy scanner
  * 3. Verifying vulnerability detection and severity classification
  * 4. Validating remediation guidance from knowledge base
  * 5. Testing threshold enforcement (fail on HIGH/CRITICAL)
+ * 6. Verifying zero-vulnerability baseline with scratch image
  *
- * Test Images (pulled from registries, not built):
- * - openjdk:8u181-jdk - Old Java 8 with known CVEs
- * - mcr.microsoft.com/dotnet/aspnet:3.1 - EOL .NET Core 3.1 with CVEs
- * - mcr.microsoft.com/dotnet/runtime:8.0-alpine - Clean baseline
+ * Test Images:
+ * - openjdk:8u181-jdk - Old Java 8 with known CVEs (pulled)
+ * - mcr.microsoft.com/dotnet/aspnet:3.1 - EOL .NET Core 3.1 with CVEs (pulled)
+ * - mcr.microsoft.com/dotnet/runtime:8.0-alpine - Current LTS baseline (pulled)
+ * - FROM scratch - Empty image with zero packages (built locally)
  *
  * Prerequisites:
  * - Docker installed and running
@@ -36,12 +38,14 @@ import { writeFileSync } from 'fs';
 const logger = createLogger({ name: 'scan-image-test', level: 'error' });
 
 /**
- * Test case definition for pull-based images
+ * Test case definition
  */
 interface TestCase {
   name: string;
-  /** Docker image to pull (full registry path) */
-  pullImage: string;
+  /** Docker image to pull (full registry path). Omit if using buildInline. */
+  pullImage?: string;
+  /** Inline Dockerfile content to build instead of pulling */
+  buildInline?: string;
   /** Local tag to apply for testing */
   localTag: string;
   expectedSeverities: {
@@ -72,11 +76,13 @@ interface TestResult {
 
 /**
  * Test cases using well-known vulnerable images from public registries
+ * and locally-built images for zero-vulnerability baselines.
  *
  * These images are intentionally old/EOL versions with documented CVEs:
  * - Java: openjdk:8u181-jdk (2018) - OpenJDK 8 update 181 with known CVEs
  * - .NET: mcr.microsoft.com/dotnet/aspnet:3.1 (EOL Dec 2022) - Known CVEs
- * - Clean: mcr.microsoft.com/dotnet/runtime:8.0-alpine - Current, minimal CVEs
+ * - .NET 8 Alpine: Current LTS - may accumulate CVEs over time
+ * - Scratch: Empty image - guaranteed zero vulnerabilities
  */
 const TEST_CASES: TestCase[] = [
   {
@@ -135,18 +141,32 @@ const TEST_CASES: TestCase[] = [
     description: 'Tests detection of EOL .NET Core 3.1 CVEs',
   },
   {
-    name: 'Clean .NET 8 Alpine Baseline',
+    name: '.NET 8 Alpine LTS Baseline',
     pullImage: 'mcr.microsoft.com/dotnet/runtime:8.0-alpine',
     localTag: 'test-scan:clean',
     expectedSeverities: {
-      // Current LTS image - expect few/no critical vulnerabilities
-      // Using loose bounds since CVE feeds change over time
-      critical: { min: 0, max: 5 }, // Allow some drift as CVEs are discovered
-      high: { min: 0, max: 10 }, // Allow reasonable variance
+      // Current LTS image - may accumulate CVEs over time as new vulnerabilities are disclosed.
+      // We don't control this image so we use loose bounds and don't assert pass/fail threshold.
+      critical: { min: 0, max: 20 },
+      high: { min: 0, max: 50 },
     },
-    shouldPassThreshold: true, // Should generally pass HIGH threshold for current LTS
+    shouldPassThreshold: false, // LTS images can accumulate CVEs; don't assume clean
     scanner: 'trivy',
-    description: 'Control test - verifies current LTS images scan successfully',
+    description: 'Verifies LTS image scans complete successfully (CVE counts may vary)',
+  },
+  {
+    name: 'Scratch Image Zero Vulnerabilities',
+    buildInline: 'FROM scratch\nCOPY --from=busybox:uclibc /bin/true /true',
+    localTag: 'test-scan:scratch',
+    expectedSeverities: {
+      // scratch has no OS packages, no libraries, no filesystem — zero vulnerabilities guaranteed
+      critical: { min: 0, max: 0 },
+      high: { min: 0, max: 0 },
+      medium: { min: 0, max: 0 },
+    },
+    shouldPassThreshold: true, // Must pass — no packages means no vulnerabilities
+    scanner: 'trivy',
+    description: 'Control test - verifies zero-vulnerability baseline with empty scratch image',
   },
 ];
 
@@ -214,6 +234,29 @@ function pullImage(remoteImage: string, localTag: string, maxRetries = 3): boole
   }
 
   return false;
+}
+
+/**
+ * Build a Docker image from inline Dockerfile content
+ */
+function buildImage(dockerfileContent: string, localTag: string): boolean {
+  console.log(`   Building ${localTag} from inline Dockerfile...`);
+  try {
+    const startTime = Date.now();
+    execSync(`echo '${dockerfileContent}' | docker build -t ${localTag} -`, {
+      stdio: 'pipe',
+      cwd: process.cwd(),
+    });
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`   ✅ Built ${localTag} (${duration}s)`);
+    return true;
+  } catch (error) {
+    console.log(`   ❌ Failed to build ${localTag}`);
+    if (error instanceof Error) {
+      console.log(`      Error: ${error.message}`);
+    }
+    return false;
+  }
 }
 
 /**
@@ -332,41 +375,59 @@ async function main() {
     process.exit(1);
   }
 
-  // List test images to be pulled
-  console.log('\n   Test images to pull:');
+  // List test images
+  console.log('\n   Test images:');
   for (const testCase of TEST_CASES) {
-    console.log(`   - ${testCase.pullImage} → ${testCase.localTag}`);
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Step 2: Pull Test Images
-  // ─────────────────────────────────────────────────────────────
-  console.log('\n📦 Step 2: Pulling test images...\n');
-
-  const pulledTags: string[] = [];
-  const pulledRemotes: string[] = [];
-
-  for (const testCase of TEST_CASES) {
-    const success = pullImage(testCase.pullImage, testCase.localTag);
-    if (success) {
-      pulledTags.push(testCase.localTag);
-      pulledRemotes.push(testCase.pullImage);
-    } else {
-      results.push({
-        name: testCase.name,
-        passed: false,
-        message: `Failed to pull Docker image: ${testCase.pullImage}`,
-      });
-      failCount++;
+    if (testCase.pullImage) {
+      console.log(`   - pull ${testCase.pullImage} → ${testCase.localTag}`);
+    } else if (testCase.buildInline) {
+      console.log(`   - build inline → ${testCase.localTag}`);
     }
   }
 
-  if (pulledTags.length === 0) {
-    console.error('\n❌ No images were pulled successfully. Aborting tests.');
+  // ─────────────────────────────────────────────────────────────
+  // Step 2: Prepare Test Images (pull or build)
+  // ─────────────────────────────────────────────────────────────
+  console.log('\n📦 Step 2: Preparing test images...\n');
+
+  const readyTags: string[] = [];
+  const pulledRemotes: string[] = [];
+
+  for (const testCase of TEST_CASES) {
+    if (testCase.pullImage) {
+      const success = pullImage(testCase.pullImage, testCase.localTag);
+      if (success) {
+        readyTags.push(testCase.localTag);
+        pulledRemotes.push(testCase.pullImage);
+      } else {
+        results.push({
+          name: testCase.name,
+          passed: false,
+          message: `Failed to pull Docker image: ${testCase.pullImage}`,
+        });
+        failCount++;
+      }
+    } else if (testCase.buildInline) {
+      const success = buildImage(testCase.buildInline, testCase.localTag);
+      if (success) {
+        readyTags.push(testCase.localTag);
+      } else {
+        results.push({
+          name: testCase.name,
+          passed: false,
+          message: `Failed to build Docker image: ${testCase.localTag}`,
+        });
+        failCount++;
+      }
+    }
+  }
+
+  if (readyTags.length === 0) {
+    console.error('\n❌ No images were prepared successfully. Aborting tests.');
     process.exit(1);
   }
 
-  console.log(`\n   ✅ Pulled ${pulledTags.length}/${TEST_CASES.length} images`);
+  console.log(`\n   ✅ Prepared ${readyTags.length}/${TEST_CASES.length} images`);
 
   // ─────────────────────────────────────────────────────────────
   // Step 3: Run Security Scans
@@ -376,14 +437,15 @@ async function main() {
   const ctx = createToolContext(logger);
 
   for (const testCase of TEST_CASES) {
-    // Skip if image wasn't pulled
-    if (!pulledTags.includes(testCase.localTag)) {
+    // Skip if image wasn't prepared
+    if (!readyTags.includes(testCase.localTag)) {
       continue;
     }
 
     console.log(`\n   📊 Scanning: ${testCase.name}`);
     console.log(`      Description: ${testCase.description}`);
-    console.log(`      Image: ${testCase.localTag} (from ${testCase.pullImage})`);
+    const imageSource = testCase.pullImage ? `from ${testCase.pullImage}` : 'built inline';
+    console.log(`      Image: ${testCase.localTag} (${imageSource})`);
     console.log(`      Scanner: ${testCase.scanner}`);
 
     const startTime = Date.now();
@@ -501,7 +563,7 @@ async function main() {
   // Step 4: Cleanup
   // ─────────────────────────────────────────────────────────────
   console.log('\n🧹 Step 4: Cleaning up...\n');
-  cleanupImages(pulledTags, pulledRemotes);
+  cleanupImages(readyTags, pulledRemotes);
 
   // ─────────────────────────────────────────────────────────────
   // Step 5: Generate Summary
@@ -532,7 +594,7 @@ async function main() {
     scanner: 'trivy',
     testImages: TEST_CASES.map((tc) => ({
       name: tc.name,
-      sourceImage: tc.pullImage,
+      sourceImage: tc.pullImage ?? 'built inline',
       localTag: tc.localTag,
     })),
     results: results.map((r) => ({

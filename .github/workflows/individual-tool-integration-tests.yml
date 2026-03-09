@@ -323,7 +323,7 @@ jobs:
       - name: Cleanup Docker images
         if: always()
         run: |
-          docker rmi -f test-scan:java-vulns test-scan:dotnet-vulns test-scan:clean || true
+          docker rmi -f test-scan:java-vulns test-scan:dotnet-vulns test-scan:clean test-scan:scratch || true
           docker rmi -f openjdk:8u181-jdk mcr.microsoft.com/dotnet/aspnet:3.1 mcr.microsoft.com/dotnet/runtime:8.0-alpine || true
 
       - name: Generate test summary
