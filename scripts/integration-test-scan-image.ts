@@ -155,18 +155,18 @@ const TEST_CASES: TestCase[] = [
     description: 'Verifies LTS image scans complete successfully (CVE counts may vary)',
   },
   {
-    name: 'Pure Scratch Image Zero Vulnerabilities',
-    buildInline: 'FROM scratch',
+    name: 'Scratch Image Zero Vulnerabilities',
+    buildInline: 'FROM scratch\nCOPY <<EOF /empty\nEOF',
     localTag: 'test-scan:scratch',
     expectedSeverities: {
-      // Pure scratch: empty filesystem, no OS, no packages, no binaries — guaranteed zero vulnerabilities
+      // scratch + single empty file via heredoc: no OS, no packages, no binaries — zero vulnerabilities
       critical: { min: 0, max: 0 },
       high: { min: 0, max: 0 },
       medium: { min: 0, max: 0 },
     },
-    shouldPassThreshold: true, // Guaranteed — nothing to scan
+    shouldPassThreshold: true, // Guaranteed — nothing scannable
     scanner: 'trivy',
-    description: 'Control test - pure scratch image with empty filesystem, guaranteed zero vulnerabilities',
+    description: 'Control test - scratch image with empty heredoc file, zero vulnerabilities',
   },
 ];
 
