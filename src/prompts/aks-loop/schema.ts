@@ -7,18 +7,10 @@
  */
 
 import { z } from 'zod';
+import { sharedLoopSchema } from '../shared/schema';
 
 export const aksRemoteDevLoopSchema = {
-  namespace: z
-    .string()
-    .optional()
-    .describe(
-      'Kubernetes namespace for the deployment. If empty, a unique namespace is auto-generated',
-    ),
-  imageName: z
-    .string()
-    .optional()
-    .describe('Docker image name. If empty, derived from the repository directory name'),
+  ...sharedLoopSchema,
   registry: z
     .string()
     .describe(
@@ -29,8 +21,8 @@ export const aksRemoteDevLoopSchema = {
 } as const;
 
 export type AksRemoteDevLoopArgs = {
-  namespace?: string;
-  imageName?: string;
+  namespace?: string | undefined;
+  imageName?: string | undefined;
   registry: string;
   resourceGroup: string;
   clusterName: string;

@@ -5,22 +5,13 @@
  * Optional fields default to sensible values in the prompt builder.
  */
 
-import { z } from 'zod';
+import { sharedLoopSchema } from '../shared/schema';
 
 export const localKindDevLoopSchema = {
-  namespace: z
-    .string()
-    .optional()
-    .describe(
-      'Kubernetes namespace for the deployment. If empty, a unique namespace is auto-generated (e.g., dev-<short-hash>)',
-    ),
-  imageName: z
-    .string()
-    .optional()
-    .describe('Docker image name. If empty, derived from the repository directory name'),
+  ...sharedLoopSchema,
 } as const;
 
 export type LocalKindDevLoopArgs = {
-  namespace?: string;
-  imageName?: string;
+  namespace?: string | undefined;
+  imageName?: string | undefined;
 };

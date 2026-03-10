@@ -5,13 +5,12 @@
  * development iteration loop using the containerization-assist MCP tools.
  */
 
+import { TOOL_NAME } from '@/tools';
+import { buildLoopPrompt } from '../shared/build-loop-prompt';
 import type { LocalKindDevLoopArgs } from './schema';
 
 /**
  * Build the prompt text for a local Kind development loop.
- *
- * The returned string is a comprehensive, step-by-step workflow instruction
- * that references the MCP tools available in containerization-assist.
  */
 export function buildLocalKindDevLoopPrompt(args: LocalKindDevLoopArgs): string {
   const nsClause = args.namespace
@@ -21,72 +20,30 @@ export function buildLocalKindDevLoopPrompt(args: LocalKindDevLoopArgs): string 
     ? `Use the image name **${args.imageName}**.`
     : 'Derive the image name from the repository directory name.';
 
-  return `You are driving a **local Kind cluster development iteration loop** using the containerization-assist MCP server tools.
-
-## Context
-- Repository: use the **current working directory** (confirm with the user before proceeding).
-- ${nsClause}
-- ${imageClause}
-- Target environment: **development** (local Kind cluster with local image registry)
-- Use the **local system architecture** for Kind testing (detect it automatically).
-
-## Workflow — follow each step in order
-
-### Step 1 — Analyze the repository
-Call **analyze-repo** using the current working directory as the repository path.
-- Confirm the detected repository, language, framework, modules, and existing Dockerfiles with the user before proceeding.
-- If the repository is a monorepo, list all independently deployable modules and ask the user which ones to target.
-
-### Step 2 — Generate Dockerfile (if missing)
-If no Dockerfile exists for the target module(s):
-1. Call **generate-dockerfile** with the repository path and analysis context.
-2. Follow the tool's guidance to create the Dockerfile(s) on disk.
-3. Retry up to **2 times** if generation fails.
-
-### Step 3 — Build the image
-1. Call **build-image-context** with the repository path, image name, and the **local system platform** (e.g., \`linux/arm64\` or \`linux/amd64\` — detect automatically).
-2. Execute the returned build command to produce the Docker image.
-3. Retry up to **2 times** on failure; call **fix-dockerfile** if the build fails due to Dockerfile issues.
-
-### Step 4 — Scan the image
-1. Call **scan-image** with the built image ID.
-2. Review vulnerabilities. If critical/high issues are found, call **fix-dockerfile** and rebuild (Step 3). Retry up to **2 times**.
-
-### Step 5 — Prepare the Kind cluster
-1. Call **prepare-cluster** with:
-   - \`clusterType: "kind"\` (this creates a local Kind cluster with a local registry)
-   - \`namespace\`: the namespace from context above
-   - \`targetPlatform\`: the local system architecture
-2. Capture the **local registry address** (e.g., \`localhost:6xxx\`) from the result for use when tagging, pushing, and generating manifests.
-3. Retry up to **2 times** on failure.
-
-### Step 6 — Tag the image for the local registry
-1. Call **tag-image** to tag the image using the **local registry address returned by \`prepare-cluster\`** (e.g., \`<registry-address>/<image>:<tag>\`).
-2. Retry up to **2 times** on failure.
-
-### Step 7 — Push the image to the local registry
-1. Call **push-image** to push the tagged image to the **same local registry address returned by \`prepare-cluster\`**.
-2. Retry up to **2 times** on failure.
-
-### Step 8 — Generate Kubernetes manifests (if missing)
-If no K8s manifests exist for the target module(s):
-1. Call **generate-k8s-manifests** with the repository path, namespace, and analysis context. Set the image reference in the manifests to use the local registry prefix returned by \`prepare-cluster\` (e.g., \`<registry-address>/<image>:<tag>\`).
-2. Follow the tool's guidance to create manifest files on disk.
-3. Retry up to **2 times** if generation fails.
-
-### Step 9 — Deploy to the Kind cluster
-1. Apply the generated manifests using \`kubectl apply -f <manifest-folder> --namespace <namespace>\`.
-2. Retry up to **2 times** on failure.
-
-### Step 10 — Verify the deployment
-1. Call **verify-deploy** with the namespace to check pod status, readiness, and events.
-2. If verification fails, inspect pod logs and events, fix issues, and re-deploy. Retry up to **2 times**.
-
-## Important rules
-- **Retry failed steps at least 2 times** before reporting failure.
-- **Follow the chain hints** returned by each tool to determine next steps.
-- If a tool suggests calling another tool, follow that suggestion.
-- Use the **local system architecture** for all platform-related parameters.
-- Keep the user informed of progress at each step.
-- If all retry attempts for a step are exhausted, report the failure clearly with diagnostic details.`;
+  return buildLoopPrompt(nsClause, imageClause, {
+    title: 'local Kind cluster development iteration loop',
+    contextLines: [
+      '- Target environment: **development** (local Kind cluster with local image registry)',
+      '- Use the **local system architecture** for Kind testing (detect it automatically).',
+    ],
+    buildPlatform:
+      'the **local system platform** (e.g., \\`linux/arm64\\` or \\`linux/amd64\\` — detect automatically)',
+    prepareStep: [
+      `1. Call **${TOOL_NAME.PREPARE_CLUSTER}** with:`,
+      '   - \\`clusterType: "kind"\\` (this creates a local Kind cluster with a local registry)',
+      '   - \\`namespace\\`: the namespace from context above',
+      '   - \\`targetPlatform\\`: the local system architecture',
+      '2. Capture the **local registry address** (e.g., \\`localhost:6xxx\\`) from the result for use when tagging, pushing, and generating manifests.',
+      '3. Retry up to **2 times** on failure.',
+    ].join('\n'),
+    tagInstruction: `Call **${TOOL_NAME.TAG_IMAGE}** to tag the image using the **local registry address returned by \\\`${TOOL_NAME.PREPARE_CLUSTER}\\\`** (e.g., \\\`<registry-address>/<image>:<tag>\\\`).`,
+    pushInstructions: [
+      `1. Call **${TOOL_NAME.PUSH_IMAGE}** to push the tagged image to the **same local registry address returned by \\\`${TOOL_NAME.PREPARE_CLUSTER}\\\`**.`,
+      '2. Retry up to **2 times** on failure.',
+    ].join('\n'),
+    manifestRegistryClause: `Set the image reference in the manifests to use the local registry prefix returned by \\\`${TOOL_NAME.PREPARE_CLUSTER}\\\` (e.g., \\\`<registry-address>/<image>:<tag>\\\`).`,
+    deployTarget: 'the Kind cluster',
+    platformRule: 'Use the **local system architecture** for all platform-related parameters.',
+    extraRules: [],
+  });
 }
