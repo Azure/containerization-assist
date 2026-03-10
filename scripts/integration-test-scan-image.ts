@@ -26,7 +26,7 @@
  *
  * Usage:
  *   npm run build
- *   npm exec -- tsx scripts/integration-test-scan-image.ts
+ *   tsx scripts/integration-test-scan-image.ts
  */
 
 import { createToolContext } from '../dist/src/mcp/context.js';
@@ -50,7 +50,7 @@ interface TestCase {
   localTag: string;
   /** When false, skip validating vulnerability counts against expected ranges. */
   validateSeverityCounts?: boolean;
-  /** When false, skip validating HIGH/CRITICAL threshold pass/fail behavior.*/
+  /** When false, skip validating HIGH/CRITICAL threshold pass/fail behavior. */
   validateThresholdBehavior?: boolean;
   expectedSeverities: {
     critical?: { min: number; max?: number };
@@ -513,13 +513,12 @@ async function main() {
 
       // Validate threshold enforcement behavior
       if (shouldValidateThresholdBehavior) {
-        const hasHighOrCritical = vulns.critical > 0 || vulns.high > 0;
-        const thresholdBehaviorCorrect = hasHighOrCritical !== testCase.shouldPassThreshold;
+        const thresholdBehaviorCorrect = scanResult.passed === testCase.shouldPassThreshold;
 
         if (!thresholdBehaviorCorrect) {
           validation.passed = false;
           validation.messages.push(
-            `Threshold enforcement incorrect: expected ${testCase.shouldPassThreshold ? 'PASS' : 'FAIL'}, got ${hasHighOrCritical ? 'FAIL' : 'PASS'}`,
+            `Threshold enforcement incorrect: expected ${testCase.shouldPassThreshold ? 'PASS' : 'FAIL'}, got ${scanResult.passed ? 'PASS' : 'FAIL'}`,
           );
         }
       }
