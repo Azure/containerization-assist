@@ -6,6 +6,7 @@
 [![Node](https://img.shields.io/github/package-json/engines-node/Azure/containerization-assist?color=brightgreen&label=node)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/github/package-json/dependency-version/Azure/containerization-assist/dev/typescript?color=blue&label=TypeScript)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/github/license/Azure/containerization-assist?color=green)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://azure.github.io/containerization-assist/)
 
 An AI-powered containerization assistant that helps you build, scan, and deploy Docker containers through VS Code and other MCP-compatible tools.
 
