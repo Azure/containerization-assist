@@ -120,7 +120,10 @@
     "smoke:journey": "tsx scripts/smoke-journey.ts",
     "test:policies": "opa test policies/",
     "changelog-sync": "tsx scripts/changelog-sync.ts",
-    "postversion": "tsx scripts/postversion.ts"
+    "postversion": "tsx scripts/postversion.ts",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
@@ -170,7 +173,8 @@
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.1"
+    "typescript-eslint": "^8.46.1",
+    "vitepress": "^1.6.4"
   },
   "lint-staged": {
     "src/**/*.ts": [

@@ -108,7 +108,7 @@ if (buildContext.ok) {
 const scan = await scanImage({ imageId: 'myapp:v1' });
 ```
 
-See [CLAUDE.md](./CLAUDE.md#sdk-usage-non-mcp) for full SDK documentation.
+See the [SDK integration examples](docs/examples/README.md) for full SDK documentation.
 
 ### Windows Users
 
