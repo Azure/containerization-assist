@@ -243,4 +243,4 @@ You can modify the policy to:
 
 - [OPA Documentation](https://www.openpolicyagent.org/docs/latest/)
 - [Rego Language Reference](https://www.openpolicyagent.org/docs/latest/policy-language/)
-- [Writing Rego Policies Guide](../docs/guides/writing-rego-policies.md)
+- [Writing Rego Policies Guide](../writing-rego-policies.md)

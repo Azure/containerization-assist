@@ -803,5 +803,5 @@ knowledge_filtering contains filter if {
 
 - GitHub Issues: [Report bugs](https://github.com/Azure/containerization-assist/issues)
 - Discussions: [Ask questions](https://github.com/Azure/containerization-assist/discussions)
-- Internal Wiki: Link to your organization's internal documentation
+- Internal: See your organization's internal wiki for organization-specific policy guidance, if available
 

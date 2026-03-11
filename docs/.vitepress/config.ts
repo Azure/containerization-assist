@@ -23,9 +23,9 @@ function escapeAngleBracketsPlugin(): Plugin {
         if (inCodeBlock) return line;
         // Escape angle brackets that look like TypeScript generics:
         //   Result<T>, Promise<Result<BuildContext>>, Array<TTool>, etc.
-        // Match < followed by a word character (not HTML tags like <br>, <div>)
+        // Match < followed by a capitalized identifier (to avoid HTML tags like <br>, <div>)
         // and not already inside backtick code spans.
-        return line.replace(/(?<!`)(<)(\w+)(>)(?!`)/g, '&lt;$2&gt;');
+        return line.replace(/(?<!`)(<)([A-Z][A-Za-z0-9_]*)(>)(?!`)/g, '&lt;$2&gt;');
       });
       return result.join('\n');
     }
@@ -37,9 +37,14 @@ export default defineConfig({
   description: 'AI-powered containerization assistant MCP server',
   base: '/containerization-assist/',
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/containerization-assist/favicon.svg' }]],
-  // Existing docs reference files outside the docs/ directory (e.g. ../../README,
-  // ../../CLAUDE, ../sprints/) that are not part of the VitePress site.
-  ignoreDeadLinks: true,
+  // Only ignore links to files outside the docs/ directory that are not part of the VitePress site.
+  ignoreDeadLinks: [
+    /\.\.\/\.\.\/README/,
+    /\.\.\/\.\.\/CLAUDE/,
+    /\.\.\/\.\.\/CONTRIBUTING/,
+    /\.\.\/sprints\//,
+    /policy-migration-v3/,
+  ],
   vite: {
     plugins: [escapeAngleBracketsPlugin()]
   },
