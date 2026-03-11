@@ -4,11 +4,16 @@ Customize containerization policies using the priority-ordered policy system.
 
 ## Quick Start
 
-### For Source Installation Users
+1. Create a directory for your policies and add a `.rego` file:
 
-Create a file at `policies.user/require-mcr-images.rego` in the repository root:
+```bash
+mkdir -p ~/.config/containerization-assist/policies
+```
+
+2. Save a policy file to that directory, e.g. `~/.config/containerization-assist/policies/require-mcr-images.rego`:
 
 ```rego
+# Rego policy: block Dockerfiles that use base images outside mcr.microsoft.com
 package containerization.require_mcr
 
 violations contains result if {
@@ -29,16 +34,7 @@ allow if count(violations) == 0
 result := { "allow": allow, "violations": violations }
 ```
 
-Then restart your MCP client.
-
-### For NPM Installation Users
-
-```bash
-# 1. Create custom policy directory
-mkdir -p ~/.config/containerization-assist/policies
-```
-
-Save the policy above to `~/.config/containerization-assist/policies/require-mcr-images.rego`, then add the `CUSTOM_POLICY_PATH` environment variable to `.vscode/mcp.json`:
+3. Point the server to your policies directory in `.vscode/mcp.json`:
 
 ```json
 {
@@ -52,7 +48,7 @@ Save the policy above to `~/.config/containerization-assist/policies/require-mcr
 }
 ```
 
-Restart VS Code to apply.
+4. Restart your MCP client to pick up the new policy.
 
 ## Policy Priority
 
