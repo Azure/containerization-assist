@@ -30,14 +30,14 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 - 📊 **Progress Tracking**: Real-time progress updates via MCP notifications
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with AI-powered suggestions
 - ✨ **Smart Analysis**: Context-aware recommendations
-- **Policy-Driven System (v3.0)** 🆕
+- **Policy-Driven System (v3.0)**
   - Pre-generation configuration
   - Knowledge filtering and weighting
   - Template injection
   - Semantic validation
   - Cross-tool consistency
 
-### Policy System (v3.0) 🆕
+### Policy System (v3.0)
 
 Full control over containerization through Rego policies:
 
