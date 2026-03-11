@@ -2,29 +2,45 @@
 
 Customize containerization policies using the priority-ordered policy system.
 
-## Quick Start (60 seconds)
+## Quick Start
 
-### For Source Installation Users (10 seconds)
+### For Source Installation Users
 
-```bash
-# Copy example policy to policies.user/
-mkdir -p policies.user
-cp policies.user.examples/allow-all-registries.rego policies.user/
+Create a file at `policies.user/require-mcr-images.rego` in the repository root:
 
-# Restart your MCP client
+```rego
+package containerization.require_mcr
+
+violations contains result if {
+  contains(input.content, "FROM ")
+  not regex.match(`(?im)FROM\s+(--platform=\S+\s+)?mcr\.microsoft\.com/`, input.content)
+
+  result := {
+    "rule": "require-mcr-images",
+    "category": "security",
+    "priority": 95,
+    "severity": "block",
+    "message": "Base images must come from mcr.microsoft.com.",
+  }
+}
+
+default allow := false
+allow if count(violations) == 0
+result := { "allow": allow, "violations": violations }
 ```
 
-### For NPM Installation Users (30 seconds)
+Then restart your MCP client.
+
+### For NPM Installation Users
 
 ```bash
 # 1. Create custom policy directory
 mkdir -p ~/.config/containerization-assist/policies
+```
 
-# 2. Copy example policy
-cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
-   ~/.config/containerization-assist/policies/
+Save the policy above to `~/.config/containerization-assist/policies/require-mcr-images.rego`, then add the `CUSTOM_POLICY_PATH` environment variable to `.vscode/mcp.json`:
 
-# 3. Set environment variable in .vscode/mcp.json
+```json
 {
   "servers": {
     "containerization-assist": {
@@ -34,9 +50,9 @@ cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-reg
     }
   }
 }
-
-# 4. Restart VS Code
 ```
+
+Restart VS Code to apply.
 
 ## Policy Priority
 

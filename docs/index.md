@@ -30,8 +30,6 @@ Or add the following to `.vscode/mcp.json` in your project:
 }
 ```
 
-Restart VS Code to enable the server in GitHub Copilot.
-
 ## What it does
 
 - **Docker Integration** — Build, scan, and deploy container images with intelligent Dockerfile generation

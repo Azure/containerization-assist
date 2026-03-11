@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitepress';
 import type { Plugin } from 'vite';
+import regoGrammar from './rego.tmLanguage.json';
 
 /**
  * Vite plugin that escapes angle brackets used as TypeScript generics in
@@ -35,11 +36,15 @@ export default defineConfig({
   title: 'Containerization Assist',
   description: 'AI-powered containerization assistant MCP server',
   base: '/containerization-assist/',
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/containerization-assist/favicon.svg' }]],
   // Existing docs reference files outside the docs/ directory (e.g. ../../README,
   // ../../CLAUDE, ../sprints/) that are not part of the VitePress site.
   ignoreDeadLinks: true,
   vite: {
     plugins: [escapeAngleBracketsPlugin()]
+  },
+  markdown: {
+    languages: [regoGrammar as any]
   },
   themeConfig: {
     nav: [
