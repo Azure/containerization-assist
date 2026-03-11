@@ -10,6 +10,8 @@
 
 An AI-powered containerization assistant that helps you build, scan, and deploy Docker containers through VS Code and other MCP-compatible tools.
 
+> **[Full documentation →](https://azure.github.io/containerization-assist/)**
+
 ## Install
 
 
