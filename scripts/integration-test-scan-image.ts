@@ -48,6 +48,10 @@ interface TestCase {
   buildInline?: string;
   /** Local tag to apply for testing */
   localTag: string;
+  /** When false, skip validating vulnerability counts against expected ranges. */
+  validateSeverityCounts?: boolean;
+  /** When false, skip validating HIGH/CRITICAL threshold pass/fail behavior. */
+  validateThresholdBehavior?: boolean;
   expectedSeverities: {
     critical?: { min: number; max?: number };
     high?: { min: number; max?: number };
@@ -144,6 +148,9 @@ const TEST_CASES: TestCase[] = [
     name: '.NET 8 Alpine LTS Baseline',
     pullImage: 'mcr.microsoft.com/dotnet/runtime:8.0-alpine',
     localTag: 'test-scan:clean',
+    // Only assert that scanning completes successfully.
+    validateSeverityCounts: false,
+    validateThresholdBehavior: false,
     expectedSeverities: {
       // Current LTS image - may accumulate CVEs over time as new vulnerabilities are disclosed.
       // We don't control this image so we use loose bounds and don't assert pass/fail threshold.
@@ -491,23 +498,29 @@ async function main() {
       console.log(`        - Medium: ${vulns.medium}`);
       console.log(`        - Low: ${vulns.low}`);
 
+      const shouldValidateSeverityCounts = testCase.validateSeverityCounts ?? true;
+      const shouldValidateThresholdBehavior = testCase.validateThresholdBehavior ?? true;
+
       // Validate vulnerability counts
-      const validation = validateSeverityCounts(testCase, {
-        critical: vulns.critical,
-        high: vulns.high,
-        medium: vulns.medium,
-        low: vulns.low,
-      });
+      const validation = shouldValidateSeverityCounts
+        ? validateSeverityCounts(testCase, {
+            critical: vulns.critical,
+            high: vulns.high,
+            medium: vulns.medium,
+            low: vulns.low,
+          })
+        : { passed: true, messages: [] as string[] };
 
-      // Validate threshold enforcement
-      const hasHighOrCritical = vulns.critical > 0 || vulns.high > 0;
-      const thresholdBehaviorCorrect = hasHighOrCritical !== testCase.shouldPassThreshold;
+      // Validate threshold enforcement behavior
+      if (shouldValidateThresholdBehavior) {
+        const thresholdBehaviorCorrect = scanResult.passed === testCase.shouldPassThreshold;
 
-      if (!thresholdBehaviorCorrect) {
-        validation.passed = false;
-        validation.messages.push(
-          `Threshold enforcement incorrect: expected ${testCase.shouldPassThreshold ? 'PASS' : 'FAIL'}, got ${hasHighOrCritical ? 'FAIL' : 'PASS'}`,
-        );
+        if (!thresholdBehaviorCorrect) {
+          validation.passed = false;
+          validation.messages.push(
+            `Threshold enforcement incorrect: expected ${testCase.shouldPassThreshold ? 'PASS' : 'FAIL'}, got ${scanResult.passed ? 'PASS' : 'FAIL'}`,
+          );
+        }
       }
 
       // Check remediation guidance for vulnerable images

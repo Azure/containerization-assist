@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.3.2]
+
+- add MCP prompts for local Kind and AKS loop
+- add install badges in README for VSCode and VSCode Insiders Marketplace
+
 ## [1.3.1]
 
 - fix: sync mcpName casing to match MCP Registry namespace (Azure, not azure) (#608)
