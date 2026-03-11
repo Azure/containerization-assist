@@ -393,4 +393,3 @@ echo '{"language": "node", "environment": "production"}' | \
 
 - [Policy Authoring Guide](../guides/policy-authoring.md)
 - [Dynamic Defaults Guide](./dynamic-defaults-example.md)
-- [Sprint 3 Overview](../sprints/sprint-3.md)

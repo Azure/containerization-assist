@@ -208,7 +208,7 @@ The implementation is split into 6 PRs (each under 2k lines):
 | 2 | Refactor MCP context | Re-export from core + MCP helpers |
 | 3 | Update tool imports | Change 14 files from `@/mcp` to `@/core` |
 | 4 | Create SDK entry point | `src/sdk/` with all 11 tool functions |
-| 5 | Package exports + docs | package.json exports, CLAUDE.md |
+| 5 | Package exports + docs | package.json exports, documentation |
 | 6 | Add SDK tests | Test coverage for SDK path |
 
 See `docs/implementation-plans/sdk-decoupling-from-mcp-detailed.md` for step-by-step instructions.

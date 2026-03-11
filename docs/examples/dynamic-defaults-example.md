@@ -418,4 +418,3 @@ opa eval -d policies/dynamic-defaults.rego \
 
 - [Template Injection Guide](./template-injection-example.md)
 - [Policy Authoring Guide](../guides/policy-authoring.md)
-- [Sprint 3 Overview](../sprints/sprint-3.md)

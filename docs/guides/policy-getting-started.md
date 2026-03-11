@@ -44,7 +44,7 @@ Policies are discovered and merged from three locations in priority order:
 
 1. **Built-in policies/** (lowest priority) - Base security and quality rules
 2. **policies.user/** (middle priority) - Repository-specific customizations
-3. **CUSTOM_POLICY_PATH** (highest priority) - Organization-wide policies
+3. **`CUSTOM_POLICY_PATH` environment variable** (highest priority) - Organization-wide policies
 
 Later policies override earlier policies by package namespace.
 
@@ -153,6 +153,6 @@ rm -rf policies.user/
 
 ## Support
 
-- [Policy Customization Examples](../../policies.user.examples/README.md)
+- [Policy Customization Examples](https://github.com/Azure/containerization-assist/tree/main/policies.user.examples)
 - [OPA Rego Documentation](https://www.openpolicyagent.org/docs/latest/)
 - [GitHub Issues](https://github.com/Azure/containerization-assist/issues)
