@@ -1,6 +1,6 @@
 # Dynamic Defaults Examples
 
-Policy-driven dynamic defaults allow you to automatically calculate environment-aware configuration values like replica counts, health check timings, and autoscaling parameters.
+Automatically calculate environment-aware configuration values — replica counts, health check timings, and autoscaling parameters — using policy-driven dynamic defaults.
 
 ## Overview
 

@@ -1,24 +1,7 @@
 # Policy Authoring Guide
 
-**Version:** 3.0.0
-**Audience:** Platform engineers, DevOps teams, policy authors
+Write custom OPA Rego policies to control Dockerfile generation, Kubernetes manifests, and security enforcement in containerization-assist.
 
-This guide provides comprehensive documentation on writing custom policies for containerization-assist using OPA Rego.
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Template Injection](#template-injection)
-3. [Policy Architecture](#policy-architecture)
-4. [Phase-by-Phase Guide](#phase-by-phase-guide)
-5. [Schema Reference](#schema-reference)
-6. [Best Practices](#best-practices)
-7. [Debugging](#debugging)
-8. [Common Pitfalls](#common-pitfalls)
-
----
 
 ## Overview
 
@@ -822,7 +805,3 @@ knowledge_filtering contains filter if {
 - Discussions: [Ask questions](https://github.com/Azure/containerization-assist/discussions)
 - Internal Wiki: Link to your organization's internal documentation
 
----
-
-**Version:** 3.0.0
-**License:** MIT

@@ -1,4 +1,4 @@
-name: Publish to MCP Registry
+name: Publish MCP Registry
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   publish-mcp-registry:
-    name: Publish to MCP Registry
+    name: Publish MCP Registry
     runs-on: ubuntu-latest
     timeout-minutes: 10
     

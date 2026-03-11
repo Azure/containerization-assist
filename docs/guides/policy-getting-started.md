@@ -1,6 +1,6 @@
 # Policy Customization - Getting Started
 
-This guide helps you customize containerization policies using the priority-ordered policy system.
+Customize containerization policies using the priority-ordered policy system.
 
 ## Quick Start (60 seconds)
 

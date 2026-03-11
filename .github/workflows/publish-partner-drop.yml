@@ -1,4 +1,4 @@
-name: Build & Publish
+name: Publish Partner Drop
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   Build:
-      name: release
+      name: Build Partner Drop
       runs-on: ubuntu-latest
       permissions: 
         actions: read
@@ -54,7 +54,7 @@ jobs:
         current-version: ${{ steps.package_version.outputs.current-version }}
 
   Publish:
-    name: publish
+    name: Publish Partner Drop
     runs-on: ubuntu-latest
     needs: Build
     environment: partner-publishing

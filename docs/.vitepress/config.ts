@@ -50,7 +50,8 @@ export default defineConfig({
       {
         text: 'Getting Started',
         items: [
-          { text: 'Overview', link: '/' }
+          { text: 'Overview', link: '/' },
+          { text: 'Prompt Loops', link: '/prompt-loops' }
         ]
       },
       {

@@ -1,6 +1,6 @@
 # Containerization Assist - MCP Integration Examples
 
-This directory contains integration patterns for using Container Assist tools in your own MCP server.
+Integration patterns for using Container Assist tools in your own MCP server.
 
 ## Examples
 

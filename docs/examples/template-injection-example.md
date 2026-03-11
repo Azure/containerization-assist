@@ -1,6 +1,6 @@
 # Template Injection Examples
 
-This guide demonstrates how to use policy-driven template injection to automatically add organizational standards to generated artifacts.
+Use policy-driven template injection to automatically add organizational standards to generated artifacts.
 
 ## Overview
 
