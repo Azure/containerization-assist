@@ -119,9 +119,12 @@ export function dockerHostToOptions(dockerHost: string): DockerConnectionOptions
         }
         return opts;
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      throw new Error(
+        `Invalid Docker host URL: ${dockerHost}${err instanceof Error ? ` — ${err.message}` : ''}`,
+      );
     }
+    // parseDockerHost matched tcp|http|https prefix but returned a non-tcp type (should not happen)
     return { host: 'localhost', port: 2375 };
   }
 

@@ -488,19 +488,15 @@ export const createDockerClient = (logger: Logger, config?: DockerClientConfig):
   }
 
   // Create Docker client with detected socket path
-  let dockerOptions: DockerOptions;
+  // Use shared helper for all docker host string → options conversion
+  const dockerOptions: DockerOptions = dockerHostToOptions(socketPath);
 
-  if (
-    (socketPath.startsWith('tcp://') ||
-      socketPath.startsWith('http://') ||
-      socketPath.startsWith('https://')) &&
-    config?.host
-  ) {
-    // TCP connection with explicit host/port override from config
-    dockerOptions = { host: config.host, port: config.port || 2375 };
-  } else {
-    // Use shared helper for all docker host string → options conversion
-    dockerOptions = dockerHostToOptions(socketPath);
+  // Apply explicit host/port overrides from config, preserving protocol from socketPath
+  if (config?.host) {
+    dockerOptions.host = config.host;
+  }
+  if (config?.port) {
+    dockerOptions.port = config.port;
   }
 
   if (config?.timeout) {

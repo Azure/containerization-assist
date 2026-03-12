@@ -251,7 +251,8 @@ async function handleScanImage(
       return Failure(resolved.error, resolved.guidance);
     }
     dockerHost = resolved.value;
-    logger.info({ context: dockerContext, dockerHost }, 'Resolved Docker context');
+    logger.info({ context: dockerContext }, 'Using Docker context');
+    logger.debug({ context: dockerContext, dockerHost }, 'Resolved Docker context endpoint');
   }
 
   try {

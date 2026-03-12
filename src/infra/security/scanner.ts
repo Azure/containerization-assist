@@ -180,11 +180,16 @@ export const createSecurityScanner = (
   scannerType?: string,
   dockerHost?: string,
 ): SecurityScanner => {
+  const type = (scannerType || 'osv').toLowerCase();
+
+  // Stub scanner needs no Docker connection — return early to skip detection
+  if (type === 'stub') {
+    return createStubScanner(logger);
+  }
+
   // Ensure every scanner talks to the same Docker daemon the server uses
   const effectiveDockerHost = dockerHost ?? toDockerHostURI(autoDetectDockerSocket());
   logger.debug({ effectiveDockerHost, explicit: !!dockerHost }, 'Scanner Docker host resolved');
-
-  const type = (scannerType || 'osv').toLowerCase();
 
   switch (type) {
     case 'osv':
@@ -195,8 +200,6 @@ export const createSecurityScanner = (
       return createSnykScanner(logger, effectiveDockerHost);
     case 'grype':
       return createGrypeScanner(logger, effectiveDockerHost);
-    case 'stub':
-      return createStubScanner(logger);
     default:
       logger.warn({ scannerType: type }, 'Unknown scanner type, falling back to OSV');
       return createOSVScanner(logger, effectiveDockerHost);
