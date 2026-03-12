@@ -358,6 +358,74 @@ describe('Docker Socket Validation', () => {
     });
   });
 
+  describe('dockerHostToOptions', () => {
+    it('should convert tcp:// to host/port options', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      const result = dockerHostToOptions('tcp://192.168.1.100:2375');
+      expect(result).toEqual({ host: '192.168.1.100', port: 2375 });
+    });
+
+    it('should convert https:// to host/port/protocol options', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      const result = dockerHostToOptions('https://docker.example.com:2376');
+      expect(result).toEqual({ host: 'docker.example.com', port: 2376, protocol: 'https' });
+    });
+
+    it('should convert unix:// to socketPath', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      const result = dockerHostToOptions('unix:///var/run/docker.sock');
+      expect(result).toEqual({ socketPath: '/var/run/docker.sock' });
+    });
+
+    it('should convert raw path to socketPath', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      const result = dockerHostToOptions('/var/run/docker.sock');
+      expect(result).toEqual({ socketPath: '/var/run/docker.sock' });
+    });
+
+    it('should convert npipe:// to socketPath', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      const result = dockerHostToOptions('npipe:////./pipe/docker_engine');
+      expect(result).toEqual({ socketPath: '//./pipe/docker_engine' });
+    });
+  });
+
+  describe('toDockerHostURI', () => {
+    it('should prepend unix:// to raw Unix paths', async () => {
+      const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
+      expect(toDockerHostURI('/var/run/docker.sock')).toBe('unix:///var/run/docker.sock');
+    });
+
+    it('should prepend unix:// to home-relative paths', async () => {
+      const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
+      expect(toDockerHostURI('/home/user/.docker/desktop/docker.sock')).toBe(
+        'unix:///home/user/.docker/desktop/docker.sock',
+      );
+    });
+
+    it('should prepend npipe:// to raw Windows pipe paths', async () => {
+      const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
+      expect(toDockerHostURI('//./pipe/docker_engine')).toBe('npipe:////./pipe/docker_engine');
+    });
+
+    it('should pass through tcp:// URIs unchanged', async () => {
+      const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
+      expect(toDockerHostURI('tcp://192.168.1.100:2375')).toBe('tcp://192.168.1.100:2375');
+    });
+
+    it('should pass through unix:// URIs unchanged', async () => {
+      const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
+      expect(toDockerHostURI('unix:///var/run/docker.sock')).toBe('unix:///var/run/docker.sock');
+    });
+
+    it('should pass through https:// URIs unchanged', async () => {
+      const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
+      expect(toDockerHostURI('https://docker.example.com:2376')).toBe(
+        'https://docker.example.com:2376',
+      );
+    });
+  });
+
   describe('Integration with Docker Client', () => {
     it('should be importable from docker client module', async () => {
       const clientModule = await import('@/infra/docker/client');

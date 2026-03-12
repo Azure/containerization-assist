@@ -20,6 +20,17 @@ export interface SocketValidationResult {
 }
 
 /**
+ * Docker connection options derived from a DOCKER_HOST string.
+ * Structurally compatible with dockerode's DockerOptions.
+ */
+export interface DockerConnectionOptions {
+  socketPath?: string | undefined;
+  host?: string | undefined;
+  port?: number | undefined;
+  protocol?: 'https' | 'http' | 'ssh' | undefined;
+}
+
+/**
  * Parsed result from a DOCKER_HOST value.
  */
 export interface ParsedDockerHost {
@@ -87,6 +98,68 @@ export function parseDockerHost(value: string): ParsedDockerHost {
   }
 
   throw new Error(`DOCKER_HOST value not recognized: ${trimmed}`);
+}
+
+/**
+ * Convert a DOCKER_HOST endpoint string to connection options for dockerode.
+ * Handles tcp://, http://, https://, unix://, npipe://, and raw socket paths.
+ */
+export function dockerHostToOptions(dockerHost: string): DockerConnectionOptions {
+  if (
+    dockerHost.startsWith('tcp://') ||
+    dockerHost.startsWith('http://') ||
+    dockerHost.startsWith('https://')
+  ) {
+    try {
+      const parsed = parseDockerHost(dockerHost);
+      if (parsed.type === 'tcp') {
+        const opts: DockerConnectionOptions = { host: parsed.host, port: parsed.port };
+        if (parsed.value.startsWith('https://')) {
+          opts.protocol = 'https';
+        }
+        return opts;
+      }
+    } catch {
+      // fallback
+    }
+    return { host: 'localhost', port: 2375 };
+  }
+
+  // unix:// scheme
+  if (dockerHost.startsWith('unix://')) {
+    return { socketPath: dockerHost.slice('unix://'.length) };
+  }
+
+  // npipe:// scheme
+  if (dockerHost.startsWith('npipe://')) {
+    return { socketPath: dockerHost.slice('npipe://'.length) };
+  }
+
+  // Raw path (e.g., /var/run/docker.sock or //./pipe/docker_engine)
+  return { socketPath: dockerHost };
+}
+
+/**
+ * Normalize a socket path (as returned by {@link autoDetectDockerSocket}) into
+ * a well-formed `DOCKER_HOST` URI suitable for child-process environment variables.
+ *
+ * - Raw Unix paths  → `unix:///var/run/docker.sock`
+ * - Raw Windows named pipes → `npipe:////./pipe/docker_engine`
+ * - Values that are already a URI (tcp://, unix://, etc.) pass through unchanged.
+ */
+export function toDockerHostURI(socketPath: string): string {
+  // Already a scheme-qualified URI — return as-is
+  if (/^[a-z][a-z0-9+.-]*:\/\//.test(socketPath)) {
+    return socketPath;
+  }
+
+  // Windows named pipe raw path
+  if (socketPath.startsWith('//./pipe/') || socketPath.startsWith('\\\\.\\pipe\\')) {
+    return `npipe://${socketPath}`;
+  }
+
+  // Raw Unix path
+  return `unix://${socketPath}`;
 }
 
 /**
