@@ -249,4 +249,8 @@ async function main(): Promise<void> {
   console.log('\n✅ All action references are valid');
 }
 
-main();
+main().catch((err) => {
+  console.error('Unexpected error while validating action references:');
+  console.error(err instanceof Error ? err.stack ?? err.message : err);
+  process.exit(1);
+});

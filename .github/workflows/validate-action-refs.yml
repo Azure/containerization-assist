@@ -36,7 +36,10 @@ jobs:
           restore-keys: |
             action-refs-
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Validate action references
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npx tsx scripts/validate-action-refs.ts
+        run: npx --no-install tsx scripts/validate-action-refs.ts
