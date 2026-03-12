@@ -37,10 +37,13 @@ src/knowledge/embedded-packs.ts
 policies/compiled/*.tar.gz
 policies/compiled/temp/
 
-# User-customized policies (local overrides)
+# User-customized policies (project-local at git root)
+.containerization-assist/
+
+# User-customized policies (local overrides) - DEPRECATED: Use .containerization-assist/policy/ instead
 policies.user/
 
-# User policy test files
+# User policy test files - DEPRECATED: Use .containerization-assist/policy/ instead
 policies.user/**/*_test.rego
 
 # Test
