@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { environment, platform, repositoryPath, type ToolNextAction } from '../shared/schemas';
+import { environment, platform, repositoryPath, workspacePath, type ToolNextAction } from '../shared/schemas';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
 export const generateK8sManifestsSchema = z
@@ -13,6 +13,7 @@ export const generateK8sManifestsSchema = z
       .describe(
         'Absolute path to the repository root. Required when generating from repository analysis.',
       ),
+    workspacePath: workspacePath.optional(),
     name: z
       .string()
       .optional()

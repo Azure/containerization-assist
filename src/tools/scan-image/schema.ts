@@ -3,9 +3,11 @@
  */
 
 import { z } from 'zod';
+import { workspacePath } from '../shared/schemas';
 
 export const scanImageSchema = z.object({
   imageId: z.string().describe('Docker image ID or name to scan'),
+  workspacePath: workspacePath.optional(),
   severity: z
     .union([
       z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),

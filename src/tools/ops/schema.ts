@@ -5,8 +5,10 @@
  */
 
 import { z } from 'zod';
+import { workspacePath } from '../shared/schemas';
 
 export const opsToolSchema = z.object({
+  workspacePath: workspacePath.optional(),
   operation: z.enum(['ping', 'status']).describe(
     'Diagnostic operation: "ping" tests server connectivity and responsiveness, "status" shows detailed resource metrics and health information',
   ),
