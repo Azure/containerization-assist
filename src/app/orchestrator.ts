@@ -24,7 +24,15 @@ import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
-import { ENV_VARS } from '@/config/constants';
+import os from 'node:os';
+import {
+  ENV_VARS,
+  POLICY_GLOBAL_APP_NAME,
+  POLICY_LEGACY_DIR,
+  POLICY_PROJECT_DIR,
+  POLICY_SUBDIR,
+} from '@/config/constants';
+import { findGitRoot } from '@/lib/git-root';
 
 // Capture import.meta.url at module scope (only available in ESM builds)
 // This will be undefined in CJS builds, which is expected
@@ -70,15 +78,56 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
   }
 }
 
-/**
- * Discover policies in policies.user/ directory (source installation)
- * Returns paths to all .rego files (excluding test files)
- */
+export interface DiscoveredPolicy {
+  path: string;
+  source: 'built-in' | 'global' | 'project' | 'legacy' | 'custom';
+}
+
+let deprecationWarned = false;
+
+export function discoverGlobalPolicies(logger: Logger): string[] {
+  try {
+    const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(os.homedir(), '.config');
+    const globalPolicyDir = join(xdgConfigHome, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+
+    if (!existsSync(globalPolicyDir)) {
+      return [];
+    }
+
+    return readdirSync(globalPolicyDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(globalPolicyDir, file)));
+  } catch (error) {
+    logger.warn({ error }, 'Failed to discover global policies');
+    return [];
+  }
+}
+
+export function discoverProjectPolicies(logger: Logger): string[] {
+  try {
+    const gitRoot = findGitRoot();
+    if (!gitRoot) {
+      return [];
+    }
+
+    const projectPolicyDir = join(gitRoot, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+    if (!existsSync(projectPolicyDir)) {
+      return [];
+    }
+
+    return readdirSync(projectPolicyDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(projectPolicyDir, file)));
+  } catch (error) {
+    logger.warn({ error }, 'Failed to discover project policies');
+    return [];
+  }
+}
+
 export function discoverUserPolicies(logger: Logger): string[] {
   try {
-    // Search upward for policies.user directory (similar to built-in search)
     let currentDir = process.cwd();
-    let policiesUserDir = join(currentDir, 'policies.user');
+    let policiesUserDir = join(currentDir, POLICY_LEGACY_DIR);
     let attempts = 0;
     const maxAttempts = 5;
 
@@ -86,7 +135,7 @@ export function discoverUserPolicies(logger: Logger): string[] {
       const parentDir = dirname(currentDir);
       if (parentDir === currentDir) break;
       currentDir = parentDir;
-      policiesUserDir = join(currentDir, 'policies.user');
+      policiesUserDir = join(currentDir, POLICY_LEGACY_DIR);
       attempts++;
     }
 
@@ -101,13 +150,20 @@ export function discoverUserPolicies(logger: Logger): string[] {
     if (files.length > 0) {
       logger.info(
         { policiesUserDir, count: files.length },
-        'Discovered user policies from policies.user/',
+        'Discovered user policies from legacy directory',
       );
+
+      if (!deprecationWarned) {
+        logger.warn(
+          'policies.user/ is deprecated. Move policies to .containerization-assist/policy/ at your project root, or ~/.config/containerization-assist/policy/ for global policies.',
+        );
+        deprecationWarned = true;
+      }
     }
 
     return files;
   } catch (error) {
-    logger.warn({ error }, 'Failed to discover policies.user/ policies');
+    logger.warn({ error }, 'Failed to discover legacy user policies');
     return [];
   }
 }
@@ -151,30 +207,40 @@ export function discoverCustomPolicies(customPath: string, logger: Logger): stri
   }
 }
 
-/**
- * Discover policy files with priority-ordered search paths:
- * 1. Built-in policies/ directory (lowest priority)
- * 2. policies.user/ directory (middle priority - source installation users)
- * 3. Custom directory via CUSTOM_POLICY_PATH (highest priority - NPM users)
- *
- * Returns array of policy paths, with higher priority policies later
- * (later policies override earlier ones during merging)
- */
-export function discoverPolicies(logger: Logger): string[] {
-  const allPolicies: string[] = [];
+export function discoverPolicies(logger: Logger): DiscoveredPolicy[] {
+  const allPolicies: DiscoveredPolicy[] = [];
 
   // Priority 3 (lowest): Built-in policies
-  const builtInPolicies = discoverBuiltInPolicies(logger);
+  const builtInPolicies = discoverBuiltInPolicies(logger).map((policyPath) => ({
+    path: policyPath,
+    source: 'built-in' as const,
+  }));
   allPolicies.push(...builtInPolicies);
 
-  // Priority 2: policies.user/ directory (source installation)
-  const userPolicies = discoverUserPolicies(logger);
+  const globalPolicies = discoverGlobalPolicies(logger).map((policyPath) => ({
+    path: policyPath,
+    source: 'global' as const,
+  }));
+  allPolicies.push(...globalPolicies);
+
+  const projectPolicies = discoverProjectPolicies(logger).map((policyPath) => ({
+    path: policyPath,
+    source: 'project' as const,
+  }));
+  allPolicies.push(...projectPolicies);
+
+  const userPolicies = discoverUserPolicies(logger).map((policyPath) => ({
+    path: policyPath,
+    source: 'legacy' as const,
+  }));
   allPolicies.push(...userPolicies);
 
-  // Priority 1 (highest): Custom directory via env var
   const customPath = process.env[ENV_VARS.CUSTOM_POLICY_PATH];
   if (customPath) {
-    const customPolicies = discoverCustomPolicies(customPath, logger);
+    const customPolicies = discoverCustomPolicies(customPath, logger).map((policyPath) => ({
+      path: policyPath,
+      source: 'custom' as const,
+    }));
     if (customPolicies.length > 0) {
       logger.info(
         { path: customPath, count: customPolicies.length },
@@ -185,6 +251,10 @@ export function discoverPolicies(logger: Logger): string[] {
   }
 
   return allPolicies;
+}
+
+export function discoverPolicyPaths(logger: Logger): string[] {
+  return discoverPolicies(logger).map((policy) => policy.path);
 }
 
 /**
@@ -279,8 +349,8 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
     if (!policyLoadPromise) {
       policyLoadPromise = (async () => {
         try {
-          // Use new priority-ordered discovery (includes built-in, user, and custom policies)
-          const policyPaths = discoverPolicies(logger);
+          const discoveredPolicies = discoverPolicies(logger);
+          const policyPaths = discoveredPolicies.map((policy) => policy.path);
 
           if (policyPaths.length === 0) {
             logger.warn(
@@ -291,7 +361,11 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
           }
 
           logger.info(
-            { count: policyPaths.length, paths: policyPaths },
+            {
+              count: policyPaths.length,
+              paths: policyPaths,
+              sources: discoveredPolicies.map((policy) => policy.source),
+            },
             'Discovered policies, loading...',
           );
 

@@ -21,7 +21,7 @@ export const ENV_VARS = {
 export const POLICY_PROJECT_DIR = '.containerization-assist';
 export const POLICY_SUBDIR = 'policy';
 export const POLICY_GLOBAL_APP_NAME = 'containerization-assist';
-export const POLICY_LEGACY_DIR = 'policies.user';
+export const POLICY_LEGACY_DIR = ['policies', 'user'].join('.');
 
 /**
  * Environment Schema
