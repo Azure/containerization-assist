@@ -40,6 +40,15 @@ const moduleInfo = z.object({
     .array(z.string())
     .optional()
     .describe('List of module dependencies including database drivers and system libraries'),
+  detectedDatabases: z
+    .array(
+      z.object({
+        dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
+        dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
+      }),
+    )
+    .optional()
+    .describe('Databases detected from module dependencies'),
   ports: z.array(z.number()).optional(),
   entryPoint: z.string().optional(),
 });

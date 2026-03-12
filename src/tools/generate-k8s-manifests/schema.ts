@@ -72,6 +72,15 @@ export const generateK8sManifestsSchema = z
       .describe(
         'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
       ),
+    detectedDatabases: z
+      .array(
+        z.object({
+          dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
+          dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
+        }),
+      )
+      .optional()
+      .describe('Databases detected from analyze-repo. Used to generate workload identity ServiceAccount for managed database access.'),
     includeComments: z
       .boolean()
       .optional()

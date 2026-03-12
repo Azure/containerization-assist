@@ -9,6 +9,7 @@ import { TOOL_NAME } from '@/tools';
 import {
   analyzeStep,
   assemblePrompt,
+  databaseCheckStep,
   deployStep,
   generateDockerfileStep,
   scanStep,
@@ -46,6 +47,7 @@ export function buildAksRemoteDevLoopPrompt(args: AksRemoteDevLoopArgs): string 
     ],
     [
       analyzeStep(),
+      databaseCheckStep(),
       generateDockerfileStep(),
       {
         heading: 'Build the image',
@@ -86,7 +88,7 @@ export function buildAksRemoteDevLoopPrompt(args: AksRemoteDevLoopArgs): string 
         heading: 'Generate Kubernetes manifests (if missing)',
         body: [
           'If no K8s manifests exist for the target module(s):',
-          `1. Call **${TOOL_NAME.GENERATE_K8S_MANIFESTS}** with the repository path, namespace, and analysis context. Set the image reference in the manifests to use the ACR registry prefix \`${registry}/\`.`,
+          `1. Call **${TOOL_NAME.GENERATE_K8S_MANIFESTS}** with the repository path, namespace, and analysis context. Set the image reference in the manifests to use the ACR registry prefix \`${registry}/\`. Pass the \`detectedDatabases\` array from analyze-repo results directly as the \`detectedDatabases\` parameter so the tool can generate a ServiceAccount with workload identity annotations.`,
           "2. Follow the tool's guidance to create manifest files on disk.",
           '3. Retry up to **2 times** if generation fails.',
         ].join('\n'),

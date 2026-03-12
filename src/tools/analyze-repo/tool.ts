@@ -9,6 +9,7 @@ import { validatePathOrFail } from '@/lib/validation-helpers';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
 import { pluralize } from '@/lib/summary-helpers';
 import { analyzeRepoToolDefinition } from './types';
+import { detectDatabases } from './database-detector';
 import {
   parsePackageJson,
   parseGradle,
@@ -184,6 +185,8 @@ async function analyzeRepositoryDeterministically(
         languageVersion: c.languageVersion,
       }));
 
+    const detectedDbs = detectDatabases(primaryConfig.dependencies ?? []);
+
     modules.push({
       name: path.basename(dirName),
       modulePath: dirName,
@@ -193,6 +196,7 @@ async function analyzeRepositoryDeterministically(
         : undefined,
       buildSystems: buildSystems.length > 0 ? buildSystems : undefined,
       dependencies: primaryConfig.dependencies,
+      detectedDatabases: detectedDbs.length > 0 ? detectedDbs : undefined,
       ports: primaryConfig.ports,
       entryPoint: primaryConfig.entryPoint,
     });
@@ -262,7 +266,13 @@ async function handleAnalyzeRepo(
         ? `${modules[0]?.language || 'unknown'} project`
         : `${pluralize(modules.length, 'module')} (${modules.map((m) => m.language).join(', ')})`;
 
-    const summary = `✅ Analyzed repository at ${repoPath}. Detected ${modulesText}.${isMonorepo ? ' Monorepo structure identified.' : ''} Ready for Dockerfile generation.`;
+    // Collect detected database types across all modules
+    const allDbTypes = [
+      ...new Set(modules.flatMap((m) => m.detectedDatabases?.map((d) => d.dbType) ?? [])),
+    ];
+    const dbClause = allDbTypes.length > 0 ? ` Databases: ${allDbTypes.join(', ')}.` : '';
+
+    const summary = `✅ Analyzed repository at ${repoPath}. Detected ${modulesText}.${isMonorepo ? ' Monorepo structure identified.' : ''}${dbClause} Ready for Dockerfile generation.`;
 
     return Success({
       summary,

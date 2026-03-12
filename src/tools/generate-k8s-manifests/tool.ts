@@ -26,6 +26,7 @@ import {
 import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
+import { MANAGED_DB_TYPES } from '@/tools/analyze-repo/database-detector';
 import type { z } from 'zod';
 import yaml from 'js-yaml';
 import path from 'node:path';
@@ -437,6 +438,17 @@ const runPattern = createKnowledgeTool<
         manifestFiles.push({ path: './k8s/configmap.yaml', purpose: 'Configuration management' });
       }
 
+      // Add serviceaccount if managed database dependencies are detected (for workload identity)
+      const hasDbDeps = input.detectedDatabases?.some((db) =>
+        MANAGED_DB_TYPES.has(db.dbType),
+      );
+      if (hasDbDeps) {
+        manifestFiles.push({
+          path: './k8s/serviceaccount.yaml',
+          purpose: 'Service account for workload identity (database access)',
+        });
+      }
+
       // Build policy config instruction if available
       const policyInstruction = input.k8sConfig
         ? ` Apply policy-driven configuration: ${
@@ -454,9 +466,13 @@ const runPattern = createKnowledgeTool<
           }`
         : '';
 
+      const workloadIdentityInstruction = hasDbDeps
+        ? ' Database dependencies detected — include a ServiceAccount with workload identity annotations (e.g., azure.workload.identity/client-id) and add the pod label azure.workload.identity/use: "true" to the Deployment template. Use passwordless authentication (e.g., DefaultAzureCredential) instead of connection-string secrets where possible.'
+        : '';
+
       const nextAction: ToolNextAction = {
         action: 'create-files',
-        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, frameworks, ports, and entry point. Use detectedDependencies (if provided in input) for dependency-aware manifest configuration.${policyInstruction}`,
+        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, frameworks, ports, and entry point. Use detectedDependencies (if provided in input) for dependency-aware manifest configuration.${workloadIdentityInstruction}${policyInstruction}`,
         files: manifestFiles,
       };
 
