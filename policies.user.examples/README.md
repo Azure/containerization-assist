@@ -6,19 +6,19 @@ This directory contains pre-built example policies you can use to customize cont
 
 ### For Source Installation Users
 
-**Option 1: Copy to policies.user/ (10 seconds)**
+**Option 1: Copy to .containerization-assist/policy/ (10 seconds)**
 
 ```bash
 # From repository root
-cp policies.user.examples/allow-all-registries.rego policies.user/
+cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
 # Restart your MCP client (VS Code, Claude Desktop, etc.)
 ```
 
 **Option 2: Create your own policy**
 
 ```bash
-mkdir -p policies.user
-cp policies.user.examples/custom-organization-template.rego policies.user/my-policy.rego
+mkdir -p .containerization-assist/policy
+cp policies.user.examples/custom-organization-template.rego .containerization-assist/policy/my-policy.rego
 # Edit my-policy.rego to customize
 # Restart your MCP client
 ```
@@ -29,11 +29,11 @@ cp policies.user.examples/custom-organization-template.rego policies.user/my-pol
 
 ```bash
 # 1. Create a policies directory in your workspace
-mkdir -p ~/.config/containerization-assist/policies
+mkdir -p ~/.config/containerization-assist/policy
 
 # 2. Copy example policy
 cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
-   ~/.config/containerization-assist/policies/
+   ~/.config/containerization-assist/policy/
 
 # 3. Set environment variable in .vscode/mcp.json
 {
@@ -58,7 +58,7 @@ cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-reg
 **Use Case:** Teams using Docker Hub, GCR, ECR, or private registries
 
 ```bash
-cp policies.user.examples/allow-all-registries.rego policies.user/
+cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
 ```
 
 ### 2. warn-only-mode.rego
@@ -66,7 +66,7 @@ cp policies.user.examples/allow-all-registries.rego policies.user/
 **Use Case:** Testing policies, gradual adoption, development environments
 
 ```bash
-cp policies.user.examples/warn-only-mode.rego policies.user/
+cp policies.user.examples/warn-only-mode.rego .containerization-assist/policy/
 ```
 
 ### 3. custom-organization-template.rego
@@ -74,7 +74,7 @@ cp policies.user.examples/warn-only-mode.rego policies.user/
 **Use Case:** Enforce custom labels, registries, naming conventions
 
 ```bash
-cp policies.user.examples/custom-organization-template.rego policies.user/my-org-policy.rego
+cp policies.user.examples/custom-organization-template.rego .containerization-assist/policy/my-org-policy.rego
 # Edit my-org-policy.rego to customize rules
 ```
 
@@ -82,10 +82,10 @@ cp policies.user.examples/custom-organization-template.rego policies.user/my-org
 
 ```bash
 # Test policy syntax and rules
-opa test policies.user/
+opa test .containerization-assist/policy/
 
 # Test specific policy file
-opa test policies.user/allow-all-registries.rego
+opa test .containerization-assist/policy/allow-all-registries.rego
 
 # Create test file (example: allow-all-registries_test.rego)
 # See policies/security-baseline_test.rego for examples

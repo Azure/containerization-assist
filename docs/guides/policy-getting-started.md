@@ -59,11 +59,12 @@ result := { "allow": allow, "violations": violations }
 
 ## Policy Priority
 
-Policies are discovered and merged from three locations in priority order:
+Policies are discovered and merged from four locations in priority order:
 
 1. **Built-in policies/** (lowest priority) - Base security and quality rules
-2. **policies.user/** (middle priority) - Repository-specific customizations
-3. **`CUSTOM_POLICY_PATH` environment variable** (highest priority) - Organization-wide policies
+2. **~/.config/containerization-assist/policy/** (low-medium priority) - Global user customizations
+3. **<git-root>/.containerization-assist/policy/** (medium-high priority) - Project-specific policies
+4. **`CUSTOM_POLICY_PATH` environment variable** (highest priority) - Custom location
 
 Later policies override earlier policies by package namespace.
 
@@ -74,7 +75,7 @@ Later policies override earlier policies by package namespace.
 Override built-in MCR preference to allow Docker Hub, GCR, ECR, etc.
 
 ```bash
-cp policies.user.examples/allow-all-registries.rego policies.user/
+cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
 # Restart MCP client
 ```
 
@@ -83,7 +84,7 @@ cp policies.user.examples/allow-all-registries.rego policies.user/
 Convert all blocking violations to warnings for testing or development.
 
 ```bash
-cp policies.user.examples/warn-only-mode.rego policies.user/
+cp policies.user.examples/warn-only-mode.rego .containerization-assist/policy/
 # Restart MCP client
 ```
 
@@ -92,7 +93,7 @@ cp policies.user.examples/warn-only-mode.rego policies.user/
 Create custom policies for your organization's requirements.
 
 ```bash
-cp policies.user.examples/custom-organization-template.rego policies.user/my-org-policy.rego
+cp policies.user.examples/custom-organization-template.rego .containerization-assist/policy/my-org-policy.rego
 # Edit my-org-policy.rego to customize
 # Restart MCP client
 ```

@@ -338,21 +338,24 @@ This provides comprehensive out-of-the-box security and quality enforcement.
 
 ### Policy Customization
 
-The policy system supports three priority-ordered search paths for easy customization:
+The policy system supports four priority-ordered search paths for easy customization:
 
 **Priority Order (highest to lowest):**
-1. **Custom directory** via `CUSTOM_POLICY_PATH` environment variable (NPM users)
-2. **`policies.user/` directory** in your repository (source installation users)
-3. **Built-in `policies/`** (baseline policies)
+1. **Custom directory** via `CUSTOM_POLICY_PATH` environment variable (highest priority)
+2. **Project directory** at `<git-root>/.containerization-assist/policy/` (tracked in git)
+3. **Global directory** at `~/.config/containerization-assist/policy/` (XDG-compliant)
+4. **Built-in `policies/`** (shipped with package, lowest priority)
 
-Later policies override earlier policies during merging by package namespace.
+> **Migration Note**: The `policies.user/` directory is deprecated. For project-specific policies, use `.containerization-assist/policy/` at your git root. For user-wide policies, use `~/.config/containerization-assist/policy/`. The old directory still works but will log a deprecation warning.
 
 #### Quick Start: Source Installation (10 seconds)
 
 ```bash
-# Copy example policy to policies.user/
-mkdir -p policies.user
-cp policies.user.examples/allow-all-registries.rego policies.user/
+# Create project-local policy directory
+mkdir -p .containerization-assist/policy
+
+# Copy an example policy
+cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
 
 # Restart your MCP client (VS Code, Claude Desktop, etc.)
 ```
@@ -360,26 +363,27 @@ cp policies.user.examples/allow-all-registries.rego policies.user/
 #### Quick Start: NPM Installation (30 seconds)
 
 ```bash
-# 1. Create custom policy directory
-mkdir -p ~/.config/containerization-assist/policies
+# Option 1: Global policies (no env var needed)
+mkdir -p ~/.config/containerization-assist/policy
 
-# 2. Copy example policy
+# Copy example policy
 cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
-   ~/.config/containerization-assist/policies/
+   ~/.config/containerization-assist/policy/
 
-# 3. Configure environment variable in .vscode/mcp.json
+# Option 2: Custom location
+
+# Configure in .vscode/mcp.json
 {
   "servers": {
     "ca": {
       "env": {
-        "CUSTOM_POLICY_PATH": "${env:HOME}/.config/containerization-assist/policies"
+        "CUSTOM_POLICY_PATH": "/path/to/policies"
       }
     }
   }
 }
 
-# 4. Restart VS Code
-```
+# Restart your MCP client
 
 #### Pre-Built Example Policies
 
@@ -483,10 +487,10 @@ See [Policy Customization Guide](docs/guides/policy-getting-started.md) and exis
 
 ```bash
 # Validate policy syntax
-opa check policies.user/my-policy.rego
+opa check .containerization-assist/policy/my-policy.rego
 
 # Run policy tests
-opa test policies.user/
+opa test .containerization-assist/policy/
 
 # Test with MCP Inspector
 npx @modelcontextprotocol/inspector containerization-assist-mcp start
