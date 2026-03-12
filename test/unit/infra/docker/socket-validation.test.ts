@@ -61,7 +61,12 @@ describe('Docker Socket Validation', () => {
     it('should parse tcp:// scheme', async () => {
       const { parseDockerHost } = await import('@/infra/docker/socket-validation');
       const result = parseDockerHost('tcp://192.168.1.100:2375');
-      expect(result).toEqual({ type: 'tcp', value: 'tcp://192.168.1.100:2375', host: '192.168.1.100', port: 2375 });
+      expect(result).toEqual({
+        type: 'tcp',
+        value: 'tcp://192.168.1.100:2375',
+        host: '192.168.1.100',
+        port: 2375,
+      });
     });
 
     it('should parse tcp:// without port (defaults to 2375)', async () => {
@@ -73,19 +78,34 @@ describe('Docker Socket Validation', () => {
     it('should parse http:// scheme as tcp', async () => {
       const { parseDockerHost } = await import('@/infra/docker/socket-validation');
       const result = parseDockerHost('http://localhost:2375');
-      expect(result).toEqual({ type: 'tcp', value: 'http://localhost:2375', host: 'localhost', port: 2375 });
+      expect(result).toEqual({
+        type: 'tcp',
+        value: 'http://localhost:2375',
+        host: 'localhost',
+        port: 2375,
+      });
     });
 
     it('should parse https:// scheme as tcp', async () => {
       const { parseDockerHost } = await import('@/infra/docker/socket-validation');
       const result = parseDockerHost('https://docker.example.com:2376');
-      expect(result).toEqual({ type: 'tcp', value: 'https://docker.example.com:2376', host: 'docker.example.com', port: 2376 });
+      expect(result).toEqual({
+        type: 'tcp',
+        value: 'https://docker.example.com:2376',
+        host: 'docker.example.com',
+        port: 2376,
+      });
     });
 
     it('should parse https:// without port (defaults to 2376)', async () => {
       const { parseDockerHost } = await import('@/infra/docker/socket-validation');
       const result = parseDockerHost('https://docker.example.com');
-      expect(result).toEqual({ type: 'tcp', value: 'https://docker.example.com', host: 'docker.example.com', port: 2376 });
+      expect(result).toEqual({
+        type: 'tcp',
+        value: 'https://docker.example.com',
+        host: 'docker.example.com',
+        port: 2376,
+      });
     });
 
     it('should parse npipe:// scheme', async () => {
@@ -202,10 +222,7 @@ describe('Docker Socket Validation', () => {
     it('should validate Windows named pipe without file check', async () => {
       const { validateDockerSocket } = await import('@/infra/docker/socket-validation');
 
-      const result = validateDockerSocket(
-        { dockerSocket: '//./pipe/docker_engine' },
-        true,
-      );
+      const result = validateDockerSocket({ dockerSocket: '//./pipe/docker_engine' }, true);
 
       expect(result.dockerSocket).toBe('//./pipe/docker_engine');
       expect(result.warnings).toEqual([]);
@@ -341,7 +358,7 @@ describe('Docker Socket Validation', () => {
       const result = validateDockerSocket({}, true);
 
       // Should fall back to auto-detect and include a warning about invalid DOCKER_HOST
-      expect(result.warnings.some(w => w.includes('Invalid DOCKER_HOST'))).toBe(true);
+      expect(result.warnings.some((w) => w.includes('Invalid DOCKER_HOST'))).toBe(true);
     });
 
     it('should validate tcp:// DOCKER_HOST without file system check', async () => {
@@ -388,6 +405,29 @@ describe('Docker Socket Validation', () => {
       const result = dockerHostToOptions('npipe:////./pipe/docker_engine');
       expect(result).toEqual({ socketPath: '//./pipe/docker_engine' });
     });
+
+    it('should convert http:// to host/port/protocol options', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      const result = dockerHostToOptions('http://localhost:2375');
+      expect(result).toEqual({ host: 'localhost', port: 2375, protocol: 'http' });
+    });
+
+    it('should throw on ssh:// endpoints', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      expect(() => dockerHostToOptions('ssh://user@remote-host')).toThrow(
+        'Unsupported Docker host scheme',
+      );
+    });
+
+    it('should throw on fd:// endpoints', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      expect(() => dockerHostToOptions('fd://something')).toThrow('Unsupported Docker host scheme');
+    });
+
+    it('should throw on invalid tcp:// URL', async () => {
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+      expect(() => dockerHostToOptions('tcp://')).toThrow('invalid URL');
+    });
   });
 
   describe('toDockerHostURI', () => {
@@ -406,6 +446,11 @@ describe('Docker Socket Validation', () => {
     it('should prepend npipe:// to raw Windows pipe paths', async () => {
       const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
       expect(toDockerHostURI('//./pipe/docker_engine')).toBe('npipe:////./pipe/docker_engine');
+    });
+
+    it('should normalize backslash Windows pipe paths to forward-slash npipe:// URIs', async () => {
+      const { toDockerHostURI } = await import('@/infra/docker/socket-validation');
+      expect(toDockerHostURI('\\\\.\\pipe\\docker_engine')).toBe('npipe:////./pipe/docker_engine');
     });
 
     it('should pass through tcp:// URIs unchanged', async () => {

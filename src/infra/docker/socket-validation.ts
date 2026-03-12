@@ -103,43 +103,35 @@ export function parseDockerHost(value: string): ParsedDockerHost {
 /**
  * Convert a DOCKER_HOST endpoint string to connection options for dockerode.
  * Handles tcp://, http://, https://, unix://, npipe://, and raw socket paths.
+ * Throws on unsupported schemes (e.g. ssh://, fd://).
  */
 export function dockerHostToOptions(dockerHost: string): DockerConnectionOptions {
+  // Reject unsupported schemes (e.g. ssh://, fd://) before parseDockerHost
   if (
-    dockerHost.startsWith('tcp://') ||
-    dockerHost.startsWith('http://') ||
-    dockerHost.startsWith('https://')
+    /^[a-z][a-z0-9+.-]*:\/\//.test(dockerHost) &&
+    !/^(tcp|https?|unix|npipe):\/\//.test(dockerHost)
   ) {
-    try {
-      const parsed = parseDockerHost(dockerHost);
-      if (parsed.type === 'tcp') {
-        const opts: DockerConnectionOptions = { host: parsed.host, port: parsed.port };
-        if (parsed.value.startsWith('https://')) {
-          opts.protocol = 'https';
-        }
-        return opts;
-      }
-    } catch (err) {
-      throw new Error(
-        `Invalid Docker host URL: ${dockerHost}${err instanceof Error ? ` — ${err.message}` : ''}`,
-      );
-    }
-    // parseDockerHost matched tcp|http|https prefix but returned a non-tcp type (should not happen)
-    return { host: 'localhost', port: 2375 };
+    throw new Error(
+      `Unsupported Docker host scheme: ${dockerHost}. ` +
+        'Only tcp://, http://, https://, unix://, and npipe:// endpoints are supported. ' +
+        'If this is an ssh:// endpoint from a Docker context, consider using a local Docker socket or TCP endpoint instead.',
+    );
   }
 
-  // unix:// scheme
-  if (dockerHost.startsWith('unix://')) {
-    return { socketPath: dockerHost.slice('unix://'.length) };
+  // parseDockerHost validates and parses all supported formats; throws on invalid input.
+  const parsed = parseDockerHost(dockerHost);
+
+  if (parsed.type === 'tcp') {
+    const protocol = dockerHost.startsWith('https://')
+      ? 'https'
+      : dockerHost.startsWith('http://')
+        ? 'http'
+        : undefined;
+    return { host: parsed.host, port: parsed.port, ...(protocol && { protocol }) };
   }
 
-  // npipe:// scheme
-  if (dockerHost.startsWith('npipe://')) {
-    return { socketPath: dockerHost.slice('npipe://'.length) };
-  }
-
-  // Raw path (e.g., /var/run/docker.sock or //./pipe/docker_engine)
-  return { socketPath: dockerHost };
+  // unix or npipe — use socket path
+  return { socketPath: parsed.value };
 }
 
 /**
@@ -156,9 +148,9 @@ export function toDockerHostURI(socketPath: string): string {
     return socketPath;
   }
 
-  // Windows named pipe raw path
+  // Windows named pipe — normalize backslashes then prefix with npipe://
   if (socketPath.startsWith('//./pipe/') || socketPath.startsWith('\\\\.\\pipe\\')) {
-    return `npipe://${socketPath}`;
+    return `npipe://${socketPath.replace(/\\/g, '/')}`;
   }
 
   // Raw Unix path
