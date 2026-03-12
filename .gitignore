@@ -90,3 +90,4 @@ coverage-lib
 # VitePress
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+.validated-action-refs

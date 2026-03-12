@@ -1,0 +1,45 @@
+name: Validate Action Refs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate GitHub Action SHAs & Tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4
+        with:
+          node-version: '22'
+
+      - name: Restore validated refs cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: .validated-action-refs
+          key: action-refs-${{ hashFiles('.github/workflows/**') }}
+          restore-keys: |
+            action-refs-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate action references
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx --no-install tsx scripts/validate-action-refs.ts
