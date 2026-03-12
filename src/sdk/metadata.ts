@@ -418,11 +418,12 @@ export const opsMetadata: ToolMetadata = {
   name: 'ops',
   displayName: 'Operations',
   toolReferenceName: 'containerization-ops',
-  modelDescription: `Operational utilities for health checks and status. Available actions:
+  modelDescription: `Operational utilities for health checks, status, and policy discovery. Available actions:
 - ping: Simple health check to verify the tool is responsive
-- status: Returns server status and version information
+- status: Returns server status, version information, and loaded policy files (paths and sources)
 
-Use ping to verify connectivity before starting a workflow.`,
+Use ping to verify connectivity before starting a workflow.
+Use status to see which policy files are active and where they were loaded from.`,
   userDescription: 'Health checks and operational utilities',
   icon: '$(pulse)',
   canBeReferencedInPrompt: true,

@@ -2,7 +2,7 @@
 
 ## [1.3.2]
 
-- add MCP prompts for local Kind and AKS loop
+- add workflow tools (kind-loop, aks-loop) for local Kind and AKS deployment loops
 - add install badges in README for VSCode and VSCode Insiders Marketplace
 
 ## [1.3.1]

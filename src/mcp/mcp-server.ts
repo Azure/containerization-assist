@@ -17,7 +17,11 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
-import { registerPrompts } from '@/prompts';
+import { buildCreatePolicyPrompt } from '@/prompts/create-policy/prompt';
+import { buildLocalKindDevLoopPrompt } from '@/prompts/kind-loop/prompt';
+import { localKindDevLoopSchema, type LocalKindDevLoopArgs } from '@/prompts/kind-loop/schema';
+import { buildAksRemoteDevLoopPrompt } from '@/prompts/aks-loop/prompt';
+import { aksRemoteDevLoopSchema, type AksRemoteDevLoopArgs } from '@/prompts/aks-loop/schema';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
 import {
@@ -203,7 +207,39 @@ export function createMCPServer<TTool extends Tool>(
     }),
   );
 
-  registerPrompts(server);
+  // --- Workflow tools ---
+  // Registered as tools (not prompts) so the guidance text appears in
+  // collapsed tool output rather than flooding the chat window.
+
+  // create-containerization-policy
+  (server as McpServer & { tool: any }).tool(
+    'create-containerization-policy',
+    'Create a custom OPA Rego policy for containerization-assist. Returns a step-by-step plan and guidance for authoring a policy. Call this tool, then walk the user through the returned plan — each step has a recommended default the user can accept or override.',
+    {},
+    async () => ({
+      content: [{ type: 'text' as const, text: buildCreatePolicyPrompt() }],
+    }),
+  );
+
+  // kind-loop
+  (server as McpServer & { tool: any }).tool(
+    'kind-loop',
+    'Drive a full local Kind cluster development iteration loop: analyze, build, scan, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
+    localKindDevLoopSchema,
+    async (args: LocalKindDevLoopArgs) => ({
+      content: [{ type: 'text' as const, text: buildLocalKindDevLoopPrompt(args) }],
+    }),
+  );
+
+  // aks-loop
+  (server as McpServer & { tool: any }).tool(
+    'aks-loop',
+    'Drive a full AKS remote cluster deployment iteration loop: analyze, build, scan, push to ACR, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
+    aksRemoteDevLoopSchema,
+    async (args: AksRemoteDevLoopArgs) => ({
+      content: [{ type: 'text' as const, text: buildAksRemoteDevLoopPrompt(args) }],
+    }),
+  );
 
   return {
     async start(): Promise<void> {

@@ -2,7 +2,26 @@
 
 Customize containerization policies using the priority-ordered policy system.
 
-## Quick Start
+## Quickstart - Guided
+
+The fastest way to create a policy is the **`create-containerization-policy`** tool. Run it from your MCP client (VS Code Copilot, Claude Desktop, etc.):
+
+```
+Use the create-containerization-policy tool to help me set up a policy
+```
+
+The tool walks you through each decision:
+
+1. **Policy type** — Dockerfile (image) or Kubernetes manifest
+2. **What to enforce** — base image allowlist, security rules, resource limits, etc.
+3. **Severity** — `block` (reject non-compliant content) or `warn` (advisory only)
+4. **Scope** — project-local (`.containerization-assist/policy/`) or global (`~/.config/containerization-assist/policy/`)
+
+It generates a complete `.rego` file, saves it to the right location, and validates the syntax — no Rego knowledge required.
+
+> **VS Code tip**: If `manage_todo_list` and `vscode_askQuestions` are available, the tool uses them for interactive progress tracking and selection prompts.
+
+## Quickstart - Manual
 
 1. Create a directory for your policies and add a `.rego` file:
 
@@ -63,7 +82,7 @@ Policies are discovered and merged from four locations in priority order:
 
 1. **Built-in policies/** (lowest priority) - Base security and quality rules
 2. **~/.config/containerization-assist/policy/** (low-medium priority) - Global user customizations
-3. **<git-root>/.containerization-assist/policy/** (medium-high priority) - Project-specific policies
+3. **`<git-root>/.containerization-assist/policy/`** (medium-high priority) - Project-specific policies
 4. **`CUSTOM_POLICY_PATH` environment variable** (highest priority) - Custom location
 
 Later policies override earlier policies by package namespace.

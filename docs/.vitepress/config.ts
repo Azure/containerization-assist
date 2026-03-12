@@ -60,27 +60,34 @@ export default defineConfig({
       {
         text: 'Getting Started',
         items: [
-          { text: 'Overview', link: '/' },
-          { text: 'Prompt Loops', link: '/prompt-loops' }
+          { text: 'Overview', link: '/' }
         ]
       },
       {
-        text: 'Guides',
+        text: 'Tools',
         items: [
-          { text: 'Policy Getting Started', link: '/guides/policy-getting-started' },
-          { text: 'Policy Authoring', link: '/guides/policy-authoring' },
+          { text: 'Workflow Tools', link: '/workflow-tools' },
+          { text: 'Image Tools', link: '/tools/image-tools' },
+          { text: 'Manifest & Deployment', link: '/tools/manifest-tools' }
+        ]
+      },
+      {
+        text: 'Policy',
+        items: [
+          { text: 'Getting Started', link: '/guides/policy-getting-started' },
+          { text: 'Authoring Guide', link: '/guides/policy-authoring' },
           { text: 'Writing Rego Policies', link: '/guides/writing-rego-policies' },
-          { text: 'VS Code Integration', link: '/guides/vscode-extension-integration' },
           { text: 'Policy Example', link: '/guides/policy-example/README' },
-          { text: 'Platform and Tag Policies', link: '/guides/policy-example/PLATFORM_AND_TAG_POLICY_USAGE' }
-        ]
-      },
-      {
-        text: 'Examples',
-        items: [
-          { text: 'SDK Integration', link: '/examples/README' },
+          { text: 'Platform and Tag Policies', link: '/guides/policy-example/PLATFORM_AND_TAG_POLICY_USAGE' },
           { text: 'Template Injection', link: '/examples/template-injection-example' },
           { text: 'Dynamic Defaults', link: '/examples/dynamic-defaults-example' }
+        ]
+      },
+      {
+        text: 'SDK & Extensions',
+        items: [
+          { text: 'VS Code Integration', link: '/guides/vscode-extension-integration' },
+          { text: 'SDK Integration', link: '/examples/README' }
         ]
       }
     ],
