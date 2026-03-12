@@ -246,4 +246,46 @@ describe('OSV Scanner Integration — Cached Fixtures', () => {
       expect(log4shell!.severity).toBe('CRITICAL');
     }, 15000);
   });
+
+  describe('Explicit Docker Host (context parameter)', () => {
+    it('should skip auto-detection when dockerHost is provided', async () => {
+      const { createSecurityScanner } = await import('@/infra/security/scanner');
+      const { autoDetectDockerSocket } = await import('@/infra/docker/socket-validation');
+
+      const mock = autoDetectDockerSocket as jest.Mock;
+      mock.mockClear();
+
+      const scanner = createSecurityScanner(
+        logger,
+        'osv',
+        'unix:///home/user/.colima/default/docker.sock',
+      );
+      expect(scanner).toBeDefined();
+      expect(mock).not.toHaveBeenCalled();
+    });
+
+    it('should pass explicit dockerHost through to dockerode via dockerHostToOptions', async () => {
+      const { createSecurityScanner } = await import('@/infra/security/scanner');
+      const { dockerHostToOptions } = await import('@/infra/docker/socket-validation');
+
+      const mock = dockerHostToOptions as jest.Mock;
+      mock.mockClear();
+
+      createSecurityScanner(logger, 'osv', 'tcp://192.168.1.50:2375');
+      expect(mock).toHaveBeenCalledWith('tcp://192.168.1.50:2375');
+    });
+
+    it('should run full scan pipeline with explicit dockerHost', async () => {
+      const { createSecurityScanner } = await import('@/infra/security/scanner');
+
+      const scanner = createSecurityScanner(logger, 'osv', 'unix:///custom/docker.sock');
+      const result = await scanner.scanImage('osv-test:log4j-context');
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.totalVulnerabilities).toBeGreaterThanOrEqual(2);
+      expect(result.value.criticalCount).toBeGreaterThanOrEqual(1);
+    }, 15000);
+  });
 });
