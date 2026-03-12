@@ -106,6 +106,7 @@
     "typecheck": "tsc --noEmit",
     "validate-api": "tsx scripts/validate-public-api.ts",
     "validate:policies": "tsx scripts/validate-policies.ts",
+    "validate:action-refs": "tsx scripts/validate-action-refs.ts",
     "policy:simulate": "tsx src/cli/policy-simulate.ts",
     "validate": "npm run lint && npm run typecheck && npm run test:unit && npm run validate:policies && node scripts/validate-examples.js",
     "fix": "npm run lint:fix && npm run format",
