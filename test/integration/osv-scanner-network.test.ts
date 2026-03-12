@@ -119,6 +119,8 @@ jest.mock('@/infra/security/osv-scanner/package-extractor', () => ({
 // Mock Docker socket detection — avoids accessing real Docker socket
 jest.mock('@/infra/docker/socket-validation', () => ({
   autoDetectDockerSocket: jest.fn().mockReturnValue('/var/run/docker.sock'),
+  dockerHostToOptions: jest.fn((host: string) => ({ socketPath: host })),
+  toDockerHostURI: jest.fn((path: string) => `unix://${path}`),
 }));
 
 // Mock dockerode — avoids real Docker connection
