@@ -77,12 +77,12 @@ export function databaseCheckStep(): Step {
   return {
     heading: 'Check for database dependencies',
     body: [
-      'Review the `detectedDatabases` field from the analyze-repo results.',
-      '- If databases were detected, ask the user:',
+      'Review the `modules[].detectedDatabases` field in the analyze-repo results for each module.',
+      '- For each module where `detectedDatabases` is non-empty, ask the user:',
       '  1. Do these databases exist as Azure PaaS services (e.g., Azure Database for PostgreSQL, Azure Cache for Redis)?',
-      '  2. If yes, collect the server hostname(s) and database name(s).',
+      '  2. If yes, collect the server hostname(s) and database name(s) for the affected module(s).',
       '  3. Confirm the managed identity client ID to use for workload identity authentication.',
-      '- If no databases were detected, skip this step.',
+      '- If no modules have any detected databases, skip this step.',
     ].join('\n'),
   };
 }

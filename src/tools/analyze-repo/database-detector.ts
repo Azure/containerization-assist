@@ -21,7 +21,6 @@ export const MANAGED_DB_TYPES = new Set([
   'redis',
   'mssql',
   'cosmosdb',
-  'elasticsearch',
 ]);
 
 /**
@@ -109,11 +108,11 @@ const DEP_PATTERNS: Array<[RegExp, string]> = [
   [/go-sql-driver\/mysql/, 'mysql'],
 
   // MongoDB — Go full paths
-  [/go\.mongodb\.org\/mongo-driver/, 'mongodb'],
+  [/^go\.mongodb\.org\/mongo-driver/, 'mongodb'],
 
   // Redis — Go full paths
-  [/github\.com\/go-redis\/redis/, 'redis'],
-  [/github\.com\/redis\/go-redis/, 'redis'],
+  [/^github\.com\/go-redis\/redis/, 'redis'],
+  [/^github\.com\/redis\/go-redis/, 'redis'],
 
   // MSSQL — Java (com.microsoft.sqlserver:mssql-jdbc)
   [/mssql-jdbc/, 'mssql'],
@@ -127,17 +126,31 @@ const DEP_PATTERNS: Array<[RegExp, string]> = [
 ];
 
 /**
- * Try to match a lowercased dependency string against the exact map,
- * then fall back to pattern matching.
+ * Strip version specifiers and extras from a dependency string.
+ * Handles: "psycopg2==2.9.9", "pymongo>=4", "psycopg2-binary (>=2.9)",
+ * "redis[hiredis]>=4.0", "package~=1.0;python_version>='3.8'"
  */
-function matchDep(lower: string): string | undefined {
-  // Exact match first
-  const exact = DEP_TO_DB[lower];
+function normalizeDep(dep: string): string {
+  return dep
+    .replace(/\[.*?\]/g, '') // strip extras like [hiredis]
+    .replace(/\(.*?\)/g, '') // strip parenthesized constraints
+    .replace(/;.*$/, '') // strip environment markers (e.g., ;python_version>='3.8')
+    .replace(/[><=!~]=?.*$/, '') // strip version operators and everything after
+    .trim();
+}
+
+/**
+ * Try to match a dependency string against the exact map (using normalized form),
+ * then fall back to pattern matching (using original lowercased form).
+ */
+function matchDep(normalized: string, original: string): string | undefined {
+  // Exact match on normalized name
+  const exact = DEP_TO_DB[normalized];
   if (exact) return exact;
 
-  // Pattern match for composite dependency strings (groupId:artifactId, Go paths)
+  // Pattern match on original lowercased string (preserves Go paths, Java groupId:artifactId)
   for (const [pattern, dbType] of DEP_PATTERNS) {
-    if (pattern.test(lower)) return dbType;
+    if (pattern.test(original)) return dbType;
   }
 
   return undefined;
@@ -151,7 +164,9 @@ export function detectDatabases(deps: string[]): DetectedDatabase[] {
   const grouped = new Map<string, string[]>();
 
   for (const dep of deps) {
-    const dbType = matchDep(dep.toLowerCase());
+    const lower = dep.toLowerCase();
+    const normalized = normalizeDep(lower);
+    const dbType = matchDep(normalized, lower);
     if (dbType) {
       const existing = grouped.get(dbType);
       if (existing) {
