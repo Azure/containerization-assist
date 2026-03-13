@@ -29,7 +29,7 @@ cp policies.user.examples/allow-all-registries.rego .containerization-assist/pol
 # Or create your own from the template
 cp policies.user.examples/custom-organization-template.rego .containerization-assist/policy/my-policy.rego
 
-# Restart your MCP client to pick up changes
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 The `policies.user.examples/` directory contains ready-to-use examples:

@@ -359,7 +359,7 @@ mkdir -p ~/.config/containerization-assist/policy
 cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
    ~/.config/containerization-assist/policy/
 
-# Restart your MCP client
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 Or set a custom location in `.vscode/mcp.json`:

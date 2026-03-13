@@ -74,7 +74,7 @@ result := { "allow": allow, "violations": violations }
 }
 ```
 
-4. Restart your MCP client to pick up the new policy.
+4. Policies are auto-reloaded on the next tool execution — no restart needed.
 
 ## Policy Priority
 
@@ -97,7 +97,7 @@ Override built-in MCR preference to allow Docker Hub, GCR, ECR, etc.
 # From npm package
 cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
    .containerization-assist/policy/
-# Restart MCP client
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ### Advisory-Only Mode
@@ -108,7 +108,7 @@ Convert all blocking violations to warnings for testing or development.
 # From npm package
 cp node_modules/containerization-assist-mcp/policies.user.examples/warn-only-mode.rego \
    .containerization-assist/policy/
-# Restart MCP client
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ### Organization-Specific Rules
@@ -120,7 +120,7 @@ Create custom policies for your organization's requirements.
 cp node_modules/containerization-assist-mcp/policies.user.examples/custom-organization-template.rego \
    .containerization-assist/policy/my-org-policy.rego
 # Edit my-org-policy.rego to customize
-# Restart MCP client
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ## Testing Your Policies
@@ -176,7 +176,7 @@ Custom policies override by package namespace. See the `allow-all-registries.reg
 
 **Q: Changes not taking effect**
 
-Restart your MCP client (VS Code, Claude Desktop, etc.) after modifying policies.
+Policy file changes (additions, edits, deletions) are picked up automatically on the next tool execution — no restart needed. Restart is only required for environment variable or transport configuration changes.
 
 **Q: Syntax error in my policy**
 
@@ -196,7 +196,7 @@ rm -rf .containerization-assist/policy/
 rm -rf ~/.config/containerization-assist/policy/
 
 # Remove environment variable from .vscode/mcp.json if set
-# Restart MCP client
+# Restart only needed for env var or transport config changes (not policy file changes)
 ```
 
 ## Support

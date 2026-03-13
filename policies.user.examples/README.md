@@ -13,7 +13,7 @@ Copy an example policy to your policy directory:
 mkdir -p ~/.config/containerization-assist/policy
 cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
    ~/.config/containerization-assist/policy/
-# Restart your MCP client
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 Or use a custom location via `.vscode/mcp.json`:
@@ -42,7 +42,7 @@ cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-reg
   }
 }
 
-# 4. Restart VS Code or your MCP client
+# 4. Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ## Available Examples
@@ -161,7 +161,7 @@ ls -la ~/.config/containerization-assist/policy/
 # or
 ls -la .containerization-assist/policy/
 
-# Ensure you restarted your MCP client after adding policies
+# Policies are auto-reloaded — verify with the ops tool's status action
 ```
 
 **Q: Syntax error in my policy**
