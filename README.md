@@ -349,31 +349,22 @@ The policy system supports four priority-ordered search paths for easy customiza
 
 > **Migration Note**: The `policies.user/` directory is deprecated. For project-specific policies, use `.containerization-assist/policy/` at your git root. For user-wide policies, use `~/.config/containerization-assist/policy/`. The old directory still works but will log a deprecation warning.
 
-#### Quick Start: Source Installation (10 seconds)
-
-```bash
-# Create project-local policy directory
-mkdir -p .containerization-assist/policy
-
-# Copy an example policy
-cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
-
-# Restart your MCP client (VS Code, Claude Desktop, etc.)
-```
-
-#### Quick Start: NPM Installation (30 seconds)
+#### Quick Start
 
 ```bash
 # Option 1: Global policies (no env var needed)
 mkdir -p ~/.config/containerization-assist/policy
 
-# Copy example policy
+# Copy example policy from the npm package
 cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
    ~/.config/containerization-assist/policy/
 
-# Option 2: Custom location
+# Restart your MCP client
+```
 
-# Configure in .vscode/mcp.json
+Or set a custom location in `.vscode/mcp.json`:
+
+```json
 {
   "servers": {
     "ca": {
@@ -383,12 +374,11 @@ cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-reg
     }
   }
 }
-
-# Restart your MCP client
+```
 
 #### Pre-Built Example Policies
 
-The `policies.user.examples/` directory includes three ready-to-use examples:
+The `policies.user.examples/` directory (included in the npm package) provides three ready-to-use examples:
 
 | Example | Purpose | Use Case |
 |---------|---------|----------|

@@ -4,25 +4,19 @@ This directory contains pre-built example policies you can use to customize cont
 
 ## Quick Start (60 seconds)
 
-### For Source Installation Users
+### Quick Start
 
-**Option 1: Copy to .containerization-assist/policy/ (10 seconds)**
-
-```bash
-# From repository root
-cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
-# Restart your MCP client (VS Code, Claude Desktop, etc.)
-```
-
-**Option 2: Create your own policy**
+Copy an example policy to your policy directory:
 
 ```bash
-mkdir -p .containerization-assist/policy
-cp policies.user.examples/custom-organization-template.rego .containerization-assist/policy/my-policy.rego
-# Edit my-policy.rego to customize
+# Global policies (all projects)
+mkdir -p ~/.config/containerization-assist/policy
+cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
+   ~/.config/containerization-assist/policy/
 # Restart your MCP client
 ```
 
+Or use a custom location via `.vscode/mcp.json`:
 ### For NPM Installation Users
 
 **Option 1: Use environment variable (30 seconds)**
@@ -100,11 +94,14 @@ Policies are merged in this order (later policies override earlier):
    - base-images.rego
    - container-best-practices.rego
 
-2. **User policies.user/** (middle priority)
-   - Your custom policies for this repository
+2. **Global** `~/.config/containerization-assist/policy/` (low-medium priority)
+   - User-wide customizations
 
-3. **Custom directory via CUSTOM_POLICY_PATH** (highest priority)
-   - Organization-wide policies (NPM users)
+3. **Project** `<git-root>/.containerization-assist/policy/` (medium-high priority)
+   - Project-specific policies (tracked in git)
+
+4. **Custom directory via `CUSTOM_POLICY_PATH`** (highest priority)
+   - Organization-wide policies
 
 ## Writing Custom Policies
 
@@ -160,7 +157,9 @@ result := {
 npx containerization-assist-mcp start --log-level debug | grep -i policy
 
 # Verify file extension is .rego (not .txt or .rego.txt)
-ls -la policies.user/
+ls -la ~/.config/containerization-assist/policy/
+# or
+ls -la .containerization-assist/policy/
 
 # Ensure you restarted your MCP client after adding policies
 ```
@@ -169,10 +168,10 @@ ls -la policies.user/
 
 ```bash
 # Validate syntax
-opa check policies.user/my-policy.rego
+opa check .containerization-assist/policy/my-policy.rego
 
 # Run tests
-opa test policies.user/
+opa test .containerization-assist/policy/
 ```
 
 **Q: Built-in policies still blocking**

@@ -12,7 +12,7 @@ package containerization.registry_override
 # - Teams that want flexibility in base image selection
 #
 # QUICK START:
-# 1. Copy this file to policies.user/ directory (source installation)
+# 1. Copy this file to .containerization-assist/policy/ in your project
 #    OR set CUSTOM_POLICY_PATH=/path/to/this/directory
 # 2. Restart your MCP client
 # 3. Done! All registries are now allowed

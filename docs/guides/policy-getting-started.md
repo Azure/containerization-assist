@@ -94,7 +94,9 @@ Later policies override earlier policies by package namespace.
 Override built-in MCR preference to allow Docker Hub, GCR, ECR, etc.
 
 ```bash
-cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
+# From npm package
+cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
+   .containerization-assist/policy/
 # Restart MCP client
 ```
 
@@ -103,7 +105,9 @@ cp policies.user.examples/allow-all-registries.rego .containerization-assist/pol
 Convert all blocking violations to warnings for testing or development.
 
 ```bash
-cp policies.user.examples/warn-only-mode.rego .containerization-assist/policy/
+# From npm package
+cp node_modules/containerization-assist-mcp/policies.user.examples/warn-only-mode.rego \
+   .containerization-assist/policy/
 # Restart MCP client
 ```
 
@@ -112,7 +116,9 @@ cp policies.user.examples/warn-only-mode.rego .containerization-assist/policy/
 Create custom policies for your organization's requirements.
 
 ```bash
-cp policies.user.examples/custom-organization-template.rego .containerization-assist/policy/my-org-policy.rego
+# From npm package
+cp node_modules/containerization-assist-mcp/policies.user.examples/custom-organization-template.rego \
+   .containerization-assist/policy/my-org-policy.rego
 # Edit my-org-policy.rego to customize
 # Restart MCP client
 ```
@@ -138,7 +144,7 @@ npx containerization-assist-mcp start --log-level debug 2>&1 | grep -i policy
 Look for:
 ```
 Discovered built-in policies: 3 files
-Discovered user policies from policies.user/: 1 files
+Discovered project policies from .containerization-assist/policy/: 1 files
 ```
 
 ### 3. Test with Dockerfile Validation
@@ -154,7 +160,7 @@ echo 'FROM node:latest\nUSER root' > test.Dockerfile
 
 Check file extension (must be `.rego`):
 ```bash
-ls -la policies.user/
+ls -la .containerization-assist/policy/
 # ✅ my-policy.rego
 # ❌ my-policy.rego.txt or my-policy.yaml
 ```
@@ -166,7 +172,7 @@ npx containerization-assist-mcp list-policies
 
 **Q: Built-in policies still blocking**
 
-Custom policies override by package namespace. See `policies.user.examples/allow-all-registries.rego` for examples of how to override built-in rules.
+Custom policies override by package namespace. See the `allow-all-registries.rego` example in `policies.user.examples/` for how to override built-in rules.
 
 **Q: Changes not taking effect**
 
@@ -176,22 +182,25 @@ Restart your MCP client (VS Code, Claude Desktop, etc.) after modifying policies
 
 Validate policy syntax:
 ```bash
-opa check policies.user/my-policy.rego
-opa test policies.user/
+opa check .containerization-assist/policy/my-policy.rego
+opa test .containerization-assist/policy/
 ```
 
 ## Reverting to Built-In Policies
 
 ```bash
-# Remove user policies
-rm -rf policies.user/
+# Remove project policies
+rm -rf .containerization-assist/policy/
 
-# Remove environment variable from .vscode/mcp.json
+# Or remove global policies
+rm -rf ~/.config/containerization-assist/policy/
+
+# Remove environment variable from .vscode/mcp.json if set
 # Restart MCP client
 ```
 
 ## Support
 
-- [Policy Customization Examples](https://github.com/Azure/containerization-assist/tree/main/policies.user.examples)
+- [Policy Customization Examples](https://github.com/Azure/containerization-assist/tree/main/policies.user.examples) (also available at `node_modules/containerization-assist-mcp/policies.user.examples/`)
 - [OPA Rego Documentation](https://www.openpolicyagent.org/docs/latest/)
 - [GitHub Issues](https://github.com/Azure/containerization-assist/issues)
