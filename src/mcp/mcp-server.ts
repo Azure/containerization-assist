@@ -18,6 +18,7 @@ import {
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
 import { z } from 'zod';
+import { WORKFLOW_TOOL_NAME } from '@/tools';
 import { buildCreatePolicyPrompt } from '@/prompts/create-policy/prompt';
 import { buildLocalKindDevLoopPrompt } from '@/prompts/kind-loop/prompt';
 import { localKindDevLoopSchema, type LocalKindDevLoopArgs } from '@/prompts/kind-loop/schema';
@@ -172,9 +173,9 @@ export function createMCPServer<TTool extends Tool>(
   let isRunning = false;
 
   const workflowTools: Array<{ name: string; description: string }> = [
-    { name: 'create-containerization-policy', description: 'Create a custom OPA Rego policy for containerization-assist' },
-    { name: 'kind-loop', description: 'Drive a full local Kind cluster development iteration loop' },
-    { name: 'aks-loop', description: 'Drive a full AKS remote cluster deployment iteration loop' },
+    { name: WORKFLOW_TOOL_NAME.CREATE_POLICY, description: 'Create a custom OPA Rego policy for containerization-assist' },
+    { name: WORKFLOW_TOOL_NAME.KIND_LOOP, description: 'Drive a full local Kind cluster development iteration loop' },
+    { name: WORKFLOW_TOOL_NAME.AKS_LOOP, description: 'Drive a full AKS remote cluster deployment iteration loop' },
   ];
 
   registerToolsWithServer({
@@ -220,7 +221,7 @@ export function createMCPServer<TTool extends Tool>(
 
   // create-containerization-policy
   (server as McpServer & { tool: any }).tool(
-    'create-containerization-policy',
+    WORKFLOW_TOOL_NAME.CREATE_POLICY,
     'Create a custom OPA Rego policy for containerization-assist. Returns a step-by-step plan and guidance for authoring a policy. Call this tool, then walk the user through the returned plan — each step has a recommended default the user can accept or override.',
     z.object({}).shape,
     async () => ({
@@ -230,7 +231,7 @@ export function createMCPServer<TTool extends Tool>(
 
   // kind-loop
   (server as McpServer & { tool: any }).tool(
-    'kind-loop',
+    WORKFLOW_TOOL_NAME.KIND_LOOP,
     'Drive a full local Kind cluster development iteration loop: analyze, build, scan, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
     localKindDevLoopSchema,
     async (args: LocalKindDevLoopArgs) => ({
@@ -240,7 +241,7 @@ export function createMCPServer<TTool extends Tool>(
 
   // aks-loop
   (server as McpServer & { tool: any }).tool(
-    'aks-loop',
+    WORKFLOW_TOOL_NAME.AKS_LOOP,
     'Drive a full AKS remote cluster deployment iteration loop: analyze, build, scan, push to ACR, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
     aksRemoteDevLoopSchema,
     async (args: AksRemoteDevLoopArgs) => ({

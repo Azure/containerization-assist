@@ -10,6 +10,7 @@
  */
 
 import { POLICY_PROJECT_DIR, POLICY_SUBDIR, POLICY_GLOBAL_APP_NAME } from '@/config/constants';
+import { TOOL_NAME } from '@/tools';
 
 export function buildCreatePolicyPrompt(): string {
   const projectDir = `\`<workspace>/${POLICY_PROJECT_DIR}/${POLICY_SUBDIR}/\``;
@@ -104,7 +105,7 @@ Using the user's choices (or defaults), generate a complete, working \`.rego\` p
 After writing the file:
 1. Remind the user the policy takes effect on the next tool execution (no restart needed — policies are re-discovered automatically, including content changes).
 2. Suggest testing with: \`opa check <policy-file>\` to validate syntax.
-3. Suggest running the \`ops\` tool with action \`status\` to confirm the policy appears in the loaded policies list.
+3. Suggest running the **\`${TOOL_NAME.OPS}\`** tool with action \`status\` to confirm the policy appears in the loaded policies list.
 
 ## Base Image Allowlist Example
 

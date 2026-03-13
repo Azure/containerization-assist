@@ -17,6 +17,13 @@ export const TOOL_NAME = {
   VERIFY_DEPLOY: 'verify-deploy',
 } as const;
 
+/** Names for workflow tools registered directly on the MCP server (not orchestrated). */
+export const WORKFLOW_TOOL_NAME = {
+  CREATE_POLICY: 'create-containerization-policy',
+  KIND_LOOP: 'kind-loop',
+  AKS_LOOP: 'aks-loop',
+} as const;
+
 export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];
 
 /**
