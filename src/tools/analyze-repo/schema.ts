@@ -5,6 +5,12 @@
 import { z } from 'zod';
 import { repositoryPath, workspacePath, analysisOptions } from '../shared/schemas';
 
+export const detectedDatabaseSchema = z.object({
+  dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
+  dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
+});
+export type DetectedDatabase = z.infer<typeof detectedDatabaseSchema>;
+
 const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
   modulePath: z
@@ -41,12 +47,7 @@ const moduleInfo = z.object({
     .optional()
     .describe('List of module dependencies including database drivers and system libraries'),
   detectedDatabases: z
-    .array(
-      z.object({
-        dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
-        dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
-      }),
-    )
+    .array(detectedDatabaseSchema)
     .optional()
     .describe('Databases detected from module dependencies'),
   ports: z.array(z.number()).optional(),

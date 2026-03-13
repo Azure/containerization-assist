@@ -86,6 +86,15 @@ describe('detectDatabases', () => {
     expect(result).toEqual([{ dbType: 'mongodb', dependencies: ['pymongo'] }]);
   });
 
+  it('should detect PostgreSQL from versioned psycopg2 specifier', () => {
+    const result = detectDatabases(['psycopg2==2.9.9']);
+    expect(result.find((d) => d.dbType === 'postgres')).toBeDefined();
+  });
+
+  it('should detect MongoDB from versioned pymongo specifier', () => {
+    const result = detectDatabases(['pymongo>=4']);
+    expect(result.find((d) => d.dbType === 'mongodb')).toBeDefined();
+  });
   // Versioned dependency strings (from requirements.txt / pyproject.toml)
   it('should detect PostgreSQL from versioned psycopg2 specifier', () => {
     const result = detectDatabases(['psycopg2==2.9.9']);

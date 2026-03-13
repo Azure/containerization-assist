@@ -467,7 +467,7 @@ const runPattern = createKnowledgeTool<
         : '';
 
       const workloadIdentityInstruction = hasDbDeps
-        ? ' Database dependencies detected — include a ServiceAccount with workload identity annotations (e.g., azure.workload.identity/client-id) and add the pod label azure.workload.identity/use: "true" to the Deployment template. Use passwordless authentication (e.g., DefaultAzureCredential) instead of connection-string secrets where possible.'
+        ? ' Database dependencies detected — include a ServiceAccount configured for workload identity or cloud IAM integration and reference it from your Deployment/Pod spec via spec.template.spec.serviceAccountName. If you are using Azure Kubernetes Service (AKS), you may also add the appropriate Azure workload identity annotations (for example, azure.workload.identity/client-id) and the pod label azure.workload.identity/use: "true". Prefer passwordless authentication using your cloud provider’s default credentials (for example, DefaultAzureCredential on Azure) instead of connection-string secrets where possible.'
         : '';
 
       const nextAction: ToolNextAction = {

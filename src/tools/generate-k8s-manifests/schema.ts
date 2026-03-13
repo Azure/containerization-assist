@@ -6,6 +6,13 @@ import { z } from 'zod';
 import { environment, platform, repositoryPath, workspacePath, type ToolNextAction } from '../shared/schemas';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
+export const DetectedDatabaseSchema = z.object({
+  dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
+  dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
+});
+
+export type DetectedDatabase = z.infer<typeof DetectedDatabaseSchema>;
+
 export const generateK8sManifestsSchema = z
   .object({
     repositoryPath: repositoryPath
@@ -73,12 +80,7 @@ export const generateK8sManifestsSchema = z
         'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
       ),
     detectedDatabases: z
-      .array(
-        z.object({
-          dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
-          dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
-        }),
-      )
+      .array(DetectedDatabaseSchema)
       .optional()
       .describe('Databases detected from analyze-repo. Used to generate workload identity ServiceAccount for managed database access.'),
     includeComments: z
