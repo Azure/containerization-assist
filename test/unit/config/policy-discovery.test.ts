@@ -18,7 +18,6 @@ import {
   POLICY_PROJECT_DIR,
   POLICY_SUBDIR,
 } from '@/config/constants';
-import * as gitRoot from '@/lib/git-root';
 
 describe('Policy Discovery', () => {
   let testDir: string;
@@ -140,76 +139,54 @@ describe('Policy Discovery', () => {
   });
 
   describe('discoverProjectPolicies', () => {
-    it('returns policies when git root and project directory exist', () => {
+    it('returns policies when project directory exists in workspacePath', () => {
       const repo = join(testDir, 'repo');
-      const nested = join(repo, 'a', 'b');
       const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
-      mkdirSync(join(repo, '.git'), { recursive: true });
       mkdirSync(projectDir, { recursive: true });
-      mkdirSync(nested, { recursive: true });
       writeFileSync(join(projectDir, 'project.rego'), 'package p\ndefault allow := true');
-      process.chdir(nested);
 
-      const policies = discoverProjectPolicies(logger);
+      const policies = discoverProjectPolicies(logger, repo);
 
       expect(policies.length).toBe(1);
       const expectedSuffix = join(POLICY_PROJECT_DIR, POLICY_SUBDIR, 'project.rego');
       expect(policies[0].endsWith(expectedSuffix)).toBe(true);
     });
 
-    it('returns empty when git root exists but project directory missing', () => {
+    it('returns empty when workspacePath has no project directory', () => {
       const repo = join(testDir, 'repo');
-      mkdirSync(join(repo, '.git'), { recursive: true });
-      process.chdir(repo);
+      mkdirSync(repo, { recursive: true });
 
-      const policies = discoverProjectPolicies(logger);
+      const policies = discoverProjectPolicies(logger, repo);
 
       expect(policies).toEqual([]);
     });
 
-    it('returns empty silently when git root not found', () => {
+    it('returns empty silently when workspacePath has no policy dir', () => {
       const dir = join(testDir, 'nogit');
       mkdirSync(dir, { recursive: true });
-      process.chdir(dir);
       const warnSpy = jest.spyOn(logger, 'warn');
 
-      const policies = discoverProjectPolicies(logger);
+      const policies = discoverProjectPolicies(logger, dir);
 
       expect(policies).toEqual([]);
       expect(warnSpy).not.toHaveBeenCalled();
       warnSpy.mockRestore();
     });
 
-    it('handles git worktree marker file', () => {
-      const repo = join(testDir, 'repo-worktree');
+    it('does not walk up to parent directories', () => {
+      const repo = join(testDir, 'repo');
       const nested = join(repo, 'x', 'y');
       const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
-      mkdirSync(repo, { recursive: true });
       mkdirSync(projectDir, { recursive: true });
       mkdirSync(nested, { recursive: true });
-      writeFileSync(join(repo, '.git'), 'gitdir: /tmp/worktree/.git');
-      writeFileSync(join(projectDir, 'worktree.rego'), 'package w\ndefault allow := true');
-      process.chdir(nested);
+      writeFileSync(join(projectDir, 'project.rego'), 'package w\ndefault allow := true');
 
-      const policies = discoverProjectPolicies(logger);
-
-      expect(policies.length).toBe(1);
-      expect(policies[0].endsWith('worktree.rego')).toBe(true);
-    });
-
-    it('returns empty on inaccessible project path and logs warning', () => {
-      const findSpy = jest.spyOn(gitRoot, 'findGitRoot').mockImplementation(() => {
-        throw new Error('find-git-root-failed');
-      });
-      const warnSpy = jest.spyOn(logger, 'warn');
-
-      const policies = discoverProjectPolicies(logger);
+      // Passing nested dir as workspacePath should NOT find policies at repo level
+      const policies = discoverProjectPolicies(logger, nested);
 
       expect(policies).toEqual([]);
-      expect(warnSpy).toHaveBeenCalled();
-      findSpy.mockRestore();
-      warnSpy.mockRestore();
     });
+
   });
 
   describe('discoverUserPolicies (deprecated)', () => {
@@ -258,19 +235,18 @@ describe('Policy Discovery', () => {
       warnSpy.mockRestore();
     });
 
-    it('preserves upward walk behavior', () => {
+    it('does not walk up to parent directories', () => {
       const repo = join(testDir, 'repo');
       const nested = join(repo, 'src', 'deep', 'tool');
       const legacy = join(repo, 'policies.user');
       mkdirSync(legacy, { recursive: true });
       mkdirSync(nested, { recursive: true });
       writeFileSync(join(legacy, 'up.rego'), 'package up\ndefault allow := true');
-      process.chdir(nested);
 
-      const policies = discoverUserPolicies(logger);
+      // Passing nested dir as workspacePath should NOT find policies at repo level
+      const policies = discoverUserPolicies(logger, nested);
 
-      expect(policies.length).toBe(1);
-      expect(policies[0].endsWith('up.rego')).toBe(true);
+      expect(policies).toEqual([]);
     });
   });
 

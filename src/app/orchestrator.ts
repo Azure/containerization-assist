@@ -23,7 +23,7 @@ import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
 import { readdirSync, existsSync, statSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import os from 'node:os';
 import {
   ENV_VARS,
@@ -32,7 +32,6 @@ import {
   POLICY_PROJECT_DIR,
   POLICY_SUBDIR,
 } from '@/config/constants';
-import { findGitRoot } from '@/lib/git-root';
 
 // Capture import.meta.url at module scope (only available in ESM builds)
 // This will be undefined in CJS builds, which is expected
@@ -105,12 +104,8 @@ export function discoverGlobalPolicies(logger: Logger): string[] {
 
 export function discoverProjectPolicies(logger: Logger, workspacePath?: string): string[] {
   try {
-    const gitRoot = findGitRoot(workspacePath);
-    if (!gitRoot) {
-      return [];
-    }
-
-    const projectPolicyDir = join(gitRoot, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+    const baseDir = workspacePath || process.cwd();
+    const projectPolicyDir = join(baseDir, POLICY_PROJECT_DIR, POLICY_SUBDIR);
     if (!existsSync(projectPolicyDir)) {
       return [];
     }
@@ -126,18 +121,8 @@ export function discoverProjectPolicies(logger: Logger, workspacePath?: string):
 
 export function discoverUserPolicies(logger: Logger, workspacePath?: string): string[] {
   try {
-    let currentDir = workspacePath || process.cwd();
-    let policiesUserDir = join(currentDir, POLICY_LEGACY_DIR);
-    let attempts = 0;
-    const maxAttempts = 5;
-
-    while (!existsSync(policiesUserDir) && attempts < maxAttempts) {
-      const parentDir = dirname(currentDir);
-      if (parentDir === currentDir) break;
-      currentDir = parentDir;
-      policiesUserDir = join(currentDir, POLICY_LEGACY_DIR);
-      attempts++;
-    }
+    const baseDir = workspacePath || process.cwd();
+    const policiesUserDir = join(baseDir, POLICY_LEGACY_DIR);
 
     if (!existsSync(policiesUserDir)) {
       return [];
@@ -242,27 +227,13 @@ export function getPolicySearchPaths(logger: Logger, workspacePath?: string): Po
   }
 
   // Project policies directory
-  const gitRoot = findGitRoot(workspacePath);
-  if (gitRoot) {
-    const projectPolicyDir = join(gitRoot, POLICY_PROJECT_DIR, POLICY_SUBDIR);
-    paths.push({ path: projectPolicyDir, source: 'project', exists: existsSync(projectPolicyDir) });
-  }
+  const projectBaseDir = workspacePath || process.cwd();
+  const projectPolicyDir = join(projectBaseDir, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+  paths.push({ path: projectPolicyDir, source: 'project', exists: existsSync(projectPolicyDir) });
 
-  // Legacy policies directory (walk up to 5 parents, matching discoverUserPolicies behavior)
-  const legacyStart = workspacePath || process.cwd();
-  let legacyCurrent = legacyStart;
-  let legacyAttempts = 0;
-  const legacyMaxAttempts = 5;
-  let legacyDir = join(legacyCurrent, POLICY_LEGACY_DIR);
-
-  while (!existsSync(legacyDir) && legacyAttempts < legacyMaxAttempts) {
-    const parentDir = dirname(legacyCurrent);
-    if (parentDir === legacyCurrent) break;
-    legacyCurrent = parentDir;
-    legacyDir = join(legacyCurrent, POLICY_LEGACY_DIR);
-    legacyAttempts++;
-  }
-
+  // Legacy policies directory (workspacePath only, no walk-up)
+  const legacyBaseDir = workspacePath || process.cwd();
+  const legacyDir = join(legacyBaseDir, POLICY_LEGACY_DIR);
   if (existsSync(legacyDir)) {
     paths.push({ path: legacyDir, source: 'legacy', exists: true });
   }

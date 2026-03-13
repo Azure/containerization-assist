@@ -12,7 +12,7 @@
 import { POLICY_PROJECT_DIR, POLICY_SUBDIR, POLICY_GLOBAL_APP_NAME } from '@/config/constants';
 
 export function buildCreatePolicyPrompt(): string {
-  const projectDir = `\`<git-root>/${POLICY_PROJECT_DIR}/${POLICY_SUBDIR}/\``;
+  const projectDir = `\`<workspace>/${POLICY_PROJECT_DIR}/${POLICY_SUBDIR}/\``;
   const globalDir = `\`~/.config/${POLICY_GLOBAL_APP_NAME}/${POLICY_SUBDIR}/\``;
 
   return `You are helping the user create a custom **containerization-assist OPA Rego policy**.
