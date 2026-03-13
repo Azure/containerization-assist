@@ -4,12 +4,10 @@
 
 import { z } from 'zod';
 import { repositoryPath, workspacePath, analysisOptions } from '../shared/schemas';
-
-export const detectedDatabaseSchema = z.object({
-  dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
-  dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
-});
-export type DetectedDatabase = z.infer<typeof detectedDatabaseSchema>;
+import { detectedDatabaseSchema } from './database-detector';
+export type { DetectedDatabase } from './database-detector';
+import { detectedEnvVarSchema } from './env-detector';
+export type { DetectedEnvVar } from './env-detector';
 
 const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
@@ -50,6 +48,10 @@ const moduleInfo = z.object({
     .array(detectedDatabaseSchema)
     .optional()
     .describe('Databases detected from module dependencies'),
+  detectedEnvVars: z
+    .array(detectedEnvVarSchema)
+    .optional()
+    .describe('Environment variables detected from config files (.env, docker-compose, Spring config) and framework inference'),
   ports: z.array(z.number()).optional(),
   entryPoint: z.string().optional(),
 });

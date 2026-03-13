@@ -608,11 +608,22 @@ const runPattern = createKnowledgeTool<
         : nodePath.join(modulePath, 'Dockerfile');
       const relativeDockerfilePath = nodePath.relative(path, dockerfilePath) || './Dockerfile';
 
+      // Build env var instruction suffix
+      const configEnvVars = (input.detectedEnvVars ?? []).filter((v) => v.classification === 'config');
+      const secretEnvVars = (input.detectedEnvVars ?? []).filter((v) => v.classification === 'secret' || v.classification === 'database');
+      let envVarInstruction = '';
+      if (configEnvVars.length > 0) {
+        envVarInstruction += ` Add ENV instructions for: ${configEnvVars.map((v) => v.name).join(', ')}.`;
+      }
+      if (secretEnvVars.length > 0) {
+        envVarInstruction += ` Do NOT bake these into the image: ${secretEnvVars.map((v) => v.name).join(', ')} — inject at runtime.`;
+      }
+
       // Build nextAction directive
       const nextAction: ToolNextAction = existingDockerfile
         ? {
             action: 'update-files',
-            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
+            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.${envVarInstruction}`,
             files: [
               {
                 path: relativeDockerfilePath,
@@ -622,7 +633,7 @@ const runPattern = createKnowledgeTool<
           }
         : {
             action: 'create-files',
-            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
+            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.${envVarInstruction}`,
             files: [
               {
                 path: relativeDockerfilePath,

@@ -87,6 +87,21 @@ export function databaseCheckStep(): Step {
   };
 }
 
+export function envVarCheckStep(): Step {
+  return {
+    heading: 'Check for detected environment variables',
+    body: [
+      'Review the `modules[].detectedEnvVars` field in the analyze-repo results for each module.',
+      '- For each module where `detectedEnvVars` is non-empty, ask the user:',
+      '  1. Confirm the classifications (secret, database, config) are correct.',
+      '  2. For secret-classified vars, confirm they will be injected at runtime (not baked into the image).',
+      '  3. For config-classified vars, confirm default values or ask for correct values.',
+      '- Pass the confirmed `detectedEnvVars` to downstream tools (generate-dockerfile, generate-k8s-manifests).',
+      '- If no modules have any detected environment variables, skip this step.',
+    ].join('\n'),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared rules
 // ---------------------------------------------------------------------------

@@ -433,9 +433,22 @@ const runPattern = createKnowledgeTool<
         { path: './k8s/service.yaml', purpose: 'Service exposure' },
       ];
 
-      // Add configmap if there are ports or environment variables
-      if (input.ports && input.ports.length > 0) {
+      // Classify detected env vars
+      const hasConfigEnvVars = input.detectedEnvVars?.some(
+        (v) => v.classification === 'config',
+      );
+      const hasSecretEnvVars = input.detectedEnvVars?.some(
+        (v) => v.classification === 'secret' || v.classification === 'database',
+      );
+
+      // Add configmap if there are ports or config-classified environment variables
+      if ((input.ports && input.ports.length > 0) || hasConfigEnvVars) {
         manifestFiles.push({ path: './k8s/configmap.yaml', purpose: 'Configuration management' });
+      }
+
+      // Add secret if secret-classified environment variables are detected
+      if (hasSecretEnvVars) {
+        manifestFiles.push({ path: './k8s/secret.yaml', purpose: 'Secret management' });
       }
 
       // Add serviceaccount if managed database dependencies are detected (for workload identity)
@@ -467,12 +480,29 @@ const runPattern = createKnowledgeTool<
         : '';
 
       const workloadIdentityInstruction = hasDbDeps
-        ? ' Database dependencies detected — include a ServiceAccount configured for workload identity or cloud IAM integration and reference it from your Deployment/Pod spec via spec.template.spec.serviceAccountName. If you are using Azure Kubernetes Service (AKS), you may also add the appropriate Azure workload identity annotations (for example, azure.workload.identity/client-id) and the pod label azure.workload.identity/use: "true". Prefer passwordless authentication using your cloud provider’s default credentials (for example, DefaultAzureCredential on Azure) instead of connection-string secrets where possible.'
+        ? " Database dependencies detected — include a ServiceAccount configured for workload identity or cloud IAM integration and reference it from your Deployment/Pod spec via spec.template.spec.serviceAccountName. If you are using Azure Kubernetes Service (AKS), you may also add the appropriate Azure workload identity annotations (for example, azure.workload.identity/client-id) and the pod label azure.workload.identity/use: \"true\". Prefer passwordless authentication using your cloud provider's default credentials (for example, DefaultAzureCredential on Azure) instead of connection-string secrets where possible."
         : '';
+
+      // Build env var instruction for ConfigMap/Secret guidance
+      let envVarInstruction = '';
+      if (hasConfigEnvVars || hasSecretEnvVars) {
+        const configNames = (input.detectedEnvVars ?? [])
+          .filter((v) => v.classification === 'config')
+          .map((v) => v.name);
+        const secretNames = (input.detectedEnvVars ?? [])
+          .filter((v) => v.classification === 'secret' || v.classification === 'database')
+          .map((v) => v.name);
+        if (configNames.length > 0) {
+          envVarInstruction += ` Create ConfigMap with config vars: ${configNames.join(', ')}.`;
+        }
+        if (secretNames.length > 0) {
+          envVarInstruction += ` Reference Secrets for secret vars via envFrom: ${secretNames.join(', ')}.`;
+        }
+      }
 
       const nextAction: ToolNextAction = {
         action: 'create-files',
-        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, frameworks, ports, and entry point. Use detectedDependencies (if provided in input) for dependency-aware manifest configuration.${workloadIdentityInstruction}${policyInstruction}`,
+        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, frameworks, ports, and entry point. Use detectedDependencies (if provided in input) for dependency-aware manifest configuration.${workloadIdentityInstruction}${envVarInstruction}${policyInstruction}`,
         files: manifestFiles,
       };
 
@@ -620,6 +650,15 @@ async function handleGenerateK8sManifests(
     ...input,
     ...(k8sConfig && { k8sConfig }),
   };
+
+  // Log detectedDatabases state for debugging orchestration issues
+  if (input.detectedDatabases === undefined) {
+    logger.debug('No detectedDatabases provided — skipping workload identity check');
+  } else if (input.detectedDatabases.length === 0) {
+    logger.debug('detectedDatabases is empty — no databases found by analyze-repo');
+  } else {
+    logger.debug({ dbTypes: input.detectedDatabases.map((d) => d.dbType) }, 'Processing detected databases');
+  }
 
   // Run the knowledge-based plan generation
   const result = await runPattern(extendedInput, ctx);

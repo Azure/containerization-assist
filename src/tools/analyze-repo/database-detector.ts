@@ -5,10 +5,18 @@
  * and returns standardized database types with the triggering deps.
  */
 
+import { z } from 'zod';
+
 export interface DetectedDatabase {
   dbType: string;
   dependencies: string[];
 }
+
+/** Zod schema for DetectedDatabase — shared across tool schemas */
+export const detectedDatabaseSchema = z.object({
+  dbType: z.string().describe('Standardized database type (e.g., postgres, mysql, mongodb, redis)'),
+  dependencies: z.array(z.string()).describe('Dependency names that triggered detection'),
+});
 
 /**
  * Database types that represent managed/networked services suitable for
@@ -100,11 +108,11 @@ const DEP_PATTERNS: Array<[RegExp, string]> = [
   // PostgreSQL — Java (org.postgresql:*), Go (jackc/pgx variants)
   [/(?:^|:)postgresql(?:$|:)/, 'postgres'],
   [/org\.postgresql:/, 'postgres'],
-  [/jackc\/pgx/, 'postgres'],
-  [/lib\/pq/, 'postgres'],
+  [/jackc\/pgx(?:\/|$)/, 'postgres'],
+  [/(?:^|\/)lib\/pq(?:$|\/)/, 'postgres'],
 
   // MySQL — Java (com.mysql:mysql-connector-j, mysql:mysql-connector-java)
-  [/mysql[_-]connector/, 'mysql'],
+  [/(?:^|:)mysql[_-]connector/, 'mysql'],
   [/go-sql-driver\/mysql/, 'mysql'],
 
   // MongoDB — Go full paths
@@ -115,7 +123,7 @@ const DEP_PATTERNS: Array<[RegExp, string]> = [
   [/^github\.com\/redis\/go-redis/, 'redis'],
 
   // MSSQL — Java (com.microsoft.sqlserver:mssql-jdbc)
-  [/mssql-jdbc/, 'mssql'],
+  [/(?:^|:)mssql-jdbc(?:$|:)/, 'mssql'],
   [/com\.microsoft\.sqlserver:/, 'mssql'],
 
   // .NET EF providers (case-insensitive via lowercased input)
