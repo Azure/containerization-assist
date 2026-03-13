@@ -17,6 +17,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
+import { z } from 'zod';
 import { buildCreatePolicyPrompt } from '@/prompts/create-policy/prompt';
 import { buildLocalKindDevLoopPrompt } from '@/prompts/kind-loop/prompt';
 import { localKindDevLoopSchema, type LocalKindDevLoopArgs } from '@/prompts/kind-loop/schema';
@@ -170,6 +171,12 @@ export function createMCPServer<TTool extends Tool>(
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
+  const workflowTools: Array<{ name: string; description: string }> = [
+    { name: 'create-containerization-policy', description: 'Create a custom OPA Rego policy for containerization-assist' },
+    { name: 'kind-loop', description: 'Drive a full local Kind cluster development iteration loop' },
+    { name: 'aks-loop', description: 'Drive a full AKS remote cluster deployment iteration loop' },
+  ];
+
   registerToolsWithServer({
     outputFormat,
     chainHintsMode,
@@ -195,7 +202,7 @@ export function createMCPServer<TTool extends Tool>(
           text: JSON.stringify(
             {
               running: isRunning,
-              tools: tools.length,
+              tools: tools.length + workflowTools.length,
               transport: transportType,
               timestamp: new Date().toISOString(),
             },
@@ -215,7 +222,7 @@ export function createMCPServer<TTool extends Tool>(
   (server as McpServer & { tool: any }).tool(
     'create-containerization-policy',
     'Create a custom OPA Rego policy for containerization-assist. Returns a step-by-step plan and guidance for authoring a policy. Call this tool, then walk the user through the returned plan — each step has a recommended default the user can accept or override.',
-    {},
+    z.object({}).shape,
     async () => ({
       content: [{ type: 'text' as const, text: buildCreatePolicyPrompt() }],
     }),
@@ -259,7 +266,7 @@ export function createMCPServer<TTool extends Tool>(
         {
           version: serverOptions.version,
           transport: transportType,
-          toolCount: tools.length + 3, // +3 for workflow tools (create-containerization-policy, kind-loop, aks-loop)
+          toolCount: tools.length + workflowTools.length,
         },
         'MCP server started',
       );
@@ -287,11 +294,7 @@ export function createMCPServer<TTool extends Tool>(
       }));
 
       // Include workflow tools that are registered directly on the McpServer
-      registeredTools.push(
-        { name: 'create-containerization-policy', description: 'Create a custom OPA Rego policy for containerization-assist' },
-        { name: 'kind-loop', description: 'Drive a full local Kind cluster development iteration loop' },
-        { name: 'aks-loop', description: 'Drive a full AKS remote cluster deployment iteration loop' },
-      );
+      registeredTools.push(...workflowTools);
 
       return registeredTools;
     },
