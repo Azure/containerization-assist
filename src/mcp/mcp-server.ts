@@ -259,7 +259,7 @@ export function createMCPServer<TTool extends Tool>(
         {
           version: serverOptions.version,
           transport: transportType,
-          toolCount: tools.length,
+          toolCount: tools.length + 3, // +3 for workflow tools (create-containerization-policy, kind-loop, aks-loop)
         },
         'MCP server started',
       );
@@ -281,10 +281,19 @@ export function createMCPServer<TTool extends Tool>(
     },
 
     getTools(): Array<{ name: string; description: string }> {
-      return tools.map((t) => ({
+      const registeredTools: Array<{ name: string; description: string }> = tools.map((t) => ({
         name: t.name,
         description: t.description,
       }));
+
+      // Include workflow tools that are registered directly on the McpServer
+      registeredTools.push(
+        { name: 'create-containerization-policy', description: 'Create a custom OPA Rego policy for containerization-assist' },
+        { name: 'kind-loop', description: 'Drive a full local Kind cluster development iteration loop' },
+        { name: 'aks-loop', description: 'Drive a full AKS remote cluster deployment iteration loop' },
+      );
+
+      return registeredTools;
     },
   };
 }

@@ -233,9 +233,13 @@ export function getPolicySearchPaths(logger: Logger, workspacePath?: string): Po
   }
 
   // Global policies directory
-  const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(os.homedir(), '.config');
-  const globalPolicyDir = join(xdgConfigHome, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
-  paths.push({ path: globalPolicyDir, source: 'global', exists: existsSync(globalPolicyDir) });
+  try {
+    const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(os.homedir(), '.config');
+    const globalPolicyDir = join(xdgConfigHome, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+    paths.push({ path: globalPolicyDir, source: 'global', exists: existsSync(globalPolicyDir) });
+  } catch {
+    // os.homedir() can throw on misconfigured systems — skip global path
+  }
 
   // Project policies directory
   const gitRoot = findGitRoot(workspacePath);
@@ -244,9 +248,21 @@ export function getPolicySearchPaths(logger: Logger, workspacePath?: string): Po
     paths.push({ path: projectPolicyDir, source: 'project', exists: existsSync(projectPolicyDir) });
   }
 
-  // Legacy policies directory
-  const legacyBase = workspacePath || process.cwd();
-  const legacyDir = join(legacyBase, POLICY_LEGACY_DIR);
+  // Legacy policies directory (walk up to 5 parents, matching discoverUserPolicies behavior)
+  const legacyStart = workspacePath || process.cwd();
+  let legacyCurrent = legacyStart;
+  let legacyAttempts = 0;
+  const legacyMaxAttempts = 5;
+  let legacyDir = join(legacyCurrent, POLICY_LEGACY_DIR);
+
+  while (!existsSync(legacyDir) && legacyAttempts < legacyMaxAttempts) {
+    const parentDir = dirname(legacyCurrent);
+    if (parentDir === legacyCurrent) break;
+    legacyCurrent = parentDir;
+    legacyDir = join(legacyCurrent, POLICY_LEGACY_DIR);
+    legacyAttempts++;
+  }
+
   if (existsSync(legacyDir)) {
     paths.push({ path: legacyDir, source: 'legacy', exists: true });
   }
@@ -381,9 +397,11 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
   // Policy cache with change detection
   // Re-discovers policy files on each execution, but only reloads if the set of files changed
+  // Fingerprint includes file paths + mtime/size so in-place edits are detected
   let policyCache: RegoEvaluator | undefined;
   let cachedPolicyFingerprint: string | undefined;
   let policyLoadPromise: Promise<void> | undefined;
+  let policyLoadGeneration = 0;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     const { toolName } = request;
@@ -407,8 +425,16 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
     // Discover policies on every execution and reload if files changed
     const discoveredPolicies = discoverPolicies(logger, workspacePath);
     const policyPaths = discoveredPolicies.map((policy) => policy.path);
-    const fingerprint = [workspacePath ?? '', ...policyPaths.slice().sort()].join('\n');
-
+    // Build fingerprint from paths + file metadata (mtime/size) so in-place edits are detected
+    const fileMeta = policyPaths.map((p) => {
+      try {
+        const s = statSync(p);
+        return `${p}:${s.mtimeMs}:${s.size}`;
+      } catch {
+        return `${p}:missing`;
+      }
+    });
+    const fingerprint = [workspacePath ?? '', ...fileMeta.sort()].join('\n');
     const policiesChanged = fingerprint !== cachedPolicyFingerprint;
 
     if (policiesChanged) {
@@ -435,9 +461,20 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
           'Policy files changed, reloading...',
         );
 
+        const thisGeneration = ++policyLoadGeneration;
+
         policyLoadPromise = (async () => {
           try {
             const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
+
+            // Only write cache if no newer generation has started
+            if (thisGeneration !== policyLoadGeneration) {
+              logger.info('Policy load superseded by newer generation, discarding result');
+              if (policyResult.ok) {
+                policyResult.value.close();
+              }
+              return;
+            }
 
             if (policyResult.ok) {
               policyCache = policyResult.value;
@@ -446,9 +483,11 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
                 'Policies loaded and merged successfully',
               );
             } else {
+              // Reset fingerprint so next execution retries the load
+              cachedPolicyFingerprint = undefined;
               logger.error(
                 { error: policyResult.error },
-                'Failed to load policies - tools will run without policy constraints',
+                'Failed to load policies - will retry on next tool execution',
               );
             }
           } catch (error) {

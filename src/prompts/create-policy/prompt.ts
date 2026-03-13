@@ -102,7 +102,7 @@ Using the user's choices (or defaults), generate a complete, working \`.rego\` p
 ### Step 7: Verify
 
 After writing the file:
-1. Remind the user the policy takes effect on the next tool execution (no restart needed — policies are re-discovered automatically).
+1. Remind the user the policy takes effect on the next tool execution (no restart needed — policies are re-discovered automatically, including content changes).
 2. Suggest testing with: \`opa check <policy-file>\` to validate syntax.
 3. Suggest running the \`ops\` tool with action \`status\` to confirm the policy appears in the loaded policies list.
 

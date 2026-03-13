@@ -153,7 +153,8 @@ describe('Policy Discovery', () => {
       const policies = discoverProjectPolicies(logger);
 
       expect(policies.length).toBe(1);
-      expect(policies[0].endsWith('/.containerization-assist/policy/project.rego')).toBe(true);
+      const expectedSuffix = join(POLICY_PROJECT_DIR, POLICY_SUBDIR, 'project.rego');
+      expect(policies[0].endsWith(expectedSuffix)).toBe(true);
     });
 
     it('returns empty when git root exists but project directory missing', () => {

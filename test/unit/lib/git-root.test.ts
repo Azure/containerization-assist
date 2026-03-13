@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { findGitRoot } from '@/lib/git-root';
 
@@ -8,7 +8,7 @@ describe('Git Root Detection', () => {
   let originalCwd: string;
 
   beforeEach(() => {
-    testDir = join(__dirname, 'test-git-root-' + Date.now());
+    testDir = realpathSync(require('node:fs').mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'test-git-root-')));
     mkdirSync(testDir, { recursive: true });
     originalCwd = process.cwd();
   });
@@ -83,18 +83,27 @@ describe('Git Root Detection', () => {
   });
 
   it('should respect MAX_PARENT_DIR_TRAVERSALS limit', () => {
-    // Setup: Create very deep directory structure (beyond traversal limit)
-    const deepPath = [testDir, ...Array(10).fill('nested')].join('/');
+    // Setup: Create very deep directory structure (beyond traversal limit of 20)
+    const deepPath = [testDir, ...Array(25).fill('nested')].join('/');
     mkdirSync(deepPath, { recursive: true });
 
     // Create .git at testDir
     mkdirSync(join(testDir, '.git'));
 
-    // Test: Starting from deep nested dir, should find .git within limit
-    // (MAX_PARENT_DIR_TRAVERSALS = 5, so going up 10 levels should not find it)
+    // Test: Starting from deep nested dir, should NOT find .git
+    // (MAX_PARENT_DIR_TRAVERSALS = 20, so going up 25 levels should not find it)
     const result = findGitRoot(deepPath);
-    // With our traversal limit of 5, we can go up at most 5 levels
-    // 10 levels deep > 5 levels, so should return null
     expect(result).toBeNull();
+  });
+
+  it('should find .git within the traversal limit', () => {
+    // 15 levels deep is within the limit of 20
+    const deepPath = [testDir, ...Array(15).fill('nested')].join('/');
+    mkdirSync(deepPath, { recursive: true });
+
+    mkdirSync(join(testDir, '.git'));
+
+    const result = findGitRoot(deepPath);
+    expect(result).toBe(testDir);
   });
 });

@@ -36,7 +36,7 @@ export const workspacePath = z
   .string()
   .min(1, 'Workspace path cannot be empty')
   .describe(
-    'Workspace path for locating project-scoped policy files. Paths are automatically normalized to forward slashes on all platforms.',
+    'Workspace path for locating project-scoped policy files. Used to find the git root and .containerization-assist/policy/ directory.',
   );
 
 export const namespaceOptional = z.string().optional().describe('Kubernetes namespace');

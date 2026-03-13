@@ -113,6 +113,8 @@ describe('Health Check Integration', () => {
               !/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.test(trimmed) && // e.g., 2024-06-01 12:34:56
               !/Duration: \d+ms/.test(trimmed) && // e.g., Duration: 123ms
               !trimmed.startsWith('{') && // Remove JSON log lines
+              !trimmed.startsWith('(node:') && // Node deprecation warnings contain PID
+              !trimmed.startsWith('(Use `node') && // Companion trace-deprecation line
               trimmed !== ''
             );
           })
