@@ -58,7 +58,7 @@ jobs:
           node-version: '20'
 
       - name: Download SDK tarball
-        uses: actions/download-artifact@v8.0.0
+        uses: actions/download-artifact@v8.0.1
         with:
           name: sdk-tarball
 
@@ -180,7 +180,7 @@ jobs:
           node-version: '20'
 
       - name: Download webpack bundle
-        uses: actions/download-artifact@v8.0.0
+        uses: actions/download-artifact@v8.0.1
         with:
           name: webpack-bundle
 
