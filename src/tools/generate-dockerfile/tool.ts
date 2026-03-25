@@ -21,6 +21,7 @@ import {
   type EnhancementGuidance,
 } from './schema';
 import type { ToolNextAction } from '../shared/schemas';
+import { partitionEnvVarNames } from '@/tools/analyze-repo/env-detector';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
@@ -609,14 +610,13 @@ const runPattern = createKnowledgeTool<
       const relativeDockerfilePath = nodePath.relative(path, dockerfilePath) || './Dockerfile';
 
       // Build env var instruction suffix
-      const configEnvVars = (input.detectedEnvVars ?? []).filter((v) => v.classification === 'config');
-      const secretEnvVars = (input.detectedEnvVars ?? []).filter((v) => v.classification === 'secret' || v.classification === 'database');
+      const { configNames, secretNames } = partitionEnvVarNames(input.detectedEnvVars ?? []);
       let envVarInstruction = '';
-      if (configEnvVars.length > 0) {
-        envVarInstruction += ` Add ENV instructions for: ${configEnvVars.map((v) => v.name).join(', ')}.`;
+      if (configNames.length > 0) {
+        envVarInstruction += ` Add ENV instructions for: ${configNames.join(', ')}.`;
       }
-      if (secretEnvVars.length > 0) {
-        envVarInstruction += ` Do NOT bake these into the image: ${secretEnvVars.map((v) => v.name).join(', ')} — inject at runtime.`;
+      if (secretNames.length > 0) {
+        envVarInstruction += ` Do NOT bake these into the image: ${secretNames.join(', ')} — inject at runtime.`;
       }
 
       // Build nextAction directive

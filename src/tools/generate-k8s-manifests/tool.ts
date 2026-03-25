@@ -27,6 +27,7 @@ import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import { MANAGED_DB_TYPES } from '@/tools/analyze-repo/database-detector';
+import { partitionEnvVarNames } from '@/tools/analyze-repo/env-detector';
 import type { z } from 'zod';
 import yaml from 'js-yaml';
 import path from 'node:path';
@@ -433,21 +434,16 @@ const runPattern = createKnowledgeTool<
         { path: './k8s/service.yaml', purpose: 'Service exposure' },
       ];
 
-      // Classify detected env vars
-      const hasConfigEnvVars = input.detectedEnvVars?.some(
-        (v) => v.classification === 'config',
-      );
-      const hasSecretEnvVars = input.detectedEnvVars?.some(
-        (v) => v.classification === 'secret' || v.classification === 'database',
-      );
+      // Partition env vars once for manifest decisions and instruction building
+      const { configNames, secretNames } = partitionEnvVarNames(input.detectedEnvVars ?? []);
 
       // Add configmap if there are ports or config-classified environment variables
-      if ((input.ports && input.ports.length > 0) || hasConfigEnvVars) {
+      if ((input.ports && input.ports.length > 0) || configNames.length > 0) {
         manifestFiles.push({ path: './k8s/configmap.yaml', purpose: 'Configuration management' });
       }
 
       // Add secret if secret-classified environment variables are detected
-      if (hasSecretEnvVars) {
+      if (secretNames.length > 0) {
         manifestFiles.push({ path: './k8s/secret.yaml', purpose: 'Secret management' });
       }
 
@@ -485,19 +481,11 @@ const runPattern = createKnowledgeTool<
 
       // Build env var instruction for ConfigMap/Secret guidance
       let envVarInstruction = '';
-      if (hasConfigEnvVars || hasSecretEnvVars) {
-        const configNames = (input.detectedEnvVars ?? [])
-          .filter((v) => v.classification === 'config')
-          .map((v) => v.name);
-        const secretNames = (input.detectedEnvVars ?? [])
-          .filter((v) => v.classification === 'secret' || v.classification === 'database')
-          .map((v) => v.name);
-        if (configNames.length > 0) {
-          envVarInstruction += ` Create ConfigMap with config vars: ${configNames.join(', ')}.`;
-        }
-        if (secretNames.length > 0) {
-          envVarInstruction += ` Reference Secrets for secret vars via envFrom: ${secretNames.join(', ')}.`;
-        }
+      if (configNames.length > 0) {
+        envVarInstruction += ` Create ConfigMap with config vars: ${configNames.join(', ')}.`;
+      }
+      if (secretNames.length > 0) {
+        envVarInstruction += ` Reference Secrets for secret vars via envFrom: ${secretNames.join(', ')}.`;
       }
 
       const nextAction: ToolNextAction = {

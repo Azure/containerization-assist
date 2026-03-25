@@ -22,6 +22,13 @@ export const detectedEnvVarSchema = z.object({
 
 export type DetectedEnvVar = z.infer<typeof detectedEnvVarSchema>;
 
+// Pre-compiled classification regexes
+const CONNECTION_STRING_RE = /(?:DATABASE_URL|CONNECTION_STRING)$/;
+const DSN_RE = /(?:^|_)DSN$/;
+const SECRET_KEYWORDS_RE = /(?:PASSWORD|PASSWD|TOKEN|SECRET|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)/;
+const AUTH_ANCHORED_RE = /(?:^|_)AUTH(?:_|$)/;
+const DB_PREFIX_RE = /^(?:DB_|REDIS_|MONGO_|MYSQL_|PG_|POSTGRES_|MSSQL_|DATABASE_)/;
+
 /**
  * Classify an environment variable name as secret, database, or config.
  *
@@ -32,31 +39,44 @@ export type DetectedEnvVar = z.infer<typeof detectedEnvVarSchema>;
 export function classifyEnvVar(name: string): 'secret' | 'database' | 'config' {
   const upper = name.toUpperCase();
 
-  // Connection strings with embedded credentials
-  if (/(?:DATABASE_URL|CONNECTION_STRING)$/.test(upper) || upper === 'REDIS_URL' || upper === 'MONGODB_URI' || upper === 'MONGO_URI') {
+  if (CONNECTION_STRING_RE.test(upper) || upper === 'REDIS_URL' || upper === 'MONGODB_URI' || upper === 'MONGO_URI') {
     return 'secret';
   }
 
   // DSN (e.g., SENTRY_DSN) — anchored to avoid matching unrelated vars
-  if (/(?:^|_)DSN$/.test(upper)) {
+  if (DSN_RE.test(upper)) {
     return 'secret';
   }
 
-  // Secret patterns (AUTH is anchored to avoid matching AUTHOR, OAUTH_PROVIDER, etc.)
-  if (
-    /(?:PASSWORD|PASSWD|TOKEN|SECRET|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)/.test(upper) ||
-    /(?:^|_)AUTH(?:_|$)/.test(upper)
-  ) {
+  // AUTH is anchored to avoid matching AUTHOR, OAUTH_PROVIDER, etc.
+  if (SECRET_KEYWORDS_RE.test(upper) || AUTH_ANCHORED_RE.test(upper)) {
     return 'secret';
   }
 
-  // Database patterns
-  if (/^(?:DB_|REDIS_|MONGO_|MYSQL_|PG_|POSTGRES_|MSSQL_|DATABASE_)/.test(upper)) {
+  if (DB_PREFIX_RE.test(upper)) {
     return 'database';
   }
 
   return 'config';
 }
+
+/**
+ * Partition env vars into config names and secret/database names in a single pass.
+ */
+export function partitionEnvVarNames(vars: DetectedEnvVar[]): { configNames: string[]; secretNames: string[] } {
+  const configNames: string[] = [];
+  const secretNames: string[] = [];
+  for (const v of vars) {
+    if (v.classification === 'config') {
+      configNames.push(v.name);
+    } else {
+      secretNames.push(v.name);
+    }
+  }
+  return { configNames, secretNames };
+}
+
+const ENV_LINE_RE = /^([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/;
 
 /**
  * Parse KEY=value lines from .env-style files.
@@ -70,8 +90,7 @@ export function detectEnvVarsFromEnvFile(content: string, source: string): Detec
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
-    // Match KEY=value or KEY= or just KEY (for .env.example files with no =)
-    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/);
+    const match = trimmed.match(ENV_LINE_RE);
     if (!match) continue;
 
     const name = match[1]!;
