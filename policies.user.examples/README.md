@@ -4,36 +4,30 @@ This directory contains pre-built example policies you can use to customize cont
 
 ## Quick Start (60 seconds)
 
-### For Source Installation Users
+### Quick Start
 
-**Option 1: Copy to policies.user/ (10 seconds)**
-
-```bash
-# From repository root
-cp policies.user.examples/allow-all-registries.rego policies.user/
-# Restart your MCP client (VS Code, Claude Desktop, etc.)
-```
-
-**Option 2: Create your own policy**
+Copy an example policy to your policy directory:
 
 ```bash
-mkdir -p policies.user
-cp policies.user.examples/custom-organization-template.rego policies.user/my-policy.rego
-# Edit my-policy.rego to customize
-# Restart your MCP client
+# Global policies (all projects)
+mkdir -p ~/.config/containerization-assist/policy
+cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
+   ~/.config/containerization-assist/policy/
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
+Or use a custom location via `.vscode/mcp.json`:
 ### For NPM Installation Users
 
 **Option 1: Use environment variable (30 seconds)**
 
 ```bash
 # 1. Create a policies directory in your workspace
-mkdir -p ~/.config/containerization-assist/policies
+mkdir -p ~/.config/containerization-assist/policy
 
 # 2. Copy example policy
 cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
-   ~/.config/containerization-assist/policies/
+   ~/.config/containerization-assist/policy/
 
 # 3. Set environment variable in .vscode/mcp.json
 {
@@ -48,7 +42,7 @@ cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-reg
   }
 }
 
-# 4. Restart VS Code or your MCP client
+# 4. Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ## Available Examples
@@ -58,7 +52,7 @@ cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-reg
 **Use Case:** Teams using Docker Hub, GCR, ECR, or private registries
 
 ```bash
-cp policies.user.examples/allow-all-registries.rego policies.user/
+cp policies.user.examples/allow-all-registries.rego .containerization-assist/policy/
 ```
 
 ### 2. warn-only-mode.rego
@@ -66,7 +60,7 @@ cp policies.user.examples/allow-all-registries.rego policies.user/
 **Use Case:** Testing policies, gradual adoption, development environments
 
 ```bash
-cp policies.user.examples/warn-only-mode.rego policies.user/
+cp policies.user.examples/warn-only-mode.rego .containerization-assist/policy/
 ```
 
 ### 3. custom-organization-template.rego
@@ -74,7 +68,7 @@ cp policies.user.examples/warn-only-mode.rego policies.user/
 **Use Case:** Enforce custom labels, registries, naming conventions
 
 ```bash
-cp policies.user.examples/custom-organization-template.rego policies.user/my-org-policy.rego
+cp policies.user.examples/custom-organization-template.rego .containerization-assist/policy/my-org-policy.rego
 # Edit my-org-policy.rego to customize rules
 ```
 
@@ -82,10 +76,10 @@ cp policies.user.examples/custom-organization-template.rego policies.user/my-org
 
 ```bash
 # Test policy syntax and rules
-opa test policies.user/
+opa test .containerization-assist/policy/
 
 # Test specific policy file
-opa test policies.user/allow-all-registries.rego
+opa test .containerization-assist/policy/allow-all-registries.rego
 
 # Create test file (example: allow-all-registries_test.rego)
 # See policies/security-baseline_test.rego for examples
@@ -100,11 +94,14 @@ Policies are merged in this order (later policies override earlier):
    - base-images.rego
    - container-best-practices.rego
 
-2. **User policies.user/** (middle priority)
-   - Your custom policies for this repository
+2. **Global** `~/.config/containerization-assist/policy/` (low-medium priority)
+   - User-wide customizations
 
-3. **Custom directory via CUSTOM_POLICY_PATH** (highest priority)
-   - Organization-wide policies (NPM users)
+3. **Project** `<git-root>/.containerization-assist/policy/` (medium-high priority)
+   - Project-specific policies (tracked in git)
+
+4. **Custom directory via `CUSTOM_POLICY_PATH`** (highest priority)
+   - Organization-wide policies
 
 ## Writing Custom Policies
 
@@ -160,19 +157,21 @@ result := {
 npx containerization-assist-mcp start --log-level debug | grep -i policy
 
 # Verify file extension is .rego (not .txt or .rego.txt)
-ls -la policies.user/
+ls -la ~/.config/containerization-assist/policy/
+# or
+ls -la .containerization-assist/policy/
 
-# Ensure you restarted your MCP client after adding policies
+# Policies are auto-reloaded — verify with the ops tool's status action
 ```
 
 **Q: Syntax error in my policy**
 
 ```bash
 # Validate syntax
-opa check policies.user/my-policy.rego
+opa check .containerization-assist/policy/my-policy.rego
 
 # Run tests
-opa test policies.user/
+opa test .containerization-assist/policy/
 ```
 
 **Q: Built-in policies still blocking**

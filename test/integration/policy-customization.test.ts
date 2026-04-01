@@ -3,7 +3,7 @@
  *
  * Tests the priority-ordered policy discovery and customization workflow:
  * - Built-in policies (lowest priority)
- * - policies.user/ directory (middle priority)
+ * - .containerization-assist/policy directory (middle priority)
  * - CUSTOM_POLICY_PATH (highest priority)
  *
  * Validates that:
@@ -34,6 +34,7 @@ describe('Policy Customization Integration', () => {
   beforeEach(() => {
     testDir = join(__dirname, 'test-customization-' + Date.now());
     mkdirSync(testDir, { recursive: true });
+    mkdirSync(join(testDir, '.git'), { recursive: true });
     originalCwd = process.cwd();
     originalEnv = process.env[ENV_VARS.CUSTOM_POLICY_PATH];
   });
@@ -50,12 +51,15 @@ describe('Policy Customization Integration', () => {
 
   describe('allow-all-registries example policy', () => {
     it('should override built-in MCR preference and allow Docker Hub', async () => {
-      // Setup: Create policies.user directory with allow-all-registries policy
-      const policiesUserDir = join(testDir, 'policies.user');
+      const policiesUserDir = join(testDir, '.containerization-assist', 'policy');
       mkdirSync(policiesUserDir, { recursive: true });
 
       // Copy example policy
-      const examplePolicy = join(process.cwd(), 'policies.user.examples', 'allow-all-registries.rego');
+      const examplePolicy = join(
+        process.cwd(),
+        'policies.user.examples',
+        'allow-all-registries.rego',
+      );
       copyFileSync(examplePolicy, join(policiesUserDir, 'allow-all-registries.rego'));
 
       // Create Dockerfile with Docker Hub registry
@@ -79,7 +83,6 @@ CMD ["node", "server.js"]
 
       writeFileSync(join(appPath, 'Dockerfile'), dockerfile);
 
-      // Change to test directory so policies.user is discovered
       process.chdir(testDir);
 
       // Load only the user policy (we're testing it in isolation)
@@ -129,10 +132,14 @@ CMD ["node", "server.js"]
 
     it('should allow GCR and ECR registries', async () => {
       // Setup
-      const policiesUserDir = join(testDir, 'policies.user');
+      const policiesUserDir = join(testDir, '.containerization-assist', 'policy');
       mkdirSync(policiesUserDir, { recursive: true });
 
-      const examplePolicy = join(process.cwd(), 'policies.user.examples', 'allow-all-registries.rego');
+      const examplePolicy = join(
+        process.cwd(),
+        'policies.user.examples',
+        'allow-all-registries.rego',
+      );
       copyFileSync(examplePolicy, join(policiesUserDir, 'allow-all-registries.rego'));
 
       const appPath = join(testDir, 'app');
@@ -192,8 +199,7 @@ CMD ["node", "server.js"]
 
   describe('warn-only-mode example policy', () => {
     it('should convert blocking violations to warnings', async () => {
-      // Setup: Create policies.user directory with warn-only-mode policy
-      const policiesUserDir = join(testDir, 'policies.user');
+      const policiesUserDir = join(testDir, '.containerization-assist', 'policy');
       mkdirSync(policiesUserDir, { recursive: true });
 
       // Copy example policy
@@ -278,14 +284,18 @@ CMD ["node", "server.js"]
   describe('priority order when policies conflict', () => {
     it('should respect priority: custom > user > built-in', async () => {
       // Setup: Create all three policy directories with conflicting policies
-      const policiesUserDir = join(testDir, 'policies.user');
+      const policiesUserDir = join(testDir, '.containerization-assist', 'policy');
       const customDir = join(testDir, 'custom');
 
       mkdirSync(policiesUserDir, { recursive: true });
       mkdirSync(customDir, { recursive: true });
 
       // User policy: allow-all-registries
-      const allowAllPolicy = join(process.cwd(), 'policies.user.examples', 'allow-all-registries.rego');
+      const allowAllPolicy = join(
+        process.cwd(),
+        'policies.user.examples',
+        'allow-all-registries.rego',
+      );
       copyFileSync(allowAllPolicy, join(policiesUserDir, 'allow-all-registries.rego'));
 
       // Custom policy: even more permissive (warn-only-mode)
@@ -352,11 +362,14 @@ CMD ["node", "server.js"]
     }, 30000);
 
     it('should work with only user policies (no custom)', async () => {
-      // Setup: Only policies.user, no custom directory
-      const policiesUserDir = join(testDir, 'policies.user');
+      const policiesUserDir = join(testDir, '.containerization-assist', 'policy');
       mkdirSync(policiesUserDir, { recursive: true });
 
-      const allowAllPolicy = join(process.cwd(), 'policies.user.examples', 'allow-all-registries.rego');
+      const allowAllPolicy = join(
+        process.cwd(),
+        'policies.user.examples',
+        'allow-all-registries.rego',
+      );
       copyFileSync(allowAllPolicy, join(policiesUserDir, 'allow-all-registries.rego'));
 
       const appPath = join(testDir, 'app');
@@ -413,7 +426,7 @@ CMD ["node", "server.js"]
   describe('custom-organization-template example policy', () => {
     it('should enforce custom organization rules', async () => {
       // Setup
-      const policiesUserDir = join(testDir, 'policies.user');
+      const policiesUserDir = join(testDir, '.containerization-assist', 'policy');
       mkdirSync(policiesUserDir, { recursive: true });
 
       // Copy custom organization template
@@ -482,7 +495,7 @@ CMD ["node", "server.js"]
 
     it('should pass when organization requirements are met', async () => {
       // Setup
-      const policiesUserDir = join(testDir, 'policies.user');
+      const policiesUserDir = join(testDir, '.containerization-assist', 'policy');
       mkdirSync(policiesUserDir, { recursive: true });
 
       const customOrgPolicy = join(

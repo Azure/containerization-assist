@@ -27,6 +27,7 @@ import { opsToolSchema } from './schema';
 import type { z } from 'zod';
 import { formatDuration, formatTimestamp } from '@/lib/summary-helpers';
 import { opsToolDefinition } from './types';
+import { discoverPolicies, getPolicySearchPaths } from '@/app/orchestrator';
 
 interface PingConfig {
   message?: string;
@@ -113,6 +114,7 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
 
 interface ServerStatusConfig {
   details?: boolean;
+  workspacePath?: string;
 }
 
 /**
@@ -157,6 +159,11 @@ export interface ServerStatusResult {
     migrated: number;
   };
   sessions?: number;
+  policies?: {
+    total: number;
+    files: Array<{ path: string; source: string }>;
+    searchPaths: Array<{ path: string; source: string; exists: boolean }>;
+  };
 }
 
 /**
@@ -190,6 +197,11 @@ export async function serverStatus(
     const uptimeStr = formatDuration(uptime);
     const summary = `✅ Server healthy. Running for ${uptimeStr}. Memory: ${memPercentage}% used, CPU: ${cpus.length} cores.`;
 
+    // Discover policies for status display
+    const workspacePath = config.workspacePath;
+    const discoveredPolicies = discoverPolicies(logger, workspacePath);
+    const searchPaths = getPolicySearchPaths(logger, workspacePath);
+
     const status: ServerStatusResult = {
       kind: 'status' as const,
       summary,
@@ -215,6 +227,11 @@ export async function serverStatus(
       tools: {
         count: 14,
         migrated: migratedToolCount,
+      },
+      policies: {
+        total: discoveredPolicies.length,
+        files: discoveredPolicies.map((p) => ({ path: p.path, source: p.source })),
+        searchPaths: searchPaths.map((sp) => ({ path: sp.path, source: sp.source, exists: sp.exists })),
       },
     };
 
@@ -265,7 +282,10 @@ async function handleOps(
       return ping({ ...(input.message !== undefined && { message: input.message }) }, context);
     case 'status':
       return serverStatus(
-        { ...(input.details !== undefined && { details: input.details }) },
+        {
+          ...(input.details !== undefined && { details: input.details }),
+          ...(input.workspacePath !== undefined && { workspacePath: input.workspacePath }),
+        },
         context,
       );
     default:

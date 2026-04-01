@@ -114,32 +114,41 @@ async function handleListPoliciesCommand(opts: { showMerged?: boolean }): Promis
   if (policies.length === 0) {
     console.error('  No policies found.');
     console.error('\n💡 To add custom policies:');
-    console.error('  1. Source installation: Copy to policies.user/');
+    console.error('  1. Project policy directory: Copy to .containerization-assist/policy/');
     console.error('  2. NPM installation: Set CUSTOM_POLICY_PATH environment variable');
     console.error('\nSee policies.user.examples/ for example policies.\n');
     exit(0);
   }
 
-  // Group by source
-  const builtIn = policies.filter((p) => p.includes('/policies/') && !p.includes('/policies.user'));
-  const user = policies.filter((p) => p.includes('/policies.user/'));
-  const custom = policies.filter(
-    (p) => !p.includes('/policies/') && !p.includes('/policies.user/'),
-  );
+  const builtIn = policies.filter((policy) => policy.source === 'built-in');
+  const global = policies.filter((policy) => policy.source === 'global');
+  const project = policies.filter((policy) => policy.source === 'project');
+  const legacy = policies.filter((policy) => policy.source === 'legacy');
+  const custom = policies.filter((policy) => policy.source === 'custom');
 
   if (builtIn.length > 0) {
     console.error('  Built-in (Priority: Low):');
-    builtIn.forEach((p) => console.error(`    - ${basename(p)}`));
+    builtIn.forEach((policy) => console.error(`    - ${basename(policy.path)}`));
   }
 
-  if (user.length > 0) {
-    console.error('\n  User (Priority: Medium):');
-    user.forEach((p) => console.error(`    - ${basename(p)}`));
+  if (global.length > 0) {
+    console.error('\n  Global XDG (Priority: Medium):');
+    global.forEach((policy) => console.error(`    - ${basename(policy.path)}`));
+  }
+
+  if (project.length > 0) {
+    console.error('\n  Project .containerization-assist/policy (Priority: Higher):');
+    project.forEach((policy) => console.error(`    - ${basename(policy.path)}`));
+  }
+
+  if (legacy.length > 0) {
+    console.error('\n  Legacy user policy directory (Priority: Compatibility):');
+    legacy.forEach((policy) => console.error(`    - ${basename(policy.path)}`));
   }
 
   if (custom.length > 0) {
-    console.error('\n  Custom via CUSTOM_POLICY_PATH (Priority: High):');
-    custom.forEach((p) => console.error(`    - ${basename(p)}`));
+    console.error('\n  Custom via CUSTOM_POLICY_PATH (Priority: Highest):');
+    custom.forEach((policy) => console.error(`    - ${basename(policy.path)}`));
   }
 
   console.error(`\n  Total: ${policies.length} policy file(s)\n`);
@@ -148,7 +157,10 @@ async function handleListPoliciesCommand(opts: { showMerged?: boolean }): Promis
   if (opts.showMerged) {
     console.error('🔀 Merged Policy Result:\n');
     try {
-      const mergedPolicy = await loadAndMergeRegoPolicies(policies, logger);
+      const mergedPolicy = await loadAndMergeRegoPolicies(
+        policies.map((policy) => policy.path),
+        logger,
+      );
       if (mergedPolicy.ok) {
         console.error('  ✅ Policies merged successfully');
         console.error(`  📦 Loaded ${policies.length} policy file(s)`);

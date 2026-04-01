@@ -2,7 +2,26 @@
 
 Customize containerization policies using the priority-ordered policy system.
 
-## Quick Start
+## Quickstart - Guided
+
+The fastest way to create a policy is the **`create-containerization-policy`** tool. Run it from your MCP client (VS Code Copilot, Claude Desktop, etc.):
+
+```
+Use the create-containerization-policy tool to help me set up a policy
+```
+
+The tool walks you through each decision:
+
+1. **Policy type** — Dockerfile (image) or Kubernetes manifest
+2. **What to enforce** — base image allowlist, security rules, resource limits, etc.
+3. **Severity** — `block` (reject non-compliant content) or `warn` (advisory only)
+4. **Scope** — project-local (`.containerization-assist/policy/`) or global (`~/.config/containerization-assist/policy/`)
+
+It generates a complete `.rego` file, saves it to the right location, and validates the syntax — no Rego knowledge required.
+
+> **VS Code tip**: If `manage_todo_list` and `vscode_askQuestions` are available, the tool uses them for interactive progress tracking and selection prompts.
+
+## Quickstart - Manual
 
 1. Create a directory for your policies and add a `.rego` file:
 
@@ -55,15 +74,16 @@ result := { "allow": allow, "violations": violations }
 }
 ```
 
-4. Restart your MCP client to pick up the new policy.
+4. Policies are auto-reloaded on the next tool execution — no restart needed.
 
 ## Policy Priority
 
-Policies are discovered and merged from three locations in priority order:
+Policies are discovered and merged from four locations in priority order:
 
 1. **Built-in policies/** (lowest priority) - Base security and quality rules
-2. **policies.user/** (middle priority) - Repository-specific customizations
-3. **`CUSTOM_POLICY_PATH` environment variable** (highest priority) - Organization-wide policies
+2. **~/.config/containerization-assist/policy/** (low-medium priority) - Global user customizations
+3. **`<git-root>/.containerization-assist/policy/`** (medium-high priority) - Project-specific policies
+4. **`CUSTOM_POLICY_PATH` environment variable** (highest priority) - Custom location
 
 Later policies override earlier policies by package namespace.
 
@@ -74,8 +94,10 @@ Later policies override earlier policies by package namespace.
 Override built-in MCR preference to allow Docker Hub, GCR, ECR, etc.
 
 ```bash
-cp policies.user.examples/allow-all-registries.rego policies.user/
-# Restart MCP client
+# From npm package
+cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
+   .containerization-assist/policy/
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ### Advisory-Only Mode
@@ -83,8 +105,10 @@ cp policies.user.examples/allow-all-registries.rego policies.user/
 Convert all blocking violations to warnings for testing or development.
 
 ```bash
-cp policies.user.examples/warn-only-mode.rego policies.user/
-# Restart MCP client
+# From npm package
+cp node_modules/containerization-assist-mcp/policies.user.examples/warn-only-mode.rego \
+   .containerization-assist/policy/
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ### Organization-Specific Rules
@@ -92,9 +116,11 @@ cp policies.user.examples/warn-only-mode.rego policies.user/
 Create custom policies for your organization's requirements.
 
 ```bash
-cp policies.user.examples/custom-organization-template.rego policies.user/my-org-policy.rego
+# From npm package
+cp node_modules/containerization-assist-mcp/policies.user.examples/custom-organization-template.rego \
+   .containerization-assist/policy/my-org-policy.rego
 # Edit my-org-policy.rego to customize
-# Restart MCP client
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
 ## Testing Your Policies
@@ -118,7 +144,7 @@ npx containerization-assist-mcp start --log-level debug 2>&1 | grep -i policy
 Look for:
 ```
 Discovered built-in policies: 3 files
-Discovered user policies from policies.user/: 1 files
+Discovered project policies from .containerization-assist/policy/: 1 files
 ```
 
 ### 3. Test with Dockerfile Validation
@@ -134,7 +160,7 @@ echo 'FROM node:latest\nUSER root' > test.Dockerfile
 
 Check file extension (must be `.rego`):
 ```bash
-ls -la policies.user/
+ls -la .containerization-assist/policy/
 # ✅ my-policy.rego
 # ❌ my-policy.rego.txt or my-policy.yaml
 ```
@@ -146,32 +172,35 @@ npx containerization-assist-mcp list-policies
 
 **Q: Built-in policies still blocking**
 
-Custom policies override by package namespace. See `policies.user.examples/allow-all-registries.rego` for examples of how to override built-in rules.
+Custom policies override by package namespace. See the `allow-all-registries.rego` example in `policies.user.examples/` for how to override built-in rules.
 
 **Q: Changes not taking effect**
 
-Restart your MCP client (VS Code, Claude Desktop, etc.) after modifying policies.
+Policy file changes (additions, edits, deletions) are picked up automatically on the next tool execution — no restart needed. Restart is only required for environment variable or transport configuration changes.
 
 **Q: Syntax error in my policy**
 
 Validate policy syntax:
 ```bash
-opa check policies.user/my-policy.rego
-opa test policies.user/
+opa check .containerization-assist/policy/my-policy.rego
+opa test .containerization-assist/policy/
 ```
 
 ## Reverting to Built-In Policies
 
 ```bash
-# Remove user policies
-rm -rf policies.user/
+# Remove project policies
+rm -rf .containerization-assist/policy/
 
-# Remove environment variable from .vscode/mcp.json
-# Restart MCP client
+# Or remove global policies
+rm -rf ~/.config/containerization-assist/policy/
+
+# Remove environment variable from .vscode/mcp.json if set
+# Restart only needed for env var or transport config changes (not policy file changes)
 ```
 
 ## Support
 
-- [Policy Customization Examples](https://github.com/Azure/containerization-assist/tree/main/policies.user.examples)
+- [Policy Customization Examples](https://github.com/Azure/containerization-assist/tree/main/policies.user.examples) (also available at `node_modules/containerization-assist-mcp/policies.user.examples/`)
 - [OPA Rego Documentation](https://www.openpolicyagent.org/docs/latest/)
 - [GitHub Issues](https://github.com/Azure/containerization-assist/issues)

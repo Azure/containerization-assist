@@ -10,9 +10,9 @@ Containerization Assist is an AI-powered MCP server that helps you build, scan, 
 
 One-click install for VS Code:
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=ca&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D)
 
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=ca&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D&quality=insiders)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D&quality=insiders)
 
 Or add the following to `.vscode/mcp.json` in your project:
 
@@ -44,14 +44,15 @@ Or add the following to `.vscode/mcp.json` in your project:
 - Optional: [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) for security scanning
 - Optional: Kubernetes cluster for deployment features
 
-## Prompt Loops
+## Workflow Tools
 
-Two built-in `/` slash commands automate the full containerize-and-deploy workflow in VS Code Copilot Chat:
+Three built-in workflow tools return step-by-step plans for common containerization tasks:
 
 - **`kind-loop`** — Local dev loop using a Kind cluster (no required inputs)
 - **`aks-loop`** — Remote deployment to AKS with Azure Container Registry
+- **`create-containerization-policy`** — Guided policy authoring with recommended defaults
 
-See [Prompt Loops](./prompt-loops.md) for details and input reference.
+See [Workflow Tools](./workflow-tools.md) for details and input reference.
 
 ## Next steps
 

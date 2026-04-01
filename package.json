@@ -75,6 +75,7 @@
     "policies/**/*.rego",
     "!policies/**/*_test.rego",
     "policies/compiled/*.wasm",
+    "!.containerization-assist/**",
     "policies.user.examples/**/*.rego",
     "!policies.user.examples/**/*_test.rego",
     "policies.user.examples/**/*.md",

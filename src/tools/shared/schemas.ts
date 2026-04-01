@@ -32,6 +32,13 @@ export const repositoryPath = z
     'Absolute path to the repository. Paths are automatically normalized to forward slashes on all platforms (e.g., /path/to/repo or C:/path/to/repo)',
   );
 
+export const workspacePath = z
+  .string()
+  .min(1, 'Workspace path cannot be empty')
+  .describe(
+    'Workspace path for locating project-scoped policy files. Used to find the git root and .containerization-assist/policy/ directory.',
+  );
+
 export const namespaceOptional = z.string().optional().describe('Kubernetes namespace');
 
 // Environment schema

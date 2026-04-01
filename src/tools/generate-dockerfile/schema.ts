@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   environment,
   repositoryPath,
+  workspacePath,
   platform,
   DOCKER_PLATFORMS,
   type DockerPlatform,
@@ -21,6 +22,7 @@ export const generateDockerfileSchema = z.object({
   repositoryPath: repositoryPath.describe(
     'Repository path (automatically normalized to forward slashes on all platforms).',
   ),
+  workspacePath: workspacePath.optional(),
   modulePath: z
     .string()
     .optional()

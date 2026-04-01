@@ -16,6 +16,14 @@ export const ENV_VARS = {
 } as const;
 
 /**
+ * Policy directory configuration for 4-tier discovery system
+ */
+export const POLICY_PROJECT_DIR = '.containerization-assist';
+export const POLICY_SUBDIR = 'policy';
+export const POLICY_GLOBAL_APP_NAME = 'containerization-assist';
+export const POLICY_LEGACY_DIR = ['policies', 'user'].join('.');
+
+/**
  * Environment Schema
  * Zod schema for environment validation across the application.
  */

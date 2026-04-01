@@ -9,7 +9,7 @@ import pushImageTool from './push-image/tool';
 import scanImageTool from './scan-image/tool';
 import tagImageTool from './tag-image/tool';
 import verifyDeployTool from './verify-deploy/tool';
-import { TOOL_NAME, ToolName } from './shared/toolDefinition';
+import { TOOL_NAME, WORKFLOW_TOOL_NAME, ToolName } from './shared/toolDefinition';
 
 export type { ToolName };
 
@@ -62,6 +62,7 @@ export const ALL_TOOLS: readonly Tool[] = [
 
 export {
   TOOL_NAME,
+  WORKFLOW_TOOL_NAME,
   analyzeRepoTool,
   buildImageContextTool,
   fixDockerfileTool,

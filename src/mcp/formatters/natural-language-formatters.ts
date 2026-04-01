@@ -1204,6 +1204,23 @@ export function formatOpsStatusNarrative(result: ServerStatusResult): string {
     parts.push(`\n**Tools Available:** ${result.tools.count}`);
   }
 
+  // Policies
+  if (result.policies) {
+    parts.push(`\n**Policies Loaded:** ${result.policies.total}`);
+    if (result.policies.files.length > 0) {
+      for (const file of result.policies.files) {
+        parts.push(`  - \`${file.path}\` (${file.source})`);
+      }
+    }
+    if (result.policies.searchPaths && result.policies.searchPaths.length > 0) {
+      parts.push(`\n**Policy Search Paths:**`);
+      for (const sp of result.policies.searchPaths) {
+        const status = sp.exists ? '✅' : '⚠️ not found';
+        parts.push(`  - \`${sp.path}\` (${sp.source}) ${status}`);
+      }
+    }
+  }
+
   // Health summary
   parts.push(`\n**Health Summary:**`);
   if (result.success) {

@@ -17,7 +17,13 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { extractErrorMessage } from '@/lib/errors';
-import { registerPrompts } from '@/prompts';
+import { z } from 'zod';
+import { WORKFLOW_TOOL_NAME } from '@/tools';
+import { buildCreatePolicyPrompt } from '@/prompts/create-policy/prompt';
+import { buildLocalKindDevLoopPrompt } from '@/prompts/kind-loop/prompt';
+import { localKindDevLoopSchema, type LocalKindDevLoopArgs } from '@/prompts/kind-loop/schema';
+import { buildAksRemoteDevLoopPrompt } from '@/prompts/aks-loop/prompt';
+import { aksRemoteDevLoopSchema, type AksRemoteDevLoopArgs } from '@/prompts/aks-loop/schema';
 import { createLogger, type Logger } from '@/lib/logger';
 import type { Tool } from '@/types/tool';
 import {
@@ -166,6 +172,12 @@ export function createMCPServer<TTool extends Tool>(
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
+  const workflowTools: Array<{ name: string; description: string }> = [
+    { name: WORKFLOW_TOOL_NAME.CREATE_POLICY, description: 'Create a custom OPA Rego policy for containerization-assist' },
+    { name: WORKFLOW_TOOL_NAME.KIND_LOOP, description: 'Drive a full local Kind cluster development iteration loop' },
+    { name: WORKFLOW_TOOL_NAME.AKS_LOOP, description: 'Drive a full AKS remote cluster deployment iteration loop' },
+  ];
+
   registerToolsWithServer({
     outputFormat,
     chainHintsMode,
@@ -191,7 +203,7 @@ export function createMCPServer<TTool extends Tool>(
           text: JSON.stringify(
             {
               running: isRunning,
-              tools: tools.length,
+              tools: tools.length + workflowTools.length,
               transport: transportType,
               timestamp: new Date().toISOString(),
             },
@@ -203,7 +215,39 @@ export function createMCPServer<TTool extends Tool>(
     }),
   );
 
-  registerPrompts(server);
+  // --- Workflow tools ---
+  // Registered as tools (not prompts) so the guidance text appears in
+  // collapsed tool output rather than flooding the chat window.
+
+  // create-containerization-policy
+  (server as McpServer & { tool: any }).tool(
+    WORKFLOW_TOOL_NAME.CREATE_POLICY,
+    'Create a custom OPA Rego policy for containerization-assist. Returns a step-by-step plan and guidance for authoring a policy. Call this tool, then walk the user through the returned plan — each step has a recommended default the user can accept or override.',
+    z.object({}).shape,
+    async () => ({
+      content: [{ type: 'text' as const, text: buildCreatePolicyPrompt() }],
+    }),
+  );
+
+  // kind-loop
+  (server as McpServer & { tool: any }).tool(
+    WORKFLOW_TOOL_NAME.KIND_LOOP,
+    'Drive a full local Kind cluster development iteration loop: analyze, build, scan, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
+    localKindDevLoopSchema,
+    async (args: LocalKindDevLoopArgs) => ({
+      content: [{ type: 'text' as const, text: buildLocalKindDevLoopPrompt(args) }],
+    }),
+  );
+
+  // aks-loop
+  (server as McpServer & { tool: any }).tool(
+    WORKFLOW_TOOL_NAME.AKS_LOOP,
+    'Drive a full AKS remote cluster deployment iteration loop: analyze, build, scan, push to ACR, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
+    aksRemoteDevLoopSchema,
+    async (args: AksRemoteDevLoopArgs) => ({
+      content: [{ type: 'text' as const, text: buildAksRemoteDevLoopPrompt(args) }],
+    }),
+  );
 
   return {
     async start(): Promise<void> {
@@ -223,7 +267,7 @@ export function createMCPServer<TTool extends Tool>(
         {
           version: serverOptions.version,
           transport: transportType,
-          toolCount: tools.length,
+          toolCount: tools.length + workflowTools.length,
         },
         'MCP server started',
       );
@@ -245,10 +289,15 @@ export function createMCPServer<TTool extends Tool>(
     },
 
     getTools(): Array<{ name: string; description: string }> {
-      return tools.map((t) => ({
+      const registeredTools: Array<{ name: string; description: string }> = tools.map((t) => ({
         name: t.name,
         description: t.description,
       }));
+
+      // Include workflow tools that are registered directly on the McpServer
+      registeredTools.push(...workflowTools);
+
+      return registeredTools;
     },
   };
 }

@@ -15,8 +15,8 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 ## Install
 
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=ca&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D)
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=ca&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D&quality=insiders)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D&quality=insiders)
 
 ## Features
 
@@ -250,14 +250,15 @@ The server provides 11 MCP tools organized by functionality:
 |------|-------------|
 | `ops` | Operational utilities for ping and server status |
 
-### MCP Prompts
+### Workflow Tools
 
-Interactive workflow prompts available as `/` slash commands in VS Code Copilot Chat:
+Interactive workflow tools that return step-by-step plans (output is collapsed by default in VS Code Copilot Chat):
 
-| Prompt | Description | Required Inputs |
-|--------|-------------|-----------------|
-| `kind-loop` | Local dev loop: analyze → build → scan → deploy to Kind | None (namespace, imageName optional) |
-| `aks-loop` | Remote dev loop: analyze → build → push → deploy to AKS | `registry`, `resourceGroup`, `clusterName` |
+| Tool | Description | Inputs |
+|------|-------------|--------|
+| `create-containerization-policy` | Step-by-step guidance for authoring a custom OPA Rego policy | None |
+| `kind-loop` | Local dev loop: analyze → build → scan → deploy to Kind | `namespace` (optional), `imageName` (optional) |
+| `aks-loop` | Remote dev loop: analyze → build → push → deploy to AKS | `registry`, `resourceGroup`, `clusterName` (required); `namespace`, `imageName` (optional) |
 
 ## Supported Technologies
 
@@ -338,52 +339,46 @@ This provides comprehensive out-of-the-box security and quality enforcement.
 
 ### Policy Customization
 
-The policy system supports three priority-ordered search paths for easy customization:
+The policy system supports four priority-ordered search paths for easy customization:
 
 **Priority Order (highest to lowest):**
-1. **Custom directory** via `CUSTOM_POLICY_PATH` environment variable (NPM users)
-2. **`policies.user/` directory** in your repository (source installation users)
-3. **Built-in `policies/`** (baseline policies)
+1. **Custom directory** via `CUSTOM_POLICY_PATH` environment variable (highest priority)
+2. **Project directory** at `<git-root>/.containerization-assist/policy/` (tracked in git)
+3. **Global directory** at `~/.config/containerization-assist/policy/` (XDG-compliant)
+4. **Built-in `policies/`** (shipped with package, lowest priority)
 
-Later policies override earlier policies during merging by package namespace.
+> **Migration Note**: The `policies.user/` directory is deprecated. For project-specific policies, use `.containerization-assist/policy/` at your git root. For user-wide policies, use `~/.config/containerization-assist/policy/`. The old directory still works but will log a deprecation warning.
 
-#### Quick Start: Source Installation (10 seconds)
+#### Quick Start
 
 ```bash
-# Copy example policy to policies.user/
-mkdir -p policies.user
-cp policies.user.examples/allow-all-registries.rego policies.user/
+# Option 1: Global policies (no env var needed)
+mkdir -p ~/.config/containerization-assist/policy
 
-# Restart your MCP client (VS Code, Claude Desktop, etc.)
+# Copy example policy from the npm package
+cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
+   ~/.config/containerization-assist/policy/
+
+# Policies are auto-reloaded on the next tool execution — no restart needed
 ```
 
-#### Quick Start: NPM Installation (30 seconds)
+Or set a custom location in `.vscode/mcp.json`:
 
-```bash
-# 1. Create custom policy directory
-mkdir -p ~/.config/containerization-assist/policies
-
-# 2. Copy example policy
-cp node_modules/containerization-assist-mcp/policies.user.examples/allow-all-registries.rego \
-   ~/.config/containerization-assist/policies/
-
-# 3. Configure environment variable in .vscode/mcp.json
+```json
 {
   "servers": {
     "ca": {
       "env": {
-        "CUSTOM_POLICY_PATH": "${env:HOME}/.config/containerization-assist/policies"
+        "CUSTOM_POLICY_PATH": "/path/to/policies"
       }
     }
   }
 }
-
-# 4. Restart VS Code
 ```
 
 #### Pre-Built Example Policies
 
-The `policies.user.examples/` directory includes three ready-to-use examples:
+The `policies.user.examples/` directory (included in the npm package) provides three ready-to-use examples:
 
 | Example | Purpose | Use Case |
 |---------|---------|----------|
@@ -483,10 +478,10 @@ See [Policy Customization Guide](docs/guides/policy-getting-started.md) and exis
 
 ```bash
 # Validate policy syntax
-opa check policies.user/my-policy.rego
+opa check .containerization-assist/policy/my-policy.rego
 
 # Run policy tests
-opa test policies.user/
+opa test .containerization-assist/policy/
 
 # Test with MCP Inspector
 npx @modelcontextprotocol/inspector containerization-assist-mcp start

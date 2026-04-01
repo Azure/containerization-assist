@@ -2,9 +2,9 @@
 layout: doc
 ---
 
-# Prompt Loops
+# Workflow Tools
 
-Containerization Assist includes two interactive prompt loops, available as `/` slash commands in VS Code Copilot Chat. Each loop walks you through a full containerize-and-deploy workflow step by step.
+Containerization Assist includes three interactive workflow tools. Each returns a step-by-step plan that the AI walks you through. Tool output is collapsed by default in VS Code Copilot Chat, keeping the conversation clean.
 
 ## `kind-loop` — Local Development
 
@@ -46,3 +46,15 @@ Same workflow, targeting a remote AKS cluster with Azure Container Registry:
 | `clusterName` | **Yes** | AKS cluster name |
 | `namespace` | No | Kubernetes namespace (defaults to `default`) |
 | `imageName` | No | Image name (auto-detected from repo) |
+
+## `create-containerization-policy` — Policy Authoring
+
+Guided workflow for creating a custom OPA Rego policy. Returns a step-by-step plan with recommended defaults for each decision:
+
+1. Choose policy scope (Dockerfile or Kubernetes manifests)
+2. Choose policy location (project-local or global)
+3. Select severity level
+4. Define rules from suggested examples
+5. Write and validate the policy
+
+No inputs required — the tool provides an interactive plan the AI walks you through.

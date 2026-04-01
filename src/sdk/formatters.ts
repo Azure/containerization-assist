@@ -772,6 +772,19 @@ function formatServerStatusResultProse(result: ServerStatusResult): string {
   sections.push(`- **Uptime**: ${formatDuration(result.uptime * 1000)}`);
   sections.push(`- **Memory**: ${result.memory.percentage}% used`);
   sections.push(`- **CPU Cores**: ${result.cpu.cores}`);
+  if (result.policies) {
+    sections.push(`- **Policies Loaded**: ${result.policies.total}`);
+    for (const file of result.policies.files) {
+      sections.push(`  - \`${file.path}\` (${file.source})`);
+    }
+    if (result.policies.searchPaths && result.policies.searchPaths.length > 0) {
+      sections.push(`- **Policy Search Paths**:`);
+      for (const sp of result.policies.searchPaths) {
+        const status = sp.exists ? '✅' : '⚠️ not found';
+        sections.push(`  - \`${sp.path}\` (${sp.source}) ${status}`);
+      }
+    }
+  }
 
   return sections.join('\n');
 }
