@@ -23,6 +23,13 @@ export const scanImageSchema = z.object({
     .enum(['trivy', 'snyk', 'grype', 'osv'])
     .default('osv') // Changed default to osv
     .describe('Scanner to use for vulnerability detection'),
+  context: z
+    .string()
+    .optional()
+    .describe(
+      'Docker context to scan in. Use a specific context name (e.g., "colima", "desktop-linux") ' +
+        'to target that Docker daemon. If not specified, auto-detects via DOCKER_HOST env var and well-known socket paths.',
+    ),
   enableAISuggestions: z
     .boolean()
     .default(true)

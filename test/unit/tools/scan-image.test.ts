@@ -55,6 +55,13 @@ jest.mock('../../../src/infra/security/scanner', () => ({
   createSecurityScanner: jest.fn(() => mockSecurityScanner),
 }));
 
+// Mock Docker context resolution
+const mockResolveDockerContext = jest.fn() as any;
+
+jest.mock('../../../src/infra/docker/context', () => ({
+  resolveDockerContext: (...args: unknown[]) => mockResolveDockerContext(...args),
+}));
+
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
   createLogger: jest.fn(() => createMockLogger()),
@@ -653,6 +660,61 @@ describe('scanImage - Success and Error Scenarios', () => {
         expect(result.error).toContain('Out of memory');
         expect(result.guidance).toBeDefined();
       }
+    });
+  });
+
+  describe('Docker Context Support', () => {
+    describe('Specific Context Scanning', () => {
+      it('should resolve context and scan with dockerHost', async () => {
+        mockResolveDockerContext.mockResolvedValue(
+          createSuccessResult('unix:///Users/user/.colima/default/docker.sock'),
+        );
+
+        const contextConfig: ScanImageParams = {
+          ...config,
+          context: 'colima',
+        };
+
+        const result = await scanImage(contextConfig, createMockToolContext());
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value.success).toBe(true);
+          expect(result.value.context).toBe('colima');
+        }
+        expect(mockResolveDockerContext).toHaveBeenCalledWith('colima', expect.anything());
+      });
+
+      it('should fail when context resolution fails', async () => {
+        mockResolveDockerContext.mockResolvedValue(
+          createFailureResult("Failed to resolve Docker context 'nonexistent'", {
+            hint: 'The context name may be incorrect',
+            resolution: 'Run "docker context ls" to see available contexts.',
+          }),
+        );
+
+        const contextConfig: ScanImageParams = {
+          ...config,
+          context: 'nonexistent',
+        };
+
+        const result = await scanImage(contextConfig, createMockToolContext());
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toContain('nonexistent');
+        }
+      });
+
+      it('should not resolve context when none specified', async () => {
+        const result = await scanImage(config, createMockToolContext());
+
+        expect(result.ok).toBe(true);
+        expect(mockResolveDockerContext).not.toHaveBeenCalled();
+        if (result.ok) {
+          expect(result.value.context).toBeUndefined();
+        }
+      });
     });
   });
 });

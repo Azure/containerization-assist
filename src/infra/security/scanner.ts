@@ -6,9 +6,13 @@ import { scanImageWithTrivy, checkTrivyAvailability } from './trivy-scanner';
 import { scanImageWithSnyk, checkSnykAvailability } from './snyk-scanner';
 import { scanImageWithGrype, checkGrypeAvailability } from './grype-scanner';
 import { scanImageWithOSV, checkOSVAvailability } from './osv-scanner/index';
-import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
+import {
+  autoDetectDockerSocket,
+  dockerHostToOptions,
+  toDockerHostURI,
+} from '@/infra/docker/socket-validation';
 
-interface SecurityScanner {
+export interface SecurityScanner {
   scanImage: (imageId: string) => Promise<Result<BasicScanResult>>;
   ping: () => Promise<Result<boolean>>;
 }
@@ -36,10 +40,10 @@ export interface BasicScanResult {
 /**
  * Create a Trivy-based security scanner
  */
-function createTrivyScanner(logger: Logger): SecurityScanner {
+function createTrivyScanner(logger: Logger, dockerHost: string): SecurityScanner {
   return {
     async scanImage(imageId: string): Promise<Result<BasicScanResult>> {
-      return scanImageWithTrivy(imageId, logger);
+      return scanImageWithTrivy(imageId, logger, dockerHost);
     },
 
     async ping(): Promise<Result<boolean>> {
@@ -56,10 +60,10 @@ function createTrivyScanner(logger: Logger): SecurityScanner {
 /**
  * Create a Snyk-based security scanner
  */
-function createSnykScanner(logger: Logger): SecurityScanner {
+function createSnykScanner(logger: Logger, dockerHost: string): SecurityScanner {
   return {
     async scanImage(imageId: string): Promise<Result<BasicScanResult>> {
-      return scanImageWithSnyk(imageId, logger);
+      return scanImageWithSnyk(imageId, logger, dockerHost);
     },
 
     async ping(): Promise<Result<boolean>> {
@@ -76,10 +80,10 @@ function createSnykScanner(logger: Logger): SecurityScanner {
 /**
  * Create a Grype-based security scanner
  */
-function createGrypeScanner(logger: Logger): SecurityScanner {
+function createGrypeScanner(logger: Logger, dockerHost: string): SecurityScanner {
   return {
     async scanImage(imageId: string): Promise<Result<BasicScanResult>> {
-      return scanImageWithGrype(imageId, logger);
+      return scanImageWithGrype(imageId, logger, dockerHost);
     },
 
     async ping(): Promise<Result<boolean>> {
@@ -97,10 +101,11 @@ function createGrypeScanner(logger: Logger): SecurityScanner {
  * Create an OSV-based security scanner
  * Uses OSV API (no external CLI required)
  */
-function createOSVScanner(logger: Logger): SecurityScanner {
-  // Create Docker client for image inspection
-  const socketPath = autoDetectDockerSocket();
-  const docker = new Docker({ socketPath });
+function createOSVScanner(logger: Logger, dockerHost: string): SecurityScanner {
+  // Create Docker client targeting the resolved daemon endpoint
+  const opts = dockerHostToOptions(dockerHost);
+  const docker = new Docker(opts);
+  logger.debug({ dockerHost, opts }, 'Created Docker client for OSV scanner');
 
   return {
     async scanImage(imageId: string): Promise<Result<BasicScanResult>> {
@@ -167,24 +172,36 @@ function createStubScanner(logger: Logger): SecurityScanner {
  *
  * @param logger - Logger instance
  * @param scannerType - Type of scanner to create ('osv', 'trivy', 'snyk', 'grype', 'stub', or undefined for 'osv')
+ * @param dockerHost - Optional Docker daemon endpoint to target a specific Docker context
  * @returns SecurityScanner instance
  */
-export const createSecurityScanner = (logger: Logger, scannerType?: string): SecurityScanner => {
+export const createSecurityScanner = (
+  logger: Logger,
+  scannerType?: string,
+  dockerHost?: string,
+): SecurityScanner => {
   const type = (scannerType || 'osv').toLowerCase();
+
+  // Stub scanner needs no Docker connection — return early to skip detection
+  if (type === 'stub') {
+    return createStubScanner(logger);
+  }
+
+  // Ensure every scanner talks to the same Docker daemon the server uses
+  const effectiveDockerHost = dockerHost ?? toDockerHostURI(autoDetectDockerSocket());
+  logger.debug({ effectiveDockerHost, explicit: !!dockerHost }, 'Scanner Docker host resolved');
 
   switch (type) {
     case 'osv':
-      return createOSVScanner(logger);
+      return createOSVScanner(logger, effectiveDockerHost);
     case 'trivy':
-      return createTrivyScanner(logger);
+      return createTrivyScanner(logger, effectiveDockerHost);
     case 'snyk':
-      return createSnykScanner(logger);
+      return createSnykScanner(logger, effectiveDockerHost);
     case 'grype':
-      return createGrypeScanner(logger);
-    case 'stub':
-      return createStubScanner(logger);
+      return createGrypeScanner(logger, effectiveDockerHost);
     default:
       logger.warn({ scannerType: type }, 'Unknown scanner type, falling back to OSV');
-      return createOSVScanner(logger);
+      return createOSVScanner(logger, effectiveDockerHost);
   }
 };
