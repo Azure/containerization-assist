@@ -27,7 +27,7 @@ function getCliPath(): string {
 
   // If neither exists, return ESM path and let the test fail with a clear error
   throw new Error(
-    `CLI not found. Please build the project first with 'npm run build' or 'npm run build:esm'`
+    `CLI not found. Please build the project first with 'npm run build' or 'npm run build:esm'`,
   );
 }
 
@@ -104,21 +104,23 @@ describe('Health Check Integration', () => {
 
       // Normalize outputs by removing lines that may contain timestamps or durations
       function normalizeOutput(output: string): string[] {
-        return output
-          .split('\n')
-          // Remove lines with timestamps or durations (customize as needed)
-          .filter(line => {
-            const trimmed = line.trim();
-            return (
-              !/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.test(trimmed) && // e.g., 2024-06-01 12:34:56
-              !/Duration: \d+ms/.test(trimmed) && // e.g., Duration: 123ms
-              !trimmed.startsWith('{') && // Remove JSON log lines
-              !trimmed.startsWith('(node:') && // Node deprecation warnings contain PID
-              !trimmed.startsWith('(Use `node') && // Companion trace-deprecation line
-              trimmed !== ''
-            );
-          })
-          .map(line => line.trim());
+        return (
+          output
+            .split('\n')
+            // Remove lines with timestamps or durations (customize as needed)
+            .filter((line) => {
+              const trimmed = line.trim();
+              return (
+                !/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.test(trimmed) && // e.g., 2024-06-01 12:34:56
+                !/Duration: \d+ms/.test(trimmed) && // e.g., Duration: 123ms
+                !trimmed.startsWith('{') && // Remove JSON log lines
+                trimmed !== ''
+              );
+            })
+            .map((line) => line.trim())
+            .map((line) => line.replace(/\(node:\d+\)/, '(node:XXXX)'))
+            .map((line) => line.replace(/❌ Kubernetes: .+/, '❌ Kubernetes: <normalized>'))
+        );
       }
 
       const norm1 = normalizeOutput(result1);

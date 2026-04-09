@@ -7,6 +7,13 @@ import { jest } from '@jest/globals';
 import { createSecurityScanner } from '../../../../src/infra/security/scanner';
 import { createLogger } from '../../../../src/lib/logger';
 
+// Mock socket-validation so auto-detection returns a known value
+jest.mock('../../../../src/infra/docker/socket-validation', () => ({
+  autoDetectDockerSocket: jest.fn(() => '/var/run/docker.sock'),
+  dockerHostToOptions: jest.fn((host: string) => ({ socketPath: host })),
+  toDockerHostURI: jest.fn((path: string) => `unix://${path}`),
+}));
+
 // Mock the individual scanner modules
 jest.mock('../../../../src/infra/security/trivy-scanner', () => ({
   scanImageWithTrivy: jest.fn(),
@@ -169,6 +176,58 @@ describe('Scanner Factory', () => {
       // Both should be defined (instances may or may not be the same)
       expect(scanner1).toBeDefined();
       expect(scanner2).toBeDefined();
+    });
+  });
+
+  describe('Docker Host Parameter', () => {
+    it('should accept dockerHost parameter for OSV scanner', () => {
+      const scanner = createSecurityScanner(logger, 'osv', 'unix:///custom/docker.sock');
+      expect(scanner).toBeDefined();
+      expect(scanner.scanImage).toBeDefined();
+    });
+
+    it('should accept dockerHost parameter for Trivy scanner', () => {
+      const scanner = createSecurityScanner(logger, 'trivy', 'tcp://192.168.1.10:2375');
+      expect(scanner).toBeDefined();
+      expect(scanner.scanImage).toBeDefined();
+    });
+
+    it('should accept dockerHost parameter for Snyk scanner', () => {
+      const scanner = createSecurityScanner(logger, 'snyk', 'unix:///var/run/docker.sock');
+      expect(scanner).toBeDefined();
+      expect(scanner.scanImage).toBeDefined();
+    });
+
+    it('should accept dockerHost parameter for Grype scanner', () => {
+      const scanner = createSecurityScanner(logger, 'grype', 'tcp://remote:2376');
+      expect(scanner).toBeDefined();
+      expect(scanner.scanImage).toBeDefined();
+    });
+
+    it('should auto-detect dockerHost when none is provided', () => {
+      const {
+        autoDetectDockerSocket,
+        toDockerHostURI,
+      } = require('../../../../src/infra/docker/socket-validation');
+
+      const scanner = createSecurityScanner(logger, 'trivy');
+      expect(scanner).toBeDefined();
+      expect(autoDetectDockerSocket).toHaveBeenCalled();
+      expect(toDockerHostURI).toHaveBeenCalledWith('/var/run/docker.sock');
+    });
+
+    it('should skip auto-detection when explicit dockerHost is provided', () => {
+      const { autoDetectDockerSocket } = require('../../../../src/infra/docker/socket-validation');
+      autoDetectDockerSocket.mockClear();
+
+      createSecurityScanner(logger, 'trivy', 'tcp://explicit:2375');
+      expect(autoDetectDockerSocket).not.toHaveBeenCalled();
+    });
+
+    it('should ignore dockerHost for stub scanner', () => {
+      const scanner = createSecurityScanner(logger, 'stub', 'unix:///some/sock');
+      expect(scanner).toBeDefined();
+      expect(scanner.scanImage).toBeDefined();
     });
   });
 });

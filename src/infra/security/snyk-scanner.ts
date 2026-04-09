@@ -161,6 +161,7 @@ async function checkSnykAuth(logger: Logger): Promise<Result<boolean>> {
 export async function scanImageWithSnyk(
   imageId: string,
   logger: Logger,
+  dockerHost: string,
 ): Promise<Result<BasicScanResult>> {
   // Validate imageId to prevent command injection
   if (!validateImageId(imageId)) {
@@ -187,15 +188,18 @@ export async function scanImageWithSnyk(
     // container test: scan container image
     // --json: output in JSON format
     const args = ['container', 'test', imageId, '--json'];
-    logger.debug({ args }, 'Executing Snyk command');
+    logger.debug({ args, dockerHost }, 'Executing Snyk command');
+
+    const execEnv = {
+      ...process.env,
+      DOCKER_HOST: dockerHost,
+      // Ensure token is passed if set
+      ...(process.env.SNYK_TOKEN && { SNYK_TOKEN: process.env.SNYK_TOKEN }),
+    };
 
     const { stdout, stderr } = await execFileAsync('snyk', args, {
       maxBuffer: LIMITS.MAX_SCAN_BUFFER,
-      env: {
-        ...process.env,
-        // Ensure token is passed if set
-        ...(process.env.SNYK_TOKEN && { SNYK_TOKEN: process.env.SNYK_TOKEN }),
-      },
+      env: execEnv,
     });
 
     // Log any warnings from stderr
