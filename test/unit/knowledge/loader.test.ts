@@ -27,14 +27,13 @@ describe('Knowledge Loader', () => {
     });
 
     it('should load all knowledge packs from built-in imports', () => {
-      // Built-in packs are now imported as JSON modules
-      const expectedPackCount = 29; // Total number of built-in packs
+      const packsDir = path.join(process.cwd(), 'knowledge/packs');
+      const packCount = readdirSync(packsDir).filter((f) => f.endsWith('.json')).length;
 
-      // Verify entries were loaded
       const entries = getAllEntries();
       expect(entries.length).toBeGreaterThan(0);
 
-      console.log(`✅ Loaded ${entries.length} entries from ${expectedPackCount} built-in packs`);
+      console.log(`✅ Loaded ${entries.length} entries from ${packCount} built-in packs`);
     });
 
     it('should return entries from getAllEntries', () => {
