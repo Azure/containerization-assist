@@ -6,7 +6,12 @@ import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { validatePathOrFail } from '@/lib/validation-helpers';
-import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo, type DetectedEnvVar } from './schema';
+import {
+  analyzeRepoSchema,
+  type RepositoryAnalysis,
+  type ModuleInfo,
+  type DetectedEnvVar,
+} from './schema';
 import { pluralize } from '@/lib/summary-helpers';
 import { analyzeRepoToolDefinition } from './types';
 import { detectDatabases } from './database-detector';
@@ -33,14 +38,17 @@ const CONFIG_FILE_PATTERN = new RegExp(
   '^(package\\.json|pom\\.xml|build\\.gradle|build\\.gradle\\.kts|' +
     'requirements\\.txt|pyproject\\.toml|Cargo\\.toml|go\\.mod|' +
     'composer\\.json|Gemfile|.*\\.csproj|.*\\.fsproj|.*\\.vbproj|' +
-    'Dockerfile|docker-compose\\.yml|application\\.properties|application\\.yml|' +
+    'Dockerfile|docker-compose\\.ya?ml|application\\.properties|application\\.ya?ml|' +
     '\\.env\\.(?:example|sample|template))$',
 );
 
 /**
  * Scan repository directory and gather file information
  */
-async function gatherRepositoryInfo(repoPath: string, logger: ReturnType<typeof getToolLogger>): Promise<{
+async function gatherRepositoryInfo(
+  repoPath: string,
+  logger: ReturnType<typeof getToolLogger>,
+): Promise<{
   configFiles: Record<string, string>;
   fileList: string[];
   directoryTree: string[];
@@ -84,7 +92,10 @@ async function gatherRepositoryInfo(repoPath: string, logger: ReturnType<typeof 
                 content.length > 1000 ? `${content.substring(0, 1000)}...[truncated]` : content;
             } catch (error) {
               logger.warn(
-                { path: relativePath, error: error instanceof Error ? error.message : String(error) },
+                {
+                  path: relativePath,
+                  error: error instanceof Error ? error.message : String(error),
+                },
                 'Failed to read config file — skipping',
               );
             }
@@ -226,7 +237,10 @@ async function analyzeRepositoryDeterministically(
         envVars.push(...detectEnvVarsFromEnvFile(cfgContent, cfgName));
       } else if (cfgName === 'docker-compose.yml' || cfgName === 'docker-compose.yaml') {
         if (isTruncated) {
-          logger.warn({ file: cfgPath }, 'docker-compose file was truncated — environment variable detection skipped');
+          logger.warn(
+            { file: cfgPath },
+            'docker-compose file was truncated — environment variable detection skipped',
+          );
         } else {
           const composeResult = detectEnvVarsFromDockerCompose(cfgContent, cfgName);
           if (composeResult.warning) {
@@ -236,7 +250,7 @@ async function analyzeRepositoryDeterministically(
         }
       } else if (cfgName === 'application.properties' || cfgName === 'application.yml') {
         // Spring ${VAR} extraction is regex-based so truncation only loses trailing vars
-        envVars.push(...detectEnvVarsFromSpringConfig(cfgContent));
+        envVars.push(...detectEnvVarsFromSpringConfig(cfgContent, cfgName));
       }
     }
 
@@ -333,10 +347,7 @@ async function handleAnalyzeRepo(
     ];
     const dbClause = allDbTypes.length > 0 ? ` Databases: ${allDbTypes.join(', ')}.` : '';
 
-    const totalEnvVars = modules.reduce(
-      (sum, m) => sum + (m.detectedEnvVars?.length ?? 0),
-      0,
-    );
+    const totalEnvVars = modules.reduce((sum, m) => sum + (m.detectedEnvVars?.length ?? 0), 0);
     const envClause = totalEnvVars > 0 ? ` ${pluralize(totalEnvVars, 'env var')} detected.` : '';
 
     const summary = `✅ Analyzed repository at ${repoPath}. Detected ${modulesText}.${isMonorepo ? ' Monorepo structure identified.' : ''}${dbClause}${envClause} Ready for Dockerfile generation.`;

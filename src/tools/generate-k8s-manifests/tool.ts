@@ -435,10 +435,16 @@ const runPattern = createKnowledgeTool<
       ];
 
       // Partition env vars once for manifest decisions and instruction building
-      const { configNames, secretNames } = partitionEnvVarNames(input.detectedEnvVars ?? []);
+      const { configNames, databaseNames, secretNames } = partitionEnvVarNames(
+        input.detectedEnvVars ?? [],
+      );
 
-      // Add configmap if there are ports or config-classified environment variables
-      if ((input.ports && input.ports.length > 0) || configNames.length > 0) {
+      // Add configmap if there are ports, config-classified, or database-classified environment variables
+      if (
+        (input.ports && input.ports.length > 0) ||
+        configNames.length > 0 ||
+        databaseNames.length > 0
+      ) {
         manifestFiles.push({ path: './k8s/configmap.yaml', purpose: 'Configuration management' });
       }
 
@@ -448,9 +454,7 @@ const runPattern = createKnowledgeTool<
       }
 
       // Add serviceaccount if managed database dependencies are detected (for workload identity)
-      const hasDbDeps = input.detectedDatabases?.some((db) =>
-        MANAGED_DB_TYPES.has(db.dbType),
-      );
+      const hasDbDeps = input.detectedDatabases?.some((db) => MANAGED_DB_TYPES.has(db.dbType));
       if (hasDbDeps) {
         manifestFiles.push({
           path: './k8s/serviceaccount.yaml',
@@ -476,16 +480,17 @@ const runPattern = createKnowledgeTool<
         : '';
 
       const workloadIdentityInstruction = hasDbDeps
-        ? " Database dependencies detected — include a ServiceAccount configured for workload identity or cloud IAM integration and reference it from your Deployment/Pod spec via spec.template.spec.serviceAccountName. If you are using Azure Kubernetes Service (AKS), you may also add the appropriate Azure workload identity annotations (for example, azure.workload.identity/client-id) and the pod label azure.workload.identity/use: \"true\". Prefer passwordless authentication using your cloud provider's default credentials (for example, DefaultAzureCredential on Azure) instead of connection-string secrets where possible."
+        ? ' Database dependencies detected — include a ServiceAccount configured for workload identity or cloud IAM integration and reference it from your Deployment/Pod spec via spec.template.spec.serviceAccountName. If you are using Azure Kubernetes Service (AKS), you may also add the appropriate Azure workload identity annotations (for example, azure.workload.identity/client-id) and the pod label azure.workload.identity/use: "true". Prefer passwordless authentication using your cloud provider\'s default credentials (for example, DefaultAzureCredential on Azure) instead of connection-string secrets where possible.'
         : '';
 
       // Build env var instruction for ConfigMap/Secret guidance
       let envVarInstruction = '';
-      if (configNames.length > 0) {
-        envVarInstruction += ` Create ConfigMap with config vars: ${configNames.join(', ')}.`;
+      const allConfigNames = [...configNames, ...databaseNames];
+      if (allConfigNames.length > 0) {
+        envVarInstruction += ` Create a ConfigMap (e.g., app-config) with keys: ${allConfigNames.join(', ')}. Reference it in the Deployment via envFrom with configMapRef or individual env entries with configMapKeyRef.`;
       }
       if (secretNames.length > 0) {
-        envVarInstruction += ` Reference Secrets for secret vars via envFrom: ${secretNames.join(', ')}.`;
+        envVarInstruction += ` Create a Secret (e.g., app-secrets) with keys: ${secretNames.join(', ')}. Reference it in the Deployment via envFrom with secretRef or individual env entries with secretKeyRef.`;
       }
 
       const nextAction: ToolNextAction = {
@@ -645,7 +650,10 @@ async function handleGenerateK8sManifests(
   } else if (input.detectedDatabases.length === 0) {
     logger.debug('detectedDatabases is empty — no databases found by analyze-repo');
   } else {
-    logger.debug({ dbTypes: input.detectedDatabases.map((d) => d.dbType) }, 'Processing detected databases');
+    logger.debug(
+      { dbTypes: input.detectedDatabases.map((d) => d.dbType) },
+      'Processing detected databases',
+    );
   }
 
   // Run the knowledge-based plan generation

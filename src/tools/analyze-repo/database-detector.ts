@@ -107,13 +107,13 @@ const DEP_TO_DB: Record<string, string> = {
 const DEP_PATTERNS: Array<[RegExp, string]> = [
   // PostgreSQL — Java (org.postgresql:*), Go (jackc/pgx variants)
   [/(?:^|:)postgresql(?:$|:)/, 'postgres'],
-  [/org\.postgresql:/, 'postgres'],
+  [/^org\.postgresql:/, 'postgres'],
   [/jackc\/pgx(?:\/|$)/, 'postgres'],
   [/(?:^|\/)lib\/pq(?:$|\/)/, 'postgres'],
 
   // MySQL — Java (com.mysql:mysql-connector-j, mysql:mysql-connector-java)
   [/(?:^|:)mysql[_-]connector/, 'mysql'],
-  [/go-sql-driver\/mysql/, 'mysql'],
+  [/^go-sql-driver\/mysql/, 'mysql'],
 
   // MongoDB — Go full paths
   [/^go\.mongodb\.org\/mongo-driver/, 'mongodb'],
@@ -124,7 +124,7 @@ const DEP_PATTERNS: Array<[RegExp, string]> = [
 
   // MSSQL — Java (com.microsoft.sqlserver:mssql-jdbc)
   [/(?:^|:)mssql-jdbc(?:$|:)/, 'mssql'],
-  [/com\.microsoft\.sqlserver:/, 'mssql'],
+  [/^com\.microsoft\.sqlserver:/, 'mssql'],
 
   // .NET EF providers (case-insensitive via lowercased input)
   [/entityframeworkcore\.sqlserver/, 'mssql'],

@@ -96,7 +96,7 @@ export function envVarCheckStep(): Step {
       '  1. Confirm the classifications (secret, database, config) are correct.',
       '  2. For secret-classified vars, confirm they will be injected at runtime (not baked into the image).',
       '  3. For config-classified vars, confirm default values or ask for correct values.',
-      '- Pass the confirmed `detectedEnvVars` to downstream tools (generate-dockerfile, generate-k8s-manifests).',
+      `- Pass the confirmed \`detectedEnvVars\` to downstream tools (**${TOOL_NAME.GENERATE_DOCKERFILE}**, **${TOOL_NAME.GENERATE_K8S_MANIFESTS}**).`,
       '- If no modules have any detected environment variables, skip this step.',
     ].join('\n'),
   };
