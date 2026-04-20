@@ -1,5 +1,13 @@
 # Change Log
 
+## [1.4.0]
+
+- add context support to scan-image tool (#628)
+- add policy evaluation and creation tool (#631)
+- add GitHub Pages documentation site (#624)
+- add GitHub Action ref validation with CI and husky pre-commit (#629)
+- dependency updates (#634, #648, #635, #641, #632, #645, #639, #642, #643, #644, #640, #623)
+
 ## [1.3.2]
 
 - add MCP prompts for local Kind and AKS loop
