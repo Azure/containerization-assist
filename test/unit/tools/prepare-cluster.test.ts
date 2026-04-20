@@ -134,7 +134,7 @@ jest.mock('node:util', () => {
             if (cmd.includes('curl') && cmd.includes('/v2/')) {
               return { stdout: '{}', stderr: '' };
             }
-                // Handle docker network connect
+            // Handle docker network connect
             if (cmd.includes('docker network connect')) {
               return { stdout: '', stderr: '' };
             }
