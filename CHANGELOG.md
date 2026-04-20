@@ -2,8 +2,9 @@
 
 ## [1.4.0]
 
+- convert MCP prompts (kind-loop, aks-loop, create-containerization-policy) to workflow tools for collapsed output in chat (#631)
 - add context support to scan-image tool (#628)
-- add policy evaluation and creation tool (#631)
+- restructure policy discovery to 4-tier model with XDG and git-root support (#631)
 - add GitHub Pages documentation site (#624)
 - add GitHub Action ref validation with CI and husky pre-commit (#629)
 - dependency updates (#634, #648, #635, #641, #632, #645, #639, #642, #643, #644, #640, #623)
