@@ -116,7 +116,7 @@ spec:
       break;
     } catch {
       if (i === 29) throw new Error('Timed out waiting for default ServiceAccount');
-      execSync('sleep 1');
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
   execSync('kubectl apply -f test-pod.yaml', { stdio: 'inherit' });
