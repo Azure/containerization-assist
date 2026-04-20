@@ -109,7 +109,16 @@ spec:
 
   // Step 6: Apply pod manifest
   console.log('\nStep 6: Applying pod to cluster...');
-  execSync('kubectl wait --for=jsonpath=.metadata.name=default serviceaccount/default -n default --timeout=30s', { stdio: 'inherit' });
+  // Wait for default ServiceAccount to be auto-created in the namespace
+  for (let i = 0; i < 30; i++) {
+    try {
+      execSync('kubectl get serviceaccount default -n default', { stdio: 'pipe' });
+      break;
+    } catch {
+      if (i === 29) throw new Error('Timed out waiting for default ServiceAccount');
+      execSync('sleep 1');
+    }
+  }
   execSync('kubectl apply -f test-pod.yaml', { stdio: 'inherit' });
   console.log('✅ Pod applied');
 
