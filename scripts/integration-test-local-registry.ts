@@ -52,10 +52,9 @@ async function main() {
 
   const registry = prepareResult.value.localRegistry;
   console.log('   Registry healthy:', registry.healthy);
-  console.log('   Reachable from cluster:', registry.reachableFromCluster);
 
-  if (!registry.reachableFromCluster) {
-    console.error('❌ Registry not reachable from cluster');
+  if (!registry.healthy) {
+    console.error('❌ Registry is not healthy');
     process.exit(1);
   }
 
