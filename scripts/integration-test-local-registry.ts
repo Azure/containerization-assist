@@ -109,6 +109,7 @@ spec:
 
   // Step 6: Apply pod manifest
   console.log('\nStep 6: Applying pod to cluster...');
+  execSync('kubectl wait --for=jsonpath=.metadata.name=default serviceaccount/default -n default --timeout=30s', { stdio: 'inherit' });
   execSync('kubectl apply -f test-pod.yaml', { stdio: 'inherit' });
   console.log('✅ Pod applied');
 
