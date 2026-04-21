@@ -130,19 +130,9 @@ jest.mock('node:util', () => {
             if (cmd.includes('kubectl get nodes --no-headers')) {
               return { stdout: 'node1   Ready   control-plane   1m   v1.27.3\n', stderr: '' };
             }
-            if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
-              return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
-            }
-            if (cmd.includes('kubectl run') && cmd.includes('curl')) {
-              return { stdout: 'success', stderr: '' };
-            }
-            // Handle curl health checks - MUST come after kubectl run checks to avoid false matches
+            // Handle curl health checks
             if (cmd.includes('curl') && cmd.includes('/v2/')) {
               return { stdout: '{}', stderr: '' };
-            }
-            // Handle kubectl delete pod for test cleanup
-            if (cmd.includes('kubectl delete pod')) {
-              return { stdout: '', stderr: '' };
             }
             // Handle docker network connect
             if (cmd.includes('docker network connect')) {
@@ -348,21 +338,9 @@ describe('prepareCluster', () => {
         if (cmd.includes('kubectl get nodes --no-headers')) {
           return { stdout: 'node1   Ready   control-plane   1m   v1.27.3\n', stderr: '' };
         }
-        // Handle DNS resolution test (matches registry-dns-test-<timestamp>)
-        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
-          return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
-        }
-        // Handle registry reachability test with curl (matches registry-test-<timestamp>)
-        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
-          return { stdout: 'success', stderr: '' };
-        }
-        // Handle curl health checks - MUST come after kubectl run checks to avoid false matches
+        // Handle curl health checks
         if (cmd.includes('curl') && cmd.includes('/v2/')) {
           return { stdout: '{}', stderr: '' };
-        }
-        // Handle kubectl delete pod for test cleanup
-        if (cmd.includes('kubectl delete pod')) {
-          return { stdout: '', stderr: '' };
         }
         // Handle docker network connect
         if (cmd.includes('docker network connect')) {
@@ -411,78 +389,7 @@ describe('prepareCluster', () => {
           expect(result.value.localRegistry.internalEndpoint).toBe('ca-registry:5000');
           expect(result.value.localRegistry.containerName).toBe('ca-registry');
           expect(result.value.localRegistry.healthy).toBe(true);
-          expect(result.value.localRegistry.reachableFromCluster).toBe(true);
         }
-      }
-    });
-
-    it('should validate registry DNS resolution', async () => {
-      const mockContext = createMockToolContext();
-      const result = await prepareCluster(devConfig, mockContext);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        // Should not have DNS warnings when DNS resolution succeeds
-        expect(result.value.warnings?.some(w => w.includes('DNS resolution failed'))).toBeFalsy();
-      }
-    });
-
-    it('should warn when registry DNS resolution fails', async () => {
-      // Mock DNS resolution failure
-      (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
-        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
-          return { stdout: 'DNS_FAILED', stderr: '' };
-        }
-        // Keep other mocks working
-        if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
-          return { stdout: 'amd64', stderr: '' };
-        }
-        if (cmd.includes('kind get clusters')) {
-          return { stdout: 'containerization-assist\n', stderr: '' };
-        }
-        if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
-          return { stdout: 'ca-registry\n', stderr: '' };
-        }
-        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
-          return { stdout: 'success', stderr: '' };
-        }
-        // Handle curl health checks - MUST come after kubectl run checks to avoid false matches
-        if (cmd.includes('curl') && cmd.includes('/v2/')) {
-          return { stdout: '{}', stderr: '' };
-        }
-        // Handle kubectl delete pod for test cleanup
-        if (cmd.includes('kubectl delete pod')) {
-          return { stdout: '', stderr: '' };
-        }
-        // Handle docker network connect
-        if (cmd.includes('docker network connect')) {
-          return { stdout: '', stderr: '' };
-        }
-        if (cmd.includes('docker inspect ca-registry') && cmd.includes('State.Status')) {
-          return { stdout: 'running', stderr: '' };
-        }
-        if (cmd.includes('docker network ls')) {
-          return { stdout: 'kind\n', stderr: '' };
-        }
-        if (cmd.includes('docker exec') && cmd.includes('config.toml')) {
-          return {
-            stdout: `
-[plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:6000"]
-  endpoint = ["http://ca-registry:5000"]
-`,
-            stderr: '',
-          };
-        }
-        return { stdout: '', stderr: '' };
-      });
-
-      const mockContext = createMockToolContext();
-      const result = await prepareCluster(devConfig, mockContext);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.warnings).toBeDefined();
-        expect(result.value.warnings?.some(w => w.includes('DNS resolution failed'))).toBe(true);
       }
     });
 
@@ -514,16 +421,9 @@ describe('prepareCluster', () => {
         if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
           return { stdout: 'ca-registry\n', stderr: '' };
         }
-        if (cmd.includes('kubectl run')) {
-          return { stdout: 'success\nDNS_SUCCESS', stderr: '' };
-        }
-        // Handle curl health checks - MUST come after kubectl run checks to avoid false matches
+        // Handle curl health checks
         if (cmd.includes('curl') && cmd.includes('/v2/')) {
           return { stdout: '{}', stderr: '' };
-        }
-        // Handle kubectl delete pod for test cleanup
-        if (cmd.includes('kubectl delete pod')) {
-          return { stdout: '', stderr: '' };
         }
         // Handle docker network connect
         if (cmd.includes('docker network connect')) {
@@ -576,21 +476,9 @@ describe('prepareCluster', () => {
         if (cmd.includes('docker network ls')) {
           return { stdout: 'kind\n', stderr: '' };
         }
-        // Handle DNS resolution test (matches registry-dns-test-<timestamp>)
-        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
-          return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
-        }
-        // Handle registry reachability test with curl (matches registry-test-<timestamp>)
-        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
-          return { stdout: 'success', stderr: '' };
-        }
-        // Handle curl health checks - MUST come after kubectl run checks to avoid false matches
+        // Handle curl health checks
         if (cmd.includes('curl') && cmd.includes('/v2/')) {
           return { stdout: '{}', stderr: '' };
-        }
-        // Handle kubectl delete pod for test cleanup
-        if (cmd.includes('kubectl delete pod')) {
-          return { stdout: '', stderr: '' };
         }
         // Handle docker network connect
         if (cmd.includes('docker network connect')) {
@@ -643,15 +531,7 @@ describe('prepareCluster', () => {
         if (cmd.includes('docker network ls')) {
           return { stdout: 'kind\n', stderr: '' };
         }
-        // Handle DNS resolution test (matches registry-dns-test-<timestamp>)
-        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
-          return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
-        }
-        // Handle registry reachability test with curl (matches registry-test-<timestamp>)
-        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
-          return { stdout: 'success', stderr: '' };
-        }
-        // Handle curl health checks - MUST come after kubectl run checks to avoid false matches
+        // Handle curl health checks
         if (cmd.includes('curl') && cmd.includes('/v2/')) {
           healthCheckAttempts++;
           // Fail first 2 attempts, succeed on 3rd
@@ -659,10 +539,6 @@ describe('prepareCluster', () => {
             return { stdout: 'failed', stderr: '' };
           }
           return { stdout: '{}', stderr: '' };
-        }
-        // Handle kubectl delete pod for test cleanup
-        if (cmd.includes('kubectl delete pod')) {
-          return { stdout: '', stderr: '' };
         }
         // Handle docker network connect
         if (cmd.includes('docker network connect')) {
@@ -757,17 +633,8 @@ describe('prepareCluster', () => {
         if (cmd.includes('kubectl get nodes --no-headers')) {
           return { stdout: 'node1   Ready   control-plane   1m   v1.27.3\n', stderr: '' };
         }
-        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
-          return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
-        }
-        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
-          return { stdout: 'success', stderr: '' };
-        }
         if (cmd.includes('curl') && cmd.includes('/v2/')) {
           return { stdout: '{}', stderr: '' };
-        }
-        if (cmd.includes('kubectl delete pod')) {
-          return { stdout: '', stderr: '' };
         }
         if (cmd.includes('docker network connect')) {
           return { stdout: '', stderr: '' };
@@ -865,17 +732,8 @@ describe('prepareCluster', () => {
         if (cmd.includes('kubectl get nodes --no-headers')) {
           return { stdout: 'node1   Ready   control-plane   1m   v1.27.3\n', stderr: '' };
         }
-        if (cmd.includes('kubectl run') && cmd.includes('nslookup')) {
-          return { stdout: 'Address 1: 172.18.0.3 ca-registry\nDNS_SUCCESS', stderr: '' };
-        }
-        if (cmd.includes('kubectl run') && cmd.includes('curl')) {
-          return { stdout: 'success', stderr: '' };
-        }
         if (cmd.includes('curl') && cmd.includes('/v2/')) {
           return { stdout: '{}', stderr: '' };
-        }
-        if (cmd.includes('kubectl delete pod')) {
-          return { stdout: '', stderr: '' };
         }
         if (cmd.includes('docker network connect')) {
           return { stdout: '', stderr: '' };
