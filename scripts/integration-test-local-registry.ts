@@ -52,10 +52,9 @@ async function main() {
 
   const registry = prepareResult.value.localRegistry;
   console.log('   Registry healthy:', registry.healthy);
-  console.log('   Reachable from cluster:', registry.reachableFromCluster);
 
-  if (!registry.reachableFromCluster) {
-    console.error('❌ Registry not reachable from cluster');
+  if (!registry.healthy) {
+    console.error('❌ Registry is not healthy');
     process.exit(1);
   }
 
@@ -110,6 +109,16 @@ spec:
 
   // Step 6: Apply pod manifest
   console.log('\nStep 6: Applying pod to cluster...');
+  // Wait for default ServiceAccount to be auto-created in the namespace
+  for (let i = 0; i < 30; i++) {
+    try {
+      execSync('kubectl get serviceaccount default -n default', { stdio: 'pipe' });
+      break;
+    } catch {
+      if (i === 29) throw new Error('Timed out waiting for default ServiceAccount');
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
   execSync('kubectl apply -f test-pod.yaml', { stdio: 'inherit' });
   console.log('✅ Pod applied');
 

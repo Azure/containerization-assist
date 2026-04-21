@@ -1064,15 +1064,11 @@ export function formatPrepareClusterNarrative(
   if (result.localRegistry) {
     parts.push(`\n**Local Registry Details:**`);
     const healthIcon = result.localRegistry.healthy ? '✅' : '⚠️';
-    const reachableIcon = result.localRegistry.reachableFromCluster ? '✅' : '⚠️';
     parts.push(`  External URL: ${result.localRegistry.externalUrl}`);
     parts.push(`  Internal Endpoint: ${result.localRegistry.internalEndpoint}`);
     parts.push(`  Container Name: ${result.localRegistry.containerName}`);
     parts.push(
       `  Health Status: ${healthIcon} ${result.localRegistry.healthy ? 'Healthy' : 'Unhealthy'}`,
-    );
-    parts.push(
-      `  Reachable from Cluster: ${reachableIcon} ${result.localRegistry.reachableFromCluster ? 'Yes' : 'No'}`,
     );
   }
 
