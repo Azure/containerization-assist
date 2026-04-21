@@ -324,7 +324,7 @@ Additionally, severity affects scoring:
 - **Knowledge Schema:** `src/knowledge/schemas.ts`
 - **Knowledge Types:** `src/knowledge/types.ts`
 - **Sample Packs:** `knowledge/packs/`
-- **Project Guidelines:** `CLAUDE.md`
+- **Project Guidelines:** See [`README.md`](../../README.md) and [`CONTRIBUTING.md`](../../CONTRIBUTING.md) in the repository root
 
 ## Contributing
 

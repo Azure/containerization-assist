@@ -1,6 +1,6 @@
 # Containerization Assist - MCP Integration Examples
 
-This directory contains integration patterns for using Container Assist tools in your own MCP server.
+Integration patterns for using Container Assist tools in your own MCP server.
 
 ## Examples
 
@@ -20,7 +20,7 @@ This directory contains integration patterns for using Container Assist tools in
 
 **[mcp-integration-with-telemetry.ts](./mcp-integration-with-telemetry.ts)** - Advanced integration with telemetry hooks:
 - Use `createToolHandler()` for fine-grained control over tool registration
-- **✨ NEW: Full TypeScript type safety** - Strongly-typed params and results in callbacks
+- **Full TypeScript type safety** - Strongly-typed params and results in callbacks
 - Add custom telemetry tracking for tool executions
 - Implement error reporting and monitoring
 - Track performance metrics and success rates
@@ -234,4 +234,3 @@ npx tsc --noEmit docs/examples/*.ts
 ## More Information
 
 - [Main README](../../README.md) - Installation and usage guide
-- [CLAUDE.md](../../CLAUDE.md) - Development guidelines

@@ -23,8 +23,15 @@ import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 import { loadAndMergeRegoPolicies, type RegoEvaluator } from '@/config/policy-rego';
 import { readdirSync, existsSync, statSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
-import { ENV_VARS } from '@/config/constants';
+import { join, resolve } from 'node:path';
+import os from 'node:os';
+import {
+  ENV_VARS,
+  POLICY_GLOBAL_APP_NAME,
+  POLICY_LEGACY_DIR,
+  POLICY_PROJECT_DIR,
+  POLICY_SUBDIR,
+} from '@/config/constants';
 
 // Capture import.meta.url at module scope (only available in ESM builds)
 // This will be undefined in CJS builds, which is expected
@@ -70,25 +77,52 @@ export function discoverBuiltInPolicies(logger: Logger): string[] {
   }
 }
 
-/**
- * Discover policies in policies.user/ directory (source installation)
- * Returns paths to all .rego files (excluding test files)
- */
-export function discoverUserPolicies(logger: Logger): string[] {
-  try {
-    // Search upward for policies.user directory (similar to built-in search)
-    let currentDir = process.cwd();
-    let policiesUserDir = join(currentDir, 'policies.user');
-    let attempts = 0;
-    const maxAttempts = 5;
+export interface DiscoveredPolicy {
+  path: string;
+  source: 'built-in' | 'global' | 'project' | 'legacy' | 'custom';
+}
 
-    while (!existsSync(policiesUserDir) && attempts < maxAttempts) {
-      const parentDir = dirname(currentDir);
-      if (parentDir === currentDir) break;
-      currentDir = parentDir;
-      policiesUserDir = join(currentDir, 'policies.user');
-      attempts++;
+let deprecationWarned = false;
+
+export function discoverGlobalPolicies(logger: Logger): string[] {
+  try {
+    const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(os.homedir(), '.config');
+    const globalPolicyDir = join(xdgConfigHome, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+
+    if (!existsSync(globalPolicyDir)) {
+      return [];
     }
+
+    return readdirSync(globalPolicyDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(globalPolicyDir, file)));
+  } catch (error) {
+    logger.warn({ error }, 'Failed to discover global policies');
+    return [];
+  }
+}
+
+export function discoverProjectPolicies(logger: Logger, workspacePath?: string): string[] {
+  try {
+    const baseDir = workspacePath || process.cwd();
+    const projectPolicyDir = join(baseDir, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+    if (!existsSync(projectPolicyDir)) {
+      return [];
+    }
+
+    return readdirSync(projectPolicyDir)
+      .filter((file) => file.endsWith('.rego') && !file.endsWith('_test.rego'))
+      .map((file) => resolve(join(projectPolicyDir, file)));
+  } catch (error) {
+    logger.warn({ error }, 'Failed to discover project policies');
+    return [];
+  }
+}
+
+export function discoverUserPolicies(logger: Logger, workspacePath?: string): string[] {
+  try {
+    const baseDir = workspacePath || process.cwd();
+    const policiesUserDir = join(baseDir, POLICY_LEGACY_DIR);
 
     if (!existsSync(policiesUserDir)) {
       return [];
@@ -101,13 +135,20 @@ export function discoverUserPolicies(logger: Logger): string[] {
     if (files.length > 0) {
       logger.info(
         { policiesUserDir, count: files.length },
-        'Discovered user policies from policies.user/',
+        'Discovered user policies from legacy directory',
       );
+
+      if (!deprecationWarned) {
+        logger.warn(
+          'policies.user/ is deprecated. Move policies to .containerization-assist/policy/ at your project root, or ~/.config/containerization-assist/policy/ for global policies.',
+        );
+        deprecationWarned = true;
+      }
     }
 
     return files;
   } catch (error) {
-    logger.warn({ error }, 'Failed to discover policies.user/ policies');
+    logger.warn({ error }, 'Failed to discover legacy user policies');
     return [];
   }
 }
@@ -151,30 +192,95 @@ export function discoverCustomPolicies(customPath: string, logger: Logger): stri
   }
 }
 
+export interface PolicySearchPath {
+  path: string;
+  source: DiscoveredPolicy['source'];
+  exists: boolean;
+}
+
 /**
- * Discover policy files with priority-ordered search paths:
- * 1. Built-in policies/ directory (lowest priority)
- * 2. policies.user/ directory (middle priority - source installation users)
- * 3. Custom directory via CUSTOM_POLICY_PATH (highest priority - NPM users)
- *
- * Returns array of policy paths, with higher priority policies later
- * (later policies override earlier ones during merging)
+ * Return all policy search directories with existence status.
+ * Unlike discoverPolicies (which scans for .rego files), this returns
+ * the directories themselves so users can see where to place policies.
  */
-export function discoverPolicies(logger: Logger): string[] {
-  const allPolicies: string[] = [];
+export function getPolicySearchPaths(logger: Logger, workspacePath?: string): PolicySearchPath[] {
+  const paths: PolicySearchPath[] = [];
 
-  // Priority 3 (lowest): Built-in policies
-  const builtInPolicies = discoverBuiltInPolicies(logger);
-  allPolicies.push(...builtInPolicies);
+  // Built-in policies directory
+  const builtInSearchPaths = resolveModulePaths({
+    relativePath: 'policies',
+    logger,
+    ...(MODULE_URL && { moduleUrl: MODULE_URL }),
+  });
+  const builtInDir = builtInSearchPaths.find((p) => existsSync(p)) ?? builtInSearchPaths[0];
+  if (builtInDir) {
+    paths.push({ path: builtInDir, source: 'built-in', exists: existsSync(builtInDir) });
+  }
 
-  // Priority 2: policies.user/ directory (source installation)
-  const userPolicies = discoverUserPolicies(logger);
-  allPolicies.push(...userPolicies);
+  // Global policies directory
+  try {
+    const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(os.homedir(), '.config');
+    const globalPolicyDir = join(xdgConfigHome, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+    paths.push({ path: globalPolicyDir, source: 'global', exists: existsSync(globalPolicyDir) });
+  } catch {
+    // os.homedir() can throw on misconfigured systems — skip global path
+  }
 
-  // Priority 1 (highest): Custom directory via env var
+  // Project policies directory
+  const projectBaseDir = workspacePath || process.cwd();
+  const projectPolicyDir = join(projectBaseDir, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+  paths.push({ path: projectPolicyDir, source: 'project', exists: existsSync(projectPolicyDir) });
+
+  // Legacy policies directory (workspacePath only, no walk-up)
+  const legacyBaseDir = workspacePath || process.cwd();
+  const legacyDir = join(legacyBaseDir, POLICY_LEGACY_DIR);
+  if (existsSync(legacyDir)) {
+    paths.push({ path: legacyDir, source: 'legacy', exists: true });
+  }
+
+  // Custom policy path (env var)
   const customPath = process.env[ENV_VARS.CUSTOM_POLICY_PATH];
   if (customPath) {
-    const customPolicies = discoverCustomPolicies(customPath, logger);
+    const resolvedCustom = resolve(customPath);
+    paths.push({ path: resolvedCustom, source: 'custom', exists: existsSync(resolvedCustom) });
+  }
+
+  return paths;
+}
+export function discoverPolicies(logger: Logger, workspacePath?: string): DiscoveredPolicy[] {
+  const allPolicies: DiscoveredPolicy[] = [];
+
+  // Priority 3 (lowest): Built-in policies
+  const builtInPolicies = discoverBuiltInPolicies(logger).map((policyPath) => ({
+    path: policyPath,
+    source: 'built-in' as const,
+  }));
+  allPolicies.push(...builtInPolicies);
+
+  const globalPolicies = discoverGlobalPolicies(logger).map((policyPath) => ({
+    path: policyPath,
+    source: 'global' as const,
+  }));
+  allPolicies.push(...globalPolicies);
+
+  const projectPolicies = discoverProjectPolicies(logger, workspacePath).map((policyPath) => ({
+    path: policyPath,
+    source: 'project' as const,
+  }));
+  allPolicies.push(...projectPolicies);
+
+  const userPolicies = discoverUserPolicies(logger, workspacePath).map((policyPath) => ({
+    path: policyPath,
+    source: 'legacy' as const,
+  }));
+  allPolicies.push(...userPolicies);
+
+  const customPath = process.env[ENV_VARS.CUSTOM_POLICY_PATH];
+  if (customPath) {
+    const customPolicies = discoverCustomPolicies(customPath, logger).map((policyPath) => ({
+      path: policyPath,
+      source: 'custom' as const,
+    }));
     if (customPolicies.length > 0) {
       logger.info(
         { path: customPath, count: customPolicies.length },
@@ -185,6 +291,10 @@ export function discoverPolicies(logger: Logger): string[] {
   }
 
   return allPolicies;
+}
+
+export function discoverPolicyPaths(logger: Logger, workspacePath?: string): string[] {
+  return discoverPolicies(logger, workspacePath).map((policy) => policy.path);
 }
 
 /**
@@ -256,9 +366,13 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
   logger.info('createOrchestrator called - policy loading will happen on first tool execution');
 
-  // Cache the loaded policy to avoid reloading on every execution
+  // Policy cache with change detection
+  // Re-discovers policy files on each execution, but only reloads if the set of files changed
+  // Fingerprint includes file paths + mtime/size so in-place edits are detected
   let policyCache: RegoEvaluator | undefined;
+  let cachedPolicyFingerprint: string | undefined;
   let policyLoadPromise: Promise<void> | undefined;
+  let policyLoadGeneration = 0;
 
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     const { toolName } = request;
@@ -275,55 +389,88 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
     logger.info({ toolName, hasPolicyPromise: !!policyLoadPromise }, 'Orchestrator execute called');
 
-    // Load policies once (with Promise-based guard to prevent race conditions)
-    if (!policyLoadPromise) {
-      policyLoadPromise = (async () => {
-        try {
-          // Use new priority-ordered discovery (includes built-in, user, and custom policies)
-          const policyPaths = discoverPolicies(logger);
+    // Extract workspacePath from params (with repositoryPath fallback for project policy discovery)
+    const params = request.params as Record<string, unknown> | undefined;
+    const workspacePath = (params?.workspacePath as string) ?? (params?.repositoryPath as string) ?? undefined;
 
-          if (policyPaths.length === 0) {
-            logger.warn(
-              { cwd: process.cwd() },
-              'No policies discovered - tools will run without policy constraints',
-            );
-            return; // Not an error, just no policies available
+    // Discover policies on every execution and reload if files changed
+    const discoveredPolicies = discoverPolicies(logger, workspacePath);
+    const policyPaths = discoveredPolicies.map((policy) => policy.path);
+    // Build fingerprint from paths + file metadata (mtime/size) so in-place edits are detected
+    const fileMeta = policyPaths.map((p) => {
+      try {
+        const s = statSync(p);
+        return `${p}:${s.mtimeMs}:${s.size}`;
+      } catch {
+        return `${p}:missing`;
+      }
+    });
+    const fingerprint = [workspacePath ?? '', ...fileMeta.sort()].join('\n');
+    const policiesChanged = fingerprint !== cachedPolicyFingerprint;
+
+    if (policiesChanged) {
+      // Reset cached state so we reload
+      if (policyCache) {
+        policyCache.close();
+        policyCache = undefined;
+      }
+      policyLoadPromise = undefined;
+      cachedPolicyFingerprint = fingerprint;
+
+      if (policyPaths.length === 0) {
+        logger.info(
+          { cwd: process.cwd() },
+          'No policies discovered - tools will run without policy constraints',
+        );
+      } else {
+        logger.info(
+          {
+            count: policyPaths.length,
+            paths: policyPaths,
+            sources: discoveredPolicies.map((policy) => policy.source),
+          },
+          'Policy files changed, reloading...',
+        );
+
+        const thisGeneration = ++policyLoadGeneration;
+
+        policyLoadPromise = (async () => {
+          try {
+            const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
+
+            // Only write cache if no newer generation has started
+            if (thisGeneration !== policyLoadGeneration) {
+              logger.info('Policy load superseded by newer generation, discarding result');
+              if (policyResult.ok) {
+                policyResult.value.close();
+              }
+              return;
+            }
+
+            if (policyResult.ok) {
+              policyCache = policyResult.value;
+              logger.info(
+                { total: policyPaths.length, policyPaths },
+                'Policies loaded and merged successfully',
+              );
+            } else {
+              // Reset fingerprint so next execution retries the load
+              cachedPolicyFingerprint = undefined;
+              logger.error(
+                { error: policyResult.error },
+                'Failed to load policies - will retry on next tool execution',
+              );
+            }
+          } catch (error) {
+            // Reset fingerprint to allow retry on next execution
+            cachedPolicyFingerprint = undefined;
+            policyLoadPromise = undefined;
+
+            logger.error({ error }, 'Failed to load policies - will retry on next tool execution');
+            throw error;
           }
-
-          logger.info(
-            { count: policyPaths.length, paths: policyPaths },
-            'Discovered policies, loading...',
-          );
-
-          const policyResult = await loadAndMergeRegoPolicies(policyPaths, logger);
-
-          if (policyResult.ok) {
-            policyCache = policyResult.value;
-            logger.info(
-              {
-                total: policyPaths.length,
-                policyPaths,
-              },
-              'Policies loaded and merged successfully',
-            );
-          } else {
-            logger.error(
-              { error: policyResult.error },
-              'Failed to load policies - tools will run without policy constraints',
-            );
-            // Note: We don't throw here, tools can still run without policies
-            // But we log clearly that policies are not available
-          }
-        } catch (error) {
-          // Reset promise to allow retry on next execution
-          policyLoadPromise = undefined;
-
-          logger.error({ error }, 'Failed to load policies - will retry on next tool execution');
-
-          // Re-throw to signal failure
-          throw error;
-        }
-      })();
+        })();
+      }
     }
 
     // Wait for policy loading to complete if in progress

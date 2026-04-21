@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { repositoryPath, analysisOptions } from '../shared/schemas';
+import { repositoryPath, workspacePath, analysisOptions } from '../shared/schemas';
 
 const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
@@ -47,6 +47,7 @@ export type ModuleInfo = z.infer<typeof moduleInfo>;
 
 export const analyzeRepoSchema = z.object({
   repositoryPath,
+  workspacePath: workspacePath.optional(),
   ...analysisOptions,
   modules: z
     .array(moduleInfo)

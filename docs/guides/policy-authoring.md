@@ -1,25 +1,7 @@
 # Policy Authoring Guide
 
-**Version:** 3.0.0
-**Last Updated:** Sprint 5
-**Audience:** Platform engineers, DevOps teams, policy authors
+Write custom OPA Rego policies to control Dockerfile generation, Kubernetes manifests, and security enforcement in containerization-assist.
 
-This guide provides comprehensive documentation on writing custom policies for containerization-assist using OPA Rego.
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Template Injection (Sprint 3)](#template-injection-sprint-3-)
-3. [Policy Architecture](#policy-architecture)
-4. [Phase-by-Phase Guide](#phase-by-phase-guide)
-5. [Schema Reference](#schema-reference)
-6. [Best Practices](#best-practices)
-7. [Debugging](#debugging)
-8. [Common Pitfalls](#common-pitfalls)
-
----
 
 ## Overview
 
@@ -75,9 +57,9 @@ my-policy_test.rego     # OPA test suite (required)
 
 ---
 
-## Template Injection (Sprint 3) ✅
+## Template Injection
 
-Template injection is now fully functional and tested. Templates allow you to automatically inject organizational standards into generated artifacts.
+Template injection allows you to automatically inject organizational standards into generated artifacts.
 
 ### Quick Start
 
@@ -115,7 +97,6 @@ Template injection is now fully functional and tested. Templates allow you to au
 
 For complete examples, see:
 - [Template Injection Examples](../examples/template-injection-example.md)
-- [Production Templates](../../policies.user.examples/production-ready/)
 
 ---
 
@@ -813,20 +794,14 @@ knowledge_filtering contains filter if {
 
 - [OPA Documentation](https://www.openpolicyagent.org/docs/latest/)
 - [Rego Style Guide](https://www.openpolicyagent.org/docs/latest/policy-language/)
-- [Production-Ready Examples](../../policies.user.examples/production-ready/)
+- [Policy Examples](https://github.com/Azure/containerization-assist/tree/main/policies.user.examples)
 - [Migration Guide](./policy-migration-v3.md)
-- [Sprint 5 Plan](../sprints/sprint-5.md)
 
 ---
 
 ## Support
 
-- GitHub Issues: [Report bugs](https://github.com/your-org/containerization-assist/issues)
-- Discussions: [Ask questions](https://github.com/your-org/containerization-assist/discussions)
-- Internal Wiki: Link to your organization's internal documentation
+- GitHub Issues: [Report bugs](https://github.com/Azure/containerization-assist/issues)
+- Discussions: [Ask questions](https://github.com/Azure/containerization-assist/discussions)
+- Internal: See your organization's internal wiki for organization-specific policy guidance, if available
 
----
-
-**Version:** 3.0.0
-**Last Updated:** Sprint 5
-**License:** MIT

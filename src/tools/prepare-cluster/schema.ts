@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { environmentSchema } from '@/config/constants';
-import { platform } from '../shared/schemas';
+import { platform, workspacePath } from '../shared/schemas';
 
 /**
  * Cluster type determines infrastructure setup behavior.
@@ -18,6 +18,7 @@ export type ClusterType = z.infer<typeof clusterTypeSchema>;
 
 export const prepareClusterSchema = z.object({
   clusterType: clusterTypeSchema,
+  workspacePath: workspacePath.optional(),
   environment: environmentSchema
     .optional()
     .describe(

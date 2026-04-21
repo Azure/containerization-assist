@@ -1064,15 +1064,11 @@ export function formatPrepareClusterNarrative(
   if (result.localRegistry) {
     parts.push(`\n**Local Registry Details:**`);
     const healthIcon = result.localRegistry.healthy ? '✅' : '⚠️';
-    const reachableIcon = result.localRegistry.reachableFromCluster ? '✅' : '⚠️';
     parts.push(`  External URL: ${result.localRegistry.externalUrl}`);
     parts.push(`  Internal Endpoint: ${result.localRegistry.internalEndpoint}`);
     parts.push(`  Container Name: ${result.localRegistry.containerName}`);
     parts.push(
       `  Health Status: ${healthIcon} ${result.localRegistry.healthy ? 'Healthy' : 'Unhealthy'}`,
-    );
-    parts.push(
-      `  Reachable from Cluster: ${reachableIcon} ${result.localRegistry.reachableFromCluster ? 'Yes' : 'No'}`,
     );
   }
 
@@ -1202,6 +1198,23 @@ export function formatOpsStatusNarrative(result: ServerStatusResult): string {
   // Tools
   if (result.tools) {
     parts.push(`\n**Tools Available:** ${result.tools.count}`);
+  }
+
+  // Policies
+  if (result.policies) {
+    parts.push(`\n**Policies Loaded:** ${result.policies.total}`);
+    if (result.policies.files.length > 0) {
+      for (const file of result.policies.files) {
+        parts.push(`  - \`${file.path}\` (${file.source})`);
+      }
+    }
+    if (result.policies.searchPaths && result.policies.searchPaths.length > 0) {
+      parts.push(`\n**Policy Search Paths:**`);
+      for (const sp of result.policies.searchPaths) {
+        const status = sp.exists ? '✅' : '⚠️ not found';
+        parts.push(`  - \`${sp.path}\` (${sp.source}) ${status}`);
+      }
+    }
   }
 
   // Health summary

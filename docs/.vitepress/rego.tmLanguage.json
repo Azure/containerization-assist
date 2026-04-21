@@ -1,0 +1,116 @@
+{
+  "name": "rego",
+  "scopeName": "source.rego",
+  "fileTypes": ["rego"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#keyword" },
+    { "include": "#comparison-operators" },
+    { "include": "#assignment-operators" },
+    { "include": "#term" }
+  ],
+  "repository": {
+    "call": {
+      "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\(",
+      "name": "meta.function-call.rego",
+      "captures": {
+        "1": { "name": "support.function.any-method.rego" }
+      }
+    },
+    "comment": {
+      "patterns": [
+        {
+          "match": "(#)\\s*(METADATA)\\s*$\\n?",
+          "name": "comment.line.number-sign.rego",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.rego" },
+            "2": { "name": "strong" }
+          }
+        },
+        {
+          "match": "(#)\\s*(scope|title|description|related_resources|authors|organizations|schemas|entrypoint|custom):.*$\\n?",
+          "name": "comment.line.number-sign.rego",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.rego" },
+            "2": { "name": "strong" }
+          }
+        },
+        {
+          "match": "(#).*$\\n?",
+          "name": "comment.line.number-sign.rego",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.rego" }
+          }
+        }
+      ]
+    },
+    "constant": {
+      "match": "\\b(?:true|false|null)\\b",
+      "name": "constant.language.rego"
+    },
+    "root-document": {
+      "match": "(?<!\\.)\\b(?:input|data)\\b",
+      "name": "variable.language.rego"
+    },
+    "keyword": {
+      "match": "(^|\\s+)(?:(default|not|package|import|as|with|else|some|in|every|if|contains))(?=\\s|$)",
+      "name": "keyword.other.rego"
+    },
+    "number": {
+      "match": "-?(?:0|[1-9]\\d*)(?:(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)?",
+      "name": "constant.numeric.rego"
+    },
+    "comparison-operators": {
+      "match": "==|!=|>|<|<=|>=|\\+|-|\\*|%|/|\\||&",
+      "name": "keyword.operator.comparison.rego"
+    },
+    "assignment-operators": {
+      "match": ":=|=",
+      "name": "keyword.operator.assignment.rego"
+    },
+    "string-escape": {
+      "match": "\\\\(?:[\"\\\\/bfnrt]|u[0-9a-fA-F]{4})",
+      "name": "constant.character.escape.rego"
+    },
+    "string-escape-invalid": {
+      "match": "\\\\.",
+      "name": "invalid.illegal.unrecognized-string-escape.rego"
+    },
+    "string": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.rego",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.rego" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.rego" } },
+          "patterns": [
+            { "include": "#string-escape" },
+            { "include": "#string-escape-invalid" }
+          ]
+        },
+        {
+          "begin": "`",
+          "end": "`",
+          "name": "string.other.raw.rego",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.rego" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.rego" } }
+        }
+      ]
+    },
+    "variable": {
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b",
+      "name": "meta.identifier.rego"
+    },
+    "term": {
+      "patterns": [
+        { "include": "#constant" },
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#call" },
+        { "include": "#root-document" },
+        { "include": "#variable" }
+      ]
+    }
+  }
+}

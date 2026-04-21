@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { imageName, tags, buildArgs, platform } from '../shared/schemas';
+import { imageName, tags, buildArgs, platform, workspacePath } from '../shared/schemas';
 
 /**
  * Input parameters for build context preparation
@@ -22,6 +22,7 @@ export const buildImageSchema = z.object({
   imageName: imageName.optional(),
   tags: tags.optional(),
   buildArgs: buildArgs.optional(),
+  workspacePath: workspacePath.optional(),
   platform,
 });
 

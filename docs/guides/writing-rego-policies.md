@@ -1,21 +1,7 @@
 # Writing Rego Policies for Containerization-Assist
 
-A comprehensive guide to writing custom OPA Rego policies for enforcing Docker and Kubernetes security, quality, and compliance standards.
+Define and enforce Docker and Kubernetes security, quality, and compliance rules using OPA Rego.
 
----
-
-## Table of Contents
-
-1. [Introduction](#introduction)
-2. [Getting Started](#getting-started)
-3. [Policy Structure](#policy-structure)
-4. [Writing Rules](#writing-rules)
-5. [Testing Policies](#testing-policies)
-6. [Common Use Cases](#common-use-cases)
-7. [Best Practices](#best-practices)
-8. [Troubleshooting](#troubleshooting)
-
----
 
 ## Introduction
 

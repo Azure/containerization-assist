@@ -356,7 +356,7 @@ async function run(
 
 The architecture is enforced through:
 
-1. **Import Rules in CLAUDE.md:**
+1. **Import Rules:**
    - Documented path alias conventions
    - Explicit prohibition of @lib importing @infra
    - ESLint import ordering rules
@@ -373,24 +373,23 @@ The architecture is enforced through:
 
 ## Migration Path
 
-1. **Phase 1: Create Layer Structure** (Completed)
+1. **Phase 1: Create Layer Structure**
    - Created `src/infra/` and moved infrastructure clients
    - Ensured `src/lib/` contains only pure utilities
    - Added path aliases to tsconfig.json
 
-2. **Phase 2: Update Imports** (Completed)
+2. **Phase 2: Update Imports**
    - Replaced relative imports with path aliases
    - Updated all tools to import from @infra and @lib
    - Removed re-exports that crossed layers
 
-3. **Phase 3: Documentation** (In Progress)
-   - Document architecture in CLAUDE.md
+3. **Phase 3: Documentation**
+   - Document architecture
    - Create this ADR
    - Add code comments explaining layer boundaries
 
 ## References
 
-- [CLAUDE.md](../../CLAUDE.md) - Path alias conventions and import guidelines
 - [src/infra/docker/client.ts](../../src/infra/docker/client.ts) - Example infrastructure client
 - [src/lib/validation-helpers.ts](../../src/lib/validation-helpers.ts) - Example pure utility
 - [src/tools/build-image-context/tool.ts](../../src/tools/build-image-context/tool.ts) - Example tool orchestration

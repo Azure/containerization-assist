@@ -1,20 +1,7 @@
 # VS Code Extension Integration Guide
 
-This guide explains how to integrate the `containerization-assist-mcp` SDK with a VS Code extension implementing the Language Model Tool API.
+Integrate the `containerization-assist-mcp` SDK with a VS Code extension using the Language Model Tool API.
 
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Installation](#installation)
-3. [Package.json Configuration](#packagejson-configuration)
-4. [Tool Implementation Pattern](#tool-implementation-pattern)
-5. [Extension Activation](#extension-activation)
-6. [Complete Tool Examples](#complete-tool-examples)
-7. [Error Handling](#error-handling)
-8. [Testing](#testing)
-9. [API Reference](#api-reference)
-
----
 
 ## Overview
 

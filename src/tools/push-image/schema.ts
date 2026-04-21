@@ -4,11 +4,12 @@
  */
 
 import { z } from 'zod';
-import { platform } from '../shared/schemas';
+import { platform, workspacePath } from '../shared/schemas';
 
 export const pushImageSchema = z.object({
   imageId: z.string().min(1).describe('Docker image ID or name to push'),
   registry: z.string().min(1).describe('Target registry hostname (e.g., myregistry.azurecr.io, docker.io)'),
+  workspacePath: workspacePath.optional(),
   platform,
   credentials: z
     .object({

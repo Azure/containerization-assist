@@ -8,7 +8,7 @@ import Docker, { DockerOptions } from 'dockerode';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorGuidance } from './errors';
-import { autoDetectDockerSocket, parseDockerHost } from './socket-validation';
+import { autoDetectDockerSocket, dockerHostToOptions } from './socket-validation';
 
 /**
  * Docker client configuration options.
@@ -488,36 +488,15 @@ export const createDockerClient = (logger: Logger, config?: DockerClientConfig):
   }
 
   // Create Docker client with detected socket path
-  const dockerOptions: DockerOptions = {};
+  // Use shared helper for all docker host string → options conversion
+  const dockerOptions: DockerOptions = dockerHostToOptions(socketPath);
 
-  if (
-    socketPath.startsWith('tcp://') ||
-    socketPath.startsWith('http://') ||
-    socketPath.startsWith('https://')
-  ) {
-    // TCP connection — extract host/port from URL if no explicit config
-    if (config?.host) {
-      dockerOptions.host = config.host;
-      dockerOptions.port = config.port || 2375;
-    } else {
-      try {
-        const parsed = parseDockerHost(socketPath);
-        if (parsed.type === 'tcp') {
-          dockerOptions.host = parsed.host;
-          dockerOptions.port = parsed.port;
-          if (parsed.value.startsWith('https://')) {
-            dockerOptions.protocol = 'https';
-          }
-        }
-      } catch {
-        // Fallback to defaults if parsing fails
-        dockerOptions.host = 'localhost';
-        dockerOptions.port = 2375;
-      }
-    }
-  } else {
-    // Unix socket / named pipe connection
-    dockerOptions.socketPath = socketPath;
+  // Apply explicit host/port overrides from config, preserving protocol from socketPath
+  if (config?.host) {
+    dockerOptions.host = config.host;
+  }
+  if (config?.port) {
+    dockerOptions.port = config.port;
   }
 
   if (config?.timeout) {

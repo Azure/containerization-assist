@@ -197,7 +197,7 @@ function showCurrentConfig(config: MCPConfig): void {
   }
 
   console.log('\n💡 Next Steps:');
-  console.log('  1. Restart your MCP client (VS Code, Claude Desktop, etc.)');
+  console.log('  1. Policy file changes are picked up automatically on the next tool execution');
   console.log('  2. Check the MCP server logs for policy discovery messages');
   console.log('  3. Look for "Discovered built-in policies" with searchPaths');
 }

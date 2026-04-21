@@ -15,6 +15,7 @@ import type { KnowledgeMatch } from '@/knowledge/types';
 import { type ScanImageParams } from './schema';
 import { formatVulnerabilities, buildStatusSummary, pluralize } from '@/lib/summary-helpers';
 import { scanImageToolDefinition } from './types';
+import { resolveDockerContext } from '@/infra/docker/context';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -70,6 +71,11 @@ export interface ScanImageResult {
   summary?: string;
   success: boolean;
   scanner: string;
+  /**
+   * The Docker context used for this scan.
+   * Only set when a specific context was requested.
+   */
+  context?: string;
   recommendedActions?: FixAction[];
   remediationGuidance?: Array<{
     vulnerability: string;
@@ -221,6 +227,7 @@ async function handleScanImage(
     severity,
     scanType = 'vulnerability',
     enableAISuggestions = true,
+    context: dockerContext,
   } = params;
 
   if (scanType !== 'vulnerability') {
@@ -236,13 +243,25 @@ async function handleScanImage(
     ? (severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical')
     : 'high';
 
+  // Resolve Docker context to endpoint if a specific context is requested
+  let dockerHost: string | undefined;
+  if (dockerContext) {
+    const resolved = await resolveDockerContext(dockerContext, logger);
+    if (!resolved.ok) {
+      return Failure(resolved.error, resolved.guidance);
+    }
+    dockerHost = resolved.value;
+    logger.info({ context: dockerContext }, 'Using Docker context');
+    logger.debug({ context: dockerContext, dockerHost }, 'Resolved Docker context endpoint');
+  }
+
   try {
     logger.info(
       { scanner, severityThreshold: finalSeverityThreshold, scanType },
       'Starting image security scan',
     );
 
-    const securityScanner = createSecurityScanner(logger, scanner);
+    const securityScanner = createSecurityScanner(logger, scanner, dockerHost);
 
     const imageId = params.imageId;
 
@@ -369,6 +388,7 @@ async function handleScanImage(
       total: scanResult.totalVulnerabilities,
     });
 
+    const contextLabel = dockerContext ? ` [context: ${dockerContext}]` : '';
     const remediationText =
       remediationGuidance.length > 0
         ? ` ${pluralize(remediationGuidance.length, 'remediation')} available.`
@@ -376,8 +396,8 @@ async function handleScanImage(
 
     const summary = buildStatusSummary(
       passed,
-      `🔒 Security scan passed (${scanner}). ${vulnSummary}.${remediationText}`,
-      `🔒 Security scan failed (${scanner}). ${vulnSummary}.${remediationText}`,
+      `🔒 Security scan passed (${scanner})${contextLabel}. ${vulnSummary}.${remediationText}`,
+      `🔒 Security scan failed (${scanner})${contextLabel}. ${vulnSummary}.${remediationText}`,
     );
 
     const vulnerabilityDetails =
@@ -401,6 +421,7 @@ async function handleScanImage(
       summary,
       success: true,
       scanner,
+      ...(dockerContext && { context: dockerContext }),
       ...(recommendedActions && recommendedActions.length > 0 && { recommendedActions }),
       ...(remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {

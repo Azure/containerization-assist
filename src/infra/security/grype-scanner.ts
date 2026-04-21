@@ -191,6 +191,7 @@ export async function checkGrypeAvailability(logger: Logger): Promise<Result<str
 export async function scanImageWithGrype(
   imageId: string,
   logger: Logger,
+  dockerHost: string,
 ): Promise<Result<BasicScanResult>> {
   // Validate imageId to prevent command injection
   if (!validateImageId(imageId)) {
@@ -211,10 +212,11 @@ export async function scanImageWithGrype(
     // -o json: output in JSON format
     // -q: quiet mode (suppress non-essential output)
     const args = [imageId, '-o', 'json', '-q'];
-    logger.debug({ args }, 'Executing Grype command');
+    logger.debug({ args, dockerHost }, 'Executing Grype command');
 
     const { stdout, stderr } = await execFileAsync('grype', args, {
       maxBuffer: LIMITS.MAX_SCAN_BUFFER,
+      env: { ...process.env, DOCKER_HOST: dockerHost },
     });
 
     // Log any warnings from stderr

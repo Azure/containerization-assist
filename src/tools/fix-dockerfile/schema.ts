@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { environment, platform } from '../shared/schemas';
+import { environment, platform, workspacePath } from '../shared/schemas';
 import type { ValidationResult } from '@/validation/core-types';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 
@@ -15,6 +15,7 @@ export const fixDockerfileSchema = z
     targetPlatform: platform.describe(
       'Target platform for deployment (e.g., linux/amd64, linux/arm64). Used for context in recommendations.',
     ),
+    workspacePath: workspacePath.optional(),
     strictPlatformValidation: z
       .boolean()
       .optional()

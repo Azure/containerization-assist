@@ -24,7 +24,7 @@ export {
   verifyDeployToolDefinition,
 };
 
-export { TOOL_NAME, type IToolDefinition } from './shared/toolDefinition';
+export { TOOL_NAME, WORKFLOW_TOOL_NAME, type IToolDefinition } from './shared/toolDefinition';
 export type { ToolName } from './shared/toolDefinition';
 
 export const ALL_TOOL_DEFINITIONS = [

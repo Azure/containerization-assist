@@ -5,7 +5,7 @@ export const prepareClusterToolDefinition = {
   name: TOOL_NAME.PREPARE_CLUSTER,
   description: 'Prepare Kubernetes cluster for deployment',
   category: 'kubernetes' as const,
-  version: '2.0.0',
+  version: '2.1.0',
   schema: prepareClusterSchema,
   metadata: {
     knowledgeEnhanced: false,

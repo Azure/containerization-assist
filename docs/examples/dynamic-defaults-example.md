@@ -1,6 +1,6 @@
 # Dynamic Defaults Examples
 
-Policy-driven dynamic defaults allow you to automatically calculate environment-aware configuration values like replica counts, health check timings, and autoscaling parameters.
+Automatically calculate environment-aware configuration values — replica counts, health check timings, and autoscaling parameters — using policy-driven dynamic defaults.
 
 ## Overview
 
@@ -418,4 +418,3 @@ opa eval -d policies/dynamic-defaults.rego \
 
 - [Template Injection Guide](./template-injection-example.md)
 - [Policy Authoring Guide](../guides/policy-authoring.md)
-- [Sprint 3 Overview](../sprints/sprint-3.md)

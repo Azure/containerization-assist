@@ -75,6 +75,7 @@
     "policies/**/*.rego",
     "!policies/**/*_test.rego",
     "policies/compiled/*.wasm",
+    "!.containerization-assist/**",
     "policies.user.examples/**/*.rego",
     "!policies.user.examples/**/*_test.rego",
     "policies.user.examples/**/*.md",
@@ -106,6 +107,7 @@
     "typecheck": "tsc --noEmit",
     "validate-api": "tsx scripts/validate-public-api.ts",
     "validate:policies": "tsx scripts/validate-policies.ts",
+    "validate:action-refs": "tsx scripts/validate-action-refs.ts",
     "policy:simulate": "tsx src/cli/policy-simulate.ts",
     "validate": "npm run lint && npm run typecheck && npm run test:unit && npm run validate:policies && node scripts/validate-examples.js",
     "fix": "npm run lint:fix && npm run format",
@@ -120,7 +122,10 @@
     "smoke:journey": "tsx scripts/smoke-journey.ts",
     "test:policies": "opa test policies/",
     "changelog-sync": "tsx scripts/changelog-sync.ts",
-    "postversion": "tsx scripts/postversion.ts"
+    "postversion": "tsx scripts/postversion.ts",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
@@ -170,7 +175,8 @@
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.1"
+    "typescript-eslint": "^8.46.1",
+    "vitepress": "^1.6.4"
   },
   "lint-staged": {
     "src/**/*.ts": [

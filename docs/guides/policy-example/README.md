@@ -36,14 +36,14 @@ The policy is configured via environment variable in `.vscode/mcp.json`:
 
 1. **Environment Variable**: `CONTAINERIZATION_ASSIST_POLICY_PATH` points to your custom policy
 2. **VS Code Variable**: `${workspaceFolder}` resolves to your workspace root
-3. **Policy Loading**: When the MCP server starts, it loads your custom policy **in addition to** built-in policies (they are merged together)
+3. **Policy Loading**: The MCP server loads and auto-reloads your custom policy on each tool execution **in addition to** built-in policies (they are merged together)
 
 ### Activating the Configuration
 
 After updating `.vscode/mcp.json`:
 
-1. **Reload VS Code**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac) → "Developer: Reload Window"
-2. **Restart MCP Server**: If using Claude Desktop or other MCP client, restart the application
+1. **Reload VS Code**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac) → "Developer: Reload Window" (needed for env var changes in mcp.json)
+2. **Policy file changes**: Are picked up automatically on the next tool execution — no restart needed
 3. **Verify**: The policy will now be enforced on all `generate-dockerfile` and `fix-dockerfile` operations
 
 ## Using with CLI

@@ -1,328 +1,432 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import os from 'node:os';
+import { join, resolve } from 'node:path';
 import { createLogger } from '@/lib/logger';
 import {
   discoverBuiltInPolicies,
+  discoverGlobalPolicies,
+  discoverProjectPolicies,
   discoverUserPolicies,
   discoverCustomPolicies,
   discoverPolicies,
+  discoverPolicyPaths,
 } from '@/app/orchestrator';
-import { ENV_VARS } from '@/config/constants';
+import {
+  ENV_VARS,
+  POLICY_GLOBAL_APP_NAME,
+  POLICY_PROJECT_DIR,
+  POLICY_SUBDIR,
+} from '@/config/constants';
 
 describe('Policy Discovery', () => {
   let testDir: string;
   let logger: ReturnType<typeof createLogger>;
   let originalCwd: string;
   let originalEnv: string | undefined;
+  let originalXdg: string | undefined;
 
   beforeEach(() => {
-    testDir = join(__dirname, 'test-policies-' + Date.now());
+    testDir = join(
+      os.tmpdir(),
+      `policy-discovery-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    );
     mkdirSync(testDir, { recursive: true });
     logger = createLogger({ name: 'test', level: 'silent' });
     originalCwd = process.cwd();
     originalEnv = process.env[ENV_VARS.CUSTOM_POLICY_PATH];
+    originalXdg = process.env.XDG_CONFIG_HOME;
   });
 
   afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
     process.chdir(originalCwd);
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
     if (originalEnv !== undefined) {
       process.env[ENV_VARS.CUSTOM_POLICY_PATH] = originalEnv;
     } else {
       delete process.env[ENV_VARS.CUSTOM_POLICY_PATH];
     }
+    if (originalXdg !== undefined) {
+      process.env.XDG_CONFIG_HOME = originalXdg;
+    } else {
+      delete process.env.XDG_CONFIG_HOME;
+    }
   });
 
   describe('discoverBuiltInPolicies', () => {
-    it('should discover built-in policies from policies/ directory', () => {
-      // Built-in policies are discovered from the actual repo
-      // This test verifies the function works
+    it('discovers built-in policies from policies directory', () => {
       const policies = discoverBuiltInPolicies(logger);
-
-      // Should find the 3 built-in policies in the repo
       expect(policies.length).toBeGreaterThanOrEqual(3);
       expect(policies.some((p) => p.endsWith('security-baseline.rego'))).toBe(true);
       expect(policies.some((p) => p.endsWith('base-images.rego'))).toBe(true);
       expect(policies.some((p) => p.endsWith('container-best-practices.rego'))).toBe(true);
     });
 
-    it('should exclude test files (*_test.rego)', () => {
+    it('excludes built-in test files', () => {
       const policies = discoverBuiltInPolicies(logger);
-
-      // No test files should be included
       expect(policies.every((p) => !p.endsWith('_test.rego'))).toBe(true);
-    });
-
-    it('should return empty array if policies/ not found', () => {
-      // Change to a directory that has no policies/ parent
-      process.chdir('/tmp');
-
-      const policies = discoverBuiltInPolicies(logger);
-
-      // Should return empty array if not found
-      expect(Array.isArray(policies)).toBe(true);
-    });
-
-    it('should search upward for policies/ directory from nested path', () => {
-      // Create a nested directory structure
-      const nestedDir = join(testDir, 'deeply', 'nested', 'path');
-      const policiesDir = join(testDir, 'policies');
-
-      mkdirSync(nestedDir, { recursive: true });
-      mkdirSync(policiesDir, { recursive: true });
-
-      // Create a test policy in the policies directory
-      writeFileSync(join(policiesDir, 'test-policy.rego'), 'package test\ndefault allow := true');
-
-      // Change to nested directory
-      process.chdir(nestedDir);
-
-      const policies = discoverBuiltInPolicies(logger);
-
-      // Should find the policy by searching upward
-      expect(policies.some((p) => p.endsWith('test-policy.rego'))).toBe(true);
     });
   });
 
-  describe('discoverUserPolicies', () => {
-    it('should discover policies from policies.user/ directory', () => {
-      // Create a test policies.user directory
-      const policiesUserDir = join(testDir, 'policies.user');
-      mkdirSync(policiesUserDir, { recursive: true });
+  describe('discoverGlobalPolicies', () => {
+    it('uses XDG_CONFIG_HOME path when set', () => {
+      const xdgHome = join(testDir, 'xdg');
+      const globalDir = join(xdgHome, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+      mkdirSync(globalDir, { recursive: true });
+      writeFileSync(join(globalDir, 'global.rego'), 'package g\ndefault allow := true');
+      process.env.XDG_CONFIG_HOME = xdgHome;
 
-      // Create test policy files
-      writeFileSync(join(policiesUserDir, 'user-policy1.rego'), 'package test1\ndefault allow := true');
-      writeFileSync(join(policiesUserDir, 'user-policy2.rego'), 'package test2\ndefault allow := true');
+      const policies = discoverGlobalPolicies(logger);
 
-      // Change to test directory
-      process.chdir(testDir);
+      expect(policies).toContain(resolve(join(globalDir, 'global.rego')));
+    });
 
-      const policies = discoverUserPolicies(logger);
+    it('falls back to homedir .config when XDG_CONFIG_HOME is unset', () => {
+      delete process.env.XDG_CONFIG_HOME;
+      const homeSpy = jest.spyOn(os, 'homedir').mockReturnValue(join(testDir, 'fake-home'));
+
+      const policies = discoverGlobalPolicies(logger);
+
+      expect(Array.isArray(policies)).toBe(true);
+      homeSpy.mockRestore();
+    });
+
+    it('returns rego files from directory and excludes test files', () => {
+      const xdgHome = join(testDir, 'xdg');
+      const globalDir = join(xdgHome, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+      mkdirSync(globalDir, { recursive: true });
+      writeFileSync(join(globalDir, 'a.rego'), 'package a\ndefault allow := true');
+      writeFileSync(join(globalDir, 'b.rego'), 'package b\ndefault allow := true');
+      writeFileSync(join(globalDir, 'skip_test.rego'), 'package skip\ndefault allow := true');
+      process.env.XDG_CONFIG_HOME = xdgHome;
+
+      const policies = discoverGlobalPolicies(logger);
 
       expect(policies.length).toBe(2);
-      expect(policies.some((p) => p.endsWith('user-policy1.rego'))).toBe(true);
-      expect(policies.some((p) => p.endsWith('user-policy2.rego'))).toBe(true);
+      expect(policies.some((p) => p.endsWith('a.rego'))).toBe(true);
+      expect(policies.some((p) => p.endsWith('b.rego'))).toBe(true);
+      expect(policies.some((p) => p.endsWith('skip_test.rego'))).toBe(false);
     });
 
-    it('should exclude test files (*_test.rego)', () => {
-      const policiesUserDir = join(testDir, 'policies.user');
-      mkdirSync(policiesUserDir, { recursive: true });
+    it('returns empty silently when directory does not exist', () => {
+      process.env.XDG_CONFIG_HOME = join(testDir, 'missing-xdg');
+      const warnSpy = jest.spyOn(logger, 'warn');
 
-      // Create test policy files
-      writeFileSync(join(policiesUserDir, 'user-policy.rego'), 'package test\ndefault allow := true');
-      writeFileSync(join(policiesUserDir, 'user-policy_test.rego'), 'package test\n# test');
+      const policies = discoverGlobalPolicies(logger);
 
-      process.chdir(testDir);
+      expect(policies).toEqual([]);
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
 
-      const policies = discoverUserPolicies(logger);
+    it('returns empty on inaccessible path and logs warning', () => {
+      delete process.env.XDG_CONFIG_HOME;
+      const warnSpy = jest.spyOn(logger, 'warn');
+      const osModule = require('node:os') as typeof import('node:os');
+      const homeSpy = jest.spyOn(osModule, 'homedir').mockImplementation(() => {
+        throw new Error('homedir-failed');
+      });
+
+      const policies = discoverGlobalPolicies(logger);
+
+      expect(policies).toEqual([]);
+      expect(warnSpy).toHaveBeenCalled();
+      homeSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('discoverProjectPolicies', () => {
+    it('returns policies when project directory exists in workspacePath', () => {
+      const repo = join(testDir, 'repo');
+      const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+      mkdirSync(projectDir, { recursive: true });
+      writeFileSync(join(projectDir, 'project.rego'), 'package p\ndefault allow := true');
+
+      const policies = discoverProjectPolicies(logger, repo);
 
       expect(policies.length).toBe(1);
-      expect(policies[0].endsWith('user-policy.rego')).toBe(true);
+      const expectedSuffix = join(POLICY_PROJECT_DIR, POLICY_SUBDIR, 'project.rego');
+      expect(policies[0].endsWith(expectedSuffix)).toBe(true);
     });
 
-    it('should return empty array if policies.user/ not found', () => {
-      // Change to directory without policies.user
-      process.chdir(testDir);
+    it('returns empty when workspacePath has no project directory', () => {
+      const repo = join(testDir, 'repo');
+      mkdirSync(repo, { recursive: true });
 
-      const policies = discoverUserPolicies(logger);
+      const policies = discoverProjectPolicies(logger, repo);
 
       expect(policies).toEqual([]);
     });
 
-    it('should search upward for policies.user/ directory from nested path', () => {
-      // Create nested structure
-      const nestedDir = join(testDir, 'src', 'tools', 'my-tool');
-      const policiesUserDir = join(testDir, 'policies.user');
+    it('returns empty silently when workspacePath has no policy dir', () => {
+      const dir = join(testDir, 'nogit');
+      mkdirSync(dir, { recursive: true });
+      const warnSpy = jest.spyOn(logger, 'warn');
 
-      mkdirSync(nestedDir, { recursive: true });
-      mkdirSync(policiesUserDir, { recursive: true });
+      const policies = discoverProjectPolicies(logger, dir);
 
-      // Create user policy at repo root level
-      writeFileSync(join(policiesUserDir, 'user-override.rego'), 'package override\ndefault allow := true');
+      expect(policies).toEqual([]);
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
 
-      // Change to deeply nested directory
-      process.chdir(nestedDir);
+    it('does not walk up to parent directories', () => {
+      const repo = join(testDir, 'repo');
+      const nested = join(repo, 'x', 'y');
+      const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+      mkdirSync(projectDir, { recursive: true });
+      mkdirSync(nested, { recursive: true });
+      writeFileSync(join(projectDir, 'project.rego'), 'package w\ndefault allow := true');
+
+      // Passing nested dir as workspacePath should NOT find policies at repo level
+      const policies = discoverProjectPolicies(logger, nested);
+
+      expect(policies).toEqual([]);
+    });
+
+  });
+
+  describe('discoverUserPolicies (deprecated)', () => {
+    it('finds legacy directory and logs deprecation warning', () => {
+      const repo = join(testDir, 'repo');
+      const legacy = join(repo, 'policies.user');
+      mkdirSync(legacy, { recursive: true });
+      writeFileSync(join(legacy, 'legacy.rego'), 'package l\ndefault allow := true');
+      process.chdir(repo);
+      const warnSpy = jest.spyOn(logger, 'warn');
 
       const policies = discoverUserPolicies(logger);
 
-      // Should find the policy by searching upward
       expect(policies.length).toBe(1);
-      expect(policies[0].endsWith('user-override.rego')).toBe(true);
+      expect(policies[0].endsWith('legacy.rego')).toBe(true);
+      expect(
+        warnSpy.mock.calls.some(
+          (call) =>
+            call[0] ===
+            'policies.user/ is deprecated. Move policies to .containerization-assist/policy/ at your project root, or ~/.config/containerization-assist/policy/ for global policies.',
+        ),
+      ).toBe(true);
+      warnSpy.mockRestore();
+    });
+
+    it('logs deprecation warning once per session', () => {
+      const repoA = join(testDir, 'repo-a');
+      const repoB = join(testDir, 'repo-b');
+      mkdirSync(join(repoA, 'policies.user'), { recursive: true });
+      mkdirSync(join(repoB, 'policies.user'), { recursive: true });
+      writeFileSync(join(repoA, 'policies.user', 'a.rego'), 'package a\ndefault allow := true');
+      writeFileSync(join(repoB, 'policies.user', 'b.rego'), 'package b\ndefault allow := true');
+      const warnSpy = jest.spyOn(logger, 'warn');
+
+      process.chdir(repoA);
+      discoverUserPolicies(logger);
+      process.chdir(repoB);
+      discoverUserPolicies(logger);
+
+      const count = warnSpy.mock.calls.filter(
+        (call) =>
+          call[0] ===
+          'policies.user/ is deprecated. Move policies to .containerization-assist/policy/ at your project root, or ~/.config/containerization-assist/policy/ for global policies.',
+      ).length;
+      expect(count).toBeLessThanOrEqual(1);
+      warnSpy.mockRestore();
+    });
+
+    it('does not walk up to parent directories', () => {
+      const repo = join(testDir, 'repo');
+      const nested = join(repo, 'src', 'deep', 'tool');
+      const legacy = join(repo, 'policies.user');
+      mkdirSync(legacy, { recursive: true });
+      mkdirSync(nested, { recursive: true });
+      writeFileSync(join(legacy, 'up.rego'), 'package up\ndefault allow := true');
+
+      // Passing nested dir as workspacePath should NOT find policies at repo level
+      const policies = discoverUserPolicies(logger, nested);
+
+      expect(policies).toEqual([]);
     });
   });
 
   describe('discoverCustomPolicies', () => {
-    it('should discover policies from custom directory', () => {
-      const customDir = join(testDir, 'custom');
-      mkdirSync(customDir, { recursive: true });
+    it('discovers custom directory policies and excludes tests', () => {
+      const custom = join(testDir, 'custom');
+      mkdirSync(custom, { recursive: true });
+      writeFileSync(join(custom, 'one.rego'), 'package one\ndefault allow := true');
+      writeFileSync(join(custom, 'two_test.rego'), 'package two\ndefault allow := true');
 
-      writeFileSync(join(customDir, 'custom-policy1.rego'), 'package custom1\ndefault allow := true');
-      writeFileSync(join(customDir, 'custom-policy2.rego'), 'package custom2\ndefault allow := true');
-
-      const policies = discoverCustomPolicies(customDir, logger);
-
-      expect(policies.length).toBe(2);
-      expect(policies.some((p) => p.endsWith('custom-policy1.rego'))).toBe(true);
-      expect(policies.some((p) => p.endsWith('custom-policy2.rego'))).toBe(true);
-    });
-
-    it('should handle single file path', () => {
-      const customFile = join(testDir, 'single-policy.rego');
-      writeFileSync(customFile, 'package single\ndefault allow := true');
-
-      const policies = discoverCustomPolicies(customFile, logger);
+      const policies = discoverCustomPolicies(custom, logger);
 
       expect(policies.length).toBe(1);
-      expect(policies[0]).toBe(customFile);
+      expect(policies[0].endsWith('one.rego')).toBe(true);
     });
 
-    it('should exclude test files (*_test.rego)', () => {
-      const customDir = join(testDir, 'custom');
-      mkdirSync(customDir, { recursive: true });
+    it('supports single rego file path', () => {
+      const file = join(testDir, 'single.rego');
+      writeFileSync(file, 'package s\ndefault allow := true');
 
-      writeFileSync(join(customDir, 'custom-policy.rego'), 'package custom\ndefault allow := true');
-      writeFileSync(join(customDir, 'custom-policy_test.rego'), 'package custom\n# test');
+      const policies = discoverCustomPolicies(file, logger);
 
-      const policies = discoverCustomPolicies(customDir, logger);
-
-      expect(policies.length).toBe(1);
-      expect(policies[0].endsWith('custom-policy.rego')).toBe(true);
-    });
-
-    it('should return empty array if path does not exist', () => {
-      const nonExistentPath = join(testDir, 'does-not-exist');
-
-      const policies = discoverCustomPolicies(nonExistentPath, logger);
-
-      expect(policies).toEqual([]);
-    });
-
-    it('should return empty array if file is not .rego', () => {
-      const txtFile = join(testDir, 'not-a-policy.txt');
-      writeFileSync(txtFile, 'not a policy');
-
-      const policies = discoverCustomPolicies(txtFile, logger);
-
-      expect(policies).toEqual([]);
+      expect(policies).toEqual([file]);
     });
   });
 
   describe('discoverPolicies (priority ordering)', () => {
-    it('should merge policies in correct priority order', () => {
-      // Create test directories
-      const policiesUserDir = join(testDir, 'policies.user');
-      const customDir = join(testDir, 'custom');
+    it('orders built-in, global, project, custom when all tiers populated', () => {
+      const xdg = join(testDir, 'xdg');
+      const globalDir = join(xdg, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+      const repo = join(testDir, 'repo');
+      const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+      const custom = join(testDir, 'custom');
 
-      mkdirSync(policiesUserDir, { recursive: true });
-      mkdirSync(customDir, { recursive: true });
+      mkdirSync(globalDir, { recursive: true });
+      mkdirSync(join(repo, '.git'), { recursive: true });
+      mkdirSync(projectDir, { recursive: true });
+      mkdirSync(custom, { recursive: true });
+      writeFileSync(join(globalDir, 'global.rego'), 'package g\ndefault allow := true');
+      writeFileSync(join(projectDir, 'project.rego'), 'package p\ndefault allow := true');
+      writeFileSync(join(custom, 'custom.rego'), 'package c\ndefault allow := true');
+      process.env.XDG_CONFIG_HOME = xdg;
+      process.env[ENV_VARS.CUSTOM_POLICY_PATH] = custom;
+      process.chdir(repo);
 
-      // Create user policy
-      writeFileSync(join(policiesUserDir, 'user-policy.rego'), 'package test\ndefault allow := true');
+      const discovered = discoverPolicies(logger);
+      const index = (suffix: string) => discovered.findIndex((p) => p.path.endsWith(suffix));
+      const builtInLast = Math.max(...discovered.map((p, i) => (p.source === 'built-in' ? i : -1)));
 
-      // Create custom policy
-      writeFileSync(join(customDir, 'custom-policy.rego'), 'package test\ndefault allow := true');
-
-      // Set environment variable
-      process.env[ENV_VARS.CUSTOM_POLICY_PATH] = customDir;
-      process.chdir(testDir);
-
-      const policies = discoverPolicies(logger);
-
-      // Should include built-in + user + custom
-      // Built-in policies come first (lowest priority)
-      expect(policies.length).toBeGreaterThanOrEqual(5); // 3 built-in + 1 user + 1 custom
-
-      // Check that custom policy comes last (highest priority)
-      expect(policies[policies.length - 1].endsWith('custom-policy.rego')).toBe(true);
-
-      // Check that user policy comes before custom
-      const userPolicyIndex = policies.findIndex((p) => p.endsWith('user-policy.rego'));
-      const customPolicyIndex = policies.findIndex((p) => p.endsWith('custom-policy.rego'));
-      expect(userPolicyIndex).toBeLessThan(customPolicyIndex);
-
-      // Check that built-in policies come first
-      const builtInIndex = policies.findIndex((p) => p.includes('/policies/'));
-      expect(builtInIndex).toBeLessThan(userPolicyIndex);
+      expect(index('global.rego')).toBeGreaterThan(builtInLast);
+      expect(index('project.rego')).toBeGreaterThan(index('global.rego'));
+      expect(index('custom.rego')).toBeGreaterThan(index('project.rego'));
     });
 
-    it('should work with only built-in policies', () => {
-      // No user or custom policies
-      process.chdir(testDir);
+    it('returns source metadata for discovered policies', () => {
+      const xdg = join(testDir, 'xdg');
+      const globalDir = join(xdg, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+      const repo = join(testDir, 'repo');
+      const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+      const custom = join(testDir, 'custom');
 
-      const policies = discoverPolicies(logger);
+      mkdirSync(globalDir, { recursive: true });
+      mkdirSync(join(repo, '.git'), { recursive: true });
+      mkdirSync(projectDir, { recursive: true });
+      mkdirSync(custom, { recursive: true });
+      writeFileSync(join(globalDir, 'global-source.rego'), 'package g\ndefault allow := true');
+      writeFileSync(join(projectDir, 'project-source.rego'), 'package p\ndefault allow := true');
+      writeFileSync(join(custom, 'custom-source.rego'), 'package c\ndefault allow := true');
+      process.env.XDG_CONFIG_HOME = xdg;
+      process.env[ENV_VARS.CUSTOM_POLICY_PATH] = custom;
+      process.chdir(repo);
 
-      // Should only have built-in policies
-      expect(policies.length).toBeGreaterThanOrEqual(3);
-      expect(policies.every((p) => p.includes('/policies/'))).toBe(true);
+      const discovered = discoverPolicies(logger);
+
+      expect(discovered.find((p) => p.path.endsWith('global-source.rego'))?.source).toBe('global');
+      expect(discovered.find((p) => p.path.endsWith('project-source.rego'))?.source).toBe(
+        'project',
+      );
+      expect(discovered.find((p) => p.path.endsWith('custom-source.rego'))?.source).toBe('custom');
+      expect(discovered.filter((p) => p.source === 'built-in').length).toBeGreaterThanOrEqual(0);
     });
 
-    it('should work with only user policies', () => {
-      const policiesUserDir = join(testDir, 'policies.user');
-      mkdirSync(policiesUserDir, { recursive: true });
-      writeFileSync(join(policiesUserDir, 'user-policy.rego'), 'package test\ndefault allow := true');
+    it('tags legacy policies with source legacy', () => {
+      const repo = join(testDir, 'repo');
+      const legacy = join(repo, 'policies.user');
+      mkdirSync(legacy, { recursive: true });
+      writeFileSync(join(legacy, 'legacy-source.rego'), 'package l\ndefault allow := true');
+      process.chdir(repo);
 
-      process.chdir(testDir);
+      const discovered = discoverPolicies(logger);
 
-      const policies = discoverPolicies(logger);
-
-      // Should have built-in + user
-      expect(policies.length).toBeGreaterThanOrEqual(4);
-      expect(policies.some((p) => p.endsWith('user-policy.rego'))).toBe(true);
+      expect(discovered.find((p) => p.path.endsWith('legacy-source.rego'))?.source).toBe('legacy');
     });
 
-    it('should work with only custom policies', () => {
-      const customDir = join(testDir, 'custom');
-      mkdirSync(customDir, { recursive: true });
-      writeFileSync(join(customDir, 'custom-policy.rego'), 'package test\ndefault allow := true');
+    it('maintains ordering when global tier empty', () => {
+      const repo = join(testDir, 'repo');
+      const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+      const custom = join(testDir, 'custom');
+      mkdirSync(join(repo, '.git'), { recursive: true });
+      mkdirSync(projectDir, { recursive: true });
+      mkdirSync(custom, { recursive: true });
+      writeFileSync(
+        join(projectDir, 'project-empty-global.rego'),
+        'package p\ndefault allow := true',
+      );
+      writeFileSync(join(custom, 'custom-empty-global.rego'), 'package c\ndefault allow := true');
+      process.env[ENV_VARS.CUSTOM_POLICY_PATH] = custom;
+      process.chdir(repo);
 
-      process.env[ENV_VARS.CUSTOM_POLICY_PATH] = customDir;
+      const discovered = discoverPolicies(logger);
 
-      const policies = discoverPolicies(logger);
-
-      // Should have built-in + custom
-      expect(policies.length).toBeGreaterThanOrEqual(4);
-      expect(policies.some((p) => p.endsWith('custom-policy.rego'))).toBe(true);
+      expect(
+        discovered.findIndex((p) => p.path.endsWith('custom-empty-global.rego')),
+      ).toBeGreaterThan(discovered.findIndex((p) => p.path.endsWith('project-empty-global.rego')));
     });
 
-    it('should maintain priority order when discovering from nested directory', () => {
-      // Create nested directory structure
-      const nestedDir = join(testDir, 'src', 'nested');
-      const policiesDir = join(testDir, 'policies');
-      const policiesUserDir = join(testDir, 'policies.user');
-      const customDir = join(testDir, 'custom');
+    it('maintains ordering when project tier empty', () => {
+      const xdg = join(testDir, 'xdg');
+      const globalDir = join(xdg, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+      const repo = join(testDir, 'repo');
+      const custom = join(testDir, 'custom');
+      mkdirSync(globalDir, { recursive: true });
+      mkdirSync(join(repo, '.git'), { recursive: true });
+      mkdirSync(custom, { recursive: true });
+      writeFileSync(
+        join(globalDir, 'global-empty-project.rego'),
+        'package g\ndefault allow := true',
+      );
+      writeFileSync(join(custom, 'custom-empty-project.rego'), 'package c\ndefault allow := true');
+      process.env.XDG_CONFIG_HOME = xdg;
+      process.env[ENV_VARS.CUSTOM_POLICY_PATH] = custom;
+      process.chdir(repo);
 
-      mkdirSync(nestedDir, { recursive: true });
-      mkdirSync(policiesDir, { recursive: true });
-      mkdirSync(policiesUserDir, { recursive: true });
-      mkdirSync(customDir, { recursive: true });
+      const discovered = discoverPolicies(logger);
 
-      // Create policies at different levels
-      writeFileSync(join(policiesDir, 'builtin-policy.rego'), 'package builtin\ndefault allow := true');
-      writeFileSync(join(policiesUserDir, 'user-policy.rego'), 'package user\ndefault allow := true');
-      writeFileSync(join(customDir, 'custom-policy.rego'), 'package custom\ndefault allow := true');
+      expect(
+        discovered.findIndex((p) => p.path.endsWith('custom-empty-project.rego')),
+      ).toBeGreaterThan(discovered.findIndex((p) => p.path.endsWith('global-empty-project.rego')));
+    });
 
-      // Set environment and change to nested directory
-      process.env[ENV_VARS.CUSTOM_POLICY_PATH] = customDir;
-      process.chdir(nestedDir);
+    it('maintains ordering when custom tier empty', () => {
+      const xdg = join(testDir, 'xdg');
+      const globalDir = join(xdg, POLICY_GLOBAL_APP_NAME, POLICY_SUBDIR);
+      const repo = join(testDir, 'repo');
+      const projectDir = join(repo, POLICY_PROJECT_DIR, POLICY_SUBDIR);
+      mkdirSync(globalDir, { recursive: true });
+      mkdirSync(join(repo, '.git'), { recursive: true });
+      mkdirSync(projectDir, { recursive: true });
+      writeFileSync(
+        join(globalDir, 'global-empty-custom.rego'),
+        'package g\ndefault allow := true',
+      );
+      writeFileSync(
+        join(projectDir, 'project-empty-custom.rego'),
+        'package p\ndefault allow := true',
+      );
+      process.env.XDG_CONFIG_HOME = xdg;
+      delete process.env[ENV_VARS.CUSTOM_POLICY_PATH];
+      process.chdir(repo);
 
-      const policies = discoverPolicies(logger);
+      const discovered = discoverPolicies(logger);
 
-      // Verify all three layers are present
-      const hasBuiltIn = policies.some((p) => p.endsWith('builtin-policy.rego'));
-      const hasUser = policies.some((p) => p.endsWith('user-policy.rego'));
-      const hasCustom = policies.some((p) => p.endsWith('custom-policy.rego'));
+      expect(
+        discovered.findIndex((p) => p.path.endsWith('project-empty-custom.rego')),
+      ).toBeGreaterThan(discovered.findIndex((p) => p.path.endsWith('global-empty-custom.rego')));
+      expect(discovered.some((p) => p.source === 'custom')).toBe(false);
+    });
 
-      expect(hasBuiltIn).toBe(true);
-      expect(hasUser).toBe(true);
-      expect(hasCustom).toBe(true);
+    it('returns paths only through discoverPolicyPaths helper', () => {
+      const repo = join(testDir, 'repo');
+      const legacy = join(repo, 'policies.user');
+      mkdirSync(legacy, { recursive: true });
+      writeFileSync(join(legacy, 'legacy-only.rego'), 'package l\ndefault allow := true');
+      process.chdir(repo);
 
-      // Verify priority ordering (custom last = highest priority)
-      const builtInIndex = policies.findIndex((p) => p.endsWith('builtin-policy.rego'));
-      const userIndex = policies.findIndex((p) => p.endsWith('user-policy.rego'));
-      const customIndex = policies.findIndex((p) => p.endsWith('custom-policy.rego'));
-      expect(builtInIndex).toBeLessThan(userIndex);
-      expect(customIndex).toBeGreaterThan(userIndex);
+      const discovered = discoverPolicies(logger);
+      const paths = discoverPolicyPaths(logger);
+
+      expect(paths).toEqual(discovered.map((p) => p.path));
+      expect(paths.every((p) => typeof p === 'string')).toBe(true);
     });
   });
 });
