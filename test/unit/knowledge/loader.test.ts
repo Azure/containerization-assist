@@ -199,7 +199,7 @@ describe('Knowledge Loader', () => {
   describe('knowledge pack statistics', () => {
     it('should log pack loading statistics', () => {
       const entries = getAllEntries();
-      const expectedPackCount = 28; // Built-in packs
+      const expectedPackCount = 29; // Built-in packs
 
       console.log('\n📊 Knowledge Pack Statistics:');
       console.log(`   Total Packs: ${expectedPackCount}`);
@@ -378,8 +378,8 @@ describe('Knowledge Loader', () => {
         `\n✅ Pack Validation: ${validCount} valid, ${invalidCount} invalid (out of ${packFiles.length})`,
       );
 
-      // Should have loaded most packs (26 out of 28 are valid knowledge packs)
-      expect(validCount).toBeGreaterThanOrEqual(26);
+      // Should have loaded most packs (27 out of 29 are valid knowledge packs)
+      expect(validCount).toBeGreaterThanOrEqual(27);
     });
   });
 });

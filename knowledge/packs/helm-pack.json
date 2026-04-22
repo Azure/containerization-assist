@@ -306,7 +306,7 @@
   {
     "id": "helm-whitespace-trim-hyphen",
     "category": "kubernetes",
-    "pattern": "helm|template|whitespace|{{-| -}}|yaml",
+    "pattern": "helm|template|whitespace|\\{\\{-| -\\}\\}|yaml",
     "recommendation": "Use hyphen trimming markers deliberately in templates to control whitespace. Missing or misplaced `{{-` / `-}}` commonly introduces blank lines or indentation breakage.",
     "example": "{{- if .Values.extraEnv }}\nenv:\n  {{- toYaml .Values.extraEnv | nindent 2 }}\n{{- end }}\n\n# Anti-pattern:\n{{ if .Values.extraEnv }}\nenv:\n{{ toYaml .Values.extraEnv | nindent 2 }}\n{{ end }}",
     "severity": "required",

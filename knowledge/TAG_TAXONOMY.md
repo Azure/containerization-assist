@@ -312,7 +312,7 @@ Additionally, severity affects scoring:
 
 ### v1.1.0 (2026-04-08)
 - Added `helm` tool tag for Helm chart generation knowledge
-- Added Helm knowledge pack with 56 entries across 10 categories
+- Added Helm knowledge pack with 56 entries in the `kubernetes` category
 
 ### v1.0.0 (2025-10-21)
 - Initial tag taxonomy
