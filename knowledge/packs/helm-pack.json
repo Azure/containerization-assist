@@ -322,7 +322,7 @@
   {
     "id": "helm-range-scope-root-variable",
     "category": "kubernetes",
-    "pattern": "helm|range|scope|$|dot",
+    "pattern": "helm|range|scope|\\$|dot",
     "recommendation": "Inside `range`, remember that `.` is rebound to the loop item. Capture root context with `$` (or local vars) when you need release/chart values inside the loop.",
     "example": "{{- $root := . -}}\n{{- range .Values.hosts }}\n- host: {{ .name | quote }}\n  release: {{ $root.Release.Name | quote }}\n{{- end }}",
     "severity": "required",

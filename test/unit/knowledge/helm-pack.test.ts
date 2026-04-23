@@ -84,6 +84,21 @@ describe('Helm Knowledge Pack', () => {
       }
     });
 
+    it('all entry patterns compile as valid regular expressions', () => {
+      for (const entry of entries) {
+        expect(() => {
+          try {
+            new RegExp(entry.pattern, 'gmi');
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(
+              `Invalid regex pattern for entry "${entry.id}" (${entry.pattern}): ${message}`,
+            );
+          }
+        }).not.toThrow();
+      }
+    });
+
     it('all entries have non-empty recommendations', () => {
       for (const entry of entries) {
         expect(entry.recommendation.length).toBeGreaterThan(0);
