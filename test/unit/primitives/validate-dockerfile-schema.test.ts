@@ -24,4 +24,23 @@ describe('validate-dockerfile schema', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('rejects empty language string', () => {
+    expect(
+      validateDockerfileSchema.safeParse({
+        content: 'FROM node:20',
+        context: { language: '' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown keys in context', () => {
+    expect(
+      validateDockerfileSchema.safeParse({
+        content: 'FROM node:20',
+        // @ts-expect-error - testing that strict() rejects unknown keys
+        context: { environment: 'dev', typo: true },
+      }).success,
+    ).toBe(false);
+  });
 });

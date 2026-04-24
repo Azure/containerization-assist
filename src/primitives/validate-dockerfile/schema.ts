@@ -5,8 +5,9 @@ export const validateDockerfileSchema = z.object({
   context: z
     .object({
       environment: z.enum(['dev', 'staging', 'production']).optional(),
-      language: z.string().optional(),
+      language: z.string().min(1).optional(),
     })
+    .strict()
     .optional(),
 });
 
