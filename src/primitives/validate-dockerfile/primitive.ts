@@ -7,6 +7,16 @@ import { validateDockerfileToolDefinition } from './types';
 import type { ValidateDockerfileInput } from './schema';
 import type { ValidatePolicyOut, PolicyFinding } from '../types';
 
+/**
+ * Map a raw RegoPolicyViolation to a PolicyFinding.
+ *
+ * Severity is taken from the CALLER's bucket (violations → 'block', warnings → 'warn', etc.)
+ * rather than from the violation's own `severity` field. This matches the project-wide
+ * convention in `validateContentAgainstPolicy` (src/lib/policy-helpers.ts) and trusts the
+ * three result arrays to be the source of truth. If a policy author accidentally tags a
+ * rule with a severity inconsistent with the bucket it emits into, we silently use the
+ * bucket. This is intentional.
+ */
 function toFinding(r: RegoPolicyViolation, severity: PolicyFinding['severity']): PolicyFinding {
   return {
     rule: r.rule,
@@ -44,9 +54,11 @@ async function handleValidateDockerfile(
       suggestions,
     });
   } catch (err) {
-    return Failure(
-      `validate-dockerfile failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    const cause = err instanceof Error ? err.message : String(err);
+    return Failure(`validate-dockerfile failed while evaluating policy: ${cause}`, {
+      message: cause,
+      hint: `Content length: ${input.content.length} chars. Check the policy file syntax and that the evaluator initialized correctly.`,
+    });
   }
 }
 
