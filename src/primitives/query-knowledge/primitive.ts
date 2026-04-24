@@ -2,24 +2,18 @@
  * query-knowledge primitive
  *
  * Wraps the knowledge matcher library for use by skills and other primitives.
- * Returns strongly-typed KnowledgeMatchOut results without MCP server overhead.
  */
 
 import { Success, Failure, type Result } from '@types';
 import type { ToolContext } from '@/core/context';
 import { loadKnowledgeData } from '@/knowledge/loader';
 import { findKnowledgeMatches } from '@/knowledge/matcher';
+import { tool } from '@/types/tool';
 import type { QueryKnowledgeInput } from './schema';
 import type { QueryKnowledgeOut, KnowledgeMatchOut } from '../types';
+import { queryKnowledgeToolDefinition } from './types';
 
-/**
- * Run the query-knowledge primitive.
- *
- * @param input - Validated input from queryKnowledgeSchema
- * @param _ctx  - Tool context (unused but required by convention)
- * @returns     - Matching knowledge entries or a Failure
- */
-async function run(
+async function handleQueryKnowledge(
   input: QueryKnowledgeInput,
   _ctx: ToolContext,
 ): Promise<Result<QueryKnowledgeOut>> {
@@ -37,7 +31,7 @@ async function run(
     const allMatches = findKnowledgeMatches(knowledgeData.entries, query);
 
     // Filter out entries that only matched via the severity bonus (reasons=[]).
-    // These are phantom matches that appear regardless of query context.
+    // These are phantom hits that surface regardless of query context.
     const matches = allMatches.filter((m) => m.reasons.length > 0);
 
     const out: KnowledgeMatchOut[] = matches.map((m) => ({
@@ -61,6 +55,7 @@ async function run(
   }
 }
 
-const queryKnowledge = { run };
-
-export default queryKnowledge;
+export default tool({
+  ...queryKnowledgeToolDefinition,
+  handler: handleQueryKnowledge,
+});

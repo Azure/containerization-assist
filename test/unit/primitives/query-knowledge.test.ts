@@ -8,7 +8,7 @@ const silentLogger = createLogger({ level: 'silent' });
 describe('query-knowledge primitive', () => {
   it('returns matches for known tags', async () => {
     const ctx = createToolContext(silentLogger);
-    const result = await queryKnowledge.run(
+    const result = await queryKnowledge.handler(
       { tags: ['generate-dockerfile', 'node'], limit: 5 },
       ctx,
     );
@@ -20,7 +20,7 @@ describe('query-knowledge primitive', () => {
 
   it('returns empty matches for unknown tags', async () => {
     const ctx = createToolContext(silentLogger);
-    const result = await queryKnowledge.run(
+    const result = await queryKnowledge.handler(
       { tags: ['nonsense-tag-zzz'], limit: 5 },
       ctx,
     );
@@ -28,5 +28,15 @@ describe('query-knowledge primitive', () => {
     if (!result.ok) return;
     expect(result.value.matches).toEqual([]);
     expect(result.value.totalMatched).toBe(0);
+  });
+
+  it('exposes the required Tool interface fields', () => {
+    expect(queryKnowledge.name).toBe('query-knowledge');
+    expect(typeof queryKnowledge.description).toBe('string');
+    expect(queryKnowledge.schema).toBeDefined();
+    expect(queryKnowledge.inputSchema).toBeDefined();
+    expect(typeof queryKnowledge.handler).toBe('function');
+    expect(typeof queryKnowledge.parse).toBe('function');
+    expect(queryKnowledge.metadata).toBeDefined();
   });
 });
