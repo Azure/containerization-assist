@@ -10,6 +10,13 @@ import scanImageTool from './scan-image/tool';
 import tagImageTool from './tag-image/tool';
 import verifyDeployTool from './verify-deploy/tool';
 import { TOOL_NAME, WORKFLOW_TOOL_NAME, ToolName } from './shared/toolDefinition';
+import {
+  queryKnowledge,
+  validateDockerfile,
+  validateK8sManifest,
+  validateCompose,
+  ALL_PRIMITIVES,
+} from '@/primitives';
 
 export type { ToolName };
 
@@ -39,6 +46,10 @@ export type Tool = (
   | typeof scanImageTool
   | typeof tagImageTool
   | typeof verifyDeployTool
+  | typeof queryKnowledge
+  | typeof validateDockerfile
+  | typeof validateK8sManifest
+  | typeof validateCompose
 ) & { name: ToolName };
 
 // Type-safe tool array using the union type
@@ -58,6 +69,9 @@ export const ALL_TOOLS: readonly Tool[] = [
   scanImageTool,
   tagImageTool,
   verifyDeployTool,
+
+  // Phase 1 primitives
+  ...ALL_PRIMITIVES,
 ] as const;
 
 export {
