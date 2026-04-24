@@ -2,13 +2,19 @@ import queryKnowledge from './query-knowledge';
 import validateDockerfile from './validate-dockerfile';
 import validateK8sManifest from './validate-k8s-manifest';
 import validateCompose from './validate-compose';
-import type { Tool } from '@/types/tool';
+import type { ToolName } from '@/tools';
 
 export { queryKnowledge, validateDockerfile, validateK8sManifest, validateCompose };
 export * from './types';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const ALL_PRIMITIVES: readonly Tool<any, any>[] = [
+export type Primitive = (
+  | typeof queryKnowledge
+  | typeof validateDockerfile
+  | typeof validateK8sManifest
+  | typeof validateCompose
+) & { name: ToolName };
+
+export const ALL_PRIMITIVES: readonly Primitive[] = [
   queryKnowledge,
   validateDockerfile,
   validateK8sManifest,
