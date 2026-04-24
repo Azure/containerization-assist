@@ -1,10 +1,10 @@
 import { describe, it, expect } from '@jest/globals';
-import pino from 'pino';
+import { createLogger } from '@/lib/logger';
 import queryKnowledge from '@/primitives/query-knowledge';
+import { queryKnowledgeSchema } from '@/primitives/query-knowledge/schema';
 import { createToolContext } from '@/core/context';
 
-// Silent pino logger for tests
-const silentLogger = pino({ level: 'silent' });
+const silentLogger = createLogger({ level: 'silent' });
 
 describe('query-knowledge primitive', () => {
   it('returns matches for known tags', async () => {
@@ -29,5 +29,17 @@ describe('query-knowledge primitive', () => {
     if (!result.ok) return;
     expect(result.value.matches).toEqual([]);
     expect(result.value.totalMatched).toBe(0);
+  });
+});
+
+describe('query-knowledge schema', () => {
+  it('rejects an empty tags array', () => {
+    const result = queryKnowledgeSchema.safeParse({ tags: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a limit above 100', () => {
+    const result = queryKnowledgeSchema.safeParse({ tags: ['x'], limit: 101 });
+    expect(result.success).toBe(false);
   });
 });
