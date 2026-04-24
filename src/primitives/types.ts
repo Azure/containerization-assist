@@ -1,14 +1,15 @@
-// src/primitives/types.ts
 /**
  * Shared types for MCP primitives.
  * Primitives are small, strongly-typed MCP tools that wrap library code
  * (knowledge matcher, policy evaluator) for use by skills and the SDK.
  */
 
+import type { KnowledgeCategory } from '@/knowledge/types';
+
 export interface KnowledgeMatchOut {
   id: string;
-  category: 'security' | 'performance' | 'best-practices' | 'optimization';
-  severity: 'high' | 'medium' | 'low';
+  category: KnowledgeCategory;
+  severity: 'high' | 'medium' | 'low' | 'required';
   title: string;
   guidance: string;
   tags: string[];
@@ -26,15 +27,23 @@ export interface PolicyFinding {
   rule: string;
   severity: PolicyViolationSeverity;
   message: string;
+  category: string;
+  priority?: number;
+  /** Optional remediation guidance provided by some policy rules. */
   hint?: string;
+  /** Content-type-specific location reference (e.g. "L14" for Dockerfile, "spec.containers[0]" for K8s). */
   path?: string;
 }
 
 export interface ValidatePolicyOut {
+  /** True when there are no blocking violations. */
   passed: boolean;
-  violations: PolicyFinding[]; // severity === 'block'
-  warnings: PolicyFinding[]; // severity === 'warn'
-  suggestions: PolicyFinding[]; // severity === 'suggest'
+  /** Blocking findings (severity === 'block'). */
+  violations: PolicyFinding[];
+  /** Non-blocking warnings (severity === 'warn'). */
+  warnings: PolicyFinding[];
+  /** Optional improvements (severity === 'suggest'). */
+  suggestions: PolicyFinding[];
 }
 
 export type ContentType = 'dockerfile' | 'k8s-manifest' | 'compose';
