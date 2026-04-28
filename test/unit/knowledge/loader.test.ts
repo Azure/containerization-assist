@@ -6,7 +6,12 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
 import * as path from 'node:path';
 import { existsSync, readdirSync, readFileSync } from 'fs';
-import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded, loadKnowledgeData } from '@/knowledge/loader';
+import {
+  loadKnowledgeBase,
+  getAllEntries,
+  isKnowledgeLoaded,
+  loadKnowledgeData,
+} from '@/knowledge/loader';
 import { CATEGORY } from '@/knowledge/types';
 import { KnowledgeEntrySchema, KnowledgePackSchema } from '@/knowledge/schemas';
 
@@ -22,14 +27,13 @@ describe('Knowledge Loader', () => {
     });
 
     it('should load all knowledge packs from built-in imports', () => {
-      // Built-in packs are now imported as JSON modules
-      const expectedPackCount = 28; // Total number of built-in packs
+      const packsDir = path.join(process.cwd(), 'knowledge/packs');
+      const packCount = readdirSync(packsDir).filter((f) => f.endsWith('.json')).length;
 
-      // Verify entries were loaded
       const entries = getAllEntries();
       expect(entries.length).toBeGreaterThan(0);
 
-      console.log(`✅ Loaded ${entries.length} entries from ${expectedPackCount} built-in packs`);
+      console.log(`✅ Loaded ${entries.length} entries from ${packCount} built-in packs`);
     });
 
     it('should return entries from getAllEntries', () => {
@@ -99,7 +103,9 @@ describe('Knowledge Loader', () => {
   describe('knowledge pack file validation', () => {
     it('should have all expected knowledge packs in directory', () => {
       const packsDir = path.join(process.cwd(), 'knowledge/packs');
-      const packFiles = readdirSync(packsDir).filter((f) => f.endsWith('.json')).sort();
+      const packFiles = readdirSync(packsDir)
+        .filter((f) => f.endsWith('.json'))
+        .sort();
 
       // Expected packs based on actual directory listing
       const expectedPacks = [
@@ -120,6 +126,7 @@ describe('Knowledge Loader', () => {
         'dotnet-signalr-pack.json',
         'dotnet-worker-pack.json',
         'go-pack.json',
+        'helm-pack.json',
         'java-pack.json',
         'kubernetes-deployment.json',
         'kubernetes-pack.json',
@@ -192,17 +199,20 @@ describe('Knowledge Loader', () => {
   describe('knowledge pack statistics', () => {
     it('should log pack loading statistics', () => {
       const entries = getAllEntries();
-      const expectedPackCount = 28; // Built-in packs
+      const expectedPackCount = 29; // Built-in packs
 
       console.log('\n📊 Knowledge Pack Statistics:');
       console.log(`   Total Packs: ${expectedPackCount}`);
       console.log(`   Total Entries: ${entries.length}`);
       console.log(`   Avg Entries/Pack: ${Math.round(entries.length / expectedPackCount)}`);
 
-      const categoryCounts = entries.reduce((acc, entry) => {
-        acc[entry.category] = (acc[entry.category] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const categoryCounts = entries.reduce(
+        (acc, entry) => {
+          acc[entry.category] = (acc[entry.category] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       console.log('   Categories:');
       for (const [category, count] of Object.entries(categoryCounts)) {
@@ -364,10 +374,12 @@ describe('Knowledge Loader', () => {
         }
       }
 
-      console.log(`\n✅ Pack Validation: ${validCount} valid, ${invalidCount} invalid (out of ${packFiles.length})`);
+      console.log(
+        `\n✅ Pack Validation: ${validCount} valid, ${invalidCount} invalid (out of ${packFiles.length})`,
+      );
 
-      // Should have loaded most packs (26 out of 28 are valid knowledge packs)
-      expect(validCount).toBeGreaterThanOrEqual(26);
+      // Should have loaded most packs (27 out of 29 are valid knowledge packs)
+      expect(validCount).toBeGreaterThanOrEqual(27);
     });
   });
 });
