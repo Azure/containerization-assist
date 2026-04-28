@@ -1,0 +1,898 @@
+[
+  {
+    "id": "helm-fullname-63-char-trunc",
+    "category": "kubernetes",
+    "pattern": "helm|chart|fullname|trunc|trimSuffix",
+    "recommendation": "Define fullname helpers in _helpers.tpl with truncation and trailing hyphen trimming. Always apply `trunc 63 | trimSuffix \"-\"` to generated names so Kubernetes DNS label validation passes.",
+    "example": "{{- define \"mychart.fullname\" -}}\n{{- $name := default .Chart.Name .Values.nameOverride -}}\n{{- printf \"%s-%s\" .Release.Name $name | trunc 63 | trimSuffix \"-\" -}}\n{{- end -}}\n\n# Anti-pattern:\n{{- define \"mychart.fullname\" -}}\n{{- printf \"%s-%s\" .Release.Name .Chart.Name -}}\n{{- end -}}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "chart-structure",
+      "naming",
+      "helpers"
+    ],
+    "description": "Names longer than 63 characters or ending in a hyphen fail DNS-1123 validation and can break installs or upgrades."
+  },
+  {
+    "id": "helm-template-name-prefix",
+    "category": "kubernetes",
+    "pattern": "helm|chart|helpers|define|subchart",
+    "recommendation": "Prefix every named template with the chart name, such as `mychart.fullname`. Template names are globally scoped across parent charts and subcharts, so prefixes prevent collisions.",
+    "example": "{{- define \"mychart.fullname\" -}}\n{{- end -}}\n\n# Anti-pattern:\n{{- define \"fullname\" -}}\n{{- end -}}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "chart-structure",
+      "helpers",
+      "subcharts"
+    ],
+    "description": "Unprefixed template names can override each other across dependencies, producing unexpected manifest output."
+  },
+  {
+    "id": "helm-include-over-template",
+    "category": "kubernetes",
+    "pattern": "helm|include|template|nindent|helpers",
+    "recommendation": "Use `include` instead of `template` when embedding named templates. `include` returns a string that can be piped through `nindent` and other formatters for valid YAML structure.",
+    "example": "labels:\n  {{- include \"mychart.labels\" . | nindent 2 }}\n\n# Anti-pattern:\nlabels:\n  {{template \"mychart.labels\" .}}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "yaml",
+      "helpers"
+    ],
+    "description": "Using `template` directly often causes indentation issues that render invalid YAML or malformed metadata blocks."
+  },
+  {
+    "id": "helm-labels-vs-selectorlabels",
+    "category": "kubernetes",
+    "pattern": "helm|labels|selectorLabels|matchLabels",
+    "recommendation": "Create two helpers: one for full metadata labels and one for selector labels without version fields. Keep selectors stable and version-free to avoid immutable selector changes.",
+    "example": "{{- define \"mychart.selectorLabels\" -}}\napp.kubernetes.io/name: {{ include \"mychart.name\" . }}\napp.kubernetes.io/instance: {{ .Release.Name }}\n{{- end }}\n\n{{- define \"mychart.labels\" -}}\n{{ include \"mychart.selectorLabels\" . }}\napp.kubernetes.io/version: {{ .Chart.AppVersion | quote }}\n{{- end }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "labels",
+      "selectors",
+      "immutability"
+    ],
+    "description": "If versioned labels are used in selectors, later upgrades can fail because `spec.selector.matchLabels` is immutable."
+  },
+  {
+    "id": "helm-helmignore-completeness",
+    "category": "kubernetes",
+    "pattern": "helm|chart|.helmignore|package|artifacts",
+    "recommendation": "Ship a complete `.helmignore` to exclude VCS, editor, and CI artifacts from chart packages. Keep patterns for `.git/`, IDE folders, swap/backup files, CI config, and OWNERS-like files.",
+    "example": ".git/\n.github/\n.vscode/\n.idea/\n*.swp\n*.bak\nOWNERS\n.gitlab-ci.yml",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "packaging",
+      "chart-structure",
+      "hygiene"
+    ],
+    "description": "Packaging noise files increases chart size and can leak internal metadata into published artifacts."
+  },
+  {
+    "id": "helm-chart-appversion-quoted",
+    "category": "kubernetes",
+    "pattern": "helm|Chart.yaml|appVersion|yaml|quote",
+    "recommendation": "Always quote `appVersion` in `Chart.yaml`. Quoting preserves exact semantic version text and avoids YAML numeric coercion.",
+    "example": "appVersion: \"1.10.0\"\n\n# Anti-pattern:\nappVersion: 1.10.0",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "chart-structure",
+      "versioning",
+      "yaml"
+    ],
+    "description": "Unquoted values like `1.10.0` can be parsed unexpectedly (for example as `1.1`), causing incorrect version metadata."
+  },
+  {
+    "id": "helm-chart-kubeversion-constraint",
+    "category": "kubernetes",
+    "pattern": "helm|Chart.yaml|kubeVersion|semver|compatibility",
+    "recommendation": "Set `kubeVersion` in `Chart.yaml` using a SemVer range that matches supported Kubernetes APIs. This prevents installs on incompatible clusters.",
+    "example": "kubeVersion: \">=1.26.0-0 <1.32.0\"",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "chart-structure",
+      "compatibility",
+      "versioning"
+    ],
+    "description": "Without version constraints, users may install charts on clusters lacking required APIs and experience runtime or upgrade failures."
+  },
+  {
+    "id": "helm-values-camelcase-keys",
+    "category": "kubernetes",
+    "pattern": "helm|values.yaml|camelCase|--set|keys",
+    "recommendation": "Use camelCase for all `values.yaml` keys. Avoid hyphenated keys because they are awkward or ambiguous with `--set` overrides.",
+    "example": "servicePort: 8080\nimagePullPolicy: IfNotPresent\n\n# Anti-pattern:\nservice-port: 8080",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "values",
+      "cli",
+      "conventions"
+    ],
+    "description": "Inconsistent key naming makes CLI overrides error-prone and increases configuration mistakes in automation."
+  },
+  {
+    "id": "helm-values-document-every-key",
+    "category": "kubernetes",
+    "pattern": "helm|values|comments|helm-docs|documentation",
+    "recommendation": "Document every top-level and nested value with comments in `values.yaml`. This keeps intent clear and supports automated docs generation with tools like helm-docs.",
+    "example": "# -- Service type for the workload\nservice:\n  # -- Kubernetes Service type\n  type: ClusterIP",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "values",
+      "documentation",
+      "maintainability"
+    ],
+    "description": "Undocumented values lead to incorrect overrides and operational drift because users cannot infer safe configuration changes."
+  },
+  {
+    "id": "helm-values-nested-nil-guard",
+    "category": "kubernetes",
+    "pattern": "helm|values|nested|nil|default",
+    "recommendation": "Guard nested values before dereferencing to avoid nil pointer errors. Bind parent maps with `default dict` (or `dig`) before reading child keys.",
+    "example": "{{- $server := .Values.server | default dict -}}\nport: {{ $server.port | default 8080 }}\n\n# Anti-pattern:\nport: {{ .Values.server.port }}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "values",
+      "templating",
+      "safety"
+    ],
+    "description": "Direct access to missing nested objects can panic template rendering and fail installs in partially configured environments."
+  },
+  {
+    "id": "helm-values-integer-type-coercion",
+    "category": "kubernetes",
+    "pattern": "helm|values|yaml|integer|quote",
+    "recommendation": "Keep numeric values as numbers in `values.yaml`, and only quote when rendering into string-only fields like environment variables. This avoids YAML type confusion.",
+    "example": "# values.yaml\nservice:\n  port: 8080\n\n# template\ncontainerPort: {{ .Values.service.port }}\nenv:\n  - name: APP_PORT\n    value: {{ .Values.service.port | quote }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "values",
+      "yaml",
+      "types"
+    ],
+    "description": "Wrong scalar types can produce invalid manifests or unexpected behavior when Kubernetes expects integers versus strings."
+  },
+  {
+    "id": "helm-values-map-over-list",
+    "category": "kubernetes",
+    "pattern": "helm|values|map|list|--set",
+    "recommendation": "Prefer maps over lists when users commonly override entries with `--set`. Map keys provide stable addressing while list indices are brittle.",
+    "example": "servicePorts:\n  http: 80\n  metrics: 9090\n\n# Anti-pattern:\nservicePorts:\n  - name: http\n    port: 80",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "values",
+      "cli",
+      "usability"
+    ],
+    "description": "List-based overrides are fragile in CI/CD because index changes can silently target the wrong element."
+  },
+  {
+    "id": "helm-values-schema-json",
+    "category": "kubernetes",
+    "pattern": "helm|values.schema.json|schema|validation|types",
+    "recommendation": "Ship a `values.schema.json` file to enforce input types, required fields, and enum constraints before rendering. Treat schema validation as part of chart contract.",
+    "example": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"service\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"port\": { \"type\": \"integer\" }\n      }\n    }\n  }\n}",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "values",
+      "validation",
+      "schema"
+    ],
+    "description": "Without schema checks, invalid values pass to templates and fail later with harder-to-debug rendering or runtime errors."
+  },
+  {
+    "id": "helm-template-quote-string-values",
+    "category": "kubernetes",
+    "pattern": "helm|template|quote|string|yaml",
+    "recommendation": "Pipe string-like values through `| quote` in templates. Quoting prevents YAML from coercing booleans, numbers, or special tokens unintentionally.",
+    "example": "env:\n  - name: LOG_LEVEL\n    value: {{ .Values.logLevel | quote }}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "yaml",
+      "safety"
+    ],
+    "description": "Unquoted strings can be retyped by YAML parsing and cause subtle config bugs or invalid manifest fields."
+  },
+  {
+    "id": "helm-template-toyaml-nindent",
+    "category": "kubernetes",
+    "pattern": "helm|toYaml|nindent|indent|template",
+    "recommendation": "Use `toYaml | nindent N` for nested blocks. `nindent` adds the leading newline required for clean parent-child YAML structure.",
+    "example": "resources:\n  {{- toYaml .Values.resources | nindent 2 }}\n\n# Anti-pattern:\nresources: {{- toYaml .Values.resources | indent 2 }}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "yaml",
+      "formatting"
+    ],
+    "description": "Using `indent` in the wrong context can collapse YAML structure and produce invalid manifests."
+  },
+  {
+    "id": "helm-template-required-function",
+    "category": "kubernetes",
+    "pattern": "helm|required|values|template|validation",
+    "recommendation": "Use `required` for mandatory values to fail fast with explicit errors. Provide clear messages that tell users exactly which key is missing.",
+    "example": "image:\n  repository: {{ required \"values.image.repository is required\" .Values.image.repository }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "validation",
+      "errors"
+    ],
+    "description": "Missing critical values otherwise render as empty strings and lead to invalid resources or hard-to-trace runtime failures."
+  },
+  {
+    "id": "helm-template-fail-invariants",
+    "category": "kubernetes",
+    "pattern": "helm|fail|invariant|mutually-exclusive|template",
+    "recommendation": "Use `fail` to enforce invariants such as mutually exclusive options. Validate impossible states during template rendering, not after deployment.",
+    "example": "{{- if and .Values.ingress.enabled .Values.route.enabled -}}\n{{- fail \"ingress.enabled and route.enabled cannot both be true\" -}}\n{{- end -}}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "validation",
+      "safety"
+    ],
+    "description": "Without invariant checks, invalid option combinations can ship to clusters and fail in unpredictable ways."
+  },
+  {
+    "id": "helm-template-default-precedence",
+    "category": "kubernetes",
+    "pattern": "helm|default|pipeline|boolean|template",
+    "recommendation": "Apply `default` at the end of the pipeline and be careful with booleans where `false` is a valid value. Use explicit key checks for booleans instead of relying on default emptiness semantics.",
+    "example": "{{- if hasKey .Values.feature \"enabled\" -}}\nfeatureEnabled: {{ .Values.feature.enabled }}\n{{- else -}}\nfeatureEnabled: true\n{{- end -}}\n\n# Anti-pattern:\nfeatureEnabled: {{ default true .Values.feature.enabled }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "defaults",
+      "booleans"
+    ],
+    "description": "`default` treats `false` as empty, which can silently override intentional settings and change behavior across environments."
+  },
+  {
+    "id": "helm-template-comment-safety",
+    "category": "kubernetes",
+    "pattern": "helm|comments|yaml|template|execution",
+    "recommendation": "Use Helm template comments (`{{- /* ... */ -}}`) for disabling template logic. YAML `#` comments do not stop Go template expressions from rendering.",
+    "example": "{{- /* Safe Helm comment: template code here will not render */ -}}\n\n# Anti-pattern:\n# {{ .Values.secretValue }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "comments",
+      "gotchas"
+    ],
+    "description": "Assuming YAML comments disable templates can leak rendered data or trigger unexpected template execution."
+  },
+  {
+    "id": "helm-whitespace-trim-hyphen",
+    "category": "kubernetes",
+    "pattern": "helm|template|whitespace|\\{\\{-| -\\}\\}|yaml",
+    "recommendation": "Use hyphen trimming markers deliberately in templates to control whitespace. Missing or misplaced `{{-` / `-}}` commonly introduces blank lines or indentation breakage.",
+    "example": "{{- if .Values.extraEnv }}\nenv:\n  {{- toYaml .Values.extraEnv | nindent 2 }}\n{{- end }}\n\n# Anti-pattern:\n{{ if .Values.extraEnv }}\nenv:\n{{ toYaml .Values.extraEnv | nindent 2 }}\n{{ end }}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "whitespace",
+      "yaml"
+    ],
+    "description": "Whitespace control errors produce noisy or invalid YAML that may pass review but fail parser validation."
+  },
+  {
+    "id": "helm-range-scope-root-variable",
+    "category": "kubernetes",
+    "pattern": "helm|range|scope|\\$|dot",
+    "recommendation": "Inside `range`, remember that `.` is rebound to the loop item. Capture root context with `$` (or local vars) when you need release/chart values inside the loop.",
+    "example": "{{- $root := . -}}\n{{- range .Values.hosts }}\n- host: {{ .name | quote }}\n  release: {{ $root.Release.Name | quote }}\n{{- end }}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "scope",
+      "gotchas"
+    ],
+    "description": "Scope rebinding often causes missing-field errors or wrong values when templates reference `.Release` or `.Values` inside loops."
+  },
+  {
+    "id": "helm-tpl-injection-risk",
+    "category": "kubernetes",
+    "pattern": "helm|tpl|injection|security|template",
+    "recommendation": "Treat `tpl` as dangerous because it evaluates strings as templates. Only apply it to trusted inputs and guard usage behind explicit opt-in flags.",
+    "example": "{{- if .Values.allowTpl }}\n{{ tpl .Values.extraTemplate . }}\n{{- else }}\n{{ .Values.extraTemplate | quote }}\n{{- end }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "security",
+      "templating",
+      "gotchas"
+    ],
+    "description": "Untrusted templated input can execute unexpected expressions, enabling config injection and unsafe rendering behavior."
+  },
+  {
+    "id": "helm-lookup-dryrun-behavior",
+    "category": "kubernetes",
+    "pattern": "helm|lookup|dry-run|template|cluster",
+    "recommendation": "Design templates so `lookup`-dependent logic has safe fallbacks during offline rendering. `helm template` without cluster access returns empty lookup results.",
+    "example": "{{- $secret := lookup \"v1\" \"Secret\" .Release.Namespace (printf \"%s-token\" .Release.Name) -}}\n{{- if $secret }}\nexistingToken: {{ index $secret.data \"token\" | quote }}\n{{- else }}\nexistingToken: \"\"\n{{- end }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "lookup",
+      "gotchas"
+    ],
+    "description": "Templates that assume live-cluster lookup behavior can fail CI rendering and produce inconsistent manifests between environments."
+  },
+  {
+    "id": "helm-random-upgrade-churn",
+    "category": "kubernetes",
+    "pattern": "helm|randAlphaNum|upgrade|lookup|secret",
+    "recommendation": "Avoid unconditional random generators like `randAlphaNum` in stable values. Reuse existing generated values via `lookup` to prevent needless rollout churn on upgrades.",
+    "example": "{{- $s := lookup \"v1\" \"Secret\" .Release.Namespace (printf \"%s-auth\" .Release.Name) -}}\n{{- if $s -}}\npassword: {{ index $s.data \"password\" }}\n{{- else -}}\npassword: {{ randAlphaNum 32 | b64enc | quote }}\n{{- end -}}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "upgrades",
+      "secrets",
+      "gotchas"
+    ],
+    "description": "Regenerating random values on every upgrade can rotate credentials unexpectedly and restart workloads unnecessarily."
+  },
+  {
+    "id": "helm-configmap-checksum-annotation",
+    "category": "kubernetes",
+    "pattern": "helm|configmap|checksum|annotation|rollout",
+    "recommendation": "Annotate pod templates with a checksum of rendered ConfigMap/Secret templates. This forces a rollout when configuration changes.",
+    "example": "metadata:\n  annotations:\n    checksum/config: {{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "rollouts",
+      "configmap",
+      "operations"
+    ],
+    "description": "Without checksum annotations, pod specs may remain unchanged and workloads can keep stale configuration after updates."
+  },
+  {
+    "id": "helm-resource-policy-keep-orphan-risk",
+    "category": "kubernetes",
+    "pattern": "helm|resource-policy|keep|orphan|uninstall",
+    "recommendation": "Use `helm.sh/resource-policy: keep` only for resources that must outlive releases, and document cleanup ownership. Assume those resources become unmanaged after uninstall.",
+    "example": "metadata:\n  annotations:\n    helm.sh/resource-policy: keep",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "lifecycle",
+      "cleanup",
+      "gotchas"
+    ],
+    "description": "Kept resources are orphaned from release lifecycle, which can leak state and complicate reinstallation or teardown."
+  },
+  {
+    "id": "helm-template-basepath-checksum",
+    "category": "kubernetes",
+    "pattern": "helm|Template.BasePath|checksum|include|path",
+    "recommendation": "Use `$.Template.BasePath` when including templates for checksum annotations. Avoid hardcoded paths so helpers work after chart moves or refactors.",
+    "example": "checksum/config: {{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}\n\n# Anti-pattern:\nchecksum/config: {{ include \"templates/configmap.yaml\" . | sha256sum }}",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "templating",
+      "rollouts",
+      "gotchas"
+    ],
+    "description": "Hardcoded include paths break easily across chart restructuring and can silently disable restart-on-config-change behavior."
+  },
+  {
+    "id": "helm-upgrade-install-idempotent",
+    "category": "kubernetes",
+    "pattern": "helm|upgrade|--install|idempotent|cicd",
+    "recommendation": "Use `helm upgrade --install` in automation so the same command handles first-time deploys and updates. Keep release flow idempotent across environments.",
+    "example": "helm upgrade --install myapp ./chart --namespace prod --create-namespace",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "cicd",
+      "release-management",
+      "idempotency"
+    ],
+    "description": "Separate install and upgrade paths in CI introduce branching logic and frequent failures when release state drifts."
+  },
+  {
+    "id": "helm-selector-labels-immutable",
+    "category": "kubernetes",
+    "pattern": "helm|selector|matchLabels|immutable|deployment",
+    "recommendation": "Treat selector labels as immutable API. Keep `spec.selector.matchLabels` stable between chart versions and limit selectors to identity labels only.",
+    "example": "spec:\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: {{ include \"mychart.name\" . }}\n      app.kubernetes.io/instance: {{ .Release.Name }}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "selectors",
+      "immutability",
+      "upgrades"
+    ],
+    "description": "Changing selectors forces resource replacement and can fail rolling upgrades for Deployments and related controllers."
+  },
+  {
+    "id": "helm-no-secrets-in-values",
+    "category": "kubernetes",
+    "pattern": "helm|values.yaml|secret|existingSecret|security",
+    "recommendation": "Do not ship real secrets in `values.yaml` defaults. Use an `existingSecret` pattern and reference externally managed Secret names.",
+    "example": "# values.yaml\nexistingSecret: \"\"\n\n# template\nenvFrom:\n  - secretRef:\n      name: {{ required \"existingSecret is required\" .Values.existingSecret }}",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "security",
+      "secrets",
+      "values"
+    ],
+    "description": "Default secrets in chart values are commonly committed to source control and leaked through artifact distribution."
+  },
+  {
+    "id": "helm-imagepullpolicy-mutable-tags",
+    "category": "kubernetes",
+    "pattern": "helm|imagePullPolicy|latest|IfNotPresent|image",
+    "recommendation": "Default `imagePullPolicy` to `IfNotPresent` for immutable tags, and switch to `Always` for mutable tags like `latest`. Make the behavior explicit in values.",
+    "example": "{{- $tag := .Values.image.tag | default \"latest\" -}}\nimagePullPolicy: {{ ternary \"Always\" \"IfNotPresent\" (eq $tag \"latest\") }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "images",
+      "security",
+      "operations"
+    ],
+    "description": "Incorrect pull policy causes stale images or unnecessary pulls, undermining repeatability and rollout confidence."
+  },
+  {
+    "id": "helm-securitycontext-defaults",
+    "category": "kubernetes",
+    "pattern": "helm|securityContext|runAsNonRoot|capabilities|readOnlyRootFilesystem",
+    "recommendation": "Provide secure-by-default `securityContext` values in charts. Set `runAsNonRoot`, drop all capabilities, and enable read-only root filesystems unless explicitly overridden.",
+    "example": "securityContext:\n  runAsNonRoot: true\n  allowPrivilegeEscalation: false\n  readOnlyRootFilesystem: true\n  capabilities:\n    drop:\n      - ALL",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "security",
+      "pod-security",
+      "defaults"
+    ],
+    "description": "Insecure defaults force every consumer to harden manually and increase the chance of privileged workloads in production."
+  },
+  {
+    "id": "helm-rbac-create-toggle",
+    "category": "kubernetes",
+    "pattern": "helm|rbac|serviceAccount|create|toggle",
+    "recommendation": "Expose `rbac.create` and `serviceAccount.create` toggles so operators can integrate with preexisting RBAC models. Bind resources conditionally based on those flags.",
+    "example": "rbac:\n  create: true\nserviceAccount:\n  create: true\n  name: \"\"",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "security",
+      "rbac",
+      "multi-tenant"
+    ],
+    "description": "Hardcoded RBAC creation conflicts with locked-down clusters and can block installs in enterprise environments."
+  },
+  {
+    "id": "helm-networkpolicy-template-toggle",
+    "category": "kubernetes",
+    "pattern": "helm|networkpolicy|enabled|template|security",
+    "recommendation": "Provide a `networkPolicy.enabled` value and template a baseline NetworkPolicy with default `false`. This offers secure extensibility without breaking clusters lacking policy controllers.",
+    "example": "networkPolicy:\n  enabled: false\n\n{{- if .Values.networkPolicy.enabled }}\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\n...\n{{- end }}",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "security",
+      "networking",
+      "policy"
+    ],
+    "description": "Without a toggle, charts either ship no network controls or enforce policies that may not be deployable in all environments."
+  },
+  {
+    "id": "helm-hook-delete-policy",
+    "category": "kubernetes",
+    "pattern": "helm|hook-delete-policy|before-hook-creation|hook-succeeded|hooks",
+    "recommendation": "Set `helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded` on hook resources. This prevents stale hook objects from accumulating between runs.",
+    "example": "metadata:\n  annotations:\n    helm.sh/hook: pre-install,pre-upgrade\n    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hooks",
+      "lifecycle",
+      "cleanup"
+    ],
+    "description": "Missing delete policies leaves old hook resources behind and can cause retries, naming conflicts, or operational noise."
+  },
+  {
+    "id": "helm-hook-weight-ordering",
+    "category": "kubernetes",
+    "pattern": "helm|hook-weight|hooks|ordering|annotations",
+    "recommendation": "Assign explicit `helm.sh/hook-weight` values (as strings) to control hook execution order. Relying on implicit ordering is fragile and non-obvious.",
+    "example": "metadata:\n  annotations:\n    helm.sh/hook: pre-upgrade\n    helm.sh/hook-weight: \"-5\"",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hooks",
+      "ordering",
+      "release-management"
+    ],
+    "description": "Undeclared ordering can race critical pre/post tasks and create intermittent release failures."
+  },
+  {
+    "id": "helm-hooks-unmanaged-resources",
+    "category": "kubernetes",
+    "pattern": "helm|hooks|release|uninstall|lifecycle",
+    "recommendation": "Design hook resources assuming they are not managed as regular release objects. Add explicit cleanup behavior and observability for hook-created resources.",
+    "example": "# Hooks are not part of normal release state\nmetadata:\n  annotations:\n    helm.sh/hook: post-install",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hooks",
+      "lifecycle",
+      "operations"
+    ],
+    "description": "Teams often expect uninstall to remove everything, but hook-created artifacts can remain and drift over time."
+  },
+  {
+    "id": "helm-subchart-hooks-not-disableable",
+    "category": "kubernetes",
+    "pattern": "helm|subchart|hooks|parent|dependencies",
+    "recommendation": "Treat subchart hooks as always-on from the parent chart perspective. If hook control is required, patch or fork the dependency to add explicit toggles.",
+    "example": "dependencies:\n  - name: dependency-chart\n    version: 1.2.3\n# Parent chart cannot directly disable child hooks",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hooks",
+      "dependencies",
+      "subcharts"
+    ],
+    "description": "Unexpected subchart hook execution can introduce side effects during install/upgrade that parent maintainers cannot suppress."
+  },
+  {
+    "id": "helm-dependency-condition-over-tags",
+    "category": "kubernetes",
+    "pattern": "helm|dependencies|condition|tags|values",
+    "recommendation": "Use dependency `condition` fields for straightforward enable/disable behavior. Reserve tags for broader grouping scenarios where one switch controls multiple dependencies.",
+    "example": "dependencies:\n  - name: redis\n    version: 18.0.0\n    repository: https://charts.bitnami.com/bitnami\n    condition: redis.enabled",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "dependencies",
+      "values",
+      "maintainability"
+    ],
+    "description": "Tag-based toggling can become opaque and lead to surprising dependency activation states."
+  },
+  {
+    "id": "helm-dependency-global-values",
+    "category": "kubernetes",
+    "pattern": "helm|dependencies|global|values|subcharts",
+    "recommendation": "Use the `global` key for cross-chart settings like registry and storage class. Keep shared defaults centralized and avoid duplicating the same value under multiple subcharts.",
+    "example": "global:\n  imageRegistry: ghcr.io/example\n  storageClass: fast-ssd",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "dependencies",
+      "values",
+      "global"
+    ],
+    "description": "Duplicated cross-chart configuration drifts quickly and causes inconsistent behavior among subcomponents."
+  },
+  {
+    "id": "helm-dependency-alias-override",
+    "category": "kubernetes",
+    "pattern": "helm|dependencies|alias|override|values",
+    "recommendation": "When a dependency uses `alias`, override its values under the alias key, not the original chart name. Keep value paths aligned with the rendered alias namespace.",
+    "example": "dependencies:\n  - name: postgresql\n    alias: db\n\n# values.yaml\ndb:\n  auth:\n    username: app",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "dependencies",
+      "aliases",
+      "values"
+    ],
+    "description": "Using the wrong values namespace silently ignores overrides and leaves dependencies misconfigured."
+  },
+  {
+    "id": "helm-dependency-pin-version-lock",
+    "category": "kubernetes",
+    "pattern": "helm|dependencies|version|Chart.lock|reproducible",
+    "recommendation": "Pin dependency versions with exact or `~X.Y.Z` ranges and commit `Chart.lock`. This keeps dependency resolution reproducible across environments and CI runs.",
+    "example": "dependencies:\n  - name: redis\n    version: \"~18.0.0\"\n# Commit Chart.lock after helm dependency update",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "dependencies",
+      "reproducibility",
+      "versioning"
+    ],
+    "description": "Floating dependency versions can introduce unreviewed behavior changes and break previously stable releases."
+  },
+  {
+    "id": "helm-release-atomic-install",
+    "category": "kubernetes",
+    "pattern": "helm|upgrade|--install|--atomic|timeout",
+    "recommendation": "Use `helm upgrade --install --atomic --timeout 5m` for production releases. Atomic mode rolls back automatically on failure and keeps release state consistent.",
+    "example": "helm upgrade --install myapp ./chart --atomic --timeout 5m",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "release-management",
+      "cicd",
+      "reliability"
+    ],
+    "description": "Non-atomic releases can leave partially applied resources and require manual intervention to restore a healthy state."
+  },
+  {
+    "id": "helm-release-wait-for-jobs",
+    "category": "kubernetes",
+    "pattern": "helm|upgrade|--wait-for-jobs|wait|jobs",
+    "recommendation": "Include `--wait-for-jobs` when your release depends on Job completion. `--wait` alone does not fully account for chart Jobs.",
+    "example": "helm upgrade --install myapp ./chart --wait --wait-for-jobs --timeout 10m",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "release-management",
+      "jobs",
+      "cicd"
+    ],
+    "description": "Pipelines may mark success before migration or initialization jobs finish, causing downstream failures."
+  },
+  {
+    "id": "helm-release-diff-pre-upgrade",
+    "category": "kubernetes",
+    "pattern": "helm|helm-diff|upgrade|review|cicd",
+    "recommendation": "Run the `helm-diff` plugin before upgrades to preview manifest deltas. Gate risky changes with review or policy checks before apply.",
+    "example": "helm plugin install https://github.com/databus23/helm-diff\nhelm diff upgrade myapp ./chart -f values-prod.yaml",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "release-management",
+      "review",
+      "cicd"
+    ],
+    "description": "Applying upgrades without visibility into diffs can introduce destructive or unintended changes unnoticed."
+  },
+  {
+    "id": "helm-release-chart-semver",
+    "category": "kubernetes",
+    "pattern": "helm|chart|version|semver|release",
+    "recommendation": "Use strict SemVer for the chart `version` field and increment it consistently on any chart change. Keep versioning policy predictable for automation and consumers.",
+    "example": "# Chart.yaml\nversion: 2.4.1",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "release-management",
+      "versioning",
+      "chart-structure"
+    ],
+    "description": "Loose or inconsistent versioning breaks dependency resolution and makes upgrade intent unclear."
+  },
+  {
+    "id": "helm-testing-test-hooks",
+    "category": "kubernetes",
+    "pattern": "helm|test|hooks|pod|validation",
+    "recommendation": "Include `helm test` hook resources that verify core connectivity and service readiness after deployment. Keep tests lightweight but meaningful.",
+    "example": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: \"{{ include \\\"mychart.fullname\\\" . }}-test\"\n  annotations:\n    helm.sh/hook: test\nspec:\n  containers:\n    - name: wget\n      image: busybox\n      command: ['wget']",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "testing",
+      "hooks",
+      "quality"
+    ],
+    "description": "Without runtime validation hooks, broken service wiring can pass install checks and fail only in production traffic."
+  },
+  {
+    "id": "helm-testing-lint-strict",
+    "category": "kubernetes",
+    "pattern": "helm|lint|--strict|ci|testing",
+    "recommendation": "Run `helm lint --strict` in CI for every chart change. Treat lint warnings as failures to maintain chart quality consistently.",
+    "example": "helm lint charts/myapp --strict",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "testing",
+      "lint",
+      "cicd"
+    ],
+    "description": "Lenient linting allows known chart issues to accumulate until they fail at deploy time."
+  },
+  {
+    "id": "helm-testing-ct-lint-and-install",
+    "category": "kubernetes",
+    "pattern": "helm|ct|lint-and-install|charts|testing",
+    "recommendation": "Use Chart Testing (`ct lint-and-install`) to detect changed charts and validate they install cleanly. Integrate it as a required CI gate.",
+    "example": "ct lint-and-install --config ct.yaml",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "testing",
+      "ct",
+      "cicd"
+    ],
+    "description": "Skipping install validation allows regressions that only appear during runtime chart deployment."
+  },
+  {
+    "id": "helm-testing-multi-values-ci",
+    "category": "kubernetes",
+    "pattern": "helm|testing|values|matrix|ci",
+    "recommendation": "Test charts against multiple values combinations (minimal, default, production) in CI. Exercise optional paths and feature toggles before release.",
+    "example": "helm template myapp ./chart -f values.yaml\nhelm template myapp ./chart -f values-minimal.yaml\nhelm template myapp ./chart -f values-prod.yaml",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "testing",
+      "values",
+      "cicd"
+    ],
+    "description": "Single-profile testing misses template branches and causes environment-specific failures after deployment."
+  },
+  {
+    "id": "helm-hardening-resource-defaults",
+    "category": "kubernetes",
+    "pattern": "helm|resources|requests|limits|values",
+    "recommendation": "Provide sane default resource requests and limits in `values.yaml`. Make limits configurable but never leave resource blocks empty by default.",
+    "example": "resources:\n  requests:\n    cpu: 100m\n    memory: 128Mi\n  limits:\n    cpu: 500m\n    memory: 512Mi",
+    "severity": "required",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hardening",
+      "resources",
+      "scheduling"
+    ],
+    "description": "Missing resource defaults lead to noisy-neighbor behavior, unstable scheduling, and unpredictable performance in shared clusters."
+  },
+  {
+    "id": "helm-hardening-hpa-replicas-guard",
+    "category": "kubernetes",
+    "pattern": "helm|autoscaling|replicas|guard|if",
+    "recommendation": "Render `replicas` only when autoscaling is disabled by guarding with `if not .Values.autoscaling.enabled`. This avoids conflicting desired state between Deployment and HPA.",
+    "example": "{{- if not .Values.autoscaling.enabled }}\nreplicas: {{ .Values.replicaCount }}\n{{- end }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hardening",
+      "autoscaling",
+      "deployment"
+    ],
+    "description": "Setting replicas alongside HPA can create scaling thrash and confusion about which controller owns replica count."
+  },
+  {
+    "id": "helm-hardening-pdb-values-pattern",
+    "category": "kubernetes",
+    "pattern": "helm|pdb|PodDisruptionBudget|values|hardening",
+    "recommendation": "Model PDB settings in values with disabled-by-default semantics and explicit minAvailable/maxUnavailable options. Enable selectively for workloads that need disruption guarantees.",
+    "example": "podDisruptionBudget: {}\n\n{{- if .Values.podDisruptionBudget.enabled }}\napiVersion: policy/v1\nkind: PodDisruptionBudget\n...\n{{- end }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hardening",
+      "availability",
+      "pdb"
+    ],
+    "description": "Always-on or poorly tuned PDBs can block node drains and maintenance operations, causing operational deadlocks."
+  },
+  {
+    "id": "helm-hardening-anti-affinity-values",
+    "category": "kubernetes",
+    "pattern": "helm|affinity|podAntiAffinity|values|scheduling",
+    "recommendation": "Expose affinity as free-form values and offer a simple podAntiAffinity shortcut for common HA defaults. This balances flexibility with practical defaults.",
+    "example": "affinity: {}\npodAntiAffinityPreset: soft\n\n{{- with .Values.affinity }}\naffinity:\n  {{- toYaml . | nindent 2 }}\n{{- end }}",
+    "severity": "high",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hardening",
+      "affinity",
+      "availability"
+    ],
+    "description": "Without configurable anti-affinity, replicas can co-locate on one node and increase blast radius during failures."
+  },
+  {
+    "id": "helm-hardening-topology-spread-values",
+    "category": "kubernetes",
+    "pattern": "helm|topologySpreadConstraints|values|scheduling|availability",
+    "recommendation": "Define `topologySpreadConstraints` as an empty list by default and render it with `toYaml | nindent`. This enables optional topology-aware spreading without forcing assumptions.",
+    "example": "topologySpreadConstraints: []\n\n{{- with .Values.topologySpreadConstraints }}\ntopologySpreadConstraints:\n  {{- toYaml . | nindent 2 }}\n{{- end }}",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hardening",
+      "scheduling",
+      "availability"
+    ],
+    "description": "Lack of spread constraints can concentrate replicas in one zone or node and reduce resilience to infrastructure failures."
+  },
+  {
+    "id": "helm-hardening-probe-values",
+    "category": "kubernetes",
+    "pattern": "helm|probes|liveness|readiness|startup",
+    "recommendation": "Expose liveness, readiness, and startup probes as free-form values so teams can tune behavior per workload. Provide safe defaults and allow overrides per environment.",
+    "example": "livenessProbe: {}\nreadinessProbe: {}\nstartupProbe: {}\n\n{{- with .Values.livenessProbe }}\nlivenessProbe:\n  {{- toYaml . | nindent 2 }}\n{{- end }}",
+    "severity": "medium",
+    "tags": [
+      "generate-k8s-manifests",
+      "helm",
+      "hardening",
+      "probes",
+      "health"
+    ],
+    "description": "Hardcoded probe settings fail across diverse runtimes and can trigger restart loops or delayed traffic readiness."
+  }
+]

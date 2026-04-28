@@ -297,7 +297,6 @@ export interface PrepareClusterResult {
     internalEndpoint: string;
     containerName: string;
     healthy: boolean;
-    reachableFromCluster: boolean;
   };
 }
 
@@ -879,106 +878,6 @@ async function getContainerNetworkIP(
 }
 
 /**
- * Verify registry is accessible from within the kind cluster.
- * Uses kubectl run to create a test pod that curls the registry endpoint.
- */
-async function verifyRegistryFromCluster(_port: number, logger: pino.Logger): Promise<boolean> {
-  try {
-    logger.debug('Testing registry reachability from within cluster...');
-
-    // Create a temporary test pod that curls the registry
-    const testPodName = `registry-test-${Date.now()}`;
-    const curlCommand = `curl -sf http://${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.REGISTRY_INTERNAL_PORT}/v2/ && echo "success" || echo "failed"`;
-
-    try {
-      // Run test pod and wait for completion (timeout 30s)
-      const { stdout } = await execAsync(
-        `kubectl run ${testPodName} --image=curlimages/curl:latest --restart=Never --rm -i --timeout=30s -- sh -c '${curlCommand}'`,
-        { timeout: 35000 },
-      );
-
-      const success = stdout.includes('success');
-      logger.debug(
-        { testPodName, success, output: stdout.trim() },
-        'In-cluster registry test result',
-      );
-
-      return success;
-    } catch (error) {
-      // If pod creation fails, try to clean it up
-      try {
-        await execAsync(`kubectl delete pod ${testPodName} --ignore-not-found=true`);
-      } catch {
-        // Ignore cleanup errors
-      }
-      logger.debug({ error }, 'In-cluster registry test failed');
-      return false;
-    }
-  } catch (error) {
-    logger.warn({ error }, 'Error testing registry from cluster');
-    return false;
-  }
-}
-
-/**
- * Validate DNS resolution for registry from within the cluster.
- * Uses kubectl run to create a test pod that performs DNS lookup for the registry hostname.
- * This specifically tests if pods can resolve the registry's DNS name to its IP address.
- */
-async function verifyRegistryDNSResolution(logger: pino.Logger): Promise<{
-  resolves: boolean;
-  resolvedIP?: string;
-}> {
-  try {
-    logger.debug('Testing registry DNS resolution from within cluster...');
-
-    // Create a temporary test pod that performs DNS lookup
-    const testPodName = `registry-dns-test-${Date.now()}`;
-    // Use nslookup to resolve the registry hostname
-    const nslookupCommand = `nslookup ${DOCKER.REGISTRY_CONTAINER_NAME} && echo "DNS_SUCCESS" || echo "DNS_FAILED"`;
-
-    try {
-      // Run test pod and wait for completion (timeout 30s)
-      const { stdout } = await execAsync(
-        `kubectl run ${testPodName} --image=busybox:latest --restart=Never --rm -i --timeout=30s -- sh -c '${nslookupCommand}'`,
-        { timeout: 35000 },
-      );
-
-      const success = stdout.includes('DNS_SUCCESS') && !stdout.includes('DNS_FAILED');
-
-      // Try to extract the resolved IP address from nslookup output
-      let resolvedIP: string | undefined;
-      if (success) {
-        // nslookup output format: "Address 1: <IP> <hostname>"
-        const ipMatch = stdout.match(/Address\s+\d+:\s+(\d+\.\d+\.\d+\.\d+)/);
-        if (ipMatch?.[1]) {
-          resolvedIP = ipMatch[1];
-        }
-      }
-
-      logger.debug(
-        { testPodName, resolves: success, resolvedIP, output: stdout.trim() },
-        'In-cluster DNS resolution test result',
-      );
-
-      return resolvedIP ? { resolves: success, resolvedIP } : { resolves: success };
-    } catch (error) {
-      // If pod creation fails, try to clean it up
-      try {
-        await execAsync(`kubectl delete pod ${testPodName} --ignore-not-found=true`);
-      } catch {
-        // Ignore cleanup errors
-      }
-      logger.debug({ error }, 'In-cluster DNS resolution test failed');
-      return { resolves: false };
-    }
-  } catch (error) {
-    logger.warn({ error }, 'Error testing registry DNS resolution from cluster');
-    return { resolves: false };
-  }
-}
-
-/**
  * Validate containerd mirror configuration on kind node.
  * Enhanced to detect actual mirror configuration structure dynamically.
  * Checks if the registry mirror config was properly applied.
@@ -1321,7 +1220,6 @@ async function setupLocalRegistry(
   port: number;
   healthy: boolean;
   healthCheckAttempts: number;
-  reachableFromCluster: boolean;
 }> {
   logger.debug({ port }, 'Starting local registry setup (Phase 1: container creation)');
 
@@ -1345,7 +1243,6 @@ async function setupLocalRegistry(
       port: existingPort,
       healthy: healthCheck.healthy,
       healthCheckAttempts: healthCheck.attempts,
-      reachableFromCluster: false, // Will be checked in Phase 2
     };
   }
 
@@ -1366,7 +1263,6 @@ async function setupLocalRegistry(
     port,
     healthy: healthCheck.healthy,
     healthCheckAttempts: healthCheck.attempts,
-    reachableFromCluster: false, // Will be checked in Phase 2
   };
 }
 
@@ -1576,65 +1472,18 @@ async function handlePrepareCluster(
         logger.info('Containerd registry mirror configuration validated successfully');
       }
 
-      // Test registry reachability from within cluster
-      logger.debug('Testing registry reachability from cluster...');
-      let registryReachable = false;
-      const maxRetries = 2;
-      const retryDelay = 3000; // 3 seconds
-
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        registryReachable = await verifyRegistryFromCluster(registryPort, logger);
-        if (registryReachable) {
-          break;
-        }
-
-        if (attempt < maxRetries) {
-          logger.debug(
-            { attempt: attempt + 1, maxRetries: maxRetries + 1 },
-            'Registry reachability test failed, retrying...',
-          );
-          await new Promise((resolve) => setTimeout(resolve, retryDelay));
-        }
-      }
-
-      if (!registryReachable) {
-        warnings.push('Registry is not reachable from within cluster - deployment may fail');
-      } else {
-        logger.info('Registry reachability from cluster validated successfully');
-      }
-
-      // Test DNS resolution from within cluster
-      logger.debug('Testing registry DNS resolution from cluster...');
-      const dnsResolution = await verifyRegistryDNSResolution(logger);
-
-      if (!dnsResolution.resolves) {
-        warnings.push(
-          `Registry DNS resolution failed from within cluster - pods cannot resolve hostname '${DOCKER.REGISTRY_CONTAINER_NAME}'`,
-        );
-        logger.warn(
-          'Registry DNS resolution failed - this may indicate network configuration issues',
-        );
-      } else {
-        const dnsMessage = dnsResolution.resolvedIP
-          ? `Registry DNS resolution validated successfully (resolved to ${dnsResolution.resolvedIP})`
-          : 'Registry DNS resolution validated successfully';
-        logger.info({ resolvedIP: dnsResolution.resolvedIP }, dnsMessage);
-      }
-
       // Populate detailed registry information combining Phase 1 and Phase 2 data
       localRegistryInfo = {
         externalUrl: registryPhase1Data.url,
         internalEndpoint: `${DOCKER.REGISTRY_CONTAINER_NAME}:${DOCKER.REGISTRY_INTERNAL_PORT}`,
         containerName: DOCKER.REGISTRY_CONTAINER_NAME,
         healthy: networkConnection.healthy,
-        reachableFromCluster: registryReachable,
       };
 
       logger.info(
         {
           connected: networkConnection.connected,
           healthy: networkConnection.healthy,
-          reachable: registryReachable,
         },
         'Registry Phase 2 complete',
       );
