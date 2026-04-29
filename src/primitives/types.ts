@@ -46,8 +46,6 @@ export interface ValidatePolicyOut {
   suggestions: PolicyFinding[];
 }
 
-export type ContentType = 'dockerfile' | 'k8s-manifest' | 'compose';
-
 import type { RegoPolicyViolation } from '@/config/policy-rego';
 
 /**
