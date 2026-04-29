@@ -47,3 +47,29 @@ export interface ValidatePolicyOut {
 }
 
 export type ContentType = 'dockerfile' | 'k8s-manifest' | 'compose';
+
+import type { RegoPolicyViolation } from '@/config/policy-rego';
+
+/**
+ * Map a raw RegoPolicyViolation to a PolicyFinding.
+ *
+ * Severity is taken from the CALLER's bucket (violations → 'block', warnings → 'warn',
+ * suggestions → 'suggest') rather than from the violation's own `severity` field. This
+ * matches the project-wide convention in `validateContentAgainstPolicy`
+ * (src/lib/policy-helpers.ts) and trusts the three result arrays to be the source of truth.
+ * If a policy author accidentally tags a rule with a severity inconsistent with the bucket
+ * it emits into, we silently use the bucket. This is intentional.
+ */
+export function toFinding(
+  r: RegoPolicyViolation,
+  severity: PolicyFinding['severity'],
+): PolicyFinding {
+  return {
+    rule: r.rule,
+    severity,
+    message: r.message,
+    category: r.category,
+    ...(r.priority !== undefined && { priority: r.priority }),
+    ...(r.description && { hint: r.description }),
+  };
+}
