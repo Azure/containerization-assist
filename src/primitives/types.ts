@@ -51,11 +51,13 @@ export interface ValidatePolicyOut {
  * Map a raw RegoPolicyViolation to a PolicyFinding.
  *
  * Severity is taken from the CALLER's bucket (violations → 'block', warnings → 'warn',
- * suggestions → 'suggest') rather than from the violation's own `severity` field. This
- * matches the project-wide convention in `validateContentAgainstPolicy`
- * (src/lib/policy-helpers.ts) and trusts the three result arrays to be the source of truth.
- * If a policy author accidentally tags a rule with a severity inconsistent with the bucket
- * it emits into, we silently use the bucket. This is intentional.
+ * suggestions → 'suggest') rather than from the violation's own `severity` field.
+ * The three result arrays (violations/warnings/suggestions) returned by `applyPolicy`
+ * are treated as the source of truth for severity. If a policy author tags a rule
+ * with a severity inconsistent with the bucket it emits into, we silently use the
+ * bucket. This is intentional.
+ *
+ * Callers should ensure the bucket they pass reflects the intended output severity.
  */
 export function toFinding(
   r: RegoPolicyViolation,
