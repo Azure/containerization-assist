@@ -137,7 +137,7 @@
     "commander": "^14.0.1",
     "docker-file-parser": "^1.0.7",
     "dockerfilelint": "^1.8.0",
-    "dockerode": "^4.0.9",
+    "dockerode": "^5.0.0",
     "glob": "^11.0.3",
     "js-yaml": "^4.1.0",
     "kubernetes-models": "^4.5.1",
