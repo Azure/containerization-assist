@@ -5,6 +5,7 @@
  */
 
 import type { KnowledgeCategory } from '@/knowledge/types';
+import type { RegoPolicyViolation } from '@/config/policy-rego';
 
 export interface KnowledgeMatchOut {
   id: string;
@@ -45,8 +46,6 @@ export interface ValidatePolicyOut {
   /** Optional improvements (severity === 'suggest'). */
   suggestions: PolicyFinding[];
 }
-
-import type { RegoPolicyViolation } from '@/config/policy-rego';
 
 /**
  * Map a raw RegoPolicyViolation to a PolicyFinding.
