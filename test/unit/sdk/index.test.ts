@@ -76,7 +76,7 @@ describe('SDK Exports', () => {
     });
   });
 
-  describe('Tools object (all 11 tools)', () => {
+  describe('Tools object (all 15 tools)', () => {
     test('exports tools.analyzeRepo', () => {
       expect(tools.analyzeRepo).toBeDefined();
       expect(tools.analyzeRepo.name).toBe('analyze-repo');
@@ -132,8 +132,8 @@ describe('SDK Exports', () => {
       expect(tools.ops.name).toBe('ops');
     });
 
-    test('exports exactly 11 tools', () => {
-      expect(Object.keys(tools)).toHaveLength(11);
+    test('exports exactly 15 tools', () => {
+      expect(Object.keys(tools)).toHaveLength(15);
     });
   });
 

@@ -28,3 +28,17 @@ describe('SDK primitive exports', () => {
     expect(r.value.passed).toBe(true);
   });
 });
+
+describe('SDK tools registry', () => {
+  it('exposes all 4 primitives in the tools registry', async () => {
+    const { tools } = await import('@/sdk');
+    expect(tools.queryKnowledge).toBeDefined();
+    expect(tools.validateDockerfile).toBeDefined();
+    expect(tools.validateK8sManifest).toBeDefined();
+    expect(tools.validateCompose).toBeDefined();
+    expect(tools.queryKnowledge.name).toBe('query-knowledge');
+    expect(tools.validateDockerfile.name).toBe('validate-dockerfile');
+    expect(tools.validateK8sManifest.name).toBe('validate-k8s-manifest');
+    expect(tools.validateCompose.name).toBe('validate-compose');
+  });
+});

@@ -300,12 +300,17 @@ interface ToolRegistry {
   prepareCluster: Tool<typeof prepareClusterSchema, PrepareClusterResult>;
   verifyDeploy: Tool<typeof verifyDeploySchema, VerifyDeploymentResult>;
   ops: Tool<typeof opsToolSchema, OpsResult>;
+  // Phase 1 primitives
+  queryKnowledge: typeof queryKnowledgeTool;
+  validateDockerfile: typeof validateDockerfileTool;
+  validateK8sManifest: typeof validateK8sManifestTool;
+  validateCompose: typeof validateComposeTool;
 }
 
 // ===== ADVANCED: DIRECT TOOL ACCESS =====
 
 /**
- * Direct access to all 11 tool objects for advanced use cases.
+ * Direct access to all 15 tool objects for advanced use cases.
  *
  * Use this when you need:
  * - Access to tool schemas for validation
@@ -360,6 +365,16 @@ export const tools = {
   // ===== Operations =====
   /** Operational utilities (ping, status checks) */
   ops: opsTool,
+
+  // ===== Primitives =====
+  /** Query the containerization knowledge base by tags */
+  queryKnowledge: queryKnowledgeTool,
+  /** Validate a Dockerfile against organizational Rego policies */
+  validateDockerfile: validateDockerfileTool,
+  /** Validate a Kubernetes manifest against organizational Rego policies */
+  validateK8sManifest: validateK8sManifestTool,
+  /** Validate a docker-compose file against organizational Rego policies */
+  validateCompose: validateComposeTool,
 } as const satisfies ToolRegistry;
 
 /**

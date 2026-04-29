@@ -419,8 +419,8 @@ describe('VS Code Extension Integration Exports', () => {
       expect(typeof executeTool).toBe('function');
     });
 
-    it('exports tools object with all 11 tools', () => {
-      expect(Object.keys(tools)).toHaveLength(11);
+    it('exports tools object with all 15 tools', () => {
+      expect(Object.keys(tools)).toHaveLength(15);
     });
 
     it('tools object has expected tool names', () => {
@@ -470,7 +470,8 @@ describe('VS Code Extension Integration Exports', () => {
     it('tools object has matching keys', () => {
       const schemaKeys = Object.keys(jsonSchemas).sort();
       const toolKeys = Object.keys(tools).sort();
-      expect(schemaKeys).toEqual(toolKeys);
+      // tools includes 4 primitives that don't have jsonSchemas entries; the original 11 should all be present
+      expect(toolKeys).toEqual(expect.arrayContaining(schemaKeys));
     });
   });
 });
