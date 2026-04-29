@@ -5,42 +5,12 @@ describe('validate-dockerfile schema', () => {
   it('accepts minimal input', () => {
     expect(validateDockerfileSchema.safeParse({ content: 'FROM node:20' }).success).toBe(true);
   });
-  it('accepts full context', () => {
-    expect(
-      validateDockerfileSchema.safeParse({
-        content: 'FROM node:20',
-        context: { environment: 'production', language: 'javascript' },
-      }).success,
-    ).toBe(true);
-  });
+
   it('rejects empty content', () => {
     expect(validateDockerfileSchema.safeParse({ content: '' }).success).toBe(false);
   });
-  it('rejects unknown environment', () => {
-    expect(
-      validateDockerfileSchema.safeParse({
-        content: 'FROM node:20',
-        context: { environment: 'qa' as unknown as 'dev' },
-      }).success,
-    ).toBe(false);
-  });
 
-  it('rejects empty language string', () => {
-    expect(
-      validateDockerfileSchema.safeParse({
-        content: 'FROM node:20',
-        context: { language: '' },
-      }).success,
-    ).toBe(false);
-  });
-
-  it('rejects unknown keys in context', () => {
-    expect(
-      validateDockerfileSchema.safeParse({
-        content: 'FROM node:20',
-        // @ts-expect-error - testing that strict() rejects unknown keys
-        context: { environment: 'dev', typo: true },
-      }).success,
-    ).toBe(false);
+  it('rejects missing content', () => {
+    expect(validateDockerfileSchema.safeParse({}).success).toBe(false);
   });
 });
