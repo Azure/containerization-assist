@@ -89,6 +89,16 @@ import { verifyDeploySchema } from '@/tools/verify-deploy/schema';
 import opsTool from '@/tools/ops/tool';
 import { opsToolSchema } from '@/tools/ops/schema';
 
+// primitives
+import queryKnowledgeTool from '@/primitives/query-knowledge';
+import { queryKnowledgeSchema } from '@/primitives/query-knowledge/schema';
+import validateDockerfileTool from '@/primitives/validate-dockerfile';
+import { validateDockerfileSchema } from '@/primitives/validate-dockerfile/schema';
+import validateK8sManifestTool from '@/primitives/validate-k8s-manifest';
+import { validateK8sManifestSchema } from '@/primitives/validate-k8s-manifest/schema';
+import validateComposeTool from '@/primitives/validate-compose';
+import { validateComposeSchema } from '@/primitives/validate-compose/schema';
+
 // ===== TYPE RE-EXPORTS =====
 // All types are consolidated in ./types.ts - re-export from there for convenience
 
@@ -140,6 +150,14 @@ export type PrepareClusterInput = z.input<typeof prepareClusterSchema>;
 export type VerifyDeployInput = z.input<typeof verifyDeploySchema>;
 /** Input type for ops - derived from Zod schema */
 export type OpsInput = z.input<typeof opsToolSchema>;
+/** Input type for queryKnowledge - derived from Zod schema */
+export type QueryKnowledgeInput = z.input<typeof queryKnowledgeSchema>;
+/** Input type for validateDockerfile - derived from Zod schema */
+export type ValidateDockerfileInput = z.input<typeof validateDockerfileSchema>;
+/** Input type for validateK8sManifest - derived from Zod schema */
+export type ValidateK8sManifestInput = z.input<typeof validateK8sManifestSchema>;
+/** Input type for validateCompose - derived from Zod schema */
+export type ValidateComposeInput = z.input<typeof validateComposeSchema>;
 
 // Full type exports available via sdk/types
 // import type { ... } from 'containerization-assist-mcp/sdk/types';
@@ -233,6 +251,32 @@ export const verifyDeploy = createSDKFunction(verifyDeployTool);
  * Operational utilities (ping, status).
  */
 export const ops = createSDKFunction(opsTool);
+
+// ----- Primitives -----
+
+/**
+ * Query the containerization knowledge base by tags.
+ * Returns ranked, actionable guidance snippets.
+ */
+export const queryKnowledge = createSDKFunction(queryKnowledgeTool);
+
+/**
+ * Validate a Dockerfile against organizational Rego policies.
+ * Returns a passing empty envelope when no policy is loaded.
+ */
+export const validateDockerfile = createSDKFunction(validateDockerfileTool);
+
+/**
+ * Validate a Kubernetes manifest YAML against organizational Rego policies.
+ * Returns a passing empty envelope when no policy is loaded.
+ */
+export const validateK8sManifest = createSDKFunction(validateK8sManifestTool);
+
+/**
+ * Validate a docker-compose file against organizational Rego policies.
+ * Returns a passing empty envelope when no policy is loaded.
+ */
+export const validateCompose = createSDKFunction(validateComposeTool);
 
 // ===== TOOL REGISTRY TYPE =====
 
@@ -451,3 +495,11 @@ export {
  * ```
  */
 export { loadKnowledgeData } from '@/knowledge/index';
+
+// ===== PRIMITIVE TYPE RE-EXPORTS =====
+export type {
+  QueryKnowledgeOut,
+  ValidatePolicyOut,
+  PolicyFinding,
+  KnowledgeMatchOut,
+} from '@/primitives/types';
