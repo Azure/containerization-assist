@@ -16,9 +16,12 @@ describe('SDK primitive exports', () => {
     expect(typeof fn).toBe('function');
   });
 
-  it('queryKnowledge returns a Result for unknown tags', async () => {
+  it('queryKnowledge returns an empty Success for unknown tags', async () => {
     const r = await queryKnowledge({ tags: ['nonexistent-tag-zzz'], limit: 1 });
-    expect(r).toHaveProperty('ok');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.matches).toEqual([]);
+    expect(r.value.totalMatched).toBe(0);
   });
 
   it('validateDockerfile returns a passing envelope without policy', async () => {
