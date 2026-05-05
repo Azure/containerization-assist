@@ -230,7 +230,10 @@ async function handleScanImage(
     context: dockerContext,
   } = params;
 
-  if (scanType !== 'vulnerability') {
+  // Normalize scanType: "all" defaults to "vulnerability" until other scan types are supported
+  const effectiveScanType = scanType === 'all' ? 'vulnerability' : scanType;
+
+  if (effectiveScanType !== 'vulnerability') {
     return Failure(`Scan type '${scanType}' is not supported`, {
       message: 'Only vulnerability scans are currently supported',
       hint: 'Use scanType="vulnerability" for image vulnerability checks',
@@ -257,7 +260,7 @@ async function handleScanImage(
 
   try {
     logger.info(
-      { scanner, severityThreshold: finalSeverityThreshold, scanType },
+      { scanner, severityThreshold: finalSeverityThreshold, scanType: effectiveScanType },
       'Starting image security scan',
     );
 
@@ -272,7 +275,7 @@ async function handleScanImage(
         resolution: 'Add imageId parameter with the Docker image ID or name to scan',
       });
     }
-    logger.info({ imageId, scanner, scanType }, 'Scanning image for vulnerabilities');
+    logger.info({ imageId, scanner, scanType: effectiveScanType }, 'Scanning image for vulnerabilities');
 
     // Scan image using security scanner
     const scanResultWrapper = await securityScanner.scanImage(imageId);
