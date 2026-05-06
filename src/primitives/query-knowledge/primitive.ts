@@ -25,14 +25,18 @@ async function handleQueryKnowledge(
       ...(input.context?.language && { language: input.context.language }),
       ...(input.context?.framework && { framework: input.context.framework }),
       ...(input.context?.toolName && { tool: input.context.toolName }),
-      limit: input.limit,
+      // Request the full ranked list from the matcher; we apply the caller's
+      // limit ourselves *after* filtering so phantom severity-only hits don't
+      // crowd out valid matches.
+      limit: knowledgeData.entries.length,
     };
 
     const allMatches = findKnowledgeMatches(knowledgeData.entries, query);
 
     // Filter out entries that only matched via the severity bonus (reasons=[]).
     // These are phantom hits that surface regardless of query context.
-    const matches = allMatches.filter((m) => m.reasons.length > 0);
+    // Apply the caller's limit after filtering so valid matches are not dropped.
+    const matches = allMatches.filter((m) => m.reasons.length > 0).slice(0, input.limit);
 
     const out: KnowledgeMatchOut[] = matches.map((m) => ({
       id: m.entry.id,

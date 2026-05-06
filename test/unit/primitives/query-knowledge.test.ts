@@ -39,4 +39,32 @@ describe('query-knowledge primitive', () => {
     expect(typeof queryKnowledge.parse).toBe('function');
     expect(queryKnowledge.metadata).toBeDefined();
   });
+
+  // Regression: phantom severity-only hits ranked above real matches must not
+  // consume the caller's limit budget. Filtering happens before slicing, so
+  // asking for limit:N returns up to N *real* matches.
+  it('returns up to `limit` real matches even when phantom hits would have crowded them out', async () => {
+    const ctx = createToolContext(silentLogger);
+    const tightResult = await queryKnowledge.handler(
+      { tags: ['generate-dockerfile', 'node'], limit: 1 },
+      ctx,
+    );
+    expect(tightResult.ok).toBe(true);
+    if (!tightResult.ok) return;
+
+    // The handler must respect the caller's limit.
+    expect(tightResult.value.matches.length).toBeLessThanOrEqual(1);
+    expect(tightResult.value.totalMatched).toBe(tightResult.value.matches.length);
+
+    // If wider request returns at least one real match, the tight request
+    // (limit:1) must also return one — otherwise the filter is dropping
+    // matches that should fit within the caller's budget.
+    const wideResult = await queryKnowledge.handler(
+      { tags: ['generate-dockerfile', 'node'], limit: 50 },
+      ctx,
+    );
+    if (wideResult.ok && wideResult.value.matches.length > 0) {
+      expect(tightResult.value.matches.length).toBe(1);
+    }
+  });
 });
