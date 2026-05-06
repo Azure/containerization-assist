@@ -21,6 +21,7 @@ import {
   type EnhancementGuidance,
 } from './schema';
 import type { ToolNextAction } from '../shared/schemas';
+import { partitionEnvVarNames } from '@/tools/analyze-repo/env-detector';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
@@ -535,8 +536,9 @@ const runPattern = createKnowledgeTool<
       // Extract base image recommendations from categorized knowledge
       // Pass languageVersion for dynamic version substitution
       // Limit to top 2 recommendations to provide clear, opinionated guidance
-      let baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || [])
-        .map((snippet) => createBaseImageRecommendation(snippet, input.languageVersion));
+      let baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || []).map(
+        (snippet) => createBaseImageRecommendation(snippet, input.languageVersion),
+      );
 
       // Apply policy config base image category preference
       if (input.dockerfileConfig?.baseImageCategory) {
@@ -608,11 +610,24 @@ const runPattern = createKnowledgeTool<
         : nodePath.join(modulePath, 'Dockerfile');
       const relativeDockerfilePath = nodePath.relative(path, dockerfilePath) || './Dockerfile';
 
+      // Build env var instruction suffix
+      const { configNames, databaseNames, secretNames } = partitionEnvVarNames(
+        input.detectedEnvVars ?? [],
+      );
+      let envVarInstruction = '';
+      const allConfigNames = [...configNames, ...databaseNames];
+      if (allConfigNames.length > 0) {
+        envVarInstruction += ` Add ENV instructions for: ${allConfigNames.join(', ')}.`;
+      }
+      if (secretNames.length > 0) {
+        envVarInstruction += ` Do NOT bake these into the image: ${secretNames.join(', ')} — inject at runtime.`;
+      }
+
       // Build nextAction directive
       const nextAction: ToolNextAction = existingDockerfile
         ? {
             action: 'update-files',
-            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.`,
+            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.${envVarInstruction}`,
             files: [
               {
                 path: relativeDockerfilePath,
@@ -622,7 +637,7 @@ const runPattern = createKnowledgeTool<
           }
         : {
             action: 'create-files',
-            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.`,
+            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.${envVarInstruction}`,
             files: [
               {
                 path: relativeDockerfilePath,
@@ -932,17 +947,18 @@ async function handleGenerateDockerfile(
   }
 
   // Query policy for generation configuration (if policy is available)
-  let dockerfileConfig: import('@/config/policy-generation-config').DockerfileGenerationConfig | null = null;
+  let dockerfileConfig:
+    | import('@/config/policy-generation-config').DockerfileGenerationConfig
+    | null = null;
   if (ctx.policy) {
-    const configQuery = await ctx.queryConfig<{ dockerfile?: import('@/config/policy-generation-config').DockerfileGenerationConfig }>(
-      'containerization.generation_config',
-      {
-        language: input.language || 'auto-detect',
-        framework: input.framework,
-        environment: input.environment || 'production',
-        appName: input.repositoryPath?.split('/').pop() || 'app',
-      },
-    );
+    const configQuery = await ctx.queryConfig<{
+      dockerfile?: import('@/config/policy-generation-config').DockerfileGenerationConfig;
+    }>('containerization.generation_config', {
+      language: input.language || 'auto-detect',
+      framework: input.framework,
+      environment: input.environment || 'production',
+      appName: input.repositoryPath?.split('/').pop() || 'app',
+    });
 
     dockerfileConfig = configQuery?.dockerfile || null;
 
@@ -980,15 +996,14 @@ async function handleGenerateDockerfile(
   // Query policy for template additions and dynamic defaults (Sprint 3)
   if (ctx.policy) {
     // Query for template additions
-    const templateQuery = await ctx.queryConfig<import('@/config/policy-generation-config').TemplateAdditions>(
-      'containerization.templates.templates',
-      {
-        language: input.language || 'auto-detect',
-        framework: input.framework,
-        environment: input.environment || 'production',
-        appName: input.repositoryPath?.split('/').pop() || 'app',
-      },
-    );
+    const templateQuery = await ctx.queryConfig<
+      import('@/config/policy-generation-config').TemplateAdditions
+    >('containerization.templates.templates', {
+      language: input.language || 'auto-detect',
+      framework: input.framework,
+      environment: input.environment || 'production',
+      appName: input.repositoryPath?.split('/').pop() || 'app',
+    });
 
     if (templateQuery) {
       ctx.logger.info(
@@ -1000,28 +1015,23 @@ async function handleGenerateDockerfile(
 
       // Merge templates into plan using template merger
       const { mergeTemplatesIntoPlan } = await import('@/lib/template-merger');
-      const updatedPlan = mergeTemplatesIntoPlan(
-        plan,
-        templateQuery,
-        {
-          language: input.language,
-          environment: input.environment,
-          framework: input.framework,
-        },
-      );
+      const updatedPlan = mergeTemplatesIntoPlan(plan, templateQuery, {
+        language: input.language,
+        environment: input.environment,
+        framework: input.framework,
+      });
       Object.assign(plan, updatedPlan);
     }
 
     // Query for dynamic defaults (health checks, etc.)
-    const dynamicDefaultsQuery = await ctx.queryConfig<import('@/config/policy-generation-config').DynamicDefaults>(
-      'containerization.dynamic_defaults.defaults',
-      {
-        language: input.language || 'auto-detect',
-        environment: input.environment || 'production',
-        trafficLevel: input.trafficLevel,
-        criticalityTier: input.criticalityTier,
-      },
-    );
+    const dynamicDefaultsQuery = await ctx.queryConfig<
+      import('@/config/policy-generation-config').DynamicDefaults
+    >('containerization.dynamic_defaults.defaults', {
+      language: input.language || 'auto-detect',
+      environment: input.environment || 'production',
+      trafficLevel: input.trafficLevel,
+      criticalityTier: input.criticalityTier,
+    });
 
     if (dynamicDefaultsQuery) {
       ctx.logger.info(
@@ -1044,7 +1054,10 @@ async function handleGenerateDockerfile(
           matchScore: 95,
           policyDriven: true,
         };
-        plan.recommendations.bestPractices = [healthCheckInfo, ...plan.recommendations.bestPractices];
+        plan.recommendations.bestPractices = [
+          healthCheckInfo,
+          ...plan.recommendations.bestPractices,
+        ];
       }
     }
   }
@@ -1089,11 +1102,12 @@ async function handleGenerateDockerfile(
   }
 
   // Filter knowledge entries based on policy if available
-  if (ctx.policy && (
-    plan.recommendations.securityConsiderations.length > 0 ||
-    plan.recommendations.optimizations.length > 0 ||
-    plan.recommendations.bestPractices.length > 0
-  )) {
+  if (
+    ctx.policy &&
+    (plan.recommendations.securityConsiderations.length > 0 ||
+      plan.recommendations.optimizations.length > 0 ||
+      plan.recommendations.bestPractices.length > 0)
+  ) {
     ctx.logger.info('Filtering knowledge base entries against policy');
 
     /**
@@ -1201,7 +1215,8 @@ async function handleGenerateDockerfile(
       bestPractices: originalCounts.bestPractices - filteredBestPractices.length,
     };
 
-    const totalFiltered = filteredCounts.security + filteredCounts.optimizations + filteredCounts.bestPractices;
+    const totalFiltered =
+      filteredCounts.security + filteredCounts.optimizations + filteredCounts.bestPractices;
     if (totalFiltered > 0) {
       ctx.logger.info(
         {

@@ -73,6 +73,35 @@ export function verifyStep(extraLines?: string[]): Step {
   };
 }
 
+export function databaseCheckStep(): Step {
+  return {
+    heading: 'Check for database dependencies',
+    body: [
+      'Review the `modules[].detectedDatabases` field in the analyze-repo results for each module.',
+      '- For each module where `detectedDatabases` is non-empty, ask the user:',
+      '  1. Do these databases exist as Azure PaaS services (e.g., Azure Database for PostgreSQL, Azure Cache for Redis)?',
+      '  2. If yes, collect the server hostname(s) and database name(s) for the affected module(s).',
+      '  3. Confirm the managed identity client ID to use for workload identity authentication.',
+      '- If no modules have any detected databases, skip this step.',
+    ].join('\n'),
+  };
+}
+
+export function envVarCheckStep(): Step {
+  return {
+    heading: 'Check for detected environment variables',
+    body: [
+      'Review the `modules[].detectedEnvVars` field in the analyze-repo results for each module.',
+      '- For each module where `detectedEnvVars` is non-empty, ask the user:',
+      '  1. Confirm the classifications (secret, database, config) are correct.',
+      '  2. For secret-classified vars, confirm they will be injected at runtime (not baked into the image).',
+      '  3. For config-classified vars, confirm default values or ask for correct values.',
+      `- Pass the confirmed \`detectedEnvVars\` to downstream tools (**${TOOL_NAME.GENERATE_DOCKERFILE}**, **${TOOL_NAME.GENERATE_K8S_MANIFESTS}**).`,
+      '- If no modules have any detected environment variables, skip this step.',
+    ].join('\n'),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared rules
 // ---------------------------------------------------------------------------

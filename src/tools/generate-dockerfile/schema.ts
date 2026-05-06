@@ -14,6 +14,7 @@ import {
 } from '../shared/schemas';
 import { ModuleInfo } from '../analyze-repo/schema';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
+import { detectedEnvVarSchema } from '../analyze-repo/env-detector';
 
 // Re-export for backward compatibility
 export { DOCKER_PLATFORMS, type DockerPlatform };
@@ -41,6 +42,12 @@ export const generateDockerfileSchema = z.object({
     .optional()
     .describe(
       'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
+    ),
+  detectedEnvVars: z
+    .array(detectedEnvVarSchema)
+    .optional()
+    .describe(
+      'Environment variables detected from analyze-repo. Used to add ENV instructions for config vars and warn about secrets that should not be baked into the image.',
     ),
   targetPlatform: platform.describe(
     'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). Defaults to linux/amd64 for maximum compatibility. Use this to cross-compile for different architectures (e.g., ARM Mac targeting AMD64 servers).',

@@ -6,9 +6,22 @@ import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { validatePathOrFail } from '@/lib/validation-helpers';
-import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
+import {
+  analyzeRepoSchema,
+  type RepositoryAnalysis,
+  type ModuleInfo,
+  type DetectedEnvVar,
+} from './schema';
 import { pluralize } from '@/lib/summary-helpers';
 import { analyzeRepoToolDefinition } from './types';
+import { detectDatabases } from './database-detector';
+import {
+  detectEnvVarsFromEnvFile,
+  detectEnvVarsFromDockerCompose,
+  detectEnvVarsFromSpringConfig,
+  inferFrameworkEnvVars,
+  deduplicateEnvVars,
+} from './env-detector';
 import {
   parsePackageJson,
   parseGradle,
@@ -20,10 +33,22 @@ import {
   type ParsedConfig,
 } from './parsers';
 
+/** Pattern matching config files we want to read during repository scanning */
+const CONFIG_FILE_PATTERN = new RegExp(
+  '^(package\\.json|pom\\.xml|build\\.gradle|build\\.gradle\\.kts|' +
+    'requirements\\.txt|pyproject\\.toml|Cargo\\.toml|go\\.mod|' +
+    'composer\\.json|Gemfile|.*\\.csproj|.*\\.fsproj|.*\\.vbproj|' +
+    'Dockerfile|docker-compose\\.ya?ml|application\\.properties|application\\.ya?ml|' +
+    '\\.env\\.(?:example|sample|template))$',
+);
+
 /**
  * Scan repository directory and gather file information
  */
-async function gatherRepositoryInfo(repoPath: string): Promise<{
+async function gatherRepositoryInfo(
+  repoPath: string,
+  logger: ReturnType<typeof getToolLogger>,
+): Promise<{
   configFiles: Record<string, string>;
   fileList: string[];
   directoryTree: string[];
@@ -59,20 +84,20 @@ async function gatherRepositoryInfo(repoPath: string): Promise<{
           files.push(relativePath);
 
           // Read config files
-          const configFilePattern = new RegExp(
-            '^(package\\.json|pom\\.xml|build\\.gradle|build\\.gradle\\.kts|' +
-              'requirements\\.txt|pyproject\\.toml|Cargo\\.toml|go\\.mod|' +
-              'composer\\.json|Gemfile|.*\\.csproj|.*\\.fsproj|.*\\.vbproj|' +
-              'Dockerfile|docker-compose\\.yml|application\\.properties|application\\.yml)$',
-          );
-          if (entry.name.match(configFilePattern)) {
+          if (entry.name.match(CONFIG_FILE_PATTERN)) {
             try {
               const content = await fs.readFile(fullPath, 'utf-8');
               // Limit content to 1000 characters to avoid token overload
               configFileContents[relativePath] =
                 content.length > 1000 ? `${content.substring(0, 1000)}...[truncated]` : content;
-            } catch {
-              // Skip files that can't be read
+            } catch (error) {
+              logger.warn(
+                {
+                  path: relativePath,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                'Failed to read config file — skipping',
+              );
             }
           }
         }
@@ -80,8 +105,11 @@ async function gatherRepositoryInfo(repoPath: string): Promise<{
         // Limit total files scanned
         if (files.length > 100) break;
       }
-    } catch {
-      // Skip directories that can't be read
+    } catch (error) {
+      logger.warn(
+        { dir, error: error instanceof Error ? error.message : String(error) },
+        'Failed to read directory — skipping',
+      );
     }
   }
 
@@ -184,6 +212,55 @@ async function analyzeRepositoryDeterministically(
         languageVersion: c.languageVersion,
       }));
 
+    const allDeps = configs.flatMap((c) => c.dependencies ?? []);
+    const detectedDbs = detectDatabases(allDeps);
+
+    // Detect environment variables from config files
+    const envVars: DetectedEnvVar[] = [];
+
+    for (const [cfgPath, cfgContent] of Object.entries(repoInfo.configFiles)) {
+      const cfgDir = path.dirname(path.join(repoPath, cfgPath));
+      const cfgName = path.basename(cfgPath);
+
+      // Only process config files belonging to this module (same dir or repo root for non-root modules)
+      const isModuleFile = cfgDir === dirName;
+      const isRootFile = cfgDir === repoPath && dirName !== repoPath;
+
+      if (!isModuleFile && !isRootFile) continue;
+
+      // Skip structured file parsing on truncated content — truncation produces
+      // invalid YAML/properties which would silently return empty results
+      const isTruncated = cfgContent.endsWith('...[truncated]');
+
+      if (/^\.env\.(example|sample|template)$/.test(cfgName)) {
+        // .env files are line-based so truncation is safe (partial lines are harmless)
+        envVars.push(...detectEnvVarsFromEnvFile(cfgContent, cfgName));
+      } else if (cfgName === 'docker-compose.yml' || cfgName === 'docker-compose.yaml') {
+        if (isTruncated) {
+          logger.warn(
+            { file: cfgPath },
+            'docker-compose file was truncated — environment variable detection skipped',
+          );
+        } else {
+          const composeResult = detectEnvVarsFromDockerCompose(cfgContent, cfgName);
+          if (composeResult.warning) {
+            logger.warn({ file: cfgPath }, composeResult.warning);
+          }
+          envVars.push(...composeResult.vars);
+        }
+      } else if (cfgName === 'application.properties' || cfgName === 'application.yml') {
+        // Spring ${VAR} extraction is regex-based so truncation only loses trailing vars
+        envVars.push(...detectEnvVarsFromSpringConfig(cfgContent, cfgName));
+      }
+    }
+
+    // Infer framework-specific env vars
+    envVars.push(
+      ...inferFrameworkEnvVars(primaryConfig.language || 'other', primaryConfig.framework),
+    );
+
+    const dedupedEnvVars = deduplicateEnvVars(envVars);
+
     modules.push({
       name: path.basename(dirName),
       modulePath: dirName,
@@ -193,6 +270,8 @@ async function analyzeRepositoryDeterministically(
         : undefined,
       buildSystems: buildSystems.length > 0 ? buildSystems : undefined,
       dependencies: primaryConfig.dependencies,
+      detectedDatabases: detectedDbs.length > 0 ? detectedDbs : undefined,
+      detectedEnvVars: dedupedEnvVars.length > 0 ? dedupedEnvVars : undefined,
       ports: primaryConfig.ports,
       entryPoint: primaryConfig.entryPoint,
     });
@@ -238,7 +317,7 @@ async function handleAnalyzeRepo(
     logger.info({ repoPath }, 'Starting deterministic repository analysis');
 
     // Gather repository information
-    const repoInfo = await gatherRepositoryInfo(repoPath);
+    const repoInfo = await gatherRepositoryInfo(repoPath, logger);
 
     // Analyze deterministically by parsing config files
     const modules = await analyzeRepositoryDeterministically(repoPath, repoInfo, ctx);
@@ -262,7 +341,16 @@ async function handleAnalyzeRepo(
         ? `${modules[0]?.language || 'unknown'} project`
         : `${pluralize(modules.length, 'module')} (${modules.map((m) => m.language).join(', ')})`;
 
-    const summary = `✅ Analyzed repository at ${repoPath}. Detected ${modulesText}.${isMonorepo ? ' Monorepo structure identified.' : ''} Ready for Dockerfile generation.`;
+    // Collect detected database types across all modules
+    const allDbTypes = [
+      ...new Set(modules.flatMap((m) => m.detectedDatabases?.map((d) => d.dbType) ?? [])),
+    ];
+    const dbClause = allDbTypes.length > 0 ? ` Databases: ${allDbTypes.join(', ')}.` : '';
+
+    const totalEnvVars = modules.reduce((sum, m) => sum + (m.detectedEnvVars?.length ?? 0), 0);
+    const envClause = totalEnvVars > 0 ? ` ${pluralize(totalEnvVars, 'env var')} detected.` : '';
+
+    const summary = `✅ Analyzed repository at ${repoPath}. Detected ${modulesText}.${isMonorepo ? ' Monorepo structure identified.' : ''}${dbClause}${envClause} Ready for Dockerfile generation.`;
 
     return Success({
       summary,
