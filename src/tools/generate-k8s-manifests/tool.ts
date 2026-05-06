@@ -26,6 +26,8 @@ import {
 import type { ToolNextAction } from '../shared/schemas';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
+import { MANAGED_DB_TYPES } from '@/tools/analyze-repo/database-detector';
+import { partitionEnvVarNames } from '@/tools/analyze-repo/env-detector';
 import type { z } from 'zod';
 import yaml from 'js-yaml';
 import path from 'node:path';
@@ -432,9 +434,32 @@ const runPattern = createKnowledgeTool<
         { path: './k8s/service.yaml', purpose: 'Service exposure' },
       ];
 
-      // Add configmap if there are ports or environment variables
-      if (input.ports && input.ports.length > 0) {
+      // Partition env vars once for manifest decisions and instruction building
+      const { configNames, databaseNames, secretNames } = partitionEnvVarNames(
+        input.detectedEnvVars ?? [],
+      );
+
+      // Add configmap if there are ports, config-classified, or database-classified environment variables
+      if (
+        (input.ports && input.ports.length > 0) ||
+        configNames.length > 0 ||
+        databaseNames.length > 0
+      ) {
         manifestFiles.push({ path: './k8s/configmap.yaml', purpose: 'Configuration management' });
+      }
+
+      // Add secret if secret-classified environment variables are detected
+      if (secretNames.length > 0) {
+        manifestFiles.push({ path: './k8s/secret.yaml', purpose: 'Secret management' });
+      }
+
+      // Add serviceaccount if managed database dependencies are detected (for workload identity)
+      const hasDbDeps = input.detectedDatabases?.some((db) => MANAGED_DB_TYPES.has(db.dbType));
+      if (hasDbDeps) {
+        manifestFiles.push({
+          path: './k8s/serviceaccount.yaml',
+          purpose: 'Service account for workload identity (database access)',
+        });
       }
 
       // Build policy config instruction if available
@@ -454,9 +479,23 @@ const runPattern = createKnowledgeTool<
           }`
         : '';
 
+      const workloadIdentityInstruction = hasDbDeps
+        ? ' Database dependencies detected — include a ServiceAccount configured for workload identity or cloud IAM integration and reference it from your Deployment/Pod spec via spec.template.spec.serviceAccountName. If you are using Azure Kubernetes Service (AKS), you may also add the appropriate Azure workload identity annotations (for example, azure.workload.identity/client-id) and the pod label azure.workload.identity/use: "true". Prefer passwordless authentication using your cloud provider\'s default credentials (for example, DefaultAzureCredential on Azure) instead of connection-string secrets where possible.'
+        : '';
+
+      // Build env var instruction for ConfigMap/Secret guidance
+      let envVarInstruction = '';
+      const allConfigNames = [...configNames, ...databaseNames];
+      if (allConfigNames.length > 0) {
+        envVarInstruction += ` Create a ConfigMap (e.g., app-config) with keys: ${allConfigNames.join(', ')}. Reference it in the Deployment via envFrom with configMapRef or individual env entries with configMapKeyRef.`;
+      }
+      if (secretNames.length > 0) {
+        envVarInstruction += ` Create a Secret (e.g., app-secrets) with keys: ${secretNames.join(', ')}. Reference it in the Deployment via envFrom with secretRef or individual env entries with secretKeyRef.`;
+      }
+
       const nextAction: ToolNextAction = {
         action: 'create-files',
-        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, frameworks, ports, and entry point. Use detectedDependencies (if provided in input) for dependency-aware manifest configuration.${policyInstruction}`,
+        instruction: `Create ${input.manifestType} manifests in ./k8s directory for ${input.name}. Use security considerations from recommendations.securityConsiderations, resource management from recommendations.resourceManagement, and best practices from recommendations.bestPractices. Reference repositoryInfo for application details like language, frameworks, ports, and entry point. Use detectedDependencies (if provided in input) for dependency-aware manifest configuration.${workloadIdentityInstruction}${envVarInstruction}${policyInstruction}`,
         files: manifestFiles,
       };
 
@@ -604,6 +643,18 @@ async function handleGenerateK8sManifests(
     ...input,
     ...(k8sConfig && { k8sConfig }),
   };
+
+  // Log detectedDatabases state for debugging orchestration issues
+  if (input.detectedDatabases === undefined) {
+    logger.debug('No detectedDatabases provided — skipping workload identity check');
+  } else if (input.detectedDatabases.length === 0) {
+    logger.debug('detectedDatabases is empty — no databases found by analyze-repo');
+  } else {
+    logger.debug(
+      { dbTypes: input.detectedDatabases.map((d) => d.dbType) },
+      'Processing detected databases',
+    );
+  }
 
   // Run the knowledge-based plan generation
   const result = await runPattern(extendedInput, ctx);

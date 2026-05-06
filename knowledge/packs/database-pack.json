@@ -772,5 +772,30 @@
       "security"
     ],
     "description": "Compliance controls meet regulatory requirements"
+  },
+  {
+    "id": "azure-managed-db-migration-pattern",
+    "category": "kubernetes",
+    "pattern": "configmap|workload-identity|database",
+    "recommendation": "For Azure-managed databases, store non-secret connection details (host, port, database name) in a ConfigMap and authenticate via workload identity. Avoid storing passwords in Secrets when passwordless auth is available.",
+    "example": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: db-config\ndata:\n  DB_HOST: mydb.postgres.database.azure.com\n  DB_PORT: \"5432\"\n  DB_NAME: appdb\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: app-sa\n  annotations:\n    azure.workload.identity/client-id: \"<CLIENT_ID>\"",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "azure",
+      "configmap",
+      "database",
+      "generate-k8s-manifests",
+      "kubernetes",
+      "managed-identity",
+      "migration",
+      "mssql",
+      "mysql",
+      "passwordless",
+      "postgres",
+      "security",
+      "workload-identity"
+    ],
+    "description": "Separating non-secret DB config into a ConfigMap and using workload identity for auth follows the principle of least privilege and simplifies credential management during migration to Azure PaaS databases"
   }
 ]
