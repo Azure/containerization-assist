@@ -2,12 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { ALL_TOOLS } from '@/tools';
 
 describe('primitive registration in ALL_TOOLS', () => {
-  const PRIMITIVE_NAMES = [
-    'query-knowledge',
-    'validate-dockerfile',
-    'validate-k8s-manifest',
-    'validate-compose',
-  ];
+  const PRIMITIVE_NAMES = ['query-knowledge', 'validate'];
 
   for (const name of PRIMITIVE_NAMES) {
     it(`registers ${name}`, () => {

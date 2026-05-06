@@ -17,9 +17,7 @@ export const TOOL_NAME = {
   VERIFY_DEPLOY: 'verify-deploy',
   // Phase 1 primitives
   QUERY_KNOWLEDGE: 'query-knowledge',
-  VALIDATE_DOCKERFILE: 'validate-dockerfile',
-  VALIDATE_K8S_MANIFEST: 'validate-k8s-manifest',
-  VALIDATE_COMPOSE: 'validate-compose',
+  VALIDATE: 'validate',
 } as const;
 
 /** Names for workflow tools registered directly on the MCP server (not orchestrated). */

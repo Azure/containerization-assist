@@ -9,32 +9,33 @@ import type { IToolDefinition } from '@/tools/shared/toolDefinition';
 import { toFinding, type ValidatePolicyOut } from './types';
 
 /**
- * Build a policy-validator primitive from a tool definition.
+ * Build a policy-validator primitive from a tool definition and its Zod schema.
  *
- * All three policy validators (validate-dockerfile, validate-k8s-manifest,
- * validate-compose) share identical handler logic — only the error prefix
- * and the tool-definition wrapper differ. This factory captures that pattern.
+ * Today only the `validate` primitive uses this factory; it survives as a
+ * named helper because the handler logic is non-trivial (no-policy fast path,
+ * mapping, error envelope) and worth keeping separate from the schema/wiring.
+ *
+ * The TSchema generic is constrained to a Zod type whose inferred output
+ * includes `content: string`, so the handler can read `input.content` with
+ * full static safety — no runtime cast required. Calling this factory with a
+ * schema that doesn't include `content: string` is a compile-time error.
  *
  * The handler:
  *   1. Returns a passing empty envelope when ctx.policy is undefined.
  *   2. Calls applyPolicy(ctx.policy, input.content) otherwise.
  *   3. Maps the result via toFinding into a uniform ValidatePolicyOut envelope.
  *   4. Returns Failure with hint context on evaluator throws.
- *
- * The schema's inferred output is required to have `content: string` —
- * this is enforced at the runtime level by the handler reading
- * `input.content`. Each caller's schema must satisfy this contract.
  */
-export function createPolicyValidatorPrimitive<TSchema extends z.ZodTypeAny>(
+export function createPolicyValidatorPrimitive<TSchema extends z.ZodType<{ content: string }>>(
   toolDefinition: IToolDefinition,
+  schema: TSchema,
   errorPrefix: string,
 ): Tool<TSchema, ValidatePolicyOut> {
   async function handler(
     input: z.infer<TSchema>,
     ctx: ToolContext,
   ): Promise<Result<ValidatePolicyOut>> {
-    // Schema contract: every caller's schema produces { content: string, ... }.
-    const content = (input as { content: string }).content;
+    const { content } = input;
 
     if (!ctx.policy) {
       return Success<ValidatePolicyOut>({
@@ -68,7 +69,7 @@ export function createPolicyValidatorPrimitive<TSchema extends z.ZodTypeAny>(
 
   return tool<TSchema, ValidatePolicyOut>({
     ...toolDefinition,
-    schema: toolDefinition.schema as TSchema,
+    schema,
     handler,
   });
 }

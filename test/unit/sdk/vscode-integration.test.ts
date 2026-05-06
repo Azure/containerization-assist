@@ -419,8 +419,8 @@ describe('VS Code Extension Integration Exports', () => {
       expect(typeof executeTool).toBe('function');
     });
 
-    it('exports tools object with all 15 tools', () => {
-      expect(Object.keys(tools)).toHaveLength(15);
+    it('exports tools object with all 13 tools', () => {
+      expect(Object.keys(tools)).toHaveLength(13);
     });
 
     it('tools object has expected tool names', () => {
@@ -436,6 +436,10 @@ describe('VS Code Extension Integration Exports', () => {
         'prepareCluster',
         'verifyDeploy',
         'ops',
+        // Phase 1 primitives — assert each by key so a missing primitive can't
+        // hide behind the tool-count check.
+        'queryKnowledge',
+        'validate',
       ];
 
       for (const tool of expectedTools) {
