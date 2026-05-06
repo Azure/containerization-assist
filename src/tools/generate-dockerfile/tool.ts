@@ -35,6 +35,12 @@ import {
 import type { RegoEvaluator } from '@/config/policy-rego';
 import type { Logger } from 'pino';
 import { generateDockerfileToolDefinition } from './types';
+import {
+  PACKAGE_VERSION,
+  TOOL_NAME,
+  OCI_LABEL_CREATED_BY,
+  OCI_LABEL_VERSION,
+} from '@/lib/package-version';
 
 const { name } = generateDockerfileToolDefinition;
 
@@ -627,7 +633,7 @@ const runPattern = createKnowledgeTool<
       const nextAction: ToolNextAction = existingDockerfile
         ? {
             action: 'update-files',
-            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations.${envVarInstruction}`,
+            instruction: `Update the existing Dockerfile at ${relativeDockerfilePath} by applying the enhancement recommendations. Preserve the items listed in existingDockerfile.guidance.preserve, make improvements from existingDockerfile.guidance.improve, and add missing features from existingDockerfile.guidance.addMissing. Use the base images, security considerations, optimizations, and best practices from recommendations. Include the LABEL instruction from attributionLabels.labels for version tracking.${envVarInstruction}`,
             files: [
               {
                 path: relativeDockerfilePath,
@@ -637,7 +643,7 @@ const runPattern = createKnowledgeTool<
           }
         : {
             action: 'create-files',
-            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy.${envVarInstruction}`,
+            instruction: `Create a new Dockerfile at ${relativeDockerfilePath} using the base images, security considerations, optimizations, and best practices from recommendations. Follow the ${rules.buildStrategy.multistage ? 'multi-stage' : 'single-stage'} build strategy described in recommendations.buildStrategy. Include the LABEL instruction from attributionLabels.labels for version tracking.${envVarInstruction}`,
             files: [
               {
                 path: relativeDockerfilePath,
@@ -706,6 +712,12 @@ const runPattern = createKnowledgeTool<
         },
         confidence,
         summary,
+        attributionLabels: {
+          labels: {
+            [OCI_LABEL_CREATED_BY]: TOOL_NAME,
+            [OCI_LABEL_VERSION]: PACKAGE_VERSION,
+          },
+        },
         ...(existingDockerfile && {
           existingDockerfile: {
             path: existingDockerfile.path,
@@ -748,6 +760,12 @@ function planToDockerfileText(plan: DockerfilePlan): string {
   // Add default tag label for policy validation (use tag from plan or default to v1)
   const defaultTag = plan.recommendations.defaultTag || 'v1';
   lines.push(`LABEL tag="${defaultTag}"`);
+
+  if (plan.attributionLabels?.labels) {
+    for (const [key, value] of Object.entries(plan.attributionLabels.labels)) {
+      lines.push(`LABEL ${key}="${value}"`);
+    }
+  }
 
   // Check for security recommendations
   const security = plan.recommendations.securityConsiderations || [];

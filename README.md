@@ -260,6 +260,28 @@ Interactive workflow tools that return step-by-step plans (output is collapsed b
 | `kind-loop` | Local dev loop: analyze → build → scan → deploy to Kind | `namespace` (optional), `imageName` (optional) |
 | `aks-loop` | Remote dev loop: analyze → build → push → deploy to AKS | `registry`, `resourceGroup`, `clusterName` (required); `namespace`, `imageName` (optional) |
 
+### Version Tracking
+
+All generated artifacts include version metadata so you can track which version of containerization-assist produced them.
+
+**Dockerfiles** (`generate-dockerfile`):
+
+The tool output includes `attributionLabels.labels` with a version label, included as a `LABEL` instruction in the generated Dockerfile:
+
+| Label | Value | Purpose |
+|-------|-------|---------|
+| `com.azure.containerizationassist.version` | Package version (e.g., `1.4.0`) | Version of containerization-assist used |
+
+**Kubernetes Manifests** (`generate-k8s-manifests`):
+
+The tool output includes `attributionLabels.annotations` applied to all generated Kubernetes resource metadata:
+
+| Type | Key | Value | Purpose |
+|------|-----|-------|---------|
+| Annotation | `com.azure.containerizationassist/version` | Package version (e.g., `1.4.0`) | Version of containerization-assist used |
+
+Organizations can add custom labels via the policy system's `orgStandards.requiredLabels` configuration.
+
 ## Supported Technologies
 
 ### Languages & Frameworks

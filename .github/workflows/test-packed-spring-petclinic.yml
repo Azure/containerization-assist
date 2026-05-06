@@ -102,6 +102,8 @@ jobs:
             echo "  - ✅ analyze-repo via JSON-RPC" >> $GITHUB_STEP_SUMMARY
             echo "  - ✅ generate-dockerfile via JSON-RPC" >> $GITHUB_STEP_SUMMARY
             echo "  - ✅ azurelinux images verified" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ Dockerfile version label verified" >> $GITHUB_STEP_SUMMARY
+            echo "  - ✅ generate-k8s-manifests version annotation verified" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **MCP CLI Test**: Failed" >> $GITHUB_STEP_SUMMARY
           fi
@@ -119,3 +121,4 @@ jobs:
           echo "4. Send JSON-RPC requests to stdin" >> $GITHUB_STEP_SUMMARY
           echo "5. Parse JSON-RPC responses from stdout" >> $GITHUB_STEP_SUMMARY
           echo "6. Verify azurelinux images in recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "7. Verify version annotation in K8s manifests" >> $GITHUB_STEP_SUMMARY
