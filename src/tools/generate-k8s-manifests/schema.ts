@@ -214,6 +214,7 @@ export interface ManifestPlan {
   manifestType: 'kubernetes' | 'helm' | 'aca' | 'kustomize';
   /** Version annotation to apply to all generated Kubernetes resources */
   attributionLabels?: {
+    labels: Record<string, string>;
     annotations: Record<string, string>;
   };
   recommendations: {
