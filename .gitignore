@@ -32,6 +32,7 @@ build/
 
 # Generated files (rebuilt during build)
 src/knowledge/embedded-packs.ts
+src/lib/generated-version.ts
 
 # Policy build intermediates (keep *.wasm files - they ship with package)
 policies/compiled/*.tar.gz

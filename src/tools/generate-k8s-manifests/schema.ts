@@ -3,7 +3,13 @@
  */
 
 import { z } from 'zod';
-import { environment, platform, repositoryPath, workspacePath, type ToolNextAction } from '../shared/schemas';
+import {
+  environment,
+  platform,
+  repositoryPath,
+  workspacePath,
+  type ToolNextAction,
+} from '../shared/schemas';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
 import { detectedDatabaseSchema } from '@/tools/analyze-repo/database-detector';
 export type { DetectedDatabase } from '@/tools/analyze-repo/database-detector';
@@ -78,11 +84,15 @@ export const generateK8sManifestsSchema = z
     detectedDatabases: z
       .array(detectedDatabaseSchema)
       .optional()
-      .describe('Databases detected from analyze-repo. Used to generate workload identity ServiceAccount for managed database access.'),
+      .describe(
+        'Databases detected from analyze-repo. Used to generate workload identity ServiceAccount for managed database access.',
+      ),
     detectedEnvVars: z
       .array(detectedEnvVarSchema)
       .optional()
-      .describe('Environment variables detected from analyze-repo. Used to generate ConfigMap for config vars and Secret for secret vars.'),
+      .describe(
+        'Environment variables detected from analyze-repo. Used to generate ConfigMap for config vars and Secret for secret vars.',
+      ),
     includeComments: z
       .boolean()
       .optional()
@@ -202,6 +212,11 @@ export interface ManifestPlan {
     warnings: string[];
   };
   manifestType: 'kubernetes' | 'helm' | 'aca' | 'kustomize';
+  /** Version annotation to apply to all generated Kubernetes resources */
+  attributionLabels?: {
+    labels: Record<string, string>;
+    annotations: Record<string, string>;
+  };
   recommendations: {
     fieldMappings?: ManifestRequirement[];
     securityConsiderations: ManifestRequirement[];

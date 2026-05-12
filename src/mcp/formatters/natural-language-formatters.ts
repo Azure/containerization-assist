@@ -341,6 +341,14 @@ export function formatDockerfilePlanNarrative(
     }
   }
 
+  // Attribution version label
+  if (plan.attributionLabels?.labels) {
+    parts.push(`\n**Version Label (LABEL instruction):**`);
+    for (const [key, value] of Object.entries(plan.attributionLabels.labels)) {
+      parts.push(`  ${key}: ${value}`);
+    }
+  }
+
   // Next steps (only if chainHintsMode is enabled)
   if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push('\n**Next Steps:**');
@@ -883,6 +891,14 @@ export function formatGenerateK8sManifestsNarrative(
     }
     if (warnings.length > 0) {
       parts.push(`  Warnings: ${warnings.length}`);
+    }
+  }
+
+  // Version annotation
+  if (result.attributionLabels?.annotations) {
+    parts.push(`\n**Version Annotation:**`);
+    for (const [key, value] of Object.entries(result.attributionLabels.annotations)) {
+      parts.push(`  ${key}: ${value}`);
     }
   }
 
