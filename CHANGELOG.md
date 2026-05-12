@@ -7,6 +7,7 @@
 - add AKS-loop pre-deployment checks (#664)
 - add static redirect pages for VS Code MCP install links (#668, #669)
 - treat scanType "all" as vulnerability scan (#665)
+- add attribution labels and annotations to generated K8s manifests (#659)
 - dependency updates (#657, #662, #663, #666)
 
 ## [1.4.0]
