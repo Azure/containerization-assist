@@ -19,6 +19,7 @@ const KnowledgeCategorySchema = z.enum([
   'security',
   'streaming',
   'validation',
+  'cicd',
 ]);
 
 /**

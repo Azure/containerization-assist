@@ -71,4 +71,11 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
     failure:
       'Security vulnerabilities detected. Review scan results and apply fixes before proceeding.',
   },
+
+  [TOOL_NAME.GENERATE_GITHUB_WORKFLOW]: {
+    success:
+      'GitHub Actions workflow plan generated. Next: commit .github/workflows/deploy.yml to your repository, then configure AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID as GitHub repository secrets. Set up an OIDC federated credential in Azure Entra ID pointing to your GitHub repository and branch.',
+    failure:
+      'Failed to generate GitHub Actions workflow plan. Ensure registry, clusterName, and resourceGroup are provided.',
+  },
 };

@@ -497,6 +497,24 @@ export function envVarCheckStep(): Step {
   };
 }
 
+export function generateGithubWorkflowStep(
+  registry: string,
+  clusterName: string,
+  resourceGroup: string,
+): Step {
+  return {
+    heading: 'Generate GitHub Actions workflow',
+    body: [
+      `1. Call **${TOOL_NAME.GENERATE_GITHUB_WORKFLOW}** with the repository path, registry (\`${registry}\`), clusterName (\`${clusterName}\`), resourceGroup (\`${resourceGroup}\`), and analysis context.`,
+      "2. Follow the tool's guidance to create `.github/workflows/deploy.yml` on disk.",
+      '3. After creating the file, remind the user to:',
+      '   - Configure GitHub repository secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`',
+      '   - Set up an OIDC federated credential in Azure Entra ID for the repository',
+      '4. Retry up to **2 times** if generation fails.',
+    ].join('\n'),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared rules
 // ---------------------------------------------------------------------------

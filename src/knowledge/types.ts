@@ -23,6 +23,7 @@ export const CATEGORY = {
   SECURITY: 'security',
   STREAMING: 'streaming',
   VALIDATION: 'validation',
+  CICD: 'cicd',
 } as const;
 
 export type KnowledgeCategory = (typeof CATEGORY)[keyof typeof CATEGORY];

@@ -1,0 +1,190 @@
+[
+  {
+    "id": "github-oidc-permissions",
+    "category": "cicd",
+    "pattern": "permissions:",
+    "recommendation": "Set id-token: write and contents: read permissions at the workflow level to enable Azure OIDC login without stored credentials",
+    "example": "permissions:\n  id-token: write   # Required for OIDC token request\n  contents: read    # Required to checkout code",
+    "severity": "required",
+    "tags": [
+      "generate-github-workflow",
+      "azure-oidc",
+      "github-actions",
+      "permissions",
+      "security"
+    ],
+    "description": "id-token: write is the minimum permission required for GitHub to request a short-lived OIDC token from Azure Entra ID. Without it, azure/login@v2 will fail silently."
+  },
+  {
+    "id": "azure-login-oidc",
+    "category": "cicd",
+    "pattern": "azure/login",
+    "recommendation": "Use azure/login@v2 with OIDC federated credentials instead of client secrets or certificates — eliminates long-lived secrets entirely",
+    "example": "- name: Azure Login (OIDC)\n  uses: azure/login@v2\n  with:\n    client-id: ${{ secrets.AZURE_CLIENT_ID }}\n    tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+    "severity": "required",
+    "tags": [
+      "generate-github-workflow",
+      "azure-oidc",
+      "azure-login",
+      "github-actions",
+      "security"
+    ],
+    "description": "Azure OIDC federated credentials allow GitHub Actions to authenticate to Azure without storing any long-lived secrets. Requires a federated credential configured in the Azure app registration pointing to the GitHub repo and branch."
+  },
+  {
+    "id": "acr-docker-login",
+    "category": "cicd",
+    "pattern": "azure/docker-login",
+    "recommendation": "Use azure/docker-login@v2 to authenticate to ACR after the Azure OIDC login step — reuses the existing Azure token, no separate ACR password needed",
+    "example": "- name: Login to ACR\n  uses: azure/docker-login@v2\n  with:\n    login-server: ${{ vars.REGISTRY }}",
+    "severity": "high",
+    "tags": [
+      "acr",
+      "azure-login",
+      "generate-github-workflow",
+      "github-actions",
+      "registry"
+    ],
+    "description": "azure/docker-login reuses the Azure token obtained by azure/login to authenticate Docker to ACR, avoiding the need for ACR admin credentials or separate service principal secrets."
+  },
+  {
+    "id": "docker-build-push-acr",
+    "category": "cicd",
+    "pattern": "docker/build-push-action",
+    "recommendation": "Use docker/build-push-action@v5 with github.sha as the image tag to ensure every commit produces a uniquely tagged image — never use 'latest' as the only tag in CI",
+    "example": "- name: Build and push image\n  uses: docker/build-push-action@v5\n  with:\n    context: .\n    push: true\n    tags: ${{ vars.REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}\n    cache-from: type=gha\n    cache-to: type=gha,mode=max",
+    "severity": "high",
+    "tags": [
+      "acr",
+      "docker-build",
+      "generate-github-workflow",
+      "github-actions",
+      "registry"
+    ],
+    "description": "Using github.sha as the image tag ensures Kubernetes detects an image change on every deploy. Layer caching via cache-from/cache-to type=gha reduces build times by reusing unchanged layers between runs."
+  },
+  {
+    "id": "aks-setup-kubectl",
+    "category": "cicd",
+    "pattern": "azure/setup-kubectl",
+    "recommendation": "Use azure/setup-kubectl@v4 to install a specific version of kubectl on the runner before running any cluster operations",
+    "example": "- name: Setup kubectl\n  uses: azure/setup-kubectl@v4\n  with:\n    version: 'latest'",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "kubectl"
+    ],
+    "description": "azure/setup-kubectl installs kubectl on the GitHub Actions runner. Without this step, kubectl may be missing or at an incompatible version for your AKS cluster."
+  },
+  {
+    "id": "aks-get-credentials",
+    "category": "cicd",
+    "pattern": "az aks get-credentials",
+    "recommendation": "Run az aks get-credentials after Azure login to configure kubectl to connect to your AKS cluster — use --overwrite-existing to handle repeated runs cleanly",
+    "example": "- name: Get AKS credentials\n  run: |\n    az aks get-credentials \\\n      --resource-group ${{ vars.RESOURCE_GROUP }} \\\n      --name ${{ vars.CLUSTER_NAME }} \\\n      --overwrite-existing",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "kubectl"
+    ],
+    "description": "az aks get-credentials downloads the kubeconfig for the target AKS cluster and merges it into ~/.kube/config. The --overwrite-existing flag prevents failures on repeated workflow runs where a stale kubeconfig entry exists."
+  },
+  {
+    "id": "k8s-bake-manifests",
+    "category": "cicd",
+    "pattern": "azure/k8s-bake",
+    "recommendation": "Use azure/k8s-bake@v1 to process Kubernetes manifests before deployment — supports plain manifests, Helm charts, and Kustomize",
+    "example": "- name: Bake manifests\n  uses: azure/k8s-bake@v1\n  with:\n    renderType: manifests\n    manifests: k8s/\n  id: bake\n\n# For Helm:\n# - name: Bake Helm chart\n#   uses: azure/k8s-bake@v1\n#   with:\n#     renderType: helm\n#     helmChart: charts/myapp\n#     overrideFiles: charts/myapp/values.production.yaml\n#   id: bake",
+    "severity": "medium",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "helm",
+      "k8s-bake",
+      "kustomize"
+    ],
+    "description": "azure/k8s-bake renders manifests from plain YAML, Helm charts, or Kustomize overlays into a single manifest bundle. The output (manifestsBundle) is passed to azure/k8s-deploy. Use renderType: helm for Helm charts, renderType: kustomize for Kustomize, renderType: manifests for plain YAML."
+  },
+  {
+    "id": "k8s-deploy-action",
+    "category": "cicd",
+    "pattern": "azure/k8s-deploy",
+    "recommendation": "Use azure/k8s-deploy@v5 to apply manifests to AKS — it injects the new image tag, performs a rolling update, and waits for rollout to complete",
+    "example": "- name: Deploy to AKS\n  uses: azure/k8s-deploy@v5\n  with:\n    namespace: ${{ vars.K8S_NAMESPACE }}\n    manifests: ${{ steps.bake.outputs.manifestsBundle }}\n    images: ${{ vars.REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ github.sha }}",
+    "severity": "required",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "k8s-deploy",
+      "kubectl"
+    ],
+    "description": "azure/k8s-deploy applies manifests to Kubernetes, injects the specified image tag into matching container specs, and waits for the rollout to stabilise. It also annotates deployed resources with workflow run metadata for traceability."
+  },
+  {
+    "id": "github-environment-gates",
+    "category": "cicd",
+    "pattern": "environment:",
+    "recommendation": "Assign the deploy job to a GitHub Environment named 'production' to enable protection rules such as required reviewers and deployment wait timers",
+    "example": "jobs:\n  deploy:\n    runs-on: ubuntu-latest\n    environment: production   # links to GitHub Environment with protection rules\n    steps:\n      - ...",
+    "severity": "medium",
+    "tags": [
+      "generate-github-workflow",
+      "github-actions",
+      "governance",
+      "security"
+    ],
+    "description": "GitHub Environments allow you to configure required reviewers, wait timers, and branch restrictions before a deploy job proceeds. Setting environment: production on the deploy job gates deployments behind these rules."
+  },
+  {
+    "id": "workflow-docker-layer-cache",
+    "category": "cicd",
+    "pattern": "cache-from:",
+    "recommendation": "Enable GitHub Actions cache for Docker layer caching to significantly reduce image build times on repeated runs",
+    "example": "- name: Build and push image\n  uses: docker/build-push-action@v5\n  with:\n    cache-from: type=gha\n    cache-to: type=gha,mode=max",
+    "severity": "medium",
+    "tags": [
+      "caching",
+      "generate-github-workflow",
+      "github-actions",
+      "optimization"
+    ],
+    "description": "type=gha uses the GitHub Actions cache backend to store and restore Docker layer cache between runs. mode=max caches all intermediate layers, not just the final image — maximising cache hit rate for multi-stage builds."
+  },
+  {
+    "id": "workflow-concurrency",
+    "category": "cicd",
+    "pattern": "concurrency:",
+    "recommendation": "Add a concurrency block to cancel in-progress runs when a newer commit is pushed — prevents stale deploys from racing or completing after a newer one",
+    "example": "concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true",
+    "severity": "medium",
+    "tags": [
+      "generate-github-workflow",
+      "github-actions",
+      "optimization",
+      "reliability"
+    ],
+    "description": "The concurrency group is scoped per workflow + branch so that concurrent pushes to main cancel previous runs while pushes to other branches remain independent. cancel-in-progress: true ensures only the latest commit is ever deployed."
+  },
+  {
+    "id": "required-secrets-guidance",
+    "category": "cicd",
+    "pattern": "secrets.AZURE",
+    "recommendation": "Configure three GitHub repository secrets and three repository variables before running the workflow — the OIDC login and ACR push will fail without them",
+    "example": "# GitHub repository SECRETS (Settings → Secrets and variables → Actions → Secrets):\n#   AZURE_CLIENT_ID      — App registration client ID with federated credential for this repo\n#   AZURE_TENANT_ID      — Azure Entra ID tenant ID\n#   AZURE_SUBSCRIPTION_ID — Azure subscription ID\n#\n# GitHub repository VARIABLES (Settings → Secrets and variables → Actions → Variables):\n#   REGISTRY             — ACR login server (e.g. myregistry.azurecr.io)\n#   CLUSTER_NAME         — AKS cluster name\n#   RESOURCE_GROUP       — Azure resource group containing the AKS cluster\n#   K8S_NAMESPACE        — Kubernetes namespace to deploy into (e.g. production)\n#   IMAGE_NAME           — Docker image name (e.g. myapp)",
+    "severity": "high",
+    "tags": [
+      "azure-oidc",
+      "generate-github-workflow",
+      "github-actions",
+      "secrets",
+      "setup"
+    ],
+    "description": "The workflow uses GitHub Secrets for sensitive values (client ID, tenant, subscription) and GitHub Variables for non-sensitive config (registry, cluster name, namespace). This separation follows least-privilege and makes non-sensitive values visible in the Actions UI."
+  }
+]
