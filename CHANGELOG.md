@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.5.0]
+
+- contribute chat skills (`analyze-repo`, `generate-dockerfile`, `fix-dockerfile`, `generate-k8s-manifests`, `deploy-to-aks`) under `skills/` for consumption by VS Code extensions via `contributes.chatSkills`
+
 ## [1.4.0]
 
 - convert MCP prompts (kind-loop, aks-loop, create-containerization-policy) to workflow tools for collapsed output in chat (#631)
