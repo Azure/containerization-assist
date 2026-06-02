@@ -4,6 +4,10 @@
 
 import { z } from 'zod';
 import { repositoryPath, workspacePath, analysisOptions } from '../shared/schemas';
+import { detectedDatabaseSchema } from './database-detector';
+export type { DetectedDatabase } from './database-detector';
+import { detectedEnvVarSchema } from './env-detector';
+export type { DetectedEnvVar } from './env-detector';
 
 const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
@@ -40,6 +44,14 @@ const moduleInfo = z.object({
     .array(z.string())
     .optional()
     .describe('List of module dependencies including database drivers and system libraries'),
+  detectedDatabases: z
+    .array(detectedDatabaseSchema)
+    .optional()
+    .describe('Databases detected from module dependencies'),
+  detectedEnvVars: z
+    .array(detectedEnvVarSchema)
+    .optional()
+    .describe('Environment variables detected from config files (.env, docker-compose, Spring config) and framework inference'),
   ports: z.array(z.number()).optional(),
   entryPoint: z.string().optional(),
 });

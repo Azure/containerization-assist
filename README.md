@@ -15,8 +15,8 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 ## Install
 
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D)
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect/mcp/install?name=containerization-assist&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22containerization-assist-mcp%22%2C%22start%22%5D%7D&quality=insiders)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Containerization_Assist_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://azure.github.io/containerization-assist/vscode-mcp-install-redirect.html)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Containerization_Assist_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](https://azure.github.io/containerization-assist/vscode-insiders-mcp-install-redirect.html)
 
 ## Features
 
@@ -259,6 +259,28 @@ Interactive workflow tools that return step-by-step plans (output is collapsed b
 | `create-containerization-policy` | Step-by-step guidance for authoring a custom OPA Rego policy | None |
 | `kind-loop` | Local dev loop: analyze → build → scan → deploy to Kind | `namespace` (optional), `imageName` (optional) |
 | `aks-loop` | Remote dev loop: analyze → build → push → deploy to AKS | `registry`, `resourceGroup`, `clusterName` (required); `namespace`, `imageName` (optional) |
+
+### Version Tracking
+
+All generated artifacts include version metadata so you can track which version of containerization-assist produced them.
+
+**Dockerfiles** (`generate-dockerfile`):
+
+The tool output includes `attributionLabels.labels` with a version label, included as a `LABEL` instruction in the generated Dockerfile:
+
+| Label | Value | Purpose |
+|-------|-------|---------|
+| `com.azure.containerizationassist.version` | Package version (e.g., `1.4.0`) | Version of containerization-assist used |
+
+**Kubernetes Manifests** (`generate-k8s-manifests`):
+
+The tool output includes `attributionLabels.annotations` applied to all generated Kubernetes resource metadata:
+
+| Type | Key | Value | Purpose |
+|------|-----|-------|---------|
+| Annotation | `com.azure.containerizationassist/version` | Package version (e.g., `1.4.0`) | Version of containerization-assist used |
+
+Organizations can add custom labels via the policy system's `orgStandards.requiredLabels` configuration.
 
 ## Supported Technologies
 

@@ -383,6 +383,33 @@ describe('generate-k8s-manifests with policy configuration', () => {
     });
   });
 
+  describe('attribution metadata', () => {
+    it('should include version annotation without policy', async () => {
+      const ctx = createToolContext(createLogger({ name: 'test', level: 'silent' }), {
+        policy: undefined,
+      });
+
+      const result = await generateK8sManifestsTool.handler(
+        {
+          repositoryPath: testDir,
+          manifestType: 'kubernetes',
+          name: 'test-app',
+          environment: 'production',
+        },
+        ctx
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const plan = result.value;
+        expect(plan.attributionLabels).toBeDefined();
+        const version = plan.attributionLabels!.annotations['com.azure.containerizationassist/version'];
+        expect(version).toBeDefined();
+        expect(version).toMatch(/^\d+\.\d+\.\d+/);
+      }
+    });
+  });
+
   describe('empty policy response', () => {
     it('should handle empty policy response gracefully', async () => {
       // Create policy that doesn't define kubernetes config
@@ -413,9 +440,8 @@ describe('generate-k8s-manifests with policy configuration', () => {
       const result = await generateK8sManifestsTool.handler(
         {
           repositoryPath: testDir,
-          manifestType: 'deployment',
-          imageName: 'test-app:latest',
-          appName: 'test-app',
+          manifestType: 'kubernetes',
+          name: 'test-app',
           environment: 'production',
         },
         ctx

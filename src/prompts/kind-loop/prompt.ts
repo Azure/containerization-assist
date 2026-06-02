@@ -11,6 +11,7 @@ import {
   assemblePrompt,
   deployStep,
   generateDockerfileStep,
+  kindContextValidationStep,
   scanStep,
   sharedRules,
   verifyStep,
@@ -35,6 +36,7 @@ export function buildLocalKindDevLoopPrompt(args: LocalKindDevLoopArgs): string 
       '- Use the **local system architecture** for Kind testing (detect it automatically).',
     ],
     [
+      kindContextValidationStep(),
       analyzeStep(),
       generateDockerfileStep(),
       {

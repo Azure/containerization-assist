@@ -237,10 +237,46 @@ async function runTests() {
     console.error(`✅ Found ${mentionedDistroLessImages.length} distroless image(s) mentioned in output.`);
     console.error(mentionedDistroLessImages.map(img => `  - ${img}`).join('\n'));
 
+    console.error('\n--- Test 3b: Verify Dockerfile version label ---');
+    if (!dockerfileText.includes('com.azure.containerizationassist.version')) {
+      throw new Error('generate-dockerfile output missing com.azure.containerizationassist.version label');
+    }
+    if (dockerfileText.includes('version: unknown') || dockerfileText.includes('version": "unknown')) {
+      throw new Error('generate-dockerfile attribution has version "unknown" - package version resolution failed');
+    }
+    console.error('✅ generate-dockerfile includes version label.');
+
+    console.error('\n--- Test 4: generate-k8s-manifests version annotation ---');
+
+    const k8sResponse = await callTool('generate-k8s-manifests', {
+      repositoryPath: REPO_PATH,
+      modulePath: REPO_PATH,
+      language: 'java',
+      languageVersion: '17',
+      framework: 'spring-boot',
+      manifestType: 'kubernetes',
+      environment: 'production',
+      targetPlatform: 'linux/amd64'
+    });
+
+    const k8sResult = k8sResponse.result;
+    printNaturalLanguageResult(k8sResult);
+    const k8sText = extractNaturalLanguageResultText(k8sResult);
+    const k8sTime = k8sResponse.executionTime;
+
+    if (!k8sText.includes('com.azure.containerizationassist/version')) {
+      throw new Error('generate-k8s-manifests output missing com.azure.containerizationassist/version annotation');
+    }
+    if (!k8sText.includes('attributionLabels') && !k8sText.includes('Version Annotation')) {
+      throw new Error('generate-k8s-manifests output missing version annotation section');
+    }
+    console.error('✅ generate-k8s-manifests includes version annotation.');
+
     console.error('\n=== ALL TESTS PASSED ===');
-    console.error(`\n⏱️  Total execution time: ${analyzeTime + dockerfileTime}ms`);
+    console.error(`\n⏱️  Total execution time: ${analyzeTime + dockerfileTime + k8sTime}ms`);
     console.error(`   - analyze-repo: ${analyzeTime}ms`);
     console.error(`   - generate-dockerfile: ${dockerfileTime}ms`);
+    console.error(`   - generate-k8s-manifests: ${k8sTime}ms`);
 
     // Cleanup
     server.kill();
