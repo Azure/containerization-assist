@@ -519,5 +519,64 @@
       "scheduling"
     ],
     "description": "Priority classes ensure critical workloads are scheduled before lower-priority ones"
+  },
+  {
+    "id": "k8s-aks-workload-identity-sa",
+    "category": "kubernetes",
+    "pattern": "serviceAccountName:",
+    "recommendation": "Create a ServiceAccount with the azure.workload.identity/client-id annotation to enable Azure Workload Identity for passwordless access to Azure resources (databases, Key Vault, Storage, etc.)",
+    "example": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: app-sa\n  annotations:\n    azure.workload.identity/client-id: \"<MANAGED_IDENTITY_CLIENT_ID>\"",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "azure",
+      "generate-k8s-manifests",
+      "kubernetes",
+      "managed-identity",
+      "security",
+      "workload-identity"
+    ],
+    "description": "Azure Workload Identity federated credentials allow pods to authenticate to Azure AD without storing secrets, following zero-trust principles"
+  },
+  {
+    "id": "k8s-aks-workload-identity-pod-label",
+    "category": "kubernetes",
+    "pattern": "azure\\.workload\\.identity/use:",
+    "recommendation": "Add the label azure.workload.identity/use: \"true\" to the pod template to enable workload identity token injection via the AKS mutating webhook",
+    "example": "spec:\n  template:\n    metadata:\n      labels:\n        azure.workload.identity/use: \"true\"\n    spec:\n      serviceAccountName: app-sa",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "azure",
+      "generate-k8s-manifests",
+      "kubernetes",
+      "managed-identity",
+      "security",
+      "workload-identity"
+    ],
+    "description": "The pod label triggers the AKS workload identity webhook to project a federated token into the pod, enabling DefaultAzureCredential-based authentication"
+  },
+  {
+    "id": "k8s-managed-db-passwordless",
+    "category": "kubernetes",
+    "pattern": "postgres|mysql|mssql",
+    "recommendation": "Use passwordless authentication (DefaultAzureCredential / Managed Identity) for Azure-managed databases instead of connection-string secrets. This eliminates secret rotation and reduces credential leak risk.",
+    "example": "env:\n  - name: AZURE_CLIENT_ID\n    valueFrom:\n      fieldRef:\n        fieldPath: metadata.annotations['azure.workload.identity/client-id']\n  - name: DB_HOST\n    valueFrom:\n      configMapKeyRef:\n        name: db-config\n        key: host",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "azure",
+      "database",
+      "generate-k8s-manifests",
+      "kubernetes",
+      "managed-identity",
+      "mssql",
+      "mysql",
+      "passwordless",
+      "postgres",
+      "security",
+      "workload-identity"
+    ],
+    "description": "Passwordless database connections via Azure AD authentication eliminate the need for secret management and reduce the attack surface"
   }
 ]

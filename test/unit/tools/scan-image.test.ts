@@ -444,6 +444,23 @@ describe('scanImage - Success and Error Scenarios', () => {
       }
     });
 
+    it('should treat scanType "all" as vulnerability scan', async () => {
+      const allConfig = {
+        imageId: 'test-app:latest',
+        scanner: 'osv',
+        scanType: 'all',
+        enableAISuggestions: false,
+        severity: 'high',
+      } as ScanImageParams;
+
+      const result = await scanImage(allConfig, createMockToolContext());
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+      }
+    });
+
     it('should fail when imageId is missing', async () => {
       const invalidConfig = {
         scanner: 'trivy',

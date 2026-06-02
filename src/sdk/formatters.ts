@@ -238,6 +238,14 @@ function formatGenerateDockerfileResultProse(
     );
   }
 
+  // Version label
+  if (result.attributionLabels?.labels) {
+    const labelList = Object.entries(result.attributionLabels.labels)
+      .map(([key, value]) => `- \`${key}\`: ${value}`)
+      .join('\n');
+    sections.push(formatSection('Version Label', labelList));
+  }
+
   return sections.join('\n');
 }
 
@@ -591,6 +599,14 @@ function formatGenerateK8sManifestsResultProse(
         'Use this plan to write the YAML manifests, then `prepare_cluster` and apply them.',
       ),
     );
+  }
+
+  // Version annotation
+  if (result.attributionLabels?.annotations) {
+    const annotationList = Object.entries(result.attributionLabels.annotations)
+      .map(([key, value]) => `- \`${key}\`: ${value}`)
+      .join('\n');
+    sections.push(formatSection('Version Annotation', annotationList));
   }
 
   return sections.join('\n');

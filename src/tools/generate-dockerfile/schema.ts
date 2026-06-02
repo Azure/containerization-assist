@@ -14,6 +14,7 @@ import {
 } from '../shared/schemas';
 import { ModuleInfo } from '../analyze-repo/schema';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
+import { detectedEnvVarSchema } from '../analyze-repo/env-detector';
 
 // Re-export for backward compatibility
 export { DOCKER_PLATFORMS, type DockerPlatform };
@@ -33,7 +34,9 @@ export const generateDockerfileSchema = z.object({
   languageVersion: z
     .string()
     .optional()
-    .describe('Language version (e.g., "17", "3.11", "20"). For Java, this is the java.version from pom.xml or sourceCompatibility from build.gradle.'),
+    .describe(
+      'Language version (e.g., "17", "3.11", "20"). For Java, this is the java.version from pom.xml or sourceCompatibility from build.gradle.',
+    ),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
   detectedDependencies: z
@@ -42,17 +45,27 @@ export const generateDockerfileSchema = z.object({
     .describe(
       'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
     ),
+  detectedEnvVars: z
+    .array(detectedEnvVarSchema)
+    .optional()
+    .describe(
+      'Environment variables detected from analyze-repo. Used to add ENV instructions for config vars and warn about secrets that should not be baked into the image.',
+    ),
   targetPlatform: platform.describe(
     'Target platform for the Docker image (e.g., "linux/amd64", "linux/arm64"). Defaults to linux/amd64 for maximum compatibility. Use this to cross-compile for different architectures (e.g., ARM Mac targeting AMD64 servers).',
   ),
   trafficLevel: z
     .enum(['high', 'medium', 'low'])
     .optional()
-    .describe('Expected traffic level for dynamic defaults calculation (affects replica counts and scaling).'),
+    .describe(
+      'Expected traffic level for dynamic defaults calculation (affects replica counts and scaling).',
+    ),
   criticalityTier: z
     .enum(['tier-1', 'tier-2', 'tier-3'])
     .optional()
-    .describe('Criticality tier for dynamic defaults calculation (tier-1=mission-critical, tier-3=low-priority).'),
+    .describe(
+      'Criticality tier for dynamic defaults calculation (tier-1=mission-critical, tier-3=low-priority).',
+    ),
 });
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;
@@ -143,6 +156,10 @@ export interface DockerfilePlan {
   };
   confidence: number;
   summary: string;
+  /** Version label to include as a LABEL instruction in the generated Dockerfile */
+  attributionLabels?: {
+    labels: Record<string, string>;
+  };
   existingDockerfile?: {
     path: string;
     content: string;
