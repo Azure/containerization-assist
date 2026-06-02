@@ -40,6 +40,7 @@ import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
 import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
 import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
+import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
 import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
@@ -52,6 +53,7 @@ import {
   formatVerifyDeployNarrative,
   formatFixDockerfileNarrative,
   formatGenerateK8sManifestsNarrative,
+  formatGithubWorkflowNarrative,
   formatPushImageNarrative,
   formatTagImageNarrative,
   formatPrepareClusterNarrative,
@@ -591,6 +593,9 @@ function formatAsNaturalLanguage(
   if (isGenerateK8sManifestsResult(output)) {
     return formatGenerateK8sManifestsNarrative(output, chainHintsMode);
   }
+  if (isGithubWorkflowPlan(output)) {
+    return formatGithubWorkflowNarrative(output, chainHintsMode);
+  }
   if (isPushImageResult(output)) {
     return formatPushImageNarrative(output, chainHintsMode);
   }
@@ -662,6 +667,15 @@ function isFixDockerfileResult(output: object): output is DockerfileFixPlan {
 
 function isGenerateK8sManifestsResult(output: object): output is ManifestPlan {
   return 'manifestType' in output && 'recommendations' in output && 'knowledgeMatches' in output;
+}
+
+function isGithubWorkflowPlan(output: object): output is GithubWorkflowPlan {
+  return (
+    'workflowJobs' in output &&
+    'secretsRequired' in output &&
+    'nextAction' in output &&
+    Array.isArray((output as GithubWorkflowPlan).workflowJobs)
+  );
 }
 
 function isTagImageResult(output: object): output is TagImageResult {

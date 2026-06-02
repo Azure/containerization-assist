@@ -112,7 +112,6 @@ describe('generate-github-workflow', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.namespace).toBe('default');
-        expect(result.data.environment).toBe('production');
         expect(result.data.manifestFormat).toBe('k8s');
         expect(result.data.branches).toEqual(['main']);
       }
@@ -126,7 +125,6 @@ describe('generate-github-workflow', () => {
         resourceGroup: 'my-rg',
         imageName: 'myapp',
         namespace: 'production',
-        environment: 'staging',
         manifestFormat: 'helm',
         manifestPath: 'charts/',
         branches: ['main', 'release'],
@@ -184,17 +182,6 @@ describe('generate-github-workflow', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should reject an invalid environment value', () => {
-      const result = generateGithubWorkflowSchema.safeParse({
-        repositoryPath: '/home/user/myapp',
-        registry: 'myregistry.azurecr.io',
-        clusterName: 'my-aks',
-        resourceGroup: 'my-rg',
-        environment: 'prod',
-      });
-
-      expect(result.success).toBe(false);
-    });
   });
 
   // ── Happy path ─────────────────────────────────────────────────────────────
@@ -208,7 +195,6 @@ describe('generate-github-workflow', () => {
           clusterName: 'my-aks',
           resourceGroup: 'my-rg',
           namespace: 'default',
-          environment: 'production',
           manifestFormat: 'k8s',
           branches: ['main'],
         },
@@ -226,16 +212,15 @@ describe('generate-github-workflow', () => {
         expect(plan.nextAction.files[0].path).toBe('.github/workflows/deploy.yml');
 
         // instruction contains key identifiers
-        expect(plan.nextAction.instruction).toContain('myregistry.azurecr.io');
+        expect(plan.nextAction.instruction).toContain('myregistry');
         expect(plan.nextAction.instruction).toContain('my-aks');
         expect(plan.nextAction.instruction).toContain('my-rg');
         expect(plan.nextAction.instruction).toContain('AZURE_CLIENT_ID');
 
         // jobs
         expect(plan.workflowJobs).toHaveLength(2);
-        expect(plan.workflowJobs[0].name).toBe('build-and-push');
+        expect(plan.workflowJobs[0].name).toBe('buildImage');
         expect(plan.workflowJobs[1].name).toBe('deploy');
-        expect(plan.workflowJobs[1].environment).toBe('production');
 
         // secrets
         expect(plan.secretsRequired).toContain('AZURE_CLIENT_ID');
@@ -260,7 +245,6 @@ describe('generate-github-workflow', () => {
           clusterName: 'my-aks',
           resourceGroup: 'my-rg',
           namespace: 'default',
-          environment: 'staging',
           manifestFormat: 'helm',
           manifestPath: 'charts/',
           branches: ['main'],

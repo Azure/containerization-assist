@@ -41,14 +41,6 @@ export const generateGithubWorkflowSchema = z.object({
     .default('default')
     .describe('Kubernetes namespace to deploy into. Defaults to "default".'),
 
-  environment: z
-    .enum(['development', 'staging', 'production'])
-    .optional()
-    .default('production')
-    .describe(
-      'Target environment. Used to set the GitHub Environment on the deploy job for protection rules.',
-    ),
-
   manifestFormat: z
     .enum(['k8s', 'helm', 'kustomize'])
     .optional()
@@ -62,6 +54,25 @@ export const generateGithubWorkflowSchema = z.object({
     .optional()
     .describe(
       'Relative path to the Kubernetes manifests directory (e.g. k8s/). Defaults to k8s/ if not provided.',
+    ),
+
+  dockerFile: z
+    .string()
+    .optional()
+    .default('Dockerfile')
+    .describe('Path to the Dockerfile relative to the build context. Defaults to "Dockerfile".'),
+
+  buildContextPath: z
+    .string()
+    .optional()
+    .default('.')
+    .describe('Docker build context path. Defaults to "." (repository root).'),
+
+  acrResourceGroup: z
+    .string()
+    .optional()
+    .describe(
+      'Azure resource group containing the ACR. Defaults to resourceGroup if not provided.',
     ),
 
   branches: z
@@ -93,8 +104,7 @@ export interface WorkflowJobDescription {
   steps: string[];
   /** Runner to use (always ubuntu-latest) */
   runsOn: string;
-  /** GitHub Environment name for protection gates (deploy job only) */
-  environment?: string;
+
 }
 
 /**

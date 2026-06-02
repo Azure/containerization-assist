@@ -12,7 +12,17 @@ Add a `generate-github-workflow` tool at the end of the containerization-assist 
 
 ## What the Generated Workflow Looks Like
 
-The tool instructs Copilot to generate a two-job GitHub Actions workflow:
+The tool instructs Copilot to generate a two-job GitHub Actions workflow that builds the
+image with `az acr build` (in Azure, not on the runner) and deploys to AKS via kubelogin +
+`azure/aks-set-context`. Non-sensitive config lives in the workflow-level `env:` block; only
+the three OIDC values are GitHub secrets.
+
+> ⛔ **Critical invariants the tool enforces:**
+> - Job keys are literally `buildImage` and `deploy` — never `build-and-push`.
+> - The image is built with `az acr build` ONLY — never `docker/build-push-action` or `docker build`.
+> - **No `environment:` key on any job** — a job-level environment changes the OIDC subject
+>   claim from `repo:OWNER/REPO:ref:refs/heads/BRANCH` to `repo:OWNER/REPO:environment:NAME`,
+>   which breaks Azure federated-credential authentication.
 
 ```yaml
 name: Build and Deploy to AKS
@@ -22,94 +32,97 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  id-token: write   # Required for Azure OIDC
-  contents: read
+env:
+  ACR_RESOURCE_GROUP: my-rg
+  AZURE_CONTAINER_REGISTRY: myregistry
+  CONTAINER_NAME: myapp
+  CLUSTER_NAME: my-aks
+  CLUSTER_RESOURCE_GROUP: my-rg
+  DEPLOYMENT_MANIFEST_PATH: k8s/
+  DOCKER_FILE: Dockerfile
+  BUILD_CONTEXT_PATH: .
+  NAMESPACE: default
 
 jobs:
-  build-and-push:
+  buildImage:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
-    outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login (OIDC)
+      - name: Azure login
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Login to ACR
-        uses: azure/docker-login@v2
-        with:
-          login-server: myregistry.azurecr.io
+      - name: Log into ACR
+        run: |
+          az acr login -n ${{ env.AZURE_CONTAINER_REGISTRY }}
 
-      - name: Build and push image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: myregistry.azurecr.io/myapp:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build and push image to ACR
+        run: |
+          az acr build --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }} --registry ${{ env.AZURE_CONTAINER_REGISTRY }} -g ${{ env.ACR_RESOURCE_GROUP }} -f ${{ env.DOCKER_FILE }} ${{ env.BUILD_CONTEXT_PATH }}
 
   deploy:
-    needs: build-and-push
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
-    environment: production
-
+    needs: [buildImage]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login (OIDC)
+      - name: Azure login
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Get AKS credentials
-        run: |
-          az aks get-credentials \
-            --resource-group ${{ vars.RESOURCE_GROUP }} \
-            --name ${{ vars.CLUSTER_NAME }} \
-            --overwrite-existing
-
-      - name: Bake manifests
-        uses: azure/k8s-bake@v1
+      - name: Set up kubelogin for non-interactive login
+        uses: azure/use-kubelogin@v1
         with:
-          renderType: manifests
-          manifests: k8s/
-        id: bake
+          kubelogin-version: "v0.0.25"
 
-      - name: Deploy to AKS
-        uses: azure/k8s-deploy@v5
+      - name: Get K8s context
+        uses: azure/aks-set-context@v4
         with:
-          namespace: ${{ vars.K8S_NAMESPACE }}
-          manifests: ${{ steps.bake.outputs.manifestsBundle }}
-          images: myregistry.azurecr.io/myapp:${{ github.sha }}
+          resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          admin: "false"
+          use-kubelogin: "true"
+
+      - name: Deploys application
+        uses: Azure/k8s-deploy@v5
+        with:
+          action: deploy
+          manifests: ${{ env.DEPLOYMENT_MANIFEST_PATH }}
+          images: |
+            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }}
+          namespace: ${{ env.NAMESPACE }}
 ```
 
-### Required GitHub Secrets & Variables
+> For Helm/Kustomize projects (`manifestFormat: helm | kustomize`) the deploy job adds an
+> `azure/k8s-bake@v1` step before `Azure/k8s-deploy@v5`, passing `manifests: ${{ steps.bake.outputs.manifestsBundle }}`.
+
+### Required GitHub Secrets
+
+Only three secrets are required — everything else is in the workflow `env:` block.
 
 | Type | Name | Value |
 |---|---|---|
 | Secret | `AZURE_CLIENT_ID` | App registration client ID (OIDC federated credential) |
 | Secret | `AZURE_TENANT_ID` | Azure Entra ID tenant ID |
 | Secret | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| Variable | `RESOURCE_GROUP` | Azure resource group name |
-| Variable | `CLUSTER_NAME` | AKS cluster name |
-| Variable | `K8S_NAMESPACE` | Kubernetes namespace (e.g. `production`) |
+
+The Azure federated credential must be configured for the **branch** subject
+(`repo:OWNER/REPO:ref:refs/heads/main`). Do **not** add a job-level `environment:` unless a
+matching environment-scoped federated credential exists — otherwise OIDC auth fails.
 
 ---
 
@@ -136,10 +149,10 @@ flowchart TD
 
     subgraph AUTO["Every Future git push — Fully Automated"]
         L[GitHub Actions triggers]
-        --> M["azure/login<br/>OIDC — no passwords"]
-        --> N["docker/build-push-action<br/>Rebuild image from Dockerfile<br/>Tag with commit SHA"]
-        --> O["azure/setup-kubectl<br/>az aks get-credentials"]
-        --> P["azure/k8s-bake<br/>Process manifests"]
+        --> M["azure/login<br/>OIDC — branch-scoped, no passwords"]
+        --> N["az acr build<br/>Build image in Azure (ACR)<br/>Tag with commit SHA"]
+        --> O["azure/use-kubelogin + aks-set-context<br/>kubeconfig via OIDC"]
+        --> P["azure/k8s-bake (helm/kustomize only)<br/>Process manifests"]
         --> Q["azure/k8s-deploy<br/>Rolling update to AKS"]
     end
 
@@ -164,18 +177,18 @@ This is the recipe book of GitHub Actions best practices the tool will query. Ea
 
 | ID | Purpose | Severity |
 |---|---|---|
-| `github-oidc-permissions` | `id-token: write` + `contents: read` permissions block | required |
+| `github-oidc-permissions` | per-job `contents: read` + `id-token: write` (deploy also `actions: read`) | required |
 | `azure-login-oidc` | `azure/login@v2` with the 3 OIDC secrets | required |
-| `acr-docker-login` | `azure/docker-login@v2` after OIDC login | high |
-| `docker-build-push-acr` | `docker/build-push-action@v5` with `github.sha` tag | high |
-| `aks-setup-kubectl` | `azure/setup-kubectl@v4` step | high |
-| `aks-get-credentials` | `az aks get-credentials` shell command | high |
-| `k8s-bake-manifests` | `azure/k8s-bake@v1` with manifest directory input | medium |
-| `k8s-deploy-action` | `azure/k8s-deploy@v5` with namespace + bake output | required |
-| `github-environment-gates` | GitHub Environments for production protection rules | medium |
-| `workflow-docker-layer-cache` | `actions/cache` via `cache-from/cache-to: type=gha` | medium |
+| `acr-docker-login` | `az acr login -n ${{ env.AZURE_CONTAINER_REGISTRY }}` after OIDC login | high |
+| `docker-build-push-acr` | `az acr build` with `github.sha` tag (NOT docker build) | required |
+| `aks-setup-kubectl` | `azure/use-kubelogin@v1` step | high |
+| `aks-get-credentials` | `azure/aks-set-context@v4` (admin: false, use-kubelogin: true) | high |
+| `k8s-bake-manifests` | `azure/k8s-bake@v1` for helm/kustomize | medium |
+| `k8s-deploy-action` | `Azure/k8s-deploy@v5` + annotate step | required |
+| `workflow-two-job-structure` | literal `buildImage` + `deploy` jobs, `needs: [buildImage]` | high |
 | `workflow-concurrency` | `concurrency` block with `cancel-in-progress: true` | medium |
-| `required-secrets-guidance` | Summary of secrets and variables to configure | high |
+| `required-secrets-guidance` | only 3 OIDC secrets; rest in `env:` block | high |
+| `no-job-environment-oidc` | NEVER add `environment:` to a job (breaks OIDC subject) | required |
 
 **Entry format:**
 ```json
