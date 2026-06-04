@@ -72,6 +72,7 @@
   "files": [
     "dist/**/*",
     "dist-cjs/**/*",
+    "skills/**/SKILL.md",
     "policies/**/*.rego",
     "!policies/**/*_test.rego",
     "policies/compiled/*.wasm",
