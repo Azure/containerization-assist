@@ -6,10 +6,12 @@
 import { jest } from '@jest/globals';
 import type { ToolContext } from '@/mcp/context';
 
-// Mock knowledge loader
-const mockGetKnowledgeForCategory = jest.fn();
-jest.mock('@/knowledge', () => ({
-  getKnowledgeForCategory: mockGetKnowledgeForCategory,
+// Mock the knowledge matcher the tool actually calls via the knowledge-tool-pattern.
+// The tool resolves snippets through `getKnowledgeSnippets` from '@/knowledge/matcher',
+// so mocking that keeps this a true unit test (no real matcher/loader access).
+const mockGetKnowledgeSnippets = jest.fn();
+jest.mock('@/knowledge/matcher', () => ({
+  getKnowledgeSnippets: mockGetKnowledgeSnippets,
 }));
 
 // Mock logger
@@ -90,7 +92,7 @@ describe('generate-github-workflow', () => {
     mockContext = createMockToolContext();
     jest.clearAllMocks();
 
-    mockGetKnowledgeForCategory.mockReturnValue([
+    mockGetKnowledgeSnippets.mockResolvedValue([
       authSnippet,
       buildSnippet,
       deploySnippet,
