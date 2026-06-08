@@ -46,7 +46,7 @@ export const generateGithubWorkflowSchema = z.object({
     .optional()
     .default('k8s')
     .describe(
-      'Manifest format used by the project. Determines whether azure/k8s-bake is needed and which renderType to use.',
+      'Manifest format used by the project. Determines whether azure/k8s-bake is needed and which renderEngine to use.',
     ),
 
   manifestPath: z
@@ -73,6 +73,14 @@ export const generateGithubWorkflowSchema = z.object({
     .optional()
     .describe(
       'Azure resource group containing the ACR. Defaults to resourceGroup if not provided.',
+    ),
+
+  workflowFileName: z
+    .string()
+    .optional()
+    .default('deploy.yml')
+    .describe(
+      'Name of the workflow file created under .github/workflows/. Defaults to "deploy.yml".',
     ),
 
   branches: z

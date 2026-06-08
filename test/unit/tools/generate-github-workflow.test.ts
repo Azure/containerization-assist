@@ -67,7 +67,7 @@ const buildSnippet = {
 
 const deploySnippet = {
   id: 'k8s-deploy-action',
-  text: 'Use azure/k8s-deploy@v5 to apply manifests to AKS',
+  text: 'Use Azure/k8s-deploy@v6 to apply manifests to AKS',
   category: 'cicd',
   tags: ['aks', 'k8s-deploy'],
   weight: 0.9,
@@ -237,6 +237,29 @@ describe('generate-github-workflow', () => {
       }
     });
 
+    it('should honor a custom workflowFileName', async () => {
+      const result = await generateGithubWorkflowTool.handler(
+        {
+          repositoryPath: '/home/user/myapp',
+          registry: 'myregistry.azurecr.io',
+          clusterName: 'my-aks',
+          resourceGroup: 'my-rg',
+          namespace: 'default',
+          manifestFormat: 'k8s',
+          branches: ['main'],
+          workflowFileName: 'release.yml',
+        },
+        mockContext,
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const plan = result.value;
+        expect(plan.nextAction.files).toHaveLength(1);
+        expect(plan.nextAction.files[0].path).toBe('.github/workflows/release.yml');
+      }
+    });
+
     it('should include bake step details in instruction when manifestFormat is helm', async () => {
       const result = await generateGithubWorkflowTool.handler(
         {
@@ -257,6 +280,8 @@ describe('generate-github-workflow', () => {
         const plan = result.value;
         expect(plan.nextAction.instruction).toContain('k8s-bake');
         expect(plan.nextAction.instruction).toContain('helm');
+        expect(plan.nextAction.instruction).toContain('renderEngine: helm');
+        expect(plan.nextAction.instruction).toContain('helmChart');
         // deploy job should include bake step in steps list
         const deployJob = plan.workflowJobs.find((j) => j.name === 'deploy');
         expect(deployJob?.steps.some((s) => s.includes('k8s-bake'))).toBe(true);
@@ -280,6 +305,8 @@ describe('generate-github-workflow', () => {
       if (result.ok) {
         const plan = result.value;
         expect(plan.nextAction.instruction).toContain('kustomize');
+        expect(plan.nextAction.instruction).toContain('renderEngine: kustomize');
+        expect(plan.nextAction.instruction).toContain('kustomizationPath');
       }
     });
 

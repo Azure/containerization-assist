@@ -981,8 +981,9 @@ export function formatGithubWorkflowNarrative(
 
   // Next steps (only if chainHintsMode is enabled)
   if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
+    const workflowPath = plan.nextAction.files[0]?.path ?? '.github/workflows/deploy.yml';
     parts.push(`\n**Next Steps:**`);
-    parts.push('  1. Create .github/workflows/deploy.yml exactly as instructed above');
+    parts.push(`  1. Create ${workflowPath} exactly as instructed above`);
     parts.push('  2. Configure AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as repository secrets');
     parts.push('  3. Set up a branch-scoped OIDC federated credential in Azure Entra ID');
     parts.push('  4. Commit and push to trigger the workflow');

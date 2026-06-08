@@ -37,8 +37,8 @@ type WorkflowCategory = 'auth' | 'build' | 'deploy' | 'bestPractices';
 interface WorkflowRules {
   /** Whether the deploy job needs azure/k8s-bake (helm or kustomize manifests) */
   includeBakeStep: boolean;
-  /** Render type to pass to azure/k8s-bake */
-  renderType: 'manifests' | 'helm' | 'kustomize';
+  /** Render engine to pass to azure/k8s-bake (only used when includeBakeStep is true) */
+  renderEngine: 'helm' | 'kustomize';
   /** Runner image — always ubuntu-latest */
   runsOn: string;
 }
@@ -91,8 +91,7 @@ const runPattern = createKnowledgeTool<
       const fmt = input.manifestFormat ?? 'k8s';
       return {
         includeBakeStep: fmt === 'helm' || fmt === 'kustomize',
-        renderType:
-          fmt === 'helm' ? 'helm' : fmt === 'kustomize' ? 'kustomize' : 'manifests',
+        renderEngine: fmt === 'kustomize' ? 'kustomize' : 'helm',
         runsOn: 'ubuntu-latest',
       };
     },
@@ -112,6 +111,7 @@ const runPattern = createKnowledgeTool<
         dockerFile = 'Dockerfile',
         buildContextPath = '.',
         acrResourceGroup,
+        workflowFileName = 'deploy.yml',
       } = input;
 
       // Derive image name from the last segment of the repository path when not provided
@@ -123,7 +123,7 @@ const runPattern = createKnowledgeTool<
       const registryName = registry.replace(/\.azurecr\.io$/i, '');
       const acrRg = acrResourceGroup ?? resourceGroup;
 
-      const workflowFilePath = '.github/workflows/deploy.yml';
+      const workflowFilePath = `.github/workflows/${workflowFileName}`;
 
       // ── Collect categorised snippets for the instruction ────────────────────
 
@@ -176,7 +176,7 @@ const runPattern = createKnowledgeTool<
         `          kubelogin-version: "v0.0.25"`,
         ``,
         `      - name: Get K8s context`,
-        `        uses: azure/aks-set-context@v4`,
+        `        uses: azure/aks-set-context@v5`,
         `        with:`,
         `          resource-group: \${{ env.CLUSTER_RESOURCE_GROUP }}`,
         `          cluster-name: \${{ env.CLUSTER_NAME }}`,
@@ -184,17 +184,19 @@ const runPattern = createKnowledgeTool<
         `          use-kubelogin: "true"`,
       ].join('\n');
 
+      const bakePathKey = rules.renderEngine === 'helm' ? 'helmChart' : 'kustomizationPath';
+
       const deployStepYaml = rules.includeBakeStep
         ? [
             `      - name: Bake manifests`,
-            `        uses: azure/k8s-bake@v1`,
+            `        uses: azure/k8s-bake@v4`,
             `        with:`,
-            `          renderType: ${rules.renderType}`,
-            `          ${rules.renderType === 'helm' ? 'helmChart' : 'manifests'}: \${{ env.DEPLOYMENT_MANIFEST_PATH }}`,
+            `          renderEngine: ${rules.renderEngine}`,
+            `          ${bakePathKey}: \${{ env.DEPLOYMENT_MANIFEST_PATH }}`,
             `        id: bake`,
             ``,
             `      - name: Deploys application`,
-            `        uses: Azure/k8s-deploy@v5`,
+            `        uses: Azure/k8s-deploy@v6`,
             `        with:`,
             `          action: deploy`,
             `          manifests: \${{ steps.bake.outputs.manifestsBundle }}`,
@@ -204,7 +206,7 @@ const runPattern = createKnowledgeTool<
           ].join('\n')
         : [
             `      - name: Deploys application`,
-            `        uses: Azure/k8s-deploy@v5`,
+            `        uses: Azure/k8s-deploy@v6`,
             `        with:`,
             `          action: deploy`,
             `          manifests: \${{ env.DEPLOYMENT_MANIFEST_PATH }}`,
@@ -217,11 +219,11 @@ const runPattern = createKnowledgeTool<
 
       const deploySteps: string[] = rules.includeBakeStep
         ? [
-            `azure/k8s-bake@v1 with renderType: ${rules.renderType} and ${rules.renderType === 'helm' ? 'helmChart' : 'manifests'}: \${{ env.DEPLOYMENT_MANIFEST_PATH }} (id: bake)`,
-            `Azure/k8s-deploy@v5 with action: deploy, manifests: \${{ steps.bake.outputs.manifestsBundle }}, images: \${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/\${{ env.CONTAINER_NAME }}:\${{ github.sha }}, namespace: \${{ env.NAMESPACE }}`,
+            `azure/k8s-bake@v4 with renderEngine: ${rules.renderEngine} and ${bakePathKey}: \${{ env.DEPLOYMENT_MANIFEST_PATH }} (id: bake)`,
+            `Azure/k8s-deploy@v6 with action: deploy, manifests: \${{ steps.bake.outputs.manifestsBundle }}, images: \${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/\${{ env.CONTAINER_NAME }}:\${{ github.sha }}, namespace: \${{ env.NAMESPACE }}`,
           ]
         : [
-            `Azure/k8s-deploy@v5 with action: deploy, manifests: \${{ env.DEPLOYMENT_MANIFEST_PATH }}, images: \${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/\${{ env.CONTAINER_NAME }}:\${{ github.sha }}, namespace: \${{ env.NAMESPACE }}`,
+            `Azure/k8s-deploy@v6 with action: deploy, manifests: \${{ env.DEPLOYMENT_MANIFEST_PATH }}, images: \${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/\${{ env.CONTAINER_NAME }}:\${{ github.sha }}, namespace: \${{ env.NAMESPACE }}`,
           ];
 
       // ── nextAction instruction ───────────────────────────────────────────────
@@ -253,8 +255,8 @@ const runPattern = createKnowledgeTool<
         `  runs-on: ${rules.runsOn}`,
         `  permissions: contents: read, id-token: write`,
         `  steps:`,
-        `    1. actions/checkout@v4`,
-        `    2. azure/login@v2 with client-id: \${{ secrets.AZURE_CLIENT_ID }}, tenant-id: \${{ secrets.AZURE_TENANT_ID }}, subscription-id: \${{ secrets.AZURE_SUBSCRIPTION_ID }}`,
+        `    1. actions/checkout@v6`,
+        `    2. azure/login@v3 with client-id: \${{ secrets.AZURE_CLIENT_ID }}, tenant-id: \${{ secrets.AZURE_TENANT_ID }}, subscription-id: \${{ secrets.AZURE_SUBSCRIPTION_ID }}`,
         `    3. Log into ACR (see pinned snippet below)`,
         `    4. Build and push image to ACR (see pinned snippet below)`,
         ``,
@@ -263,8 +265,8 @@ const runPattern = createKnowledgeTool<
         `  runs-on: ${rules.runsOn}`,
         `  permissions: actions: read, contents: read, id-token: write`,
         `  steps:`,
-        `    1. actions/checkout@v4`,
-        `    2. azure/login@v2 with client-id: \${{ secrets.AZURE_CLIENT_ID }}, tenant-id: \${{ secrets.AZURE_TENANT_ID }}, subscription-id: \${{ secrets.AZURE_SUBSCRIPTION_ID }}`,
+        `    1. actions/checkout@v6`,
+        `    2. azure/login@v3 with client-id: \${{ secrets.AZURE_CLIENT_ID }}, tenant-id: \${{ secrets.AZURE_TENANT_ID }}, subscription-id: \${{ secrets.AZURE_SUBSCRIPTION_ID }}`,
         `    3. Set up kubelogin + AKS context (see pinned snippet below)`,
         ...deploySteps.map((s, i) => `    ${4 + i}. ${s}`),
         `    ${4 + deploySteps.length}. Annotate deployment (see pinned snippet below)`,
@@ -285,7 +287,7 @@ const runPattern = createKnowledgeTool<
         aksContextYaml,
         '```',
         ``,
-        `### deploy — k8s-deploy${rules.includeBakeStep ? ` (with bake for ${rules.renderType})` : ''}`,
+        `### deploy — k8s-deploy${rules.includeBakeStep ? ` (with bake for ${rules.renderEngine})` : ''}`,
         '```yaml',
         deployStepYaml,
         '```',
@@ -313,7 +315,7 @@ const runPattern = createKnowledgeTool<
         `  Configure an OIDC federated credential in Azure Entra ID for this repository and branch.`,
         ``,
         `## Manifest format`,
-        `  ${manifestFormat}${rules.includeBakeStep ? ` — include azure/k8s-bake step with renderType: ${rules.renderType}` : ' — deploy manifests directly'}`,
+        `  ${manifestFormat}${rules.includeBakeStep ? ` — include azure/k8s-bake step with renderEngine: ${rules.renderEngine}` : ' — deploy manifests directly'}`,
         knowledgeSection,
       ]
         .filter((line) => line !== undefined)
@@ -326,8 +328,8 @@ const runPattern = createKnowledgeTool<
           name: 'buildImage',
           runsOn: rules.runsOn,
           steps: [
-            'actions/checkout@v4',
-            'azure/login@v2 (OIDC)',
+            'actions/checkout@v6',
+            'azure/login@v3 (OIDC)',
             `az acr login -n ${registryName}`,
             `az acr build → ${registryName}.azurecr.io/${imageName}:\${{ github.sha }}`,
           ],
@@ -336,16 +338,16 @@ const runPattern = createKnowledgeTool<
           name: 'deploy',
           runsOn: rules.runsOn,
           steps: [
-            'actions/checkout@v4',
-            'azure/login@v2 (OIDC)',
+            'actions/checkout@v6',
+            'azure/login@v3 (OIDC)',
             'azure/use-kubelogin@v1',
-            `azure/aks-set-context@v4 → ${clusterName}`,
+            `azure/aks-set-context@v5 → ${clusterName}`,
             ...(rules.includeBakeStep
               ? [
-                  `azure/k8s-bake@v1 (renderType: ${rules.renderType}, manifests: ${manifestPath})`,
-                  `Azure/k8s-deploy@v5 → namespace: ${namespace}`,
+                  `azure/k8s-bake@v4 (renderEngine: ${rules.renderEngine}, path: ${manifestPath})`,
+                  `Azure/k8s-deploy@v6 → namespace: ${namespace}`,
                 ]
-              : [`Azure/k8s-deploy@v5 → namespace: ${namespace}`]),
+              : [`Azure/k8s-deploy@v6 → namespace: ${namespace}`]),
             `kubectl annotate deployment --all -n ${namespace} (pipeline metadata)`,
           ],
         },
@@ -366,7 +368,7 @@ const runPattern = createKnowledgeTool<
         `Image: ${imageName} (tagged with commit SHA)\n` +
         `Cluster: ${clusterName} (resource group: ${resourceGroup})\n` +
         `Namespace: ${namespace}\n` +
-        `Manifest format: ${manifestFormat}${rules.includeBakeStep ? ` (bake step: ${rules.renderType})` : ''}\n` +
+        `Manifest format: ${manifestFormat}${rules.includeBakeStep ? ` (bake step: ${rules.renderEngine})` : ''}\n` +
         `Trigger branches: ${branchList}\n` +
         `Knowledge snippets applied: ${totalSnippets}\n\n` +
         `✅ Ready to create workflow. After committing, configure GitHub secrets:\n` +

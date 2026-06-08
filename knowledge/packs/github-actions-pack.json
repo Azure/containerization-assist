@@ -19,8 +19,8 @@
     "id": "azure-login-oidc",
     "category": "cicd",
     "pattern": "azure/login",
-    "recommendation": "Use azure/login@v2 with OIDC federated credentials instead of client secrets or certificates — eliminates long-lived secrets entirely",
-    "example": "- name: Azure Login (OIDC)\n  uses: azure/login@v2\n  with:\n    client-id: ${{ secrets.AZURE_CLIENT_ID }}\n    tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+    "recommendation": "Use azure/login@v3 with OIDC federated credentials instead of client secrets or certificates — eliminates long-lived secrets entirely",
+    "example": "- name: Azure Login (OIDC)\n  uses: azure/login@v3\n  with:\n    client-id: ${{ secrets.AZURE_CLIENT_ID }}\n    tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}",
     "severity": "required",
     "tags": [
       "generate-github-workflow",
@@ -82,8 +82,8 @@
     "id": "aks-get-credentials",
     "category": "cicd",
     "pattern": "azure/aks-set-context",
-    "recommendation": "Use azure/aks-set-context@v4 with use-kubelogin: true and admin: false to configure kubectl context for AKS using OIDC non-interactive authentication",
-    "example": "- name: Get K8s context\n  uses: azure/aks-set-context@v4\n  with:\n    resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}\n    cluster-name: ${{ env.CLUSTER_NAME }}\n    admin: 'false'\n    use-kubelogin: 'true'",
+    "recommendation": "Use azure/aks-set-context@v5 with use-kubelogin: true and admin: false to configure kubectl context for AKS using OIDC non-interactive authentication",
+    "example": "- name: Get K8s context\n  uses: azure/aks-set-context@v5\n  with:\n    resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}\n    cluster-name: ${{ env.CLUSTER_NAME }}\n    admin: 'false'\n    use-kubelogin: 'true'",
     "severity": "high",
     "tags": [
       "aks",
@@ -91,14 +91,14 @@
       "github-actions",
       "kubectl"
     ],
-    "description": "azure/aks-set-context@v4 replaces az aks get-credentials. Setting admin: false and use-kubelogin: true ensures the kubeconfig uses the Azure OIDC identity (from the azure/login step) rather than cluster admin credentials, following least-privilege principles."
+    "description": "azure/aks-set-context@v5 replaces az aks get-credentials. Setting admin: false and use-kubelogin: true ensures the kubeconfig uses the Azure OIDC identity (from the azure/login step) rather than cluster admin credentials, following least-privilege principles."
   },
   {
     "id": "k8s-bake-manifests",
     "category": "cicd",
     "pattern": "azure/k8s-bake",
-    "recommendation": "Use azure/k8s-bake@v1 to process Kubernetes manifests before deployment — supports plain manifests, Helm charts, and Kustomize",
-    "example": "- name: Bake manifests\n  uses: azure/k8s-bake@v1\n  with:\n    renderType: manifests\n    manifests: k8s/\n  id: bake\n\n# For Helm:\n# - name: Bake Helm chart\n#   uses: azure/k8s-bake@v1\n#   with:\n#     renderType: helm\n#     helmChart: charts/myapp\n#     overrideFiles: charts/myapp/values.production.yaml\n#   id: bake",
+    "recommendation": "Use azure/k8s-bake@v4 (renderEngine) to render Helm charts or Kustomize overlays before deployment. Plain Kubernetes manifests do NOT need bake — pass them directly to Azure/k8s-deploy",
+    "example": "# Helm:\n- name: Bake Helm chart\n  uses: azure/k8s-bake@v4\n  with:\n    renderEngine: helm\n    helmChart: charts/myapp\n    overrideFiles: charts/myapp/values.production.yaml\n  id: bake\n\n# Kustomize:\n# - name: Bake Kustomize overlay\n#   uses: azure/k8s-bake@v4\n#   with:\n#     renderEngine: kustomize\n#     kustomizationPath: k8s/overlays/production\n#   id: bake\n\n# Plain manifests: skip bake — pass manifests directly to Azure/k8s-deploy",
     "severity": "medium",
     "tags": [
       "aks",
@@ -108,14 +108,14 @@
       "k8s-bake",
       "kustomize"
     ],
-    "description": "azure/k8s-bake renders manifests from plain YAML, Helm charts, or Kustomize overlays into a single manifest bundle. The output (manifestsBundle) is passed to azure/k8s-deploy. Use renderType: helm for Helm charts, renderType: kustomize for Kustomize, renderType: manifests for plain YAML."
+    "description": "azure/k8s-bake@v4 renders Helm charts or Kustomize overlays into a single manifest bundle. The output (manifestsBundle) is passed to Azure/k8s-deploy. Use renderEngine: helm with helmChart for Helm, renderEngine: kustomize with kustomizationPath for Kustomize. NOTE: v2+ removed the plain-'manifests' render type and renamed renderType to renderEngine; plain Kubernetes YAML is no longer baked and should be passed straight to Azure/k8s-deploy."
   },
   {
     "id": "k8s-deploy-action",
     "category": "cicd",
     "pattern": "azure/k8s-deploy",
-    "recommendation": "Use Azure/k8s-deploy@v5 to apply manifests to AKS, then follow with a kubectl annotate step to tag deployed resources with pipeline metadata for traceability",
-    "example": "- name: Deploys application\n  uses: Azure/k8s-deploy@v5\n  with:\n    action: deploy\n    manifests: ${{ env.DEPLOYMENT_MANIFEST_PATH }}\n    images: |\n      ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }}\n    namespace: ${{ env.NAMESPACE }}\n\n- name: Annotate deployment\n  run: |\n    if kubectl get deployment -n ${{ env.NAMESPACE }} --no-headers 2>/dev/null | grep -q .; then\n      kubectl annotate deployment --all -n ${{ env.NAMESPACE }} \\\n        aks-project/pipeline-repo=\"${{ github.repository }}\" \\\n        aks-project/pipeline-workflow=\"${{ github.workflow }}\" \\\n        aks-project/deployed-by=\"vscode\" \\\n        aks-project/pipeline-run-url=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\" \\\n        --overwrite\n    fi",
+    "recommendation": "Use Azure/k8s-deploy@v6 to apply manifests to AKS, then follow with a kubectl annotate step to tag deployed resources with pipeline metadata for traceability",
+    "example": "- name: Deploys application\n  uses: Azure/k8s-deploy@v6\n  with:\n    action: deploy\n    manifests: ${{ env.DEPLOYMENT_MANIFEST_PATH }}\n    images: |\n      ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }}\n    namespace: ${{ env.NAMESPACE }}\n\n- name: Annotate deployment\n  run: |\n    if kubectl get deployment -n ${{ env.NAMESPACE }} --no-headers 2>/dev/null | grep -q .; then\n      kubectl annotate deployment --all -n ${{ env.NAMESPACE }} \\\n        aks-project/pipeline-repo=\"${{ github.repository }}\" \\\n        aks-project/pipeline-workflow=\"${{ github.workflow }}\" \\\n        aks-project/deployed-by=\"vscode\" \\\n        aks-project/pipeline-run-url=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\" \\\n        --overwrite\n    fi",
     "severity": "required",
     "tags": [
       "aks",
@@ -124,14 +124,14 @@
       "k8s-deploy",
       "kubectl"
     ],
-    "description": "Azure/k8s-deploy@v5 applies manifests and injects the image tag into matching container specs. The follow-up annotate step tags deployed resources with pipeline metadata (repo, workflow, run URL) for traceability. The conditional check prevents failures when no deployments exist in the namespace."
+    "description": "Azure/k8s-deploy@v6 applies manifests and injects the image tag into matching container specs. The follow-up annotate step tags deployed resources with pipeline metadata (repo, workflow, run URL) for traceability. The conditional check prevents failures when no deployments exist in the namespace."
   },
   {
     "id": "workflow-two-job-structure",
     "category": "cicd",
     "pattern": "needs: [buildImage]",
     "recommendation": "Split the workflow into two jobs — 'buildImage' (build and push to ACR) and 'deploy' (set context and deploy to AKS) — with deploy depending on buildImage via needs:",
-    "example": "jobs:\n  buildImage:\n    permissions:\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Azure login\n        uses: azure/login@v2\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... log into ACR and az acr build steps\n\n  deploy:\n    permissions:\n      actions: read\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    needs: [buildImage]\n    steps:\n      - uses: actions/checkout@v4\n      - name: Azure login\n        uses: azure/login@v2\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... kubelogin, aks-set-context, k8s-deploy steps",
+    "example": "jobs:\n  buildImage:\n    permissions:\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n      - name: Azure login\n        uses: azure/login@v3\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... log into ACR and az acr build steps\n\n  deploy:\n    permissions:\n      actions: read\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    needs: [buildImage]\n    steps:\n      - uses: actions/checkout@v6\n      - name: Azure login\n        uses: azure/login@v3\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... kubelogin, aks-set-context, k8s-deploy steps",
     "severity": "high",
     "tags": [
       "generate-github-workflow",
@@ -185,5 +185,20 @@
       "security"
     ],
     "description": "Adding 'environment: <name>' to a job changes the GitHub Actions OIDC token subject claim from 'repo:OWNER/REPO:ref:refs/heads/BRANCH' to 'repo:OWNER/REPO:environment:<name>'. Azure federated credentials are typically configured for the branch subject, so a job-level environment causes the OIDC token to be rejected by Azure Entra ID (no matching federated identity). Omit environment entirely unless an environment-scoped federated credential has been explicitly configured in Azure."
+  },
+  {
+    "id": "action-version-pinning",
+    "category": "cicd",
+    "pattern": "uses:",
+    "recommendation": "Pin every action to its floating major tag (@vN) so it auto-tracks the latest compatible release. When an action publishes a new major, bump N. Do NOT use @main or commit-floating refs, and do NOT use @latest (not a valid GitHub Actions version selector)",
+    "example": "# Good — floating major tag, always the latest compatible release:\nuses: actions/checkout@v6\nuses: azure/login@v3\nuses: azure/use-kubelogin@v1\nuses: azure/aks-set-context@v5\nuses: azure/k8s-bake@v4\nuses: Azure/k8s-deploy@v6\n\n# Avoid:\n# uses: actions/checkout@main     # unverifiable, supply-chain risk\n# uses: actions/checkout@latest   # not a real selector — fails unless a 'latest' tag exists",
+    "severity": "high",
+    "tags": [
+      "generate-github-workflow",
+      "github-actions",
+      "versioning",
+      "maintenance"
+    ],
+    "description": "GitHub Actions has no '@latest' selector like npm; the idiomatic way to always get the latest compatible release is the floating major tag '@vN', which the action maintainers move forward across minor/patch releases. Pinning to the major keeps workflows getting fixes automatically while staying on a stable API. Bump the major only when the action ships a new one (and verify any renamed inputs). Current latest majors at time of writing: actions/checkout@v6, azure/login@v3, azure/use-kubelogin@v1, azure/aks-set-context@v5, azure/k8s-bake@v4, Azure/k8s-deploy@v6."
   }
 ]

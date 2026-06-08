@@ -13,7 +13,7 @@ export const generateGithubWorkflowToolDefinition = {
   },
   chainHints: {
     success:
-      'GitHub Actions workflow plan generated. Next: commit .github/workflows/deploy.yml to your repository, then configure AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID as GitHub repository secrets. Set up an OIDC federated credential in Azure Entra ID pointing to your GitHub repository and branch.',
+      'GitHub Actions workflow plan generated. Next: commit the workflow file under .github/workflows/ to your repository, then configure AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID as GitHub repository secrets. Set up a branch-scoped OIDC federated credential in Azure Entra ID pointing to your GitHub repository and branch.',
     failure:
       'Failed to generate GitHub Actions workflow plan. Ensure registry, clusterName, and resourceGroup are provided.',
   },

@@ -880,12 +880,12 @@ describe('natural-language-formatters', () => {
         {
           name: 'buildImage',
           runsOn: 'ubuntu-latest',
-          steps: ['actions/checkout@v4', 'az acr build'],
+          steps: ['actions/checkout@v6', 'az acr build'],
         },
         {
           name: 'deploy',
           runsOn: 'ubuntu-latest',
-          steps: ['Azure/k8s-deploy@v5'],
+          steps: ['Azure/k8s-deploy@v6'],
         },
       ],
       secretsRequired: ['AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID'],
