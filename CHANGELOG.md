@@ -1,5 +1,15 @@
 # Change Log
 
+## [1.4.1]
+
+- add Helm chart structure and templating knowledge pack (#646)
+- add database detection + AKS workload identity support (#630)
+- add AKS-loop pre-deployment checks (#664)
+- add static redirect pages for VS Code MCP install links (#668, #669)
+- treat scanType "all" as vulnerability scan (#665)
+- add attribution labels and annotations to generated K8s manifests (#659)
+- dependency updates (#657, #662, #663, #666)
+
 ## [1.4.0]
 
 - convert MCP prompts (kind-loop, aks-loop, create-containerization-policy) to workflow tools for collapsed output in chat (#631)
