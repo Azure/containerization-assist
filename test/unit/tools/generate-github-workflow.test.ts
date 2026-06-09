@@ -61,7 +61,7 @@ const authSnippet = {
 
 const buildSnippet = {
   id: 'docker-build-push-acr',
-  text: 'Use docker/build-push-action@v5 with cache-from/cache-to: type=gha',
+  text: "REQUIRED: build and push the image with 'az acr build' ONLY — never use docker/build-push-action, docker build, docker buildx, or docker/setup-buildx-action",
   category: 'cicd',
   tags: ['docker-build', 'acr', 'registry'],
   weight: 0.9,

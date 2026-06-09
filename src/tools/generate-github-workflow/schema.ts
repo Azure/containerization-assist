@@ -52,6 +52,7 @@ export const generateGithubWorkflowSchema = z.object({
   manifestPath: z
     .string()
     .optional()
+    .default('k8s/')
     .describe(
       'Relative path to the Kubernetes manifests directory (e.g. k8s/). Defaults to k8s/ if not provided.',
     ),
@@ -106,7 +107,7 @@ export type GenerateGithubWorkflowParams = z.infer<typeof generateGithubWorkflow
  * Description of a single GitHub Actions job in the generated workflow
  */
 export interface WorkflowJobDescription {
-  /** Job identifier (e.g. "build-and-push", "deploy") */
+  /** Job identifier (e.g. "buildImage", "deploy") */
   name: string;
   /** Ordered list of step descriptions */
   steps: string[];

@@ -28,6 +28,8 @@ import {
 } from './schema';
 import { generateGithubWorkflowToolDefinition } from './types';
 
+const { name } = generateGithubWorkflowToolDefinition;
+
 // ─── Category type ────────────────────────────────────────────────────────────
 
 type WorkflowCategory = 'auth' | 'build' | 'deploy' | 'bestPractices';
@@ -51,7 +53,7 @@ const runPattern = createKnowledgeTool<
   WorkflowCategory,
   WorkflowRules
 >({
-  name: 'generate-github-workflow',
+  name: TOOL_NAME.GENERATE_GITHUB_WORKFLOW,
 
   query: {
     topic: TOPICS.GITHUB_WORKFLOW,
