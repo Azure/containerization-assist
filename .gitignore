@@ -65,8 +65,8 @@ temp/
 *.tmp
 *.backup.*
 
-# Tool planning scratch file (local only)
-plan-generateGithubWorkflow.md
+# Tool planning scratch files (local only)
+planning/
 
 # TypeScript
 *.tsbuildinfo

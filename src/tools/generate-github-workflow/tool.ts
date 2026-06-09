@@ -53,7 +53,7 @@ const runPattern = createKnowledgeTool<
   WorkflowCategory,
   WorkflowRules
 >({
-  name: TOOL_NAME.GENERATE_GITHUB_WORKFLOW,
+  name,
 
   query: {
     topic: TOPICS.GITHUB_WORKFLOW,
