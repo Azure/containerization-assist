@@ -2,7 +2,7 @@
 
 ## [1.4.1]
 
-- add chat skills for VS Code Copilot (#685)
+- add chat skills for VS Code (via GitHub Copilot) (#685)
 - add Helm chart structure and templating knowledge pack (#646)
 - add database detection + AKS workload identity support (#630)
 - add AKS-loop pre-deployment checks (#664)
