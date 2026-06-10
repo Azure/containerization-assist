@@ -2,13 +2,14 @@
 
 ## [1.4.1]
 
+- add chat skills for VS Code (via GitHub Copilot) (#685)
 - add Helm chart structure and templating knowledge pack (#646)
 - add database detection + AKS workload identity support (#630)
 - add AKS-loop pre-deployment checks (#664)
 - add static redirect pages for VS Code MCP install links (#668, #669)
 - treat scanType "all" as vulnerability scan (#665)
 - add attribution labels and annotations to generated K8s manifests (#659)
-- dependency updates (#657, #662, #663, #666)
+- dependency updates (#656, #657, #658, #662, #663, #666, #667, #672, #673, #674, #676, #677, #679, #680, #681, #683)
 
 ## [1.4.0]
 
