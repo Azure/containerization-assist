@@ -13,6 +13,7 @@
  * ⚠️  Do NOT use import.meta in this file — the CJS build forbids it.
  */
 
+import path from 'node:path';
 import { type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
@@ -116,16 +117,22 @@ const runPattern = createKnowledgeTool<
         workflowFileName = 'deploy.yml',
       } = input;
 
-      // Derive image name from the last segment of the repository path when not provided
+      // Derive image name from the repository directory name when not provided.
+      // Use path.basename (project convention) — it ignores trailing slashes, so a
+      // path like "/home/user/myapp/" still yields "myapp" rather than an empty string.
+      // basename returns '' for slash-only paths, so fall back with || (not ??).
       const imageName =
-        input.imageName ??
-        (repositoryPath ? repositoryPath.replace(/\\/g, '/').split('/').pop() ?? 'app' : 'app');
+        input.imageName ?? (path.basename(repositoryPath.replace(/\\/g, '/')) || 'app');
 
       // ACR registry name (short form, without .azurecr.io) for use in az acr commands
       const registryName = registry.replace(/\.azurecr\.io$/i, '');
       const acrRg = acrResourceGroup ?? resourceGroup;
 
-      const workflowFilePath = `.github/workflows/${workflowFileName}`;
+      // Reduce the workflow file name to a bare basename (project convention) so a value
+      // like "../escape.yml" or "nested/path.yml" cannot escape .github/workflows/.
+      // basename strips any directory/traversal segments; fall back for slash-only input.
+      const workflowFileBaseName = path.basename(workflowFileName.replace(/\\/g, '/')) || 'deploy.yml';
+      const workflowFilePath = `.github/workflows/${workflowFileBaseName}`;
 
       // ── Collect categorised snippets for the instruction ────────────────────
 

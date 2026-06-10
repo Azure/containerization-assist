@@ -262,6 +262,33 @@ describe('generate-github-workflow', () => {
       }
     });
 
+    it('should strip path traversal and directory segments from workflowFileName', async () => {
+      const cases: Array<{ input: string; expected: string }> = [
+        { input: '../../escape.yml', expected: '.github/workflows/escape.yml' },
+        { input: 'nested/path.yml', expected: '.github/workflows/path.yml' },
+        { input: '/abs/deploy.yml', expected: '.github/workflows/deploy.yml' },
+      ];
+
+      for (const { input, expected } of cases) {
+        const result = await generateGithubWorkflowTool.handler(
+          {
+            repositoryPath: '/home/user/myapp',
+            registry: 'myregistry.azurecr.io',
+            clusterName: 'my-aks',
+            resourceGroup: 'my-rg',
+            workflowFileName: input,
+          },
+          mockContext,
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          // The generated path must always stay directly under .github/workflows/
+          expect(result.value.nextAction.files[0].path).toBe(expected);
+        }
+      }
+    });
+
     it('should include bake step details in instruction when manifestFormat is helm', async () => {
       const result = await generateGithubWorkflowTool.handler(
         {
@@ -328,6 +355,26 @@ describe('generate-github-workflow', () => {
       if (result.ok) {
         const plan = result.value;
         expect(plan.summary).toContain('spring-petclinic');
+      }
+    });
+
+    it('should derive image name correctly when repository path has a trailing slash', async () => {
+      const result = await generateGithubWorkflowTool.handler(
+        {
+          repositoryPath: '/home/user/myapp/',
+          registry: 'myregistry.azurecr.io',
+          clusterName: 'my-aks',
+          resourceGroup: 'my-rg',
+          branches: ['main'],
+        },
+        mockContext,
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const plan = result.value;
+        // basename ignores the trailing slash → "myapp" (not an empty string)
+        expect(plan.summary).toContain('Image: myapp ');
       }
     });
 
