@@ -65,6 +65,9 @@ temp/
 *.tmp
 *.backup.*
 
+# Tool planning scratch files (local only)
+planning/
+
 # TypeScript
 *.tsbuildinfo
 

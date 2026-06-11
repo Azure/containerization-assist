@@ -1,0 +1,204 @@
+[
+  {
+    "id": "github-oidc-permissions",
+    "category": "cicd",
+    "pattern": "permissions:",
+    "recommendation": "Set per-job permissions: buildImage job needs contents: read and id-token: write; deploy job additionally needs actions: read",
+    "example": "jobs:\n  buildImage:\n    permissions:\n      contents: read\n      id-token: write\n  deploy:\n    permissions:\n      actions: read\n      contents: read\n      id-token: write",
+    "severity": "required",
+    "tags": [
+      "generate-github-workflow",
+      "azure-oidc",
+      "github-actions",
+      "permissions",
+      "security"
+    ],
+    "description": "Permissions are set per-job rather than at workflow level. buildImage needs id-token: write for the OIDC token request and contents: read for checkout. The deploy job additionally needs actions: read to access outputs from the buildImage job."
+  },
+  {
+    "id": "azure-login-oidc",
+    "category": "cicd",
+    "pattern": "azure/login",
+    "recommendation": "Use azure/login@v3 with OIDC federated credentials instead of client secrets or certificates — eliminates long-lived secrets entirely",
+    "example": "- name: Azure Login (OIDC)\n  uses: azure/login@v3\n  with:\n    client-id: ${{ secrets.AZURE_CLIENT_ID }}\n    tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+    "severity": "required",
+    "tags": [
+      "generate-github-workflow",
+      "azure-oidc",
+      "azure-login",
+      "github-actions",
+      "security"
+    ],
+    "description": "Azure OIDC federated credentials allow GitHub Actions to authenticate to Azure without storing any long-lived secrets. Requires a federated credential configured in the Azure app registration pointing to the GitHub repo and branch."
+  },
+  {
+    "id": "acr-docker-login",
+    "category": "cicd",
+    "pattern": "az acr login",
+    "recommendation": "Use 'az acr login -n ${{ env.AZURE_CONTAINER_REGISTRY }}' to authenticate Docker to ACR after the Azure OIDC login step — reuses the existing Azure CLI token",
+    "example": "- name: Log into ACR\n  run: |\n    az acr login -n ${{ env.AZURE_CONTAINER_REGISTRY }}",
+    "severity": "high",
+    "tags": [
+      "acr",
+      "azure-login",
+      "generate-github-workflow",
+      "github-actions",
+      "registry"
+    ],
+    "description": "az acr login reuses the Azure token obtained by azure/login to authenticate Docker to ACR. This works alongside az acr build in the same job and avoids needing the azure/docker-login action or ACR admin credentials."
+  },
+  {
+    "id": "docker-build-push-acr",
+    "category": "cicd",
+    "pattern": "az acr build",
+    "recommendation": "REQUIRED: build and push the image with 'az acr build' ONLY — never use docker/build-push-action, docker build, docker buildx, or docker/setup-buildx-action. az acr build runs the build in Azure, not on the runner, and tags with github.sha for traceability",
+    "example": "- name: Build and push image to ACR\n  run: |\n    az acr build \\\n      --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }} \\\n      --registry ${{ env.AZURE_CONTAINER_REGISTRY }} \\\n      -g ${{ env.ACR_RESOURCE_GROUP }} \\\n      -f ${{ env.DOCKER_FILE }} \\\n      ${{ env.BUILD_CONTEXT_PATH }}",
+    "severity": "required",
+    "tags": [
+      "acr",
+      "docker-build",
+      "generate-github-workflow",
+      "github-actions",
+      "registry"
+    ],
+    "description": "az acr build is the required build method for this workflow. It sends the build context to ACR and executes the Docker build in Azure infrastructure, not on the runner. This avoids Docker-in-Docker setup and runner disk space concerns. Do NOT substitute docker/build-push-action or any docker build command. The image is tagged with github.sha so Kubernetes detects an image change on every deploy."
+  },
+  {
+    "id": "aks-setup-kubectl",
+    "category": "cicd",
+    "pattern": "azure/use-kubelogin",
+    "recommendation": "Use azure/use-kubelogin@v1 to configure kubelogin for non-interactive AAD/OIDC authentication before connecting to AKS — required when admin: false is set on aks-set-context",
+    "example": "- name: Set up kubelogin for non-interactive login\n  uses: azure/use-kubelogin@v1\n  with:\n    kubelogin-version: 'v0.0.25'",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "kubectl"
+    ],
+    "description": "azure/use-kubelogin installs kubelogin on the runner. kubelogin is required for non-interactive AAD/OIDC authentication to AKS when not using admin credentials. Without it, kubectl commands will prompt for interactive login and the workflow will hang."
+  },
+  {
+    "id": "aks-get-credentials",
+    "category": "cicd",
+    "pattern": "azure/aks-set-context",
+    "recommendation": "Use azure/aks-set-context@v5 with use-kubelogin: true and admin: false to configure kubectl context for AKS using OIDC non-interactive authentication",
+    "example": "- name: Get K8s context\n  uses: azure/aks-set-context@v5\n  with:\n    resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}\n    cluster-name: ${{ env.CLUSTER_NAME }}\n    admin: 'false'\n    use-kubelogin: 'true'",
+    "severity": "high",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "kubectl"
+    ],
+    "description": "azure/aks-set-context@v5 replaces az aks get-credentials. Setting admin: false and use-kubelogin: true ensures the kubeconfig uses the Azure OIDC identity (from the azure/login step) rather than cluster admin credentials, following least-privilege principles."
+  },
+  {
+    "id": "k8s-bake-manifests",
+    "category": "cicd",
+    "pattern": "azure/k8s-bake",
+    "recommendation": "Use azure/k8s-bake@v4 (renderEngine) to render Helm charts or Kustomize overlays before deployment. Plain Kubernetes manifests do NOT need bake — pass them directly to Azure/k8s-deploy",
+    "example": "# Helm:\n- name: Bake Helm chart\n  uses: azure/k8s-bake@v4\n  with:\n    renderEngine: helm\n    helmChart: charts/myapp\n    overrideFiles: charts/myapp/values.production.yaml\n  id: bake\n\n# Kustomize:\n# - name: Bake Kustomize overlay\n#   uses: azure/k8s-bake@v4\n#   with:\n#     renderEngine: kustomize\n#     kustomizationPath: k8s/overlays/production\n#   id: bake\n\n# Plain manifests: skip bake — pass manifests directly to Azure/k8s-deploy",
+    "severity": "medium",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "helm",
+      "k8s-bake",
+      "kustomize"
+    ],
+    "description": "azure/k8s-bake@v4 renders Helm charts or Kustomize overlays into a single manifest bundle. The output (manifestsBundle) is passed to Azure/k8s-deploy. Use renderEngine: helm with helmChart for Helm, renderEngine: kustomize with kustomizationPath for Kustomize. NOTE: v2+ removed the plain-'manifests' render type and renamed renderType to renderEngine; plain Kubernetes YAML is no longer baked and should be passed straight to Azure/k8s-deploy."
+  },
+  {
+    "id": "k8s-deploy-action",
+    "category": "cicd",
+    "pattern": "azure/k8s-deploy",
+    "recommendation": "Use Azure/k8s-deploy@v6 to apply manifests to AKS, then follow with a kubectl annotate step to tag deployed resources with pipeline metadata for traceability",
+    "example": "- name: Deploys application\n  uses: Azure/k8s-deploy@v6\n  with:\n    action: deploy\n    manifests: ${{ env.DEPLOYMENT_MANIFEST_PATH }}\n    images: |\n      ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }}\n    namespace: ${{ env.NAMESPACE }}\n\n- name: Annotate deployment\n  run: |\n    if kubectl get deployment -n ${{ env.NAMESPACE }} --no-headers 2>/dev/null | grep -q .; then\n      kubectl annotate deployment --all -n ${{ env.NAMESPACE }} \\\n        aks-project/pipeline-repo=\"${{ github.repository }}\" \\\n        aks-project/pipeline-workflow=\"${{ github.workflow }}\" \\\n        aks-project/deployed-by=\"vscode\" \\\n        aks-project/pipeline-run-url=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\" \\\n        --overwrite\n    fi",
+    "severity": "required",
+    "tags": [
+      "aks",
+      "generate-github-workflow",
+      "github-actions",
+      "k8s-deploy",
+      "kubectl"
+    ],
+    "description": "Azure/k8s-deploy@v6 applies manifests and injects the image tag into matching container specs. The follow-up annotate step tags deployed resources with pipeline metadata (repo, workflow, run URL) for traceability. The conditional check prevents failures when no deployments exist in the namespace."
+  },
+  {
+    "id": "workflow-two-job-structure",
+    "category": "cicd",
+    "pattern": "needs: [buildImage]",
+    "recommendation": "Split the workflow into two jobs — 'buildImage' (build and push to ACR) and 'deploy' (set context and deploy to AKS) — with deploy depending on buildImage via needs:",
+    "example": "jobs:\n  buildImage:\n    permissions:\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n      - name: Azure login\n        uses: azure/login@v3\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... log into ACR and az acr build steps\n\n  deploy:\n    permissions:\n      actions: read\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    needs: [buildImage]\n    steps:\n      - uses: actions/checkout@v6\n      - name: Azure login\n        uses: azure/login@v3\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... kubelogin, aks-set-context, k8s-deploy steps",
+    "severity": "high",
+    "tags": [
+      "generate-github-workflow",
+      "github-actions",
+      "workflow-structure"
+    ],
+    "description": "Separating build and deploy into two jobs provides clearer failure attribution, allows the deploy job to be re-run independently without rebuilding the image, and lets each job carry only the permissions it needs. The deploy job uses needs: [buildImage] to ensure the image is in ACR before deployment starts. Each job performs its own azure/login step."
+  },
+  {
+    "id": "workflow-concurrency",
+    "category": "cicd",
+    "pattern": "concurrency:",
+    "recommendation": "Add a concurrency block to cancel in-progress runs when a newer commit is pushed — prevents stale deploys from racing or completing after a newer one",
+    "example": "concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true",
+    "severity": "medium",
+    "tags": [
+      "generate-github-workflow",
+      "github-actions",
+      "optimization",
+      "reliability"
+    ],
+    "description": "The concurrency group is scoped per workflow + branch so that concurrent pushes to main cancel previous runs while pushes to other branches remain independent. cancel-in-progress: true ensures only the latest commit is ever deployed."
+  },
+  {
+    "id": "required-secrets-guidance",
+    "category": "cicd",
+    "pattern": "secrets.AZURE",
+    "recommendation": "Store only the three OIDC secrets as GitHub repository secrets; define all other config (registry name, cluster, paths) in the workflow-level env: block for visibility and easy editing",
+    "example": "env:\n  ACR_RESOURCE_GROUP: my-rg\n  AZURE_CONTAINER_REGISTRY: myregistry\n  CONTAINER_NAME: myapp\n  CLUSTER_NAME: my-aks\n  CLUSTER_RESOURCE_GROUP: my-rg\n  DEPLOYMENT_MANIFEST_PATH: k8s/\n  DOCKER_FILE: Dockerfile\n  BUILD_CONTEXT_PATH: .\n  NAMESPACE: production\n\n# GitHub repository SECRETS (Settings → Secrets and variables → Actions):\n#   AZURE_CLIENT_ID       — App registration client ID with federated credential for this repo\n#   AZURE_TENANT_ID       — Azure Entra ID tenant ID\n#   AZURE_SUBSCRIPTION_ID — Azure subscription ID",
+    "severity": "high",
+    "tags": [
+      "azure-oidc",
+      "generate-github-workflow",
+      "github-actions",
+      "secrets",
+      "setup"
+    ],
+    "description": "Non-sensitive config (registry name, cluster name, namespace, Dockerfile path, build context) is stored in the workflow env: block for visibility and easy editing without touching secrets. Only the three OIDC values are stored as GitHub Secrets. This keeps the workflow self-documenting and avoids overloading Secrets with non-sensitive values."
+  },
+  {
+    "id": "no-job-environment-oidc",
+    "category": "cicd",
+    "pattern": "environment:",
+    "recommendation": "REQUIRED: do NOT add an 'environment:' key to any job. A job-level environment changes the GitHub OIDC subject claim and breaks Azure federated-credential authentication",
+    "example": "# CORRECT — no environment key:\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    needs: [buildImage]\n    permissions:\n      actions: read\n      contents: read\n      id-token: write\n\n# WRONG — do NOT do this:\n#   deploy:\n#     environment: production   # <- changes OIDC subject, breaks auth",
+    "severity": "required",
+    "tags": [
+      "azure-oidc",
+      "generate-github-workflow",
+      "github-actions",
+      "security"
+    ],
+    "description": "Adding 'environment: <name>' to a job changes the GitHub Actions OIDC token subject claim from 'repo:OWNER/REPO:ref:refs/heads/BRANCH' to 'repo:OWNER/REPO:environment:<name>'. Azure federated credentials are typically configured for the branch subject, so a job-level environment causes the OIDC token to be rejected by Azure Entra ID (no matching federated identity). Omit environment entirely unless an environment-scoped federated credential has been explicitly configured in Azure."
+  },
+  {
+    "id": "action-version-pinning",
+    "category": "cicd",
+    "pattern": "uses:",
+    "recommendation": "Pin every action to its floating major tag (@vN) so it auto-tracks the latest compatible release. When an action publishes a new major, bump N. Do NOT use @main or commit-floating refs, and do NOT use @latest (not a valid GitHub Actions version selector)",
+    "example": "# Good — floating major tag, always the latest compatible release:\nuses: actions/checkout@v6\nuses: azure/login@v3\nuses: azure/use-kubelogin@v1\nuses: azure/aks-set-context@v5\nuses: azure/k8s-bake@v4\nuses: Azure/k8s-deploy@v6\n\n# Avoid:\n# uses: actions/checkout@main     # unverifiable, supply-chain risk\n# uses: actions/checkout@latest   # not a real selector — fails unless a 'latest' tag exists",
+    "severity": "high",
+    "tags": [
+      "generate-github-workflow",
+      "github-actions",
+      "versioning",
+      "maintenance"
+    ],
+    "description": "GitHub Actions has no '@latest' selector like npm; the idiomatic way to always get the latest compatible release is the floating major tag '@vN', which the action maintainers move forward across minor/patch releases. Pinning to the major keeps workflows getting fixes automatically while staying on a stable API. Bump the major only when the action ships a new one (and verify any renamed inputs). Current latest majors at time of writing: actions/checkout@v6, azure/login@v3, azure/use-kubelogin@v1, azure/aks-set-context@v5, azure/k8s-bake@v4, Azure/k8s-deploy@v6."
+  }
+]

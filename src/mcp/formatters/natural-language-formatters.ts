@@ -24,6 +24,7 @@ import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
 import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
 import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
+import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
 import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
@@ -909,6 +910,83 @@ export function formatGenerateK8sManifestsNarrative(
     parts.push('  2. Use prepare-cluster to setup namespace and prerequisites');
     parts.push('  3. Use kubectl apply to deploy manifests to cluster');
     parts.push('  4. Verify deployment with verify-deploy');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Format generate-github-workflow result as natural language narrative
+ *
+ * @param plan - GitHub Actions workflow plan with nextAction instruction
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
+ * @returns Formatted narrative including the full workflow-generation instruction
+ *
+ * @description
+ * Produces a workflow-generation report that surfaces the complete
+ * `nextAction.instruction` to the client. This instruction contains the
+ * pinned YAML (az acr build, kubelogin/aks-set-context, k8s-deploy), the
+ * literal buildImage/deploy job structure, the "no environment: on any job"
+ * rule, and the categorized knowledge snippets. Without this formatter the
+ * server falls back to the summary only, dropping all of that guidance.
+ */
+export function formatGithubWorkflowNarrative(
+  plan: GithubWorkflowPlan,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
+  const parts: string[] = [];
+
+  // Action-oriented header
+  parts.push('✨ CREATE GITHUB ACTIONS WORKFLOW\n');
+
+  // Clear, complete instruction (this is the critical part)
+  parts.push(`**Action:** ${plan.nextAction.instruction}\n`);
+
+  // Files to create
+  parts.push(`**Files:**`);
+  plan.nextAction.files.forEach((f) => {
+    parts.push(`  📄 ${f.path} - ${f.purpose}`);
+  });
+  parts.push('');
+
+  // Workflow jobs overview
+  if (plan.workflowJobs.length > 0) {
+    parts.push(`**Jobs:**`);
+    plan.workflowJobs.forEach((job) => {
+      parts.push(`  🔧 ${job.name} (runs-on: ${job.runsOn})`);
+      job.steps.forEach((step) => parts.push(`     • ${step}`));
+    });
+    parts.push('');
+  }
+
+  // Required secrets
+  if (plan.secretsRequired.length > 0) {
+    parts.push(`**Required GitHub Secrets:**`);
+    plan.secretsRequired.forEach((s) => parts.push(`  🔐 ${s}`));
+  }
+
+  // Required variables
+  if (plan.variablesRequired.length > 0) {
+    parts.push(`\n**Required GitHub Variables:**`);
+    plan.variablesRequired.forEach((v) => parts.push(`  ⚙️ ${v}`));
+  }
+
+  // Version annotation
+  if (plan.attributionLabels?.annotations) {
+    parts.push(`\n**Version Annotation:**`);
+    for (const [key, value] of Object.entries(plan.attributionLabels.annotations)) {
+      parts.push(`  ${key}: ${value}`);
+    }
+  }
+
+  // Next steps (only if chainHintsMode is enabled)
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
+    const workflowPath = plan.nextAction.files[0]?.path ?? '.github/workflows/deploy.yml';
+    parts.push(`\n**Next Steps:**`);
+    parts.push(`  1. Create ${workflowPath} exactly as instructed above`);
+    parts.push('  2. Configure AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as repository secrets');
+    parts.push('  3. Set up a branch-scoped OIDC federated credential in Azure Entra ID');
+    parts.push('  4. Commit and push to trigger the workflow');
   }
 
   return parts.join('\n');

@@ -8,11 +8,13 @@ import {
   formatDockerfilePlanNarrative,
   formatBuildImageNarrative,
   formatAnalyzeRepoNarrative,
+  formatGithubWorkflowNarrative,
 } from '@/mcp/formatters/natural-language-formatters';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
 import type { BuildImageResult } from '@/tools/build-image-context/schema';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
 
 describe('natural-language-formatters', () => {
   describe('formatScanImageNarrative', () => {
@@ -858,6 +860,66 @@ describe('natural-language-formatters', () => {
 
       expect(narrative).toContain('**Modules Found:** 0');
       expect(narrative).toContain('No modules detected in repository');
+    });
+  });
+
+  describe('formatGithubWorkflowNarrative', () => {
+    const makePlan = (): GithubWorkflowPlan => ({
+      nextAction: {
+        action: 'create-files',
+        instruction:
+          'Create a new GitHub Actions workflow at .github/workflows/deploy.yml. Use az acr build ONLY. Do NOT add an environment: key to any job. Use literal job keys buildImage and deploy.',
+        files: [
+          {
+            path: '.github/workflows/deploy.yml',
+            purpose: 'GitHub Actions CI/CD workflow',
+          },
+        ],
+      },
+      workflowJobs: [
+        {
+          name: 'buildImage',
+          runsOn: 'ubuntu-latest',
+          steps: ['actions/checkout@v6', 'az acr build'],
+        },
+        {
+          name: 'deploy',
+          runsOn: 'ubuntu-latest',
+          steps: ['Azure/k8s-deploy@v6'],
+        },
+      ],
+      secretsRequired: ['AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID'],
+      variablesRequired: [],
+      summary: 'Knowledge snippets applied: 13',
+      attributionLabels: {
+        annotations: {
+          'com.azure.containerizationassist/workflow-generator': 'generate-github-workflow',
+        },
+      },
+    });
+
+    it('surfaces the full nextAction.instruction (not just the summary)', () => {
+      const narrative = formatGithubWorkflowNarrative(makePlan());
+
+      expect(narrative).toContain('az acr build ONLY');
+      expect(narrative).toContain('Do NOT add an environment:');
+      expect(narrative).toContain('buildImage and deploy');
+    });
+
+    it('lists the workflow file, jobs, and required secrets', () => {
+      const narrative = formatGithubWorkflowNarrative(makePlan());
+
+      expect(narrative).toContain('.github/workflows/deploy.yml');
+      expect(narrative).toContain('buildImage');
+      expect(narrative).toContain('deploy');
+      expect(narrative).toContain('AZURE_CLIENT_ID');
+      expect(narrative).toContain('AZURE_TENANT_ID');
+      expect(narrative).toContain('AZURE_SUBSCRIPTION_ID');
+    });
+
+    it('includes next steps when chain hints are enabled', () => {
+      const narrative = formatGithubWorkflowNarrative(makePlan());
+      expect(narrative).toContain('**Next Steps:**');
     });
   });
 });

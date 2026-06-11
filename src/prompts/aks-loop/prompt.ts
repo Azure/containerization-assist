@@ -18,6 +18,7 @@ import {
   deployStep,
   envVarCheckStep,
   generateDockerfileStep,
+  generateGithubWorkflowStep,
   scanStep,
   sharedRules,
   verifyStep,
@@ -120,6 +121,7 @@ export function buildAksRemoteDevLoopPrompt(args: AksRemoteDevLoopArgs): string 
       verifyStep([
         '3. Report the external IP / ingress endpoint if a LoadBalancer or Ingress is configured.',
       ]),
+      generateGithubWorkflowStep(registry, args.clusterName, args.resourceGroup),
     ],
     [
       ...sharedRules,

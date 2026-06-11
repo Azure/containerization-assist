@@ -8,6 +8,7 @@ export const TOOL_NAME = {
   BUILD_IMAGE_CONTEXT: 'build-image-context',
   FIX_DOCKERFILE: 'fix-dockerfile',
   GENERATE_DOCKERFILE: 'generate-dockerfile',
+  GENERATE_GITHUB_WORKFLOW: 'generate-github-workflow',
   GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
   OPS: 'ops',
   PREPARE_CLUSTER: 'prepare-cluster',

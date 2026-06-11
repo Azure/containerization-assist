@@ -497,6 +497,27 @@ export function envVarCheckStep(): Step {
   };
 }
 
+export function generateGithubWorkflowStep(
+  registry: string,
+  clusterName: string,
+  resourceGroup: string,
+): Step {
+  return {
+    heading: 'Generate GitHub Actions workflow (optional)',
+    body: [
+      '**Only run this step after the deployment has been verified healthy.** This is an optional, post-deployment convenience step.',
+      '1. Ask the user whether they want a GitHub Actions workflow generated for CI/CD. If they decline, skip this step entirely.',
+      '2. Before generating, check whether a workflow file already exists under `.github/workflows/`. If one exists, ask the user before overwriting it — do **NOT** clobber it silently.',
+      `3. Call **${TOOL_NAME.GENERATE_GITHUB_WORKFLOW}** with the repository path, registry (\`${registry}\`), clusterName (\`${clusterName}\`), resourceGroup (\`${resourceGroup}\`), and analysis context.`,
+      "4. Follow the tool's instruction exactly when creating the file. Critical constraints (the tool will restate them): use the literal job keys `buildImage` and `deploy`, use `az acr build` only (never `docker/build-push-action`), and do **NOT** add an `environment:` key to any job (it breaks OIDC federated-credential auth).",
+      '5. After creating the file, remind the user to:',
+      '   - Configure GitHub repository secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`',
+      '   - Set up a branch-scoped OIDC federated credential in Azure Entra ID for the repository',
+      '6. This step is **non-fatal**: the deployment has already succeeded, so if workflow generation fails, report it and finish normally rather than treating it as a loop failure.',
+    ].join('\n'),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared rules
 // ---------------------------------------------------------------------------

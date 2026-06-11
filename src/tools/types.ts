@@ -2,6 +2,7 @@ import { analyzeRepoToolDefinition } from './analyze-repo/types';
 import { buildImageContextToolDefinition } from './build-image-context/types';
 import { fixDockerfileToolDefinition } from './fix-dockerfile/types';
 import { generateDockerfileToolDefinition } from './generate-dockerfile/types';
+import { generateGithubWorkflowToolDefinition } from './generate-github-workflow/types';
 import { generateK8sManifestsToolDefinition } from './generate-k8s-manifests/types';
 import { opsToolDefinition } from './ops/types';
 import { prepareClusterToolDefinition } from './prepare-cluster/types';
@@ -15,6 +16,7 @@ export {
   buildImageContextToolDefinition,
   fixDockerfileToolDefinition,
   generateDockerfileToolDefinition,
+  generateGithubWorkflowToolDefinition,
   generateK8sManifestsToolDefinition,
   opsToolDefinition,
   prepareClusterToolDefinition,
@@ -32,6 +34,7 @@ export const ALL_TOOL_DEFINITIONS = [
   buildImageContextToolDefinition,
   fixDockerfileToolDefinition,
   generateDockerfileToolDefinition,
+  generateGithubWorkflowToolDefinition,
   generateK8sManifestsToolDefinition,
   opsToolDefinition,
   prepareClusterToolDefinition,
