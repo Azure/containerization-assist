@@ -475,7 +475,7 @@ async function handlePrepareCluster(
       const k8sClient = createKubernetesClient(logger);
       namespaceExists = await checkNamespace(k8sClient, namespace, logger);
     } catch (err) {
-      logger.debug({ err }, 'No kubeconfig available — skipping namespace probe');
+      logger.debug({ err }, 'No kubeconfig available - skipping namespace probe');
     }
     const clusterPlatform = await detectClusterPlatform(logger);
 
