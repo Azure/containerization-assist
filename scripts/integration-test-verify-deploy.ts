@@ -27,6 +27,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import { DOCKER_PLATFORMS, DockerPlatform } from '../dist/src/tools/shared/schemas.js';
+import { executeClusterPlan } from './lib/execute-cluster-plan.js';
 
 const logger = createLogger({ name: 'verify-deploy-test', level: 'error' });
 
@@ -67,7 +68,7 @@ async function waitForCondition(
 ): Promise<boolean> {
   const startTime = Date.now();
   let attempts = 0;
-  
+
   while (Date.now() - startTime < timeoutMs) {
     attempts++;
     try {
@@ -77,15 +78,15 @@ async function waitForCondition(
     } catch {
       // Condition check failed, continue waiting
     }
-    
+
     if (attempts % 5 === 0) {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       console.log(`      Still waiting for ${description}... (${elapsed}s elapsed)`);
     }
-    
+
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
-  
+
   return false;
 }
 
@@ -95,7 +96,7 @@ async function waitForCondition(
  */
 async function cleanup(registryPort?: string): Promise<void> {
   console.log('\n🧹 Cleaning up resources...\n');
-  
+
   try {
     // Delete Kubernetes resources
     execSync('kubectl delete deployment test-web-app --ignore-not-found=true', { stdio: 'pipe' });
@@ -105,7 +106,7 @@ async function cleanup(registryPort?: string): Promise<void> {
     const msg = error instanceof Error ? error.message : String(error);
     console.log(`   ⚠️ Kubernetes cleanup failed: ${msg}`);
   }
-  
+
   try {
     // Delete kind cluster
     execSync('kind delete cluster --name containerization-assist', { stdio: 'pipe' });
@@ -114,7 +115,7 @@ async function cleanup(registryPort?: string): Promise<void> {
     const msg = error instanceof Error ? error.message : String(error);
     console.log(`   ⚠️ Kind cluster cleanup failed: ${msg}`);
   }
-  
+
   try {
     // Delete registry container
     execSync('docker rm -f ca-registry', { stdio: 'pipe' });
@@ -123,7 +124,7 @@ async function cleanup(registryPort?: string): Promise<void> {
     const msg = error instanceof Error ? error.message : String(error);
     console.log(`   ⚠️ Registry cleanup failed: ${msg}`);
   }
-  
+
   try {
     // Clean up test images
     if (registryPort) {
@@ -146,11 +147,11 @@ async function main() {
 
   const results: TestResult[] = [];
   let registryPort: string | undefined;
-  
+
   // Determine platform
   const envTargetPlatform = process.env.TARGET_PLATFORM;
   let targetPlatform: DockerPlatform;
-  
+
   if (envTargetPlatform && DOCKER_PLATFORMS.includes(envTargetPlatform as DockerPlatform)) {
     targetPlatform = envTargetPlatform as DockerPlatform;
   } else {
@@ -162,7 +163,7 @@ async function main() {
       targetPlatform = 'linux/amd64';
     }
   }
-  
+
   console.log(`\n   Target platform: ${targetPlatform}`);
 
   try {
@@ -204,27 +205,44 @@ async function main() {
     console.log('\n🏗️  Step 2: Preparing kind cluster with local registry...\n');
 
     const ctx = createToolContext(logger);
-    
-    const prepareResult = await prepareCluster.handler({
-      targetPlatform,
-      environment: 'development',
-      namespace: 'default',
-      strictPlatformValidation: true,
-    }, ctx);
+
+    const prepareResult = await prepareCluster.handler(
+      {
+        targetPlatform,
+        environment: 'development',
+        namespace: 'default',
+        strictPlatformValidation: true,
+      },
+      ctx,
+    );
 
     if (!prepareResult.ok) {
-      console.error('   ❌ Cluster preparation failed:', prepareResult.error);
+      console.error('   ❌ Cluster preparation planning failed:', prepareResult.error);
       results.push({
         name: 'Cluster Preparation',
         passed: false,
         message: `Failed: ${prepareResult.error}`,
       });
-      throw new Error('Cluster preparation failed');
+      throw new Error('Cluster preparation planning failed');
     }
 
-    const registryUrl = prepareResult.value.localRegistryUrl!;
+    // prepare-cluster is advisory: execute the returned plan to provision the cluster.
+    console.log('   Executing cluster plan...');
+    const { registryUrl: derivedRegistryUrl } = executeClusterPlan(prepareResult.value);
+
+    if (!derivedRegistryUrl) {
+      console.error('   ❌ Could not determine local registry URL from cluster plan');
+      results.push({
+        name: 'Cluster Preparation',
+        passed: false,
+        message: 'No registry URL in plan',
+      });
+      throw new Error('Cluster preparation failed: no registry URL');
+    }
+
+    const registryUrl = derivedRegistryUrl;
     registryPort = registryUrl.split(':')[1];
-    
+
     console.log('   ✅ Cluster prepared');
     console.log(`      Registry URL: ${registryUrl}`);
     console.log(`      Registry port: ${registryPort}`);
@@ -242,14 +260,14 @@ async function main() {
     console.log('\n📦 Step 3: Building test application...\n');
 
     const imageTag = `localhost:${registryPort}/test-health-app:v1.0.0`;
-    
+
     try {
       execSync(`docker build -t ${imageTag} ${healthAppPath}`, {
         stdio: 'inherit',
         cwd: process.cwd(),
       });
       console.log('   ✅ Test application built');
-      
+
       results.push({
         name: 'Build Test App',
         passed: true,
@@ -274,7 +292,7 @@ async function main() {
     try {
       execSync(`docker push ${imageTag}`, { stdio: 'inherit' });
       console.log('   ✅ Image pushed to registry');
-      
+
       results.push({
         name: 'Push to Registry',
         passed: true,
@@ -298,14 +316,14 @@ async function main() {
     // Read and update manifest with correct registry URL
     let manifest = readFileSync(manifestPath, 'utf-8');
     manifest = manifest.replace(/localhost:5000/g, `localhost:${registryPort}`);
-    
+
     const tempManifestPath = join(os.tmpdir(), `test-web-app-deployment-${Date.now()}.yaml`);
     writeFileSync(tempManifestPath, manifest);
-    
+
     try {
       execSync(`kubectl apply -f ${tempManifestPath}`, { stdio: 'inherit' });
       console.log('   ✅ Application deployed');
-      
+
       results.push({
         name: 'Deploy to Cluster',
         passed: true,
@@ -340,7 +358,7 @@ async function main() {
         }
       },
       120000, // 2 minute timeout
-      3000,   // Check every 3 seconds
+      3000, // Check every 3 seconds
     );
 
     if (!deploymentReady) {
@@ -349,7 +367,7 @@ async function main() {
       execSync('kubectl get pods -l app=test-web-app', { stdio: 'inherit' });
       console.log('\n   Pod events:');
       execSync('kubectl describe pods -l app=test-web-app | tail -30', { stdio: 'inherit' });
-      
+
       results.push({
         name: 'Deployment Ready',
         passed: false,
@@ -359,7 +377,7 @@ async function main() {
     }
 
     console.log('   ✅ Deployment ready (2/2 replicas)');
-    
+
     // Wait for service endpoints to be populated (can take a moment after pods are ready)
     console.log('   ⏳ Waiting for service endpoints...');
     const endpointsReady = await waitForCondition(
@@ -376,15 +394,15 @@ async function main() {
         }
       },
       30000, // 30 second timeout
-      2000,  // Check every 2 seconds
+      2000, // Check every 2 seconds
     );
-    
+
     if (endpointsReady) {
       console.log('   ✅ Service endpoints ready');
     } else {
       console.log('   ⚠️ Service endpoints not yet available (will continue)');
     }
-    
+
     results.push({
       name: 'Deployment Ready',
       passed: true,
@@ -396,11 +414,14 @@ async function main() {
     // ─────────────────────────────────────────────────────────────
     console.log('\n🔍 Step 7: Running verify-deploy tool...\n');
 
-    const verifyResult = await verifyDeployTool.handler({
-      deploymentName: 'test-web-app',
-      namespace: 'default',
-      checks: ['pods', 'services', 'health'],
-    }, ctx);
+    const verifyResult = await verifyDeployTool.handler(
+      {
+        deploymentName: 'test-web-app',
+        namespace: 'default',
+        checks: ['pods', 'services', 'health'],
+      },
+      ctx,
+    );
 
     if (!verifyResult.ok) {
       console.error('   ❌ verify-deploy failed:', verifyResult.error);
@@ -417,7 +438,9 @@ async function main() {
     console.log(`      Deployment: ${verifyData.deploymentName}`);
     console.log(`      Namespace: ${verifyData.namespace}`);
     console.log(`      Ready: ${verifyData.ready}`);
-    console.log(`      Replicas: ${verifyData.status?.readyReplicas}/${verifyData.status?.totalReplicas}`);
+    console.log(
+      `      Replicas: ${verifyData.status?.readyReplicas}/${verifyData.status?.totalReplicas}`,
+    );
     console.log(`      Endpoints: ${verifyData.endpoints?.length || 0}`);
     if (verifyData.summary) {
       console.log(`      Summary: ${verifyData.summary}`);
@@ -487,9 +510,10 @@ async function main() {
     results.push({
       name: 'Result Validation',
       passed: allRequiredValidationsPassed,
-      message: allRequiredValidationsPassed ? 'All required validations passed' : 'Some required validations failed',
+      message: allRequiredValidationsPassed
+        ? 'All required validations passed'
+        : 'Some required validations failed',
     });
-
   } catch (error) {
     console.error('\n❌ Test failed with error:', error instanceof Error ? error.message : error);
   } finally {
