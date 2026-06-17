@@ -467,8 +467,20 @@ async function handlePrepareCluster(
     const warnings: string[] = [];
 
     // ---- Probe read-only state (no mutations) ----
-    const k8sClient = createKubernetesClient(logger);
-    const namespaceExists = await checkNamespace(k8sClient, namespace, logger);
+    // The cluster may not exist yet (e.g. a kind cluster we are about to create),
+    // in which case there is no kubeconfig. Treat that as "namespace not found"
+    // and continue building the plan rather than failing — the plan itself
+    // contains the commands to create the cluster.
+    let namespaceExists = false;
+    try {
+      const k8sClient = createKubernetesClient(logger);
+      namespaceExists = await checkNamespace(k8sClient, namespace, logger);
+    } catch (error) {
+      logger.debug(
+        { error: error instanceof Error ? error.message : String(error) },
+        'No reachable cluster/kubeconfig; treating namespace as not existing',
+      );
+    }
     const clusterPlatform = await detectClusterPlatform(logger);
 
     let kindInstalled = false;

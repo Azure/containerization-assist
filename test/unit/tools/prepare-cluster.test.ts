@@ -36,6 +36,7 @@ jest.mock('@/infra/kubernetes/client', () => ({
 
 // Import after mocks are set up
 import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
+import { createKubernetesClient } from '@/infra/kubernetes/client';
 
 jest.mock('@/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
@@ -450,6 +451,30 @@ describe('prepareCluster (advisory)', () => {
       );
 
       expect(result.ok).toBe(false);
+    });
+
+    it('still returns a plan when no kubeconfig/cluster exists yet (kind bootstrap)', async () => {
+      // Fresh CI host: the kind cluster has not been created, so there is no
+      // kubeconfig and createKubernetesClient throws. The tool must still
+      // produce a plan containing the cluster-creation commands.
+      jest.mocked(createKubernetesClient).mockImplementationOnce(() => {
+        throw new Error(
+          'Kubeconfig not found. Neither KUBECONFIG environment variable nor ~/.kube/config exists',
+        );
+      });
+      mockKindEmptyExec();
+
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.detected.namespaceExists).toBe(false);
+        const commands = result.value.recommendations.setupCommands.map((c) => c.command);
+        expect(commands.some((c) => c.includes('kind create cluster'))).toBe(true);
+      }
     });
   });
 });
