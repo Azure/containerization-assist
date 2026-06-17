@@ -43,7 +43,7 @@ import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
 import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
 import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
-import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
+import type { ClusterPlan } from '@/tools/prepare-cluster/schema';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import {
   formatScanImageNarrative,
@@ -686,8 +686,8 @@ function isPushImageResult(output: object): output is PushImageResult {
   return 'registry' in output && 'digest' in output && 'pushedTag' in output;
 }
 
-function isPrepareClusterResult(output: object): output is PrepareClusterResult {
-  return 'clusterReady' in output && 'cluster' in output && 'checks' in output;
+function isPrepareClusterResult(output: object): output is ClusterPlan {
+  return 'clusterType' in output && 'detected' in output && 'recommendations' in output;
 }
 
 function isPingResult(output: object): output is PingResult {

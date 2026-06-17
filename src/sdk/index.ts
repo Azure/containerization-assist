@@ -36,7 +36,7 @@ import type {
   TagImageResult,
   PushImageResult,
   ManifestPlan,
-  PrepareClusterResult,
+  ClusterPlan,
   VerifyDeploymentResult,
   OpsResult,
 } from './types.js';
@@ -111,7 +111,7 @@ export type {
   TagImageResult,
   PushImageResult,
   ManifestPlan,
-  PrepareClusterResult,
+  ClusterPlan,
   VerifyDeploymentResult,
   OpsResult,
 } from './types.js';
@@ -253,7 +253,7 @@ interface ToolRegistry {
   tagImage: Tool<typeof tagImageSchema, TagImageResult>;
   pushImage: Tool<typeof pushImageSchema, PushImageResult>;
   generateK8sManifests: Tool<typeof generateK8sManifestsSchema, ManifestPlan>;
-  prepareCluster: Tool<typeof prepareClusterSchema, PrepareClusterResult>;
+  prepareCluster: Tool<typeof prepareClusterSchema, ClusterPlan>;
   verifyDeploy: Tool<typeof verifyDeploySchema, VerifyDeploymentResult>;
   ops: Tool<typeof opsToolSchema, OpsResult>;
 }
