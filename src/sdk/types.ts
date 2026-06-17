@@ -97,8 +97,7 @@ export type {
 
 // ===== PREPARE-CLUSTER TYPES =====
 
-export type { PrepareClusterParams } from '@/tools/prepare-cluster/schema';
-export type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
+export type { PrepareClusterParams, ClusterPlan } from '@/tools/prepare-cluster/schema';
 
 // ===== VERIFY-DEPLOY TYPES =====
 
