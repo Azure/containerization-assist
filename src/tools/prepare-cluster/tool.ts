@@ -471,6 +471,7 @@ async function handlePrepareCluster(
     // before a kind cluster has been created for the first time).  Treat that as
     // "cluster not reachable yet" and fall back to the empty-state assumptions so
     // the plan can still be computed and returned to the caller.
+    // Default to false: correct for fresh/non-existent clusters when kubeconfig is unavailable.
     let namespaceExists = false;
     try {
       const k8sClient = createKubernetesClient(logger);
