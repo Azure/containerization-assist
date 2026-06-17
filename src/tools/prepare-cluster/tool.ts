@@ -467,8 +467,16 @@ async function handlePrepareCluster(
     const warnings: string[] = [];
 
     // ---- Probe read-only state (no mutations) ----
-    const k8sClient = createKubernetesClient(logger);
-    const namespaceExists = await checkNamespace(k8sClient, namespace, logger);
+    // createKubernetesClient throws when no kubeconfig is found (e.g. fresh CI runner with
+    // no cluster yet).  Since this tool is purely advisory, we treat a missing kubeconfig
+    // as "no cluster available" and default all K8s-probe results to false / null.
+    let namespaceExists = false;
+    try {
+      const k8sClient = createKubernetesClient(logger);
+      namespaceExists = await checkNamespace(k8sClient, namespace, logger);
+    } catch (err) {
+      logger.debug({ err }, 'No kubeconfig available — skipping namespace probe');
+    }
     const clusterPlatform = await detectClusterPlatform(logger);
 
     let kindInstalled = false;
