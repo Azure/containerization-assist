@@ -38,6 +38,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from
 import { join, resolve } from 'path';
 import { DockerPlatform } from '../dist/src/tools/shared/schemas.js';
 import os from 'os';
+import { executeClusterPlan } from './lib/execute-cluster-plan.js';
 
 const logger = createLogger({ name: 'e2e-workflow-test', level: 'error' });
 
@@ -576,16 +577,32 @@ CMD ["java", "-jar", "app.jar"]
         name: 'Prepare Cluster',
         tool: 'prepare-cluster',
         passed: false,
-        message: `Cluster preparation failed: ${clusterResult.error}`,
+        message: `Cluster preparation planning failed: ${clusterResult.error}`,
         duration: step5Duration,
       });
       throw new Error('prepare-cluster failed');
     }
 
-    const registryUrl = clusterResult.value.localRegistryUrl!;
+    // prepare-cluster is advisory: execute the returned plan to provision the cluster.
+    console.log('   Executing cluster plan...');
+    const { registryUrl: derivedRegistryUrl } = executeClusterPlan(clusterResult.value);
+
+    if (!derivedRegistryUrl) {
+      results.push({
+        step: 5,
+        name: 'Prepare Cluster',
+        tool: 'prepare-cluster',
+        passed: false,
+        message: 'Cluster plan did not yield a registry URL',
+        duration: step5Duration,
+      });
+      throw new Error('prepare-cluster failed: no registry URL');
+    }
+
+    const registryUrl = derivedRegistryUrl;
     registryPort = registryUrl.split(':')[1];
     console.log('   ✅ Cluster prepared');
-    console.log(`      Cluster: ${clusterResult.value.cluster}`);
+    console.log(`      Cluster: ${clusterResult.value.clusterType}`);
     console.log(`      Registry: ${registryUrl}`);
 
     results.push({
@@ -596,7 +613,7 @@ CMD ["java", "-jar", "app.jar"]
       message: 'Cluster prepared with local registry',
       duration: step5Duration,
       details: {
-        cluster: clusterResult.value.cluster,
+        cluster: clusterResult.value.clusterType,
         registryUrl,
       },
     });
