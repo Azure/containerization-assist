@@ -27,7 +27,7 @@ import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
 import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
 import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
-import type { PrepareClusterResult } from '@/tools/prepare-cluster/tool';
+import type { ClusterPlan } from '@/tools/prepare-cluster/schema';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import { formatDuration, formatVulnerabilities, pluralize } from '@/lib/summary-helpers';
 import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
@@ -984,7 +984,9 @@ export function formatGithubWorkflowNarrative(
     const workflowPath = plan.nextAction.files[0]?.path ?? '.github/workflows/deploy.yml';
     parts.push(`\n**Next Steps:**`);
     parts.push(`  1. Create ${workflowPath} exactly as instructed above`);
-    parts.push('  2. Configure AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as repository secrets');
+    parts.push(
+      '  2. Configure AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as repository secrets',
+    );
     parts.push('  3. Set up a branch-scoped OIDC federated credential in Azure Entra ID');
     parts.push('  4. Commit and push to trigger the workflow');
   }
@@ -1095,89 +1097,85 @@ export function formatTagImageNarrative(
 }
 
 /**
- * Format prepare-cluster result as natural language narrative
+ * Format prepare-cluster plan as natural language narrative
  *
- * @param result - Cluster preparation result
+ * @param plan - Cluster preparation plan (advisory)
  * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
- * @returns Formatted narrative with setup details
+ * @returns Formatted narrative with detected state, setup commands, and manifests
  *
  * @description
- * Produces a cluster preparation report including:
- * - Cluster preparation status
- * - Namespace and connectivity checks
- * - Resources and checks performed
+ * Produces an advisory cluster preparation report including:
+ * - Action-oriented header and instruction
+ * - Read-only detected cluster/host state
+ * - Setup commands the agent should run
+ * - Manifests the agent should apply
+ * - Platform compatibility guidance
  * - Warnings if any
  * - Context-aware next steps (when chainHintsMode is 'enabled')
  */
 export function formatPrepareClusterNarrative(
-  result: PrepareClusterResult,
+  plan: ClusterPlan,
   chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
 ): string {
   const parts: string[] = [];
 
-  // Header
-  const icon = result.success ? '✅' : '❌';
-  parts.push(`${icon} Cluster Preparation ${result.success ? 'Complete' : 'Failed'}\n`);
+  // Action-oriented header
+  parts.push(`🔧 PREPARE CLUSTER (${plan.clusterType})\n`);
 
-  // Cluster and namespace info
-  parts.push(`**Cluster:** ${result.cluster}`);
-  parts.push(`**Namespace:** ${result.namespace}`);
-  parts.push(`**Ready:** ${result.clusterReady ? 'Yes' : 'No'}`);
+  // Clear instruction
+  parts.push(`**Action:** ${plan.nextAction.instruction}\n`);
 
-  // Checks performed
-  parts.push(`\n**Checks Performed:**`);
-  const checks = result.checks;
-  Object.entries(checks).forEach(([check, passed]) => {
-    if (typeof passed === 'boolean') {
-      const checkIcon = passed ? '✅' : '❌';
-      const checkName = check
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/^./, (str) => str.toUpperCase())
-        .trim();
-      parts.push(`  ${checkIcon} ${checkName}`);
-    }
-  });
+  // Detected state
+  const { detected, recommendations } = plan;
+  parts.push(`**Detected State:**`);
+  if (plan.clusterType === 'kind') {
+    parts.push(`  ${detected.kindInstalled ? '✅' : '❌'} Kind installed`);
+    parts.push(`  ${detected.clusterExists ? '✅' : '❌'} Cluster exists`);
+    parts.push(`  ${detected.registryRunning ? '✅' : '❌'} Local registry running`);
+  }
+  parts.push(`  ${detected.namespaceExists ? '✅' : '❌'} Namespace exists`);
+  parts.push(`  Cluster platform: ${detected.clusterPlatform ?? 'not detected'}`);
+
+  // Setup commands
+  if (recommendations.setupCommands.length > 0) {
+    parts.push(`\n**Setup Commands:** (${recommendations.setupCommands.length})`);
+    recommendations.setupCommands.forEach((cmd) => {
+      const optional = cmd.optional ? ' (optional)' : '';
+      parts.push(`  • ${cmd.goal}${optional}`);
+      parts.push(`    $ ${cmd.command}`);
+    });
+  }
+
+  // Manifests
+  if (recommendations.manifests.length > 0) {
+    parts.push(`\n**Manifests to Apply:** (${recommendations.manifests.length})`);
+    recommendations.manifests.forEach((m) => {
+      parts.push(`  📄 ${m.kind} (namespace: ${m.namespace})`);
+    });
+  }
+
+  // Platform guidance
+  const guidance = recommendations.platformGuidance;
+  const guidanceIcon = guidance.compatible ? '✅' : '⚠️';
+  parts.push(`\n**Platform Guidance:** ${guidanceIcon} ${guidance.note}`);
 
   // Warnings if any
-  if (result.warnings && result.warnings.length > 0) {
-    parts.push(`\n**Warnings:** (${result.warnings.length})`);
-    result.warnings.slice(0, 3).forEach((warning) => {
+  if (plan.warnings && plan.warnings.length > 0) {
+    parts.push(`\n**Warnings:** (${plan.warnings.length})`);
+    plan.warnings.slice(0, 3).forEach((warning) => {
       parts.push(`  ⚠ ${warning}`);
     });
-    if (result.warnings.length > 3) {
-      parts.push(`  ... and ${result.warnings.length - 3} more`);
+    if (plan.warnings.length > 3) {
+      parts.push(`  ... and ${plan.warnings.length - 3} more`);
     }
-  }
-
-  // Local registry if created
-  if (result.localRegistryUrl) {
-    parts.push(`\n**Local Registry:** ${result.localRegistryUrl}`);
-  }
-
-  // Detailed registry information if available
-  if (result.localRegistry) {
-    parts.push(`\n**Local Registry Details:**`);
-    const healthIcon = result.localRegistry.healthy ? '✅' : '⚠️';
-    parts.push(`  External URL: ${result.localRegistry.externalUrl}`);
-    parts.push(`  Internal Endpoint: ${result.localRegistry.internalEndpoint}`);
-    parts.push(`  Container Name: ${result.localRegistry.containerName}`);
-    parts.push(
-      `  Health Status: ${healthIcon} ${result.localRegistry.healthy ? 'Healthy' : 'Unhealthy'}`,
-    );
   }
 
   // Next steps (only if chainHintsMode is enabled)
   if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push(`\n**Next Steps:**`);
-    if (result.success && result.clusterReady) {
-      parts.push('  → Cluster is ready for deployment');
-      parts.push('  → Use kubectl apply to deploy your application');
-      parts.push('  → Resources will be deployed to the prepared namespace');
-    } else {
-      parts.push('  → Check cluster connectivity');
-      parts.push('  → Verify RBAC permissions');
-      parts.push('  → Review error logs for details');
-    }
+    parts.push('  → Run the setup commands above (in order, skipping satisfied optional ones)');
+    parts.push('  → Apply the manifests via kubectl');
+    parts.push('  → Re-check platform compatibility once the cluster exists, then verify-deploy');
   }
 
   return parts.join('\n');
