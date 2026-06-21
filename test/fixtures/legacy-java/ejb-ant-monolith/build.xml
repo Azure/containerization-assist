@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="invoices" default="dist" basedir=".">
+
+    <description>
+        Legacy invoice management — Java EE 6 EJB + JAX-RS, built with Ant.
+    </description>
+
+    <property name="src.dir"     value="src"/>
+    <property name="web.dir"     value="web"/>
+    <property name="lib.dir"     value="lib"/>
+    <property name="build.dir"   value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="dist.dir"    value="dist"/>
+    <property name="war.name"    value="invoices.war"/>
+
+    <property name="javac.source" value="1.8"/>
+    <property name="javac.target" value="1.8"/>
+
+    <path id="compile.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <target name="clean" description="Remove build artifacts">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+
+    <target name="init">
+        <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+    </target>
+
+    <target name="compile" depends="init" description="Compile Java sources">
+        <javac srcdir="${src.dir}"
+               destdir="${classes.dir}"
+               source="${javac.source}"
+               target="${javac.target}"
+               includeantruntime="false"
+               debug="true"
+               encoding="UTF-8">
+            <classpath refid="compile.classpath"/>
+        </javac>
+    </target>
+
+    <target name="dist" depends="compile" description="Package WAR">
+        <war destfile="${dist.dir}/${war.name}"
+             webxml="${web.dir}/WEB-INF/web.xml">
+            <classes dir="${classes.dir}"/>
+            <webinf dir="${web.dir}/WEB-INF">
+                <exclude name="web.xml"/>
+            </webinf>
+            <!-- App-server-provided APIs are NOT bundled. -->
+        </war>
+    </target>
+
+</project>
