@@ -269,16 +269,26 @@ function buildKindInstallCommand(): { command: string; goal: string } {
 
   if (systemInfo.isWindows) {
     const url = `https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-windows-${downloadArch}.exe`;
+    // Wrap in `cmd /c` so `%USERPROFILE%` is expanded by cmd.exe regardless of the
+    // parent shell. PowerShell (the common Windows shell) does not expand `%VAR%`
+    // syntax, so an unwrapped command would move the binary into a literal
+    // "%USERPROFILE%" folder. Create the target dir first (move fails if it is
+    // missing) and use `move /Y` so re-runs overwrite without an interactive
+    // prompt. Inner quotes keep the destination path space-safe under cmd.exe.
     return {
-      command: `curl.exe -Lo kind.exe ${url} && move kind.exe "%USERPROFILE%\\bin\\kind.exe"`,
+      command: `cmd /c "curl.exe -Lo kind.exe ${url} && if not exist "%USERPROFILE%\\bin" mkdir "%USERPROFILE%\\bin" && move /Y kind.exe "%USERPROFILE%\\bin\\kind.exe""`,
       goal: 'Install the kind binary (Windows) and place it on your PATH',
     };
   }
 
   const url = `https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${downloadOS}-${downloadArch}`;
+  // Avoid a hard `sudo` dependency: in advisory mode the plan may be run by a
+  // non-root user (or non-interactively, where a sudo password prompt would hang).
+  // Prefer the on-PATH system location when it is writable, otherwise fall back to
+  // a user-writable bin dir so the install still succeeds without elevation.
   return {
-    command: `curl -Lo ./kind ${url} && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind`,
-    goal: 'Install the kind binary and place it on your PATH',
+    command: `curl -Lo ./kind ${url} && chmod +x ./kind && (mv ./kind /usr/local/bin/kind 2>/dev/null || { mkdir -p "$HOME/.local/bin" && mv ./kind "$HOME/.local/bin/kind"; })`,
+    goal: 'Install the kind binary to a PATH location (no sudo required; falls back to ~/.local/bin)',
   };
 }
 
@@ -321,44 +331,102 @@ ${nodeImageLine}
 }
 
 /**
- * Read-only check for whether the local registry container is running.
- * Returns the mapped host port if the container is running, otherwise null.
- * Does NOT start stopped containers or mutate networks (advisory mode).
+ * Build the `kind create cluster` command that streams the cluster config via stdin.
+ * The config is piped using a heredoc on POSIX shells and a PowerShell here-string on
+ * Windows (Bash heredocs do not work in PowerShell/cmd). The cluster name is the
+ * already-escaped, single-quote-wrapped form, which is literal in both shells.
  */
-async function checkLocalRegistryExists(logger: pino.Logger): Promise<number | null> {
+function buildKindCreateClusterCommand(
+  shellSafeClusterName: string,
+  clusterName: string,
+  kindConfig: string,
+): ClusterSetupCommand {
+  const { isWindows } = getSystemInfo();
+  // kindConfig always ends with a newline, so the heredoc/here-string terminator
+  // lands on its own line in both forms.
+  const command = isWindows
+    ? `@'\n${kindConfig}'@ | kind create cluster --name ${shellSafeClusterName} --config=-`
+    : `cat <<'EOF' | kind create cluster --name ${shellSafeClusterName} --config=-\n${kindConfig}EOF`;
+  return {
+    command,
+    goal: `Create the kind cluster '${clusterName}' with local-registry support`,
+  };
+}
+
+/**
+ * Read-only status of the local registry container.
+ */
+interface LocalRegistryStatus {
+  /** Container is currently running. */
+  running: boolean;
+  /** Container exists (running or stopped). */
+  exists: boolean;
+  /** Host port mapped to the registry's internal port, if discoverable. */
+  port: number | null;
+}
+
+/**
+ * Read-only inspection of the local registry container.
+ * Distinguishes three states without mutating anything (advisory mode):
+ *  - running: container is up; port read from its runtime network settings.
+ *  - stopped: container exists but is not running; port reused from its host config.
+ *  - absent:  no container with the registry name exists.
+ * Never starts containers or mutates networks.
+ */
+async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegistryStatus> {
+  const absent: LocalRegistryStatus = { running: false, exists: false, port: null };
+  const containerName = DOCKER.REGISTRY_CONTAINER_NAME;
+
   try {
-    // Check if the container is currently running
+    // Is the container currently running?
     const { stdout: runningContainers } = await execAsync(
-      `docker ps --filter "name=${DOCKER.REGISTRY_CONTAINER_NAME}" --format "{{.Names}}"`,
+      `docker ps --filter "name=${containerName}" --format "{{.Names}}"`,
     );
-    const isRunning = runningContainers.trim() === DOCKER.REGISTRY_CONTAINER_NAME;
+    const running = runningContainers
+      .trim()
+      .split('\n')
+      .some((name) => name.trim() === containerName);
 
-    if (!isRunning) {
-      logger.debug('Local registry container is not running');
-      return null;
+    // If not running, does it still exist in a stopped state?
+    let exists = running;
+    if (!running) {
+      const { stdout: allContainers } = await execAsync(
+        `docker ps -a --filter "name=${containerName}" --format "{{.Names}}"`,
+      );
+      exists = allContainers
+        .trim()
+        .split('\n')
+        .some((name) => name.trim() === containerName);
+
+      if (!exists) {
+        logger.debug('Local registry container does not exist');
+        return absent;
+      }
+      logger.debug('Local registry container exists but is stopped');
     }
 
-    // Get the port mapping for the running container
+    // Resolve the mapped host port. HostConfig.PortBindings persists for stopped
+    // containers (NetworkSettings.Ports is cleared when the container is not running).
     const { stdout: portMapping } = await execAsync(
-      `docker inspect ${DOCKER.REGISTRY_CONTAINER_NAME} --format '{{range $p, $conf := .NetworkSettings.Ports}}{{if eq $p "5000/tcp"}}{{(index $conf 0).HostPort}}{{end}}{{end}}'`,
+      `docker inspect ${containerName} --format '{{range $p, $conf := .HostConfig.PortBindings}}{{if eq $p "5000/tcp"}}{{(index $conf 0).HostPort}}{{end}}{{end}}'`,
     );
-    const port = parseInt(portMapping.trim(), 10);
+    const parsedPort = parseInt(portMapping.trim(), 10);
+    const port = isNaN(parsedPort) ? null : parsedPort;
 
-    if (isNaN(port)) {
+    if (port === null) {
       logger.warn('Could not determine registry port mapping');
-      return null;
     }
 
-    logger.debug({ port }, 'Local registry is running');
-    return port;
+    logger.debug({ running, exists, port }, 'Local registry status');
+    return { running, exists, port };
   } catch (error) {
     logger.debug({ error }, 'Error checking local registry');
-    return null;
+    return absent;
   }
 }
 
 /**
- * Build the `docker run` command that starts the local registry container.
+ * Build the `docker run` command that creates and starts the local registry container.
  */
 function buildRegistryRunCommand(port: number): ClusterSetupCommand {
   return {
@@ -368,14 +436,27 @@ function buildRegistryRunCommand(port: number): ClusterSetupCommand {
 }
 
 /**
+ * Build the command that starts an existing (stopped) local registry container,
+ * reusing its original port mapping.
+ */
+function buildRegistryStartCommand(port: number): ClusterSetupCommand {
+  return {
+    command: `docker start ${DOCKER.REGISTRY_CONTAINER_NAME}`,
+    goal: `Start the existing local Docker registry container (reuses port ${port})`,
+  };
+}
+
+/**
  * Build the command that connects the local registry to the kind Docker network.
- * Marked optional because the registry may already be connected.
+ * Required for in-cluster image pulls: the kind config points containerd mirrors at
+ * `http://${REGISTRY_CONTAINER_NAME}:5000`, which only resolves once the registry is
+ * attached to the kind network. Emitted only for a newly created registry (an existing
+ * registry is already attached — Docker network membership persists across stop/start).
  */
 function buildRegistryNetworkConnectCommand(): ClusterSetupCommand {
   return {
     command: `docker network connect kind ${DOCKER.REGISTRY_CONTAINER_NAME}`,
     goal: 'Connect the local registry to the kind network so the cluster can pull from it',
-    optional: true,
   };
 }
 
@@ -450,12 +531,16 @@ async function handlePrepareCluster(
 
   const clusterName = isKind ? 'containerization-assist' : 'default';
 
-  // Validate the cluster name up front so any emitted commands are injection-safe.
+  // Validate + escape the cluster name up front so any emitted commands are injection-safe.
+  // validateAndEscapeClusterName returns the name wrapped in single quotes for shell safety;
+  // emitted kind commands must interpolate this escaped form, never the raw name.
+  let shellSafeClusterName = clusterName;
   if (isKind) {
     const nameResult = validateAndEscapeClusterName(clusterName);
     if (!nameResult.ok) {
       return nameResult;
     }
+    shellSafeClusterName = nameResult.value;
   }
 
   try {
@@ -485,7 +570,7 @@ async function handlePrepareCluster(
 
     let kindInstalled = false;
     let clusterExists = false;
-    let registryRunning: number | null = null;
+    let registryStatus: LocalRegistryStatus = { running: false, exists: false, port: null };
 
     if (isKind) {
       kindInstalled = await checkKindInstalled(logger);
@@ -495,7 +580,7 @@ async function handlePrepareCluster(
           clusterExists = existsResult.value;
         }
       }
-      registryRunning = await checkLocalRegistryExists(logger);
+      registryStatus = await checkLocalRegistryStatus(logger);
     }
 
     // ---- Compute recommendations from the unsatisfied state ----
@@ -503,34 +588,44 @@ async function handlePrepareCluster(
     const manifests: ClusterManifestPlan[] = [];
 
     if (isKind) {
-      // Use the existing registry port if one is running, otherwise pick a free port.
-      const registryPort = registryRunning ?? (await findRegistryPort());
+      // Reuse the existing registry port (running or stopped); otherwise pick a free port.
+      const registryPort = registryStatus.port ?? (await findRegistryPort());
 
       // 1. Install kind if it is missing.
       if (!kindInstalled) {
         setupCommands.push(buildKindInstallCommand());
       }
 
-      // 2. Start the local registry if it is not already running.
-      if (registryRunning === null) {
+      // 2. Ensure the local registry is running.
+      const registryNewlyCreated = !registryStatus.exists;
+      if (!registryStatus.exists) {
+        // No registry container yet — create one.
         setupCommands.push(buildRegistryRunCommand(registryPort));
+      } else if (!registryStatus.running) {
+        // Container exists but is stopped — start it (reusing its existing port)
+        // rather than `docker run`, which would fail with a name conflict.
+        setupCommands.push(buildRegistryStartCommand(registryPort));
       }
 
       // 3. Create the kind cluster (with local-registry mirror config) if it does not exist.
       if (!clusterExists) {
         const kindConfig = buildKindClusterConfig(registryPort, strictPlatformValidation);
-        setupCommands.push({
-          command: `cat <<'EOF' | kind create cluster --name ${clusterName} --config=-\n${kindConfig}EOF`,
-          goal: `Create the kind cluster '${clusterName}' with local-registry support`,
-        });
+        setupCommands.push(
+          buildKindCreateClusterCommand(shellSafeClusterName, clusterName, kindConfig),
+        );
       }
 
-      // 4. Connect the registry to the kind network (optional — may already be connected).
-      setupCommands.push(buildRegistryNetworkConnectCommand());
+      // 4. Connect the registry to the kind network. Required for in-cluster pulls,
+      //    but only when the registry container is newly created: an existing registry
+      //    is already attached (network membership persists across stop/start), and
+      //    re-running `docker network connect` on an attached container errors.
+      if (registryNewlyCreated) {
+        setupCommands.push(buildRegistryNetworkConnectCommand());
+      }
 
       // 5. Point kubectl at the cluster.
       setupCommands.push({
-        command: `kind export kubeconfig --name ${clusterName}`,
+        command: `kind export kubeconfig --name ${shellSafeClusterName}`,
         goal: 'Point kubectl at the kind cluster',
       });
 
@@ -553,9 +648,10 @@ async function handlePrepareCluster(
     const platformGuidance = buildPlatformGuidance(targetPlatform, clusterPlatform, warnings);
 
     // ---- Confidence + summary ----
-    // High confidence when state was probed cleanly; lower when the cluster platform
-    // could not be detected (e.g., no cluster exists yet) since guidance is partial.
-    const confidence = clusterPlatform === null && !isKind ? 0.7 : 0.9;
+    // High confidence when the cluster platform was detected; lower whenever it could
+    // not be (e.g., the cluster does not exist yet, including kind bootstrap) because
+    // the platform-compatibility guidance is then only partial.
+    const confidence = clusterPlatform === null ? 0.7 : 0.9;
 
     const requiredCommands = setupCommands.filter((c) => !c.optional).length;
     const summary =
@@ -577,7 +673,7 @@ async function handlePrepareCluster(
         kindInstalled,
         clusterExists,
         namespaceExists,
-        registryRunning: registryRunning !== null,
+        registryRunning: registryStatus.running,
         clusterPlatform,
       },
       recommendations: {

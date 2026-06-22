@@ -37,6 +37,7 @@ jest.mock('@/infra/kubernetes/client', () => ({
 // Import after mocks are set up
 import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
 import { createKubernetesClient } from '@/infra/kubernetes/client';
+import { getSystemInfo } from '@/lib/platform';
 
 jest.mock('@/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
@@ -132,6 +133,39 @@ function mockKindEmptyExec() {
     }
     if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
       return { stdout: '', stderr: '' };
+    }
+    return { stdout: '', stderr: '' };
+  });
+}
+
+/**
+ * execAsync behavior for a kind host where the registry container exists but is STOPPED:
+ * kind installed, cluster exists, `docker ps` (running) returns nothing, but
+ * `docker ps -a` lists the stopped container and `docker inspect` reports its old port.
+ */
+function mockKindStoppedRegistryExec() {
+  (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
+    if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
+      return { stdout: 'amd64', stderr: '' };
+    }
+    if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
+      return { stdout: 'linux', stderr: '' };
+    }
+    if (cmd.includes('kind version')) {
+      return { stdout: 'kind v0.20.0 go1.20.5 linux/amd64', stderr: '' };
+    }
+    if (cmd.includes('kind get clusters')) {
+      return { stdout: 'containerization-assist\n', stderr: '' };
+    }
+    // Stopped container: not in `docker ps`, but present in `docker ps -a`.
+    if (cmd.includes('docker ps -a') && cmd.includes('ca-registry')) {
+      return { stdout: 'ca-registry', stderr: '' };
+    }
+    if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
+      return { stdout: '', stderr: '' };
+    }
+    if (cmd.includes('docker inspect ca-registry')) {
+      return { stdout: '6000', stderr: '' };
     }
     return { stdout: '', stderr: '' };
   });
@@ -259,6 +293,26 @@ describe('prepareCluster (advisory)', () => {
       }
     });
 
+    it('installs kind without sudo and falls back to a user-writable dir', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const installCmd = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('kind.sigs.k8s.io/dl'),
+        );
+        expect(installCmd).toBeDefined();
+        // Must not require elevation in advisory mode (sudo can hang/fail non-interactively).
+        expect(installCmd?.command).not.toContain('sudo');
+        // Prefers /usr/local/bin, falls back to a user-writable location.
+        expect(installCmd?.command).toContain('/usr/local/bin/kind');
+        expect(installCmd?.command).toContain('$HOME/.local/bin');
+      }
+    });
+
     it('embeds the kind cluster config (with registry mirror) in the create command', async () => {
       const result = await prepareCluster(
         { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
@@ -276,7 +330,7 @@ describe('prepareCluster (advisory)', () => {
       }
     });
 
-    it('marks the registry network-connect command as optional', async () => {
+    it('emits the registry network-connect command as a required step for a newly created registry', async () => {
       const result = await prepareCluster(
         { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
         createMockToolContext(),
@@ -288,8 +342,144 @@ describe('prepareCluster (advisory)', () => {
           c.command.includes('docker network connect kind'),
         );
         expect(connectCmd).toBeDefined();
-        expect(connectCmd?.optional).toBe(true);
+        // Required for in-cluster pulls (containerd mirrors point at the registry),
+        // so it must NOT be marked optional.
+        expect(connectCmd?.optional).toBeFalsy();
       }
+    });
+  });
+
+  describe('Kind cluster — Windows host', () => {
+    beforeEach(() => {
+      mockK8sClient.namespaceExists.mockResolvedValue(false);
+      mockKindEmptyExec();
+      (getSystemInfo as jest.Mock).mockReturnValue({
+        isWindows: true,
+        isMac: false,
+        isLinux: false,
+      });
+    });
+
+    afterEach(() => {
+      (getSystemInfo as jest.Mock).mockReturnValue({
+        isWindows: false,
+        isMac: false,
+        isLinux: true,
+      });
+    });
+
+    it('emits a PowerShell here-string (not a Bash heredoc) for cluster creation on Windows', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const createCmd = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('kind create cluster'),
+        );
+        expect(createCmd).toBeDefined();
+        // PowerShell literal here-string, piped to kind --config -
+        expect(createCmd?.command).toContain("@'");
+        expect(createCmd?.command).toContain("'@ | kind create cluster");
+        // The Bash heredoc form must not be used on Windows.
+        expect(createCmd?.command).not.toContain("cat <<'EOF'");
+        // The config payload is still embedded.
+        expect(createCmd?.command).toContain('containerdConfigPatches');
+      }
+    });
+
+    it('wraps the kind install command in cmd /c so %USERPROFILE% expands in any shell', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const installCmd = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('kind-windows-'),
+        );
+        expect(installCmd).toBeDefined();
+        // cmd /c forces cmd.exe to expand %USERPROFILE% even under PowerShell.
+        expect(installCmd?.command.startsWith('cmd /c ')).toBe(true);
+        // Creates the target dir first and overwrites idempotently.
+        expect(installCmd?.command).toContain('if not exist "%USERPROFILE%\\bin" mkdir');
+        expect(installCmd?.command).toContain('move /Y kind.exe "%USERPROFILE%\\bin\\kind.exe"');
+      }
+    });
+  });
+
+  describe('Kind cluster — registry exists but stopped', () => {
+    beforeEach(() => {
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
+      mockKindStoppedRegistryExec();
+    });
+
+    it('reports the registry as not running but recommends docker start (not docker run)', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const { detected, recommendations } = result.value;
+        expect(detected.registryRunning).toBe(false);
+
+        const commands = recommendations.setupCommands.map((c) => c.command);
+        expect(commands).toContain('docker start ca-registry');
+        expect(commands.some((c) => c.startsWith('docker run'))).toBe(false);
+      }
+    });
+
+    it('does not re-emit the network-connect command for an already existing registry', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // An existing registry is already attached to the kind network (membership
+        // persists across stop/start); re-running connect would error.
+        const connectCmd = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('docker network connect kind'),
+        );
+        expect(connectCmd).toBeUndefined();
+      }
+    });
+
+    it('reuses the existing stopped container port in the config and manifest', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const startCmd = result.value.recommendations.setupCommands.find((c) =>
+          c.command.startsWith('docker start'),
+        );
+        expect(startCmd?.goal).toContain('6000');
+
+        const configMap = result.value.recommendations.manifests.find(
+          (m) => m.kind === 'ConfigMap' && m.namespace === 'kube-public',
+        );
+        expect(configMap?.yaml).toContain('localhost:6000');
+      }
+    });
+
+    it('never starts the container itself (advisory, read-only)', async () => {
+      await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      const calls = ((global as any).mockExecAsync.mock.calls as Array<[string]>).map((c) => c[0]);
+      expect(calls.some((c) => c.startsWith('docker start'))).toBe(false);
+      expect(calls.some((c) => c.startsWith('docker run'))).toBe(false);
     });
   });
 

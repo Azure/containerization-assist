@@ -46,7 +46,7 @@ export function runSetupCommands(plan: ClusterPlan): void {
     console.log(`   → ${cmd.goal}`);
     console.log(`     $ ${cmd.command}`);
     try {
-      execSync(cmd.command, { stdio: 'inherit', shell: '/bin/bash' });
+      execSync(cmd.command, { stdio: 'inherit' });
     } catch (error) {
       if (cmd.optional) {
         console.log(`     (optional command failed, continuing): ${String(error)}`);
@@ -66,7 +66,6 @@ export function applyManifests(plan: ClusterPlan): void {
     execSync('kubectl apply -f -', {
       input: manifest.yaml,
       stdio: ['pipe', 'inherit', 'inherit'],
-      shell: '/bin/bash',
     });
   }
 }
