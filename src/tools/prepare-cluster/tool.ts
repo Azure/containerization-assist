@@ -28,11 +28,7 @@ import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/core/context';
 import { DOCKER, KUBERNETES } from '@/config/constants';
 import { prepareClusterToolDefinition } from './types';
-import {
-  createKubernetesClient,
-  type K8sManifest,
-  type KubernetesClient,
-} from '@/infra/kubernetes/client';
+import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 import {
   getSystemInfo,
   getDownloadOS,
@@ -204,21 +200,6 @@ function buildPlatformGuidance(
     requiresEmulation,
     note,
   };
-}
-
-async function checkNamespace(
-  k8sClient: KubernetesClient,
-  namespace: string,
-  logger: pino.Logger,
-): Promise<boolean> {
-  try {
-    const exists = await k8sClient.namespaceExists(namespace);
-    logger.debug({ namespace, exists }, 'Checking namespace');
-    return exists;
-  } catch (error) {
-    logger.warn({ namespace, error }, 'Namespace check failed');
-    return false;
-  }
 }
 
 async function checkKindInstalled(logger: pino.Logger): Promise<boolean> {
@@ -405,16 +386,33 @@ async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegis
       logger.debug('Local registry container exists but is stopped');
     }
 
-    // Resolve the mapped host port. HostConfig.PortBindings persists for stopped
-    // containers (NetworkSettings.Ports is cleared when the container is not running).
-    const { stdout: portMapping } = await execAsync(
-      `docker inspect ${containerName} --format '{{range $p, $conf := .HostConfig.PortBindings}}{{if eq $p "5000/tcp"}}{{(index $conf 0).HostPort}}{{end}}{{end}}'`,
-    );
-    const parsedPort = parseInt(portMapping.trim(), 10);
-    const port = isNaN(parsedPort) ? null : parsedPort;
+    // Resolve the mapped host port. Prefer the runtime network settings for a
+    // running container (authoritative for the port actually published), and fall
+    // back to the configured host bindings (which persist for stopped containers).
+    // Both sources are tried because either can be empty depending on how the
+    // container was created and how the Docker version reports it.
+    const portKey = `${DOCKER.REGISTRY_INTERNAL_PORT}/tcp`;
+    const portSources = running
+      ? ['.NetworkSettings.Ports', '.HostConfig.PortBindings']
+      : ['.HostConfig.PortBindings', '.NetworkSettings.Ports'];
+
+    let port: number | null = null;
+    for (const source of portSources) {
+      const { stdout: portMapping } = await execAsync(
+        `docker inspect ${containerName} --format '{{range $p, $conf := ${source}}}{{if eq $p "${portKey}"}}{{(index $conf 0).HostPort}}{{end}}{{end}}'`,
+      );
+      const parsedPort = parseInt(portMapping.trim(), 10);
+      if (!isNaN(parsedPort)) {
+        port = parsedPort;
+        break;
+      }
+    }
 
     if (port === null) {
-      logger.warn('Could not determine registry port mapping');
+      logger.warn(
+        { containerName },
+        'Could not determine the existing registry host port from Docker; the generated plan may use an incorrect port',
+      );
     }
 
     logger.debug({ running, exists, port }, 'Local registry status');
@@ -552,18 +550,22 @@ async function handlePrepareCluster(
     const warnings: string[] = [];
 
     // ---- Probe read-only state (no mutations) ----
-    // The cluster may not exist yet (e.g. a kind cluster we are about to create),
-    // in which case there is no kubeconfig. Treat that as "namespace not found"
-    // and continue building the plan rather than failing — the plan itself
-    // contains the commands to create the cluster.
+    // The cluster may not exist yet (e.g. a kind cluster we are about to create), in
+    // which case there is no reachable kubeconfig. For kind that is expected — the
+    // plan itself creates the cluster, so we continue. For a generic/already-existing
+    // cluster, an unreachable kubeconfig means the emitted manifests would fail on
+    // apply, so we record it here and surface it in the generic branch below.
     let namespaceExists = false;
+    let clusterReachable = true;
     try {
       const k8sClient = createKubernetesClient(logger);
-      namespaceExists = await checkNamespace(k8sClient, namespace, logger);
+      namespaceExists = await k8sClient.namespaceExists(namespace);
+      logger.debug({ namespace, namespaceExists }, 'Checked namespace existence');
     } catch (error) {
+      clusterReachable = false;
       logger.debug(
         { error: error instanceof Error ? error.message : String(error) },
-        'No reachable cluster/kubeconfig; treating namespace as not existing',
+        'Cluster/kubeconfig not reachable while probing namespace',
       );
     }
     const clusterPlatform = await detectClusterPlatform(logger);
@@ -590,6 +592,15 @@ async function handlePrepareCluster(
     if (isKind) {
       // Reuse the existing registry port (running or stopped); otherwise pick a free port.
       const registryPort = registryStatus.port ?? (await findRegistryPort());
+
+      // If a registry already exists but its port could not be read, we are about to
+      // emit config (kind mirror + ConfigMap) for a freshly picked port that will not
+      // match the running registry. Surface that so the caller can verify/correct it.
+      if (registryStatus.exists && registryStatus.port === null) {
+        warnings.push(
+          `An existing local registry container ("${DOCKER.REGISTRY_CONTAINER_NAME}") was detected but its published host port could not be determined. The plan uses port ${registryPort}, which may not match the existing registry — verify the registry's actual port before applying the kind config and ConfigMap.`,
+        );
+      }
 
       // 1. Install kind if it is missing.
       if (!kindInstalled) {
@@ -632,7 +643,20 @@ async function handlePrepareCluster(
       // Registry-hosting ConfigMap documents the registry for tools/users (kind best practice).
       manifests.push(buildLocalRegistryConfigMapManifest(registryPort));
     } else {
-      // Generic cluster (AKS/EKS/GKE/minikube/...): the cluster already exists.
+      // Generic cluster (AKS/EKS/GKE/minikube/...): the cluster is expected to already
+      // exist. If we could not reach it, every manifest below will fail on apply —
+      // surface a warning and a required connectivity check so the agent fixes its
+      // kubeconfig/context first instead of acting on a plan that looks ready but is not.
+      if (!clusterReachable) {
+        warnings.push(
+          `The target ${effectiveClusterType} cluster is not reachable (missing or invalid kubeconfig/context). The setup commands and manifests below will fail until kubectl is pointed at the cluster — configure your kubeconfig (e.g. az aks get-credentials, aws eks update-kubeconfig, or gcloud container clusters get-credentials) and re-run this tool.`,
+        );
+        setupCommands.push({
+          command: 'kubectl cluster-info',
+          goal: 'Verify kubectl can reach the target cluster before applying manifests (configure your kubeconfig/context first if this fails)',
+        });
+      }
+
       if (!namespaceExists) {
         setupCommands.push({
           command: `kubectl create namespace ${namespace}`,
@@ -648,10 +672,12 @@ async function handlePrepareCluster(
     const platformGuidance = buildPlatformGuidance(targetPlatform, clusterPlatform, warnings);
 
     // ---- Confidence + summary ----
-    // High confidence when the cluster platform was detected; lower whenever it could
-    // not be (e.g., the cluster does not exist yet, including kind bootstrap) because
-    // the platform-compatibility guidance is then only partial.
-    const confidence = clusterPlatform === null ? 0.7 : 0.9;
+    // High confidence when the cluster platform was detected; lower when it could not
+    // be (e.g. the cluster does not exist yet, including kind bootstrap) because the
+    // platform-compatibility guidance is then only partial; lowest for a generic
+    // (already-existing) cluster we could not reach at all, since the plan is then
+    // built without any real cluster state.
+    const confidence = !isKind && !clusterReachable ? 0.4 : clusterPlatform === null ? 0.7 : 0.9;
 
     const requiredCommands = setupCommands.filter((c) => !c.optional).length;
     const summary =

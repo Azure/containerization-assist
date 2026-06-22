@@ -483,6 +483,66 @@ describe('prepareCluster (advisory)', () => {
     });
   });
 
+  describe('Kind cluster — running registry without host bindings', () => {
+    beforeEach(() => {
+      mockK8sClient.namespaceExists.mockResolvedValue(false);
+      // Running registry whose port is only reported by runtime NetworkSettings.Ports
+      // (HostConfig.PortBindings is empty, e.g. created without an explicit -p form).
+      (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('kind version')) {
+          return { stdout: 'kind v0.20.0 go1.20.5 linux/amd64', stderr: '' };
+        }
+        if (cmd.includes('kind get clusters')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (cmd.includes('kubectl get nodes')) {
+          throw new Error('no cluster');
+        }
+        if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
+          return { stdout: 'ca-registry', stderr: '' };
+        }
+        if (cmd.includes('docker inspect ca-registry') && cmd.includes('NetworkSettings.Ports')) {
+          return { stdout: '6000', stderr: '' };
+        }
+        if (cmd.includes('docker inspect ca-registry') && cmd.includes('HostConfig.PortBindings')) {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+    });
+
+    it('reuses the running registry port from runtime network settings (no new free port)', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const { recommendations, warnings } = result.value;
+
+        // No docker run — the registry already exists and is running.
+        const commands = recommendations.setupCommands.map((c) => c.command);
+        expect(commands.some((c) => c.startsWith('docker run'))).toBe(false);
+
+        // The kind mirror config and the ConfigMap both use the detected port (6000),
+        // not a freshly picked free port.
+        const createCmd = recommendations.setupCommands.find((c) =>
+          c.command.includes('kind create cluster'),
+        );
+        expect(createCmd?.command).toContain('localhost:6000');
+
+        const configMap = recommendations.manifests.find(
+          (m) => m.kind === 'ConfigMap' && m.namespace === 'kube-public',
+        );
+        expect(configMap?.yaml).toContain('localhost:6000');
+
+        // Port was determined, so no "could not determine port" warning.
+        expect((warnings ?? []).some((w) => w.includes('could not be determined'))).toBe(false);
+      }
+    });
+  });
+
   describe('Generic cluster', () => {
     beforeEach(() => {
       mockK8sClient.namespaceExists.mockResolvedValue(true);
@@ -664,6 +724,40 @@ describe('prepareCluster (advisory)', () => {
         expect(result.value.detected.namespaceExists).toBe(false);
         const commands = result.value.recommendations.setupCommands.map((c) => c.command);
         expect(commands.some((c) => c.includes('kind create cluster'))).toBe(true);
+      }
+    });
+
+    it('surfaces an unreachable kubeconfig for a generic cluster as a warning + required check', async () => {
+      // Production target (generic): the cluster is expected to already exist, but the
+      // kubeconfig is missing/invalid so createKubernetesClient throws. The plan must
+      // flag this rather than look ready, since the manifests would fail on apply.
+      jest.mocked(createKubernetesClient).mockImplementationOnce(() => {
+        throw new Error(
+          'Kubeconfig not found. Neither KUBECONFIG environment variable nor ~/.kube/config exists',
+        );
+      });
+
+      const result = await prepareCluster(
+        { clusterType: 'generic', namespace: 'app-ns', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const { recommendations, warnings, confidence } = result.value;
+
+        // Warning explains the cluster is unreachable.
+        expect((warnings ?? []).some((w) => w.includes('not reachable'))).toBe(true);
+
+        // A required (non-optional) connectivity check is emitted before the manifests.
+        const connectivity = recommendations.setupCommands.find(
+          (c) => c.command === 'kubectl cluster-info',
+        );
+        expect(connectivity).toBeDefined();
+        expect(connectivity?.optional).toBeFalsy();
+
+        // Confidence is reduced because the plan was built without real cluster state.
+        expect(confidence).toBeLessThanOrEqual(0.4);
       }
     });
   });
