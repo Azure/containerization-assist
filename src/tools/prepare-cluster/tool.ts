@@ -263,13 +263,32 @@ function buildKindInstallCommand(): { command: string; goal: string } {
   }
 
   const url = `https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${downloadOS}-${downloadArch}`;
+
   // Avoid a hard `sudo` dependency: in advisory mode the plan may be run by a
   // non-root user (or non-interactively, where a sudo password prompt would hang).
-  // Prefer the on-PATH system location when it is writable, otherwise fall back to
-  // a user-writable bin dir so the install still succeeds without elevation.
+  // Prefer the on-PATH system location when it is writable, otherwise fall back to a
+  // user-writable bin dir. Crucially, verify kind actually lands on PATH and fail loudly
+  // if it does not: on macOS ~/.local/bin is not on PATH by default, so a silent fallback
+  // would install kind somewhere the next command (`kind create cluster`) can't find,
+  // surfacing as a confusing "command not found" instead of a clear install error.
+  const curlInstall =
+    `curl -Lo ./kind ${url} && chmod +x ./kind && ` +
+    `if [ -w /usr/local/bin ]; then DEST=/usr/local/bin; else mkdir -p "$HOME/.local/bin" && DEST="$HOME/.local/bin"; fi && ` +
+    `mv ./kind "$DEST/kind" && ` +
+    `{ command -v kind >/dev/null || { echo "kind installed to $DEST but it is not on PATH. Add it: export PATH=$DEST:$PATH" >&2; exit 1; }; }`;
+
+  // On macOS prefer Homebrew when present: it installs into a PATH location and keeps
+  // kind updatable. Fall back to the verified curl install when brew is unavailable.
+  if (systemInfo.isMac) {
+    return {
+      command: `if command -v brew >/dev/null 2>&1; then brew install kind; else ${curlInstall}; fi`,
+      goal: 'Install kind (prefers Homebrew on macOS; falls back to a verified direct download)',
+    };
+  }
+
   return {
-    command: `curl -Lo ./kind ${url} && chmod +x ./kind && (mv ./kind /usr/local/bin/kind 2>/dev/null || { mkdir -p "$HOME/.local/bin" && mv ./kind "$HOME/.local/bin/kind"; })`,
-    goal: 'Install the kind binary to a PATH location (no sudo required; falls back to ~/.local/bin)',
+    command: curlInstall,
+    goal: 'Install the kind binary to a PATH location (no sudo; verifies kind is on PATH afterward)',
   };
 }
 
