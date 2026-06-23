@@ -33,6 +33,9 @@ export const TOPICS = {
 
   // AI services
   KNOWLEDGE_ENHANCEMENT: 'knowledge_enhancement',
+
+  // GitHub Actions workflow generation
+  GITHUB_WORKFLOW: 'github_workflow',
 } as const;
 
 /**

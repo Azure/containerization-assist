@@ -125,6 +125,7 @@ describe('Knowledge Loader', () => {
         'dotnet-pack.json',
         'dotnet-signalr-pack.json',
         'dotnet-worker-pack.json',
+        'github-actions-pack.json',
         'go-pack.json',
         'helm-pack.json',
         'java-pack.json',
