@@ -39,7 +39,7 @@ export const prepareClusterSchema = z.object({
     .optional()
     .default(true)
     .describe(
-      'Fail if cluster architecture does not match target platform. When true, prevents deployment to incompatible clusters. Set to false to allow emulation (may have performance impact).',
+      'Fail if a detected cluster architecture does not match the target platform. When true, an incompatible cluster (whose platform was detected during probing) blocks the plan to prevent deploying images that would require emulation. If the cluster does not exist yet (platform not detectable), the tool stays advisory and returns guidance instead of failing. Set to false to allow emulation (may have performance impact).',
     ),
 });
 

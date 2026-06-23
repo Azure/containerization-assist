@@ -37,7 +37,7 @@ jest.mock('@/infra/kubernetes/client', () => ({
 // Import after mocks are set up
 import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
 import { createKubernetesClient } from '@/infra/kubernetes/client';
-import { getSystemInfo } from '@/lib/platform';
+import { getSystemInfo, isPlatformCompatible } from '@/lib/platform';
 
 jest.mock('@/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
@@ -67,20 +67,23 @@ jest.mock('@/lib/port-utils', () => ({
 }));
 
 jest.mock('node:child_process', () => ({
-  exec: jest.fn(),
+  execFile: jest.fn(),
 }));
 
-// Closure-based execAsync mock; tests override (global as any).mockExecAsync.
+// Closure-based execFile mock; tests override (global as any).mockExecFileAsync.
+// The tool calls execFileAsync(command, argsArray), so the mock receives the binary
+// name as the first argument and the argv array as the second. Helpers below match on
+// the joined "command arg1 arg2 ..." string for readability.
 jest.mock('node:util', () => {
-  let execAsyncMock: any = null;
+  let execFileAsyncMock: any = null;
 
   return {
     promisify: jest.fn(() => {
-      if (!execAsyncMock) {
-        execAsyncMock = jest.fn(async () => ({ stdout: '', stderr: '' }));
-        (global as any).mockExecAsync = execAsyncMock;
+      if (!execFileAsyncMock) {
+        execFileAsyncMock = jest.fn(async () => ({ stdout: '', stderr: '' }));
+        (global as any).mockExecFileAsync = execFileAsyncMock;
       }
-      return execAsyncMock;
+      return execFileAsyncMock;
     }),
   };
 });
@@ -91,12 +94,18 @@ function createMockToolContext() {
   } as any;
 }
 
+/** Join an execFile (command, args) call into a single string for matching. */
+function joinExec(cmd: string, args?: string[]): string {
+  return [cmd, ...(args ?? [])].join(' ');
+}
+
 /**
- * Default execAsync behavior for a "kind ready" host:
+ * Default execFile behavior for a "kind ready" host:
  * kind installed, cluster exists, registry running on port 6000, linux/amd64 nodes.
  */
 function mockKindReadyExec() {
-  (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
+  (global as any).mockExecFileAsync.mockImplementation(async (command: string, args?: string[]) => {
+    const cmd = joinExec(command, args);
     if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
       return { stdout: 'amd64', stderr: '' };
     }
@@ -113,18 +122,19 @@ function mockKindReadyExec() {
       return { stdout: 'ca-registry', stderr: '' };
     }
     if (cmd.includes('docker inspect ca-registry')) {
-      return { stdout: '6000', stderr: '' };
+      return { stdout: '{"5000/tcp":[{"HostIp":"0.0.0.0","HostPort":"6000"}]}', stderr: '' };
     }
     return { stdout: '', stderr: '' };
   });
 }
 
 /**
- * execAsync behavior for an "empty kind" host:
+ * execFile behavior for an "empty kind" host:
  * kind NOT installed, no cluster, no registry. kubectl node probe fails.
  */
 function mockKindEmptyExec() {
-  (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
+  (global as any).mockExecFileAsync.mockImplementation(async (command: string, args?: string[]) => {
+    const cmd = joinExec(command, args);
     if (cmd.includes('kind version')) {
       throw new Error('kind: command not found');
     }
@@ -139,12 +149,13 @@ function mockKindEmptyExec() {
 }
 
 /**
- * execAsync behavior for a kind host where the registry container exists but is STOPPED:
+ * execFile behavior for a kind host where the registry container exists but is STOPPED:
  * kind installed, cluster exists, `docker ps` (running) returns nothing, but
  * `docker ps -a` lists the stopped container and `docker inspect` reports its old port.
  */
 function mockKindStoppedRegistryExec() {
-  (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
+  (global as any).mockExecFileAsync.mockImplementation(async (command: string, args?: string[]) => {
+    const cmd = joinExec(command, args);
     if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
       return { stdout: 'amd64', stderr: '' };
     }
@@ -165,7 +176,7 @@ function mockKindStoppedRegistryExec() {
       return { stdout: '', stderr: '' };
     }
     if (cmd.includes('docker inspect ca-registry')) {
-      return { stdout: '6000', stderr: '' };
+      return { stdout: '{"5000/tcp":[{"HostIp":"0.0.0.0","HostPort":"6000"}]}', stderr: '' };
     }
     return { stdout: '', stderr: '' };
   });
@@ -174,9 +185,9 @@ function mockKindStoppedRegistryExec() {
 describe('prepareCluster (advisory)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    if ((global as any).mockExecAsync) {
-      (global as any).mockExecAsync.mockReset();
-      (global as any).mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    if ((global as any).mockExecFileAsync) {
+      (global as any).mockExecFileAsync.mockReset();
+      (global as any).mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' });
     }
   });
 
@@ -204,13 +215,15 @@ describe('prepareCluster (advisory)', () => {
       }
     });
 
-    it('never mutates host state (no docker run / kind create / kubectl apply emitted as execAsync)', async () => {
+    it('never mutates host state (no docker run / kind create / kubectl apply emitted as execFile)', async () => {
       await prepareCluster(
         { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
         createMockToolContext(),
       );
 
-      const calls = ((global as any).mockExecAsync.mock.calls as Array<[string]>).map((c) => c[0]);
+      const calls = (
+        (global as any).mockExecFileAsync.mock.calls as Array<[string, string[]?]>
+      ).map((c) => joinExec(c[0], c[1]));
       expect(calls.some((c) => c.startsWith('docker run'))).toBe(false);
       expect(calls.some((c) => c.includes('kind create cluster'))).toBe(false);
       expect(calls.some((c) => c.includes('kubectl apply'))).toBe(false);
@@ -246,6 +259,18 @@ describe('prepareCluster (advisory)', () => {
         expect(installCmd).toBeUndefined();
         expect(runRegistry).toBeUndefined();
         expect(createCluster).toBeUndefined();
+
+        // When kubectl was reachable during probing, `kind export kubeconfig` is emitted
+        // as optional so an already-prepared cluster is not flagged as ACTION REQUIRED.
+        const exportKubeconfig = recommendations.setupCommands.find((c) =>
+          c.command.includes('kind export kubeconfig'),
+        );
+        expect(exportKubeconfig).toBeDefined();
+        expect(exportKubeconfig?.optional).toBe(true);
+
+        // Nothing required remains, so the summary should read as "ready", not "ACTION REQUIRED".
+        expect(required).toHaveLength(0);
+        expect(result.value.summary).toContain('appears ready');
       }
     });
 
@@ -440,7 +465,9 @@ describe('prepareCluster (advisory)', () => {
         createMockToolContext(),
       );
 
-      const calls = ((global as any).mockExecAsync.mock.calls as Array<[string]>).map((c) => c[0]);
+      const calls = (
+        (global as any).mockExecFileAsync.mock.calls as Array<[string, string[]?]>
+      ).map((c) => joinExec(c[0], c[1]));
       expect(calls.some((c) => c.startsWith('docker start'))).toBe(false);
       expect(calls.some((c) => c.startsWith('docker run'))).toBe(false);
     });
@@ -449,15 +476,18 @@ describe('prepareCluster (advisory)', () => {
   describe('Generic cluster', () => {
     beforeEach(() => {
       mockK8sClient.namespaceExists.mockResolvedValue(true);
-      (global as any).mockExecAsync.mockImplementation(async (cmd: string) => {
-        if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
-          return { stdout: 'amd64', stderr: '' };
-        }
-        if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
-          return { stdout: 'linux', stderr: '' };
-        }
-        return { stdout: '', stderr: '' };
-      });
+      (global as any).mockExecFileAsync.mockImplementation(
+        async (command: string, args?: string[]) => {
+          const cmd = joinExec(command, args);
+          if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
+            return { stdout: 'amd64', stderr: '' };
+          }
+          if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
+            return { stdout: 'linux', stderr: '' };
+          }
+          return { stdout: '', stderr: '' };
+        },
+      );
     });
 
     it('does not probe kind/registry and emits a ServiceAccount manifest', async () => {
@@ -480,9 +510,9 @@ describe('prepareCluster (advisory)', () => {
         expect(sa).toBeDefined();
 
         // No kind probes should have run.
-        const calls = ((global as any).mockExecAsync.mock.calls as Array<[string]>).map(
-          (c) => c[0],
-        );
+        const calls = (
+          (global as any).mockExecFileAsync.mock.calls as Array<[string, string[]?]>
+        ).map((c) => joinExec(c[0], c[1]));
         expect(calls.some((c) => c.includes('kind version'))).toBe(false);
         expect(calls.some((c) => c.includes('kind get clusters'))).toBe(false);
       }
@@ -594,6 +624,63 @@ describe('prepareCluster (advisory)', () => {
         expect(result.value.detected.clusterPlatform).toBeNull();
       }
     });
+
+    it('fails in strict mode when a detected cluster platform is incompatible', async () => {
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
+      mockKindReadyExec();
+      // Detected cluster platform (linux/amd64) is treated as incompatible with the target.
+      jest.mocked(isPlatformCompatible).mockReturnValueOnce(false);
+
+      const result = await prepareCluster(
+        // strictPlatformValidation defaults to true
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/arm64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Platform mismatch');
+      }
+    });
+
+    it('only warns (does not fail) on an incompatible platform when strict mode is off', async () => {
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
+      mockKindReadyExec();
+      jest.mocked(isPlatformCompatible).mockReturnValueOnce(false);
+
+      const result = await prepareCluster(
+        {
+          clusterType: 'kind',
+          namespace: 'default',
+          targetPlatform: 'linux/arm64',
+          strictPlatformValidation: false,
+        },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const guidance = result.value.recommendations.platformGuidance;
+        expect(guidance.compatible).toBe(false);
+        expect(guidance.requiresEmulation).toBe(true);
+        expect(result.value.warnings?.some((w) => w.includes('Platform mismatch'))).toBe(true);
+      }
+    });
+
+    it('does not fail in strict mode when the cluster platform is undetected (bootstrap)', async () => {
+      mockK8sClient.namespaceExists.mockResolvedValue(false);
+      mockKindEmptyExec();
+      // Even if compatibility would be false, an undetected (null) cluster platform must
+      // not trigger the strict gate — the platform is unknowable before the cluster exists.
+      jest.mocked(isPlatformCompatible).mockReturnValueOnce(false);
+
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/arm64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+    });
   });
 
   describe('Error handling', () => {
@@ -627,6 +714,14 @@ describe('prepareCluster (advisory)', () => {
         expect(result.value.detected.namespaceExists).toBe(false);
         const commands = result.value.recommendations.setupCommands.map((c) => c.command);
         expect(commands.some((c) => c.includes('kind create cluster'))).toBe(true);
+
+        // The cluster was unreachable during probing, so `kind export kubeconfig` must be
+        // a required step (kubectl needs pointing at the cluster the plan creates).
+        const exportKubeconfig = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('kind export kubeconfig'),
+        );
+        expect(exportKubeconfig).toBeDefined();
+        expect(exportKubeconfig?.optional).toBeFalsy();
       }
     });
   });

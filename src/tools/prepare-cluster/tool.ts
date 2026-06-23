@@ -49,11 +49,16 @@ import {
   type ClusterManifestPlan,
   type ClusterPlatformGuidance,
 } from './schema';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pluralize } from '@/lib/summary-helpers';
 
-const execAsync = promisify(exec);
+// Internal read-only probes run via execFile (no shell): arguments are passed as a
+// literal argv array, so there is no cross-platform shell-quoting to get wrong. This
+// matches the rest of the codebase (e.g. infra/docker/context.ts, the security scanners).
+// Note: commands *emitted in the plan* are still shell strings — they are meant to be run
+// by the calling agent in its own terminal.
+const execFileAsync = promisify(execFile);
 
 const KIND_VERSION = 'v0.20.0';
 const KIND_AMD64_NODE_IMAGE =
@@ -69,19 +74,21 @@ const KIND_AMD64_NODE_IMAGE =
  * - The regex makes command injection impossible as no shell metacharacters are allowed
  *
  * IMPORTANT: Returns the cluster name wrapped in single quotes for shell safety.
- * The returned value must be used with template literal interpolation only.
- * DO NOT use with string concatenation or you may get double-quoting issues.
+ * The returned value is interpolated into the shell-command strings emitted in the
+ * plan (which the agent runs in its own terminal), so it must be used with template
+ * literal interpolation only. DO NOT use with string concatenation or you may get
+ * double-quoting issues.
  *
  * @example
  * ```typescript
  * const result = validateAndEscapeClusterName("my-cluster");
  * if (result.ok) {
  *   // ✅ Correct - template literal interpolation
- *   await execAsync(`kind create cluster --name ${result.value}`);
+ *   const command = `kind create cluster --name ${result.value}`;
  *   // Result: kind create cluster --name 'my-cluster'
  *
  *   // ❌ Wrong - string concatenation causes double quoting
- *   await execAsync("kind create cluster --name " + result.value);
+ *   const command = "kind create cluster --name " + result.value;
  * }
  * ```
  */
@@ -125,10 +132,13 @@ async function detectClusterPlatform(logger: pino.Logger): Promise<DockerPlatfor
     logger.debug('Detecting cluster node platform...');
 
     // Get node architecture information
-    const { stdout } = await execAsync(
-      "kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}'",
-    );
-    const arch = stdout.trim().replace(/'/g, '');
+    const { stdout } = await execFileAsync('kubectl', [
+      'get',
+      'nodes',
+      '-o',
+      'jsonpath={.items[0].status.nodeInfo.architecture}',
+    ]);
+    const arch = stdout.trim();
 
     if (!arch) {
       logger.warn('Could not detect cluster node architecture');
@@ -138,10 +148,13 @@ async function detectClusterPlatform(logger: pino.Logger): Promise<DockerPlatfor
     // Get OS if available (usually linux for Kubernetes)
     let os = 'linux';
     try {
-      const { stdout: osOutput } = await execAsync(
-        "kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.operatingSystem}'",
-      );
-      const detectedOS = osOutput.trim().replace(/'/g, '').toLowerCase();
+      const { stdout: osOutput } = await execFileAsync('kubectl', [
+        'get',
+        'nodes',
+        '-o',
+        'jsonpath={.items[0].status.nodeInfo.operatingSystem}',
+      ]);
+      const detectedOS = osOutput.trim().toLowerCase();
       if (detectedOS) {
         os = detectedOS;
       }
@@ -204,7 +217,7 @@ function buildPlatformGuidance(
 
 async function checkKindInstalled(logger: pino.Logger): Promise<boolean> {
   try {
-    await execAsync('kind version');
+    await execFileAsync('kind', ['version']);
     logger.debug('Kind is already installed');
     return true;
   } catch {
@@ -226,7 +239,7 @@ async function checkKindClusterExists(
   }
 
   try {
-    const { stdout } = await execAsync('kind get clusters');
+    const { stdout } = await execFileAsync('kind', ['get', 'clusters']);
     const clusters = stdout
       .trim()
       .split('\n')
@@ -366,6 +379,26 @@ interface LocalRegistryStatus {
 }
 
 /**
+ * Extract the published host port for `portKey` from a Docker port map emitted as JSON
+ * (e.g. `docker inspect <name> --format {{json .NetworkSettings.Ports}}`). Returns null
+ * when the map is empty/null, the key is absent, or no numeric HostPort is present.
+ */
+function extractHostPort(portMapJson: string, portKey: string): number | null {
+  let portMap: Record<string, Array<{ HostPort?: string }> | null> | null;
+  try {
+    portMap = JSON.parse(portMapJson.trim());
+  } catch {
+    return null;
+  }
+  const bindings = portMap?.[portKey];
+  if (!Array.isArray(bindings) || bindings.length === 0) {
+    return null;
+  }
+  const hostPort = parseInt(bindings[0]?.HostPort ?? '', 10);
+  return isNaN(hostPort) ? null : hostPort;
+}
+
+/**
  * Read-only inspection of the local registry container.
  * Distinguishes three states without mutating anything (advisory mode):
  *  - running: container is up; port read from its runtime network settings.
@@ -379,9 +412,13 @@ async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegis
 
   try {
     // Is the container currently running?
-    const { stdout: runningContainers } = await execAsync(
-      `docker ps --filter "name=${containerName}" --format "{{.Names}}"`,
-    );
+    const { stdout: runningContainers } = await execFileAsync('docker', [
+      'ps',
+      '--filter',
+      `name=${containerName}`,
+      '--format',
+      '{{.Names}}',
+    ]);
     const running = runningContainers
       .trim()
       .split('\n')
@@ -390,9 +427,14 @@ async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegis
     // If not running, does it still exist in a stopped state?
     let exists = running;
     if (!running) {
-      const { stdout: allContainers } = await execAsync(
-        `docker ps -a --filter "name=${containerName}" --format "{{.Names}}"`,
-      );
+      const { stdout: allContainers } = await execFileAsync('docker', [
+        'ps',
+        '-a',
+        '--filter',
+        `name=${containerName}`,
+        '--format',
+        '{{.Names}}',
+      ]);
       exists = allContainers
         .trim()
         .split('\n')
@@ -405,11 +447,16 @@ async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegis
       logger.debug('Local registry container exists but is stopped');
     }
 
-    // Resolve the mapped host port. Prefer the runtime network settings for a
-    // running container (authoritative for the port actually published), and fall
-    // back to the configured host bindings (which persist for stopped containers).
-    // Both sources are tried because either can be empty depending on how the
-    // container was created and how the Docker version reports it.
+    // Resolve the mapped host port. Indexing a Docker port map by key inside a Go
+    // `--format` template is awkward (the key "5000/tcp" has to be a quoted string
+    // literal), so instead emit the whole port map as JSON via `{{json ...}}` and index
+    // it in Node. Running through execFile (no shell) means the template is passed to
+    // Docker verbatim, so there is no cross-shell quoting to get wrong.
+    //
+    // Prefer the runtime network settings for a running container (authoritative for
+    // the port actually published), and fall back to the configured host bindings
+    // (which persist for stopped containers). Both sources are tried because either can
+    // be empty depending on how the container was created and how Docker reports it.
     const portKey = `${DOCKER.REGISTRY_INTERNAL_PORT}/tcp`;
     const portSources = running
       ? ['.NetworkSettings.Ports', '.HostConfig.PortBindings']
@@ -417,12 +464,15 @@ async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegis
 
     let port: number | null = null;
     for (const source of portSources) {
-      const { stdout: portMapping } = await execAsync(
-        `docker inspect ${containerName} --format '{{range $p, $conf := ${source}}}{{if eq $p "${portKey}"}}{{(index $conf 0).HostPort}}{{end}}{{end}}'`,
-      );
-      const parsedPort = parseInt(portMapping.trim(), 10);
-      if (!isNaN(parsedPort)) {
-        port = parsedPort;
+      const { stdout: portJson } = await execFileAsync('docker', [
+        'inspect',
+        containerName,
+        '--format',
+        `{{json ${source}}}`,
+      ]);
+      const hostPort = extractHostPort(portJson, portKey);
+      if (hostPort !== null) {
+        port = hostPort;
         break;
       }
     }
@@ -653,10 +703,15 @@ async function handlePrepareCluster(
         setupCommands.push(buildRegistryNetworkConnectCommand());
       }
 
-      // 5. Point kubectl at the cluster.
+      // 5. Point kubectl at the cluster. Required only when the cluster was not
+      //    reachable during probing (no/wrong kubeconfig, or the cluster is about to be
+      //    created above). When kubectl already reached the cluster, the kubeconfig is
+      //    in place — emit this as an optional convenience step so an otherwise-ready
+      //    cluster does not get flagged as "ACTION REQUIRED".
       setupCommands.push({
         command: `kind export kubeconfig --name ${shellSafeClusterName}`,
         goal: 'Point kubectl at the kind cluster',
+        optional: clusterReachable,
       });
 
       // Registry-hosting ConfigMap documents the registry for tools/users (kind best practice).
@@ -689,6 +744,28 @@ async function handlePrepareCluster(
 
     // ---- Platform compatibility guidance (read-only, never fails) ----
     const platformGuidance = buildPlatformGuidance(targetPlatform, clusterPlatform, warnings);
+
+    // ---- Strict platform gate ----
+    // The schema documents strictPlatformValidation as a hard gate ("Fail if cluster
+    // architecture does not match target platform ... prevents deployment to incompatible
+    // clusters"). Honor that contract: when strict mode is on AND we actually detected the
+    // cluster's platform (platformGuidance.cluster is non-null) AND it is incompatible with
+    // the target, fail instead of merely warning. We gate only on a *detected* mismatch —
+    // when the cluster does not exist yet (platformGuidance.cluster is null, e.g. kind
+    // bootstrap) the platform is unknowable, so the tool stays advisory and emits guidance
+    // rather than blocking. Reusing platformGuidance.note keeps a single source of truth for
+    // the mismatch wording. Failing here is still read-only: it reports the problem and never
+    // executes or mutates anything. Pass strictPlatformValidation: false to downgrade this to
+    // an emulation warning.
+    if (strictPlatformValidation && platformGuidance.cluster && !platformGuidance.compatible) {
+      timer.error(new Error(platformGuidance.note));
+      return Failure(platformGuidance.note, {
+        message: platformGuidance.note,
+        hint: 'Target platform is not compatible with the detected cluster platform',
+        resolution:
+          'Recreate the cluster with a matching architecture, or set strictPlatformValidation=false to allow emulation (may have performance impact)',
+      });
+    }
 
     // ---- Confidence + summary ----
     // High confidence when the cluster platform was detected; lower when it could not
