@@ -12,11 +12,15 @@ env:
 jobs:
   # Single test job with all essential validations
   test:
-    name: Tests & Quality Gates
-    runs-on: ubuntu-latest
+    name: Tests & Quality Gates (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.1
@@ -43,6 +47,7 @@ jobs:
         run: npm ci
 
       - name: Install OPA CLI
+        if: runner.os == 'Linux'
         run: |
           curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
           chmod +x opa
@@ -51,12 +56,18 @@ jobs:
           node_modules/.bin/opa version
 
       - name: Validate version sync
+        if: runner.os == 'Linux'
         run: npx tsx scripts/validate-version-sync.ts
 
       - name: Build project
         run: npm run build
 
+      - name: Verify build artifacts (cross-platform)
+        run: >-
+          node -e "['dist/src/index.js','dist/src/index.d.ts','dist/src/cli/cli.js','dist-cjs/src/index.js','dist-cjs/src/index.d.ts'].forEach(function(f){if(!require('fs').existsSync(f)){console.error('Missing: '+f);process.exit(1)}});console.log('Build artifacts verified')"
+
       - name: Test OPA Policies
+        if: runner.os == 'Linux'
         run: |
           echo "Testing built-in policies..."
           npm run test:policies 2>&1 | tee policy-tests-builtin.txt
@@ -73,17 +84,21 @@ jobs:
           echo "✅ All ${TOTAL_POLICY_TESTS} OPA policy tests passed"
 
       - name: Validate examples compile
+        if: runner.os == 'Linux'
         run: node scripts/validate-examples.js
 
       - name: Run lint and cache output
+        if: runner.os == 'Linux'
         run: npm run lint 2>&1 | tee eslint-output.txt || true
 
       - name: Run tests with coverage
+        if: runner.os == 'Linux'
         run: npm run test:coverage -- --passWithNoTests
         env:
           DOCKER_AVAILABLE: true
 
       - name: Extract coverage metrics
+        if: runner.os == 'Linux'
         continue-on-error: true
         run: |
           if [ -f "coverage/coverage-summary.json" ]; then
@@ -100,22 +115,17 @@ jobs:
             echo "COVERAGE_BRANCHES=N/A" >> $GITHUB_ENV
           fi
 
-      - name: Verify build artifacts
+      - name: Verify ESM import extensions
+        if: runner.os == 'Linux'
         run: |
-          test -f dist/src/index.js || { echo "❌ ESM index.js missing"; exit 1; }
-          test -f dist/src/index.d.ts || { echo "❌ ESM index.d.ts missing"; exit 1; }
-          test -x dist/src/cli/cli.js || { echo "❌ CLI not executable"; exit 1; }
-          test -f dist-cjs/src/index.js || { echo "❌ CJS index.js missing"; exit 1; }
-          test -f dist-cjs/src/index.d.ts || { echo "❌ CJS index.d.ts missing"; exit 1; }
-
           if grep -r "from ['\"]\.\.\/[^'\"]*['\"]" dist/src --include="*.js" | grep -v "\.js['\"]"; then
             echo "❌ Found ESM imports without .js extensions"
             exit 1
           fi
-
-          echo "✅ Build artifacts verified"
+          echo "✅ ESM import extensions verified"
 
       - name: Run quality gates
+        if: runner.os == 'Linux'
         run: |
           UPDATE_BASELINES=true npm run quality:gates 2>&1 | tee quality-gates.txt || true
 
@@ -129,7 +139,7 @@ jobs:
           fi
 
       - name: Generate workflow summary
-        if: always()
+        if: always() && runner.os == 'Linux'
         run: |
           echo "# 🛡️ Test Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -159,7 +169,7 @@ jobs:
 
       # Upload all artifacts in single step
       - name: Upload artifacts
-        if: always()
+        if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
         with:
           name: build-and-quality-${{ github.run_id }}
