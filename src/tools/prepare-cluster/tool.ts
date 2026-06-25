@@ -272,11 +272,13 @@ function buildKindInstallCommand(): { command: string; goal: string } {
     // syntax, so an unwrapped command would move the binary into a literal
     // "%USERPROFILE%" folder. Create the target dir first (move fails if it is
     // missing) and use `move /Y` so re-runs overwrite without an interactive
-    // prompt. Inner quotes keep the destination path space-safe under cmd.exe.
-    // `curl.exe -f` makes HTTP errors (404/5xx) exit non-zero instead of writing the
-    // error body into kind.exe, so a failed download aborts the chain loudly.
+    // prompt. Inner quotes are doubled ("") because cmd.exe strips the outer quotes
+    // of a `/c "..."` payload; undoubled inner quotes would terminate the command
+    // line early. Doubling keeps the space-safe paths intact under both cmd and
+    // PowerShell. `curl.exe -f` makes HTTP errors (404/5xx) exit non-zero instead of
+    // writing the error body into kind.exe, so a failed download aborts the chain loudly.
     return {
-      command: `cmd /c "curl.exe -fLo kind.exe ${url} && if not exist "%USERPROFILE%\\bin" mkdir "%USERPROFILE%\\bin" && move /Y kind.exe "%USERPROFILE%\\bin\\kind.exe""`,
+      command: `cmd /c "curl.exe -fLo kind.exe ${url} && if not exist ""%USERPROFILE%\\bin"" mkdir ""%USERPROFILE%\\bin"" && move /Y kind.exe ""%USERPROFILE%\\bin\\kind.exe"""`,
       goal: 'Install the kind binary (Windows) and place it on your PATH',
     };
   }
