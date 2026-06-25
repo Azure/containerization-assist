@@ -121,6 +121,10 @@ function mockKindReadyExec() {
     if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
       return { stdout: 'ca-registry', stderr: '' };
     }
+    if (cmd.includes('docker inspect ca-registry') && cmd.includes('.NetworkSettings.Networks')) {
+      // Registry is attached to the kind network (set up by a previous run).
+      return { stdout: '{"kind":{"NetworkID":"net-kind"}}', stderr: '' };
+    }
     if (cmd.includes('docker inspect ca-registry')) {
       return { stdout: '{"5000/tcp":[{"HostIp":"0.0.0.0","HostPort":"6000"}]}', stderr: '' };
     }
@@ -174,6 +178,10 @@ function mockKindStoppedRegistryExec() {
     }
     if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
       return { stdout: '', stderr: '' };
+    }
+    if (cmd.includes('docker inspect ca-registry') && cmd.includes('.NetworkSettings.Networks')) {
+      // Stopped registry retains its kind-network membership across stop/start.
+      return { stdout: '{"kind":{"NetworkID":"net-kind"}}', stderr: '' };
     }
     if (cmd.includes('docker inspect ca-registry')) {
       return { stdout: '{"5000/tcp":[{"HostIp":"0.0.0.0","HostPort":"6000"}]}', stderr: '' };
@@ -385,9 +393,13 @@ describe('prepareCluster (advisory)', () => {
           c.command.includes('kind create cluster'),
         );
         expect(createCmd).toBeDefined();
-        // PowerShell literal here-string, piped to kind --config -
-        expect(createCmd?.command).toContain("@'");
-        expect(createCmd?.command).toContain("'@ | kind create cluster");
+        // PowerShell literal here-string assigned to a variable, then piped to kind.
+        // The terminator `'@` must be alone on its line (piping on the same line is a
+        // PowerShell parse error), so the pipeline runs on the following line.
+        expect(createCmd?.command).toContain("$kindConfig = @'");
+        expect(createCmd?.command).toContain("'@\n$kindConfig | kind create cluster");
+        // The terminator must not be followed by a pipe on the same line.
+        expect(createCmd?.command).not.toContain("'@ | kind create cluster");
         // The Bash heredoc form must not be used on Windows.
         expect(createCmd?.command).not.toContain("cat <<'EOF'");
         // The config payload is still embedded.
@@ -471,6 +483,126 @@ describe('prepareCluster (advisory)', () => {
       ).map((c) => joinExec(c[0], c[1]));
       expect(calls.some((c) => c.startsWith('docker start'))).toBe(false);
       expect(calls.some((c) => c.startsWith('docker run'))).toBe(false);
+    });
+  });
+
+  describe('Kind cluster — registry exists but not attached to the kind network', () => {
+    beforeEach(() => {
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
+      // Running registry, kind cluster exists, but the registry is only on the default
+      // bridge network — NOT the kind network. In-cluster pulls would fail, so the plan
+      // must still emit a (required) `docker network connect`.
+      (global as any).mockExecFileAsync.mockImplementation(
+        async (command: string, args?: string[]) => {
+          const cmd = joinExec(command, args);
+          if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
+            return { stdout: 'amd64', stderr: '' };
+          }
+          if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
+            return { stdout: 'linux', stderr: '' };
+          }
+          if (cmd.includes('kind version')) {
+            return { stdout: 'kind v0.32.0 go1.24.0 linux/amd64', stderr: '' };
+          }
+          if (cmd.includes('kind get clusters')) {
+            return { stdout: 'containerization-assist\n', stderr: '' };
+          }
+          if (
+            cmd.includes('docker inspect ca-registry') &&
+            cmd.includes('.NetworkSettings.Networks')
+          ) {
+            return { stdout: '{"bridge":{"NetworkID":"net-bridge"}}', stderr: '' };
+          }
+          if (cmd.includes('docker inspect ca-registry')) {
+            return { stdout: '{"5000/tcp":[{"HostIp":"0.0.0.0","HostPort":"6000"}]}', stderr: '' };
+          }
+          if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
+            return { stdout: 'ca-registry', stderr: '' };
+          }
+          return { stdout: '', stderr: '' };
+        },
+      );
+    });
+
+    it('emits a required docker network connect when an existing registry is not on the kind network', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const connectCmd = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('docker network connect kind'),
+        );
+        expect(connectCmd).toBeDefined();
+        expect(connectCmd?.optional).toBeFalsy();
+        // The tool only probes membership; it never attaches the network itself.
+        const calls = (
+          (global as any).mockExecFileAsync.mock.calls as Array<[string, string[]?]>
+        ).map((c) => joinExec(c[0], c[1]));
+        expect(calls.some((c) => c.startsWith('docker network connect'))).toBe(false);
+      }
+    });
+  });
+
+  describe('Kind cluster — registry network membership could not be determined', () => {
+    beforeEach(() => {
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
+      // Running registry and an existing kind cluster, but the network-membership
+      // `docker inspect` fails. Since we cannot be sure the registry is detached, the
+      // connect command is still surfaced — but as optional guidance, not ACTION REQUIRED.
+      (global as any).mockExecFileAsync.mockImplementation(
+        async (command: string, args?: string[]) => {
+          const cmd = joinExec(command, args);
+          if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
+            return { stdout: 'amd64', stderr: '' };
+          }
+          if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
+            return { stdout: 'linux', stderr: '' };
+          }
+          if (cmd.includes('kind version')) {
+            return { stdout: 'kind v0.32.0 go1.24.0 linux/amd64', stderr: '' };
+          }
+          if (cmd.includes('kind get clusters')) {
+            return { stdout: 'containerization-assist\n', stderr: '' };
+          }
+          if (
+            cmd.includes('docker inspect ca-registry') &&
+            cmd.includes('.NetworkSettings.Networks')
+          ) {
+            throw new Error('docker inspect failed');
+          }
+          if (cmd.includes('docker inspect ca-registry')) {
+            return { stdout: '{"5000/tcp":[{"HostIp":"0.0.0.0","HostPort":"6000"}]}', stderr: '' };
+          }
+          if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
+            return { stdout: 'ca-registry', stderr: '' };
+          }
+          return { stdout: '', stderr: '' };
+        },
+      );
+    });
+
+    it('emits an optional docker network connect when membership cannot be determined', async () => {
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const connectCmd = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('docker network connect kind'),
+        );
+        expect(connectCmd).toBeDefined();
+        expect(connectCmd?.optional).toBe(true);
+        // Still advisory-only: the tool never attaches the network itself.
+        const calls = (
+          (global as any).mockExecFileAsync.mock.calls as Array<[string, string[]?]>
+        ).map((c) => joinExec(c[0], c[1]));
+        expect(calls.some((c) => c.startsWith('docker network connect'))).toBe(false);
+      }
     });
   });
 

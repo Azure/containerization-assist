@@ -68,6 +68,10 @@ const KIND_VERSION = 'v0.32.0';
 const KIND_AMD64_NODE_IMAGE =
   'kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5';
 
+// The Docker network kind creates for its nodes. The local registry must be attached to
+// it so in-cluster containerd mirrors can resolve `http://${REGISTRY_CONTAINER_NAME}:5000`.
+const KIND_NETWORK_NAME = 'kind';
+
 /**
  * Validate and escape cluster name to prevent command injection.
  * Cluster names must follow Kubernetes naming conventions.
@@ -367,8 +371,12 @@ function buildKindCreateClusterCommand(
   const { isWindows } = getSystemInfo();
   // kindConfig always ends with a newline, so the heredoc/here-string terminator
   // lands on its own line in both forms.
+  //
+  // On Windows, a PowerShell here-string terminator (`'@`) must be the only content on
+  // its line — `'@ | kind ...` is a parse error. So we assign the here-string to a
+  // variable (terminator alone on its line) and pipe that variable on the next line.
   const command = isWindows
-    ? `@'\n${kindConfig}'@ | kind create cluster --name ${shellSafeClusterName} --config=-`
+    ? `$kindConfig = @'\n${kindConfig}'@\n$kindConfig | kind create cluster --name ${shellSafeClusterName} --config=-`
     : `cat <<'EOF' | kind create cluster --name ${shellSafeClusterName} --config=-\n${kindConfig}EOF`;
   return {
     command,
@@ -386,6 +394,28 @@ interface LocalRegistryStatus {
   exists: boolean;
   /** Host port mapped to the registry's internal port, if discoverable. */
   port: number | null;
+  /**
+   * Whether the container is attached to the `kind` Docker network (required for
+   * in-cluster pulls). `true`/`false` when known; `null` when membership could not be
+   * determined (e.g. `docker inspect` failed) — in that case the plan surfaces the
+   * connect command as optional guidance rather than a hard ACTION REQUIRED step.
+   */
+  attachedToKindNetwork: boolean | null;
+}
+
+/**
+ * Return true if the Docker networks map emitted as JSON
+ * (e.g. `docker inspect <name> --format {{json .NetworkSettings.Networks}}`)
+ * contains `networkName` as a key. Returns false on empty/null/invalid input.
+ */
+function isAttachedToNetwork(networksJson: string, networkName: string): boolean {
+  let networks: Record<string, unknown> | null;
+  try {
+    networks = JSON.parse(networksJson.trim());
+  } catch {
+    return false;
+  }
+  return Boolean(networks) && Object.prototype.hasOwnProperty.call(networks, networkName);
 }
 
 /**
@@ -417,7 +447,13 @@ function extractHostPort(portMapJson: string, portKey: string): number | null {
  * Never starts containers or mutates networks.
  */
 async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegistryStatus> {
-  const absent: LocalRegistryStatus = { running: false, exists: false, port: null };
+  const absent: LocalRegistryStatus = {
+    running: false,
+    exists: false,
+    port: null,
+    // The container does not exist yet, so it is definitively not attached.
+    attachedToKindNetwork: false,
+  };
   const containerName = DOCKER.REGISTRY_CONTAINER_NAME;
 
   try {
@@ -494,8 +530,31 @@ async function checkLocalRegistryStatus(logger: pino.Logger): Promise<LocalRegis
       );
     }
 
-    logger.debug({ running, exists, port }, 'Local registry status');
-    return { running, exists, port };
+    // Read-only check of `kind`-network membership. The cluster's containerd mirror points
+    // at http://<registry>:5000, which only resolves from kind nodes once the registry is
+    // attached to the `kind` Docker network. An existing registry is NOT guaranteed to be
+    // attached (it may be user-created, restored, or the kind network may have been
+    // recreated), so probe membership instead of assuming it. The `kind` network exists
+    // only after a kind cluster has been created; before that it is simply absent from the
+    // inspect output, which correctly reports the registry as not attached.
+    // null = could not determine membership (the inspect failed). The plan then offers
+    // the connect command as optional guidance instead of flagging ACTION REQUIRED,
+    // since we cannot be sure the registry is detached.
+    let attachedToKindNetwork: boolean | null = null;
+    try {
+      const { stdout: networksJson } = await execFileAsync('docker', [
+        'inspect',
+        containerName,
+        '--format',
+        '{{json .NetworkSettings.Networks}}',
+      ]);
+      attachedToKindNetwork = isAttachedToNetwork(networksJson, KIND_NETWORK_NAME);
+    } catch (error) {
+      logger.debug({ error }, 'Could not determine registry network membership');
+    }
+
+    logger.debug({ running, exists, port, attachedToKindNetwork }, 'Local registry status');
+    return { running, exists, port, attachedToKindNetwork };
   } catch (error) {
     logger.debug({ error }, 'Error checking local registry');
     return absent;
@@ -532,7 +591,7 @@ function buildRegistryStartCommand(port: number): ClusterSetupCommand {
  */
 function buildRegistryNetworkConnectCommand(): ClusterSetupCommand {
   return {
-    command: `docker network connect kind ${DOCKER.REGISTRY_CONTAINER_NAME}`,
+    command: `docker network connect ${KIND_NETWORK_NAME} ${DOCKER.REGISTRY_CONTAINER_NAME}`,
     goal: 'Connect the local registry to the kind network so the cluster can pull from it',
   };
 }
@@ -651,7 +710,12 @@ async function handlePrepareCluster(
 
     let kindInstalled = false;
     let clusterExists = false;
-    let registryStatus: LocalRegistryStatus = { running: false, exists: false, port: null };
+    let registryStatus: LocalRegistryStatus = {
+      running: false,
+      exists: false,
+      port: null,
+      attachedToKindNetwork: null,
+    };
 
     if (isKind) {
       kindInstalled = await checkKindInstalled(logger);
@@ -687,7 +751,6 @@ async function handlePrepareCluster(
       }
 
       // 2. Ensure the local registry is running.
-      const registryNewlyCreated = !registryStatus.exists;
       if (!registryStatus.exists) {
         // No registry container yet — create one.
         setupCommands.push(buildRegistryRunCommand(registryPort));
@@ -705,12 +768,21 @@ async function handlePrepareCluster(
         );
       }
 
-      // 4. Connect the registry to the kind network. Required for in-cluster pulls,
-      //    but only when the registry container is newly created: an existing registry
-      //    is already attached (network membership persists across stop/start), and
-      //    re-running `docker network connect` on an attached container errors.
-      if (registryNewlyCreated) {
-        setupCommands.push(buildRegistryNetworkConnectCommand());
+      // 4. Connect the registry to the kind network when it is not already attached.
+      //    Required for in-cluster pulls: the kind containerd mirror points at
+      //    http://<registry>:5000, which only resolves once the registry is on the `kind`
+      //    network. A newly created registry is never attached yet; an existing registry
+      //    may or may not be (user-created/restored containers, or a recreated kind
+      //    network), so we rely on the read-only membership probe rather than assuming.
+      //    Skip it only when the registry is known to be attached, because
+      //    `docker network connect` errors on an already-connected container. When
+      //    membership could not be determined (null), still surface the command but as
+      //    optional guidance so an otherwise-ready cluster is not flagged ACTION REQUIRED.
+      if (registryStatus.attachedToKindNetwork !== true) {
+        setupCommands.push({
+          ...buildRegistryNetworkConnectCommand(),
+          optional: registryStatus.attachedToKindNetwork === null,
+        });
       }
 
       // 5. Point kubectl at the cluster. Required only when the cluster was not
