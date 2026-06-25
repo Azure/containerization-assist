@@ -706,7 +706,6 @@ async function handlePrepareCluster(
         'Cluster/kubeconfig not reachable while probing namespace',
       );
     }
-    const clusterPlatform = await detectClusterPlatform(logger);
 
     let kindInstalled = false;
     let clusterExists = false;
@@ -727,6 +726,15 @@ async function handlePrepareCluster(
       }
       registryStatus = await checkLocalRegistryStatus(logger);
     }
+
+    // Detect the cluster node platform via `kubectl get nodes`. For kind this is only
+    // trustworthy once the target kind cluster actually exists: before then, kubectl may
+    // be pointed at an unrelated cluster (a remote context or another local cluster), so
+    // its node architecture would yield misleading platform guidance and could falsely
+    // trip the strict platform gate for a kind cluster we are about to create. Treat the
+    // platform as "not detected" (null) until the kind cluster exists. Generic clusters
+    // are expected to already exist, so we detect unconditionally there.
+    const clusterPlatform = !isKind || clusterExists ? await detectClusterPlatform(logger) : null;
 
     // ---- Compute recommendations from the unsatisfied state ----
     const setupCommands: ClusterSetupCommand[] = [];
@@ -785,15 +793,17 @@ async function handlePrepareCluster(
         });
       }
 
-      // 5. Point kubectl at the cluster. Required only when the cluster was not
-      //    reachable during probing (no/wrong kubeconfig, or the cluster is about to be
-      //    created above). When kubectl already reached the cluster, the kubeconfig is
-      //    in place — emit this as an optional convenience step so an otherwise-ready
-      //    cluster does not get flagged as "ACTION REQUIRED".
+      // 5. Point kubectl at the kind cluster. Treat this as optional only when the kind
+      //    cluster actually exists AND kubectl was reachable during probing. Reachability
+      //    alone is NOT sufficient: kubectl may currently be pointed at an unrelated
+      //    cluster, so `clusterReachable` can be true while the target kind cluster does
+      //    not exist yet. In that bootstrap case (clusterExists === false, including when
+      //    the cluster is being created above) the export is REQUIRED — skipping it could
+      //    leave kubectl on the wrong context and apply the manifests to the wrong cluster.
       setupCommands.push({
         command: `kind export kubeconfig --name ${shellSafeClusterName}`,
         goal: 'Point kubectl at the kind cluster',
-        optional: clusterReachable,
+        optional: clusterExists && clusterReachable,
       });
 
       // Registry-hosting ConfigMap documents the registry for tools/users (kind best practice).

@@ -814,6 +814,60 @@ describe('prepareCluster (advisory)', () => {
 
       expect(result.ok).toBe(true);
     });
+
+    it('ignores kubectl platform when the kind cluster does not exist yet (unrelated context)', async () => {
+      // kubectl is currently pointed at an UNRELATED cluster (e.g. a remote arm64
+      // context) while the target kind cluster has not been created. The reported node
+      // architecture must not be attributed to the kind cluster: platform is "not
+      // detected" until the kind cluster exists, so it must neither produce guidance nor
+      // trip the strict gate.
+      mockK8sClient.namespaceExists.mockResolvedValue(true);
+      (global as any).mockExecFileAsync.mockImplementation(
+        async (command: string, args?: string[]) => {
+          const cmd = joinExec(command, args);
+          // An unrelated cluster answers the node probe...
+          if (cmd.includes('kubectl get nodes') && cmd.includes('architecture')) {
+            return { stdout: 'arm64', stderr: '' };
+          }
+          if (cmd.includes('kubectl get nodes') && cmd.includes('operatingSystem')) {
+            return { stdout: 'linux', stderr: '' };
+          }
+          // ...but the target kind cluster does NOT exist yet.
+          if (cmd.includes('kind version')) {
+            return { stdout: 'kind v0.32.0 go1.24.0 linux/amd64', stderr: '' };
+          }
+          if (cmd.includes('kind get clusters')) {
+            return { stdout: '', stderr: '' };
+          }
+          if (cmd.includes('docker ps') && cmd.includes('ca-registry')) {
+            return { stdout: '', stderr: '' };
+          }
+          return { stdout: '', stderr: '' };
+        },
+      );
+
+      const result = await prepareCluster(
+        { clusterType: 'kind', namespace: 'default', targetPlatform: 'linux/amd64' },
+        createMockToolContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Platform is treated as not-detected, not the unrelated cluster's arm64.
+        expect(result.value.detected.clusterPlatform).toBeNull();
+        expect(result.value.recommendations.platformGuidance.cluster).toBeNull();
+        // No platform-mismatch warning is surfaced from the unrelated context.
+        expect(result.value.warnings?.some((w) => w.includes('Platform mismatch'))).toBeFalsy();
+        // Bootstrap: the kind cluster does not exist yet, so kubeconfig export must be
+        // REQUIRED even though kubectl was reachable (it was pointed at the unrelated
+        // cluster). Otherwise the agent could apply manifests to the wrong context.
+        const exportKubeconfig = result.value.recommendations.setupCommands.find((c) =>
+          c.command.includes('kind export kubeconfig'),
+        );
+        expect(exportKubeconfig).toBeDefined();
+        expect(exportKubeconfig?.optional).toBeFalsy();
+      }
+    });
   });
 
   describe('Error handling', () => {
