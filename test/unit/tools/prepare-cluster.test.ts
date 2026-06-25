@@ -409,9 +409,10 @@ describe('prepareCluster (advisory)', () => {
         expect(installCmd).toBeDefined();
         // cmd /c forces cmd.exe to expand %USERPROFILE% even under PowerShell.
         expect(installCmd?.command.startsWith('cmd /c ')).toBe(true);
-        // Creates the target dir first and overwrites idempotently.
-        expect(installCmd?.command).toContain('if not exist "%USERPROFILE%\\bin" mkdir');
-        expect(installCmd?.command).toContain('move /Y kind.exe "%USERPROFILE%\\bin\\kind.exe"');
+        // Creates the target dir first and overwrites idempotently. Inner quotes are
+        // doubled ("") so cmd.exe does not terminate the `/c "..."` payload early.
+        expect(installCmd?.command).toContain('if not exist ""%USERPROFILE%\\bin"" mkdir');
+        expect(installCmd?.command).toContain('move /Y kind.exe ""%USERPROFILE%\\bin\\kind.exe""');
       }
     });
   });
