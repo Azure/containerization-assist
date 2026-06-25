@@ -22,6 +22,10 @@ import {
   buildMcpAksLoopUserPrompt,
   createMcpToolBundle,
   cleanupAzureResources,
+  probeDeployReady,
+  ensureRegistryLogin,
+  ensureEvalCluster,
+  provisionEvalDatabases,
   loadAzureContext,
   slugifyModel,
   type AzureContext,
@@ -122,6 +126,13 @@ export interface GradientRunRecord {
   toolCallsByName?: Record<string, number>;
   durationMs?: number;
   checks: CheckResult[];
+  /**
+   * Harness-measured ground truth: did the workload this run pushed actually
+   * reach Running/Ready on the cluster? Independent of the agent's own claims.
+   */
+  deployReady?: boolean;
+  /** Human-readable readiness detail (per-Deployment ready/desired replicas). */
+  deployDetail?: string;
   /** Final assistant text. Useful for debugging "agent bailed early" runs. */
   finalText?: string;
   error?: string;
@@ -143,10 +154,54 @@ export interface GradientOptions {
   /** Run models concurrently. Defaults to true when >1 model. */
   parallelModels?: boolean;
   /**
+   * Cap on how many model lanes run concurrently when `parallelModels` is on.
+   * Undefined = unlimited (one lane per model, classic behavior). Useful to
+   * stay under provider rate limits during a wide sweep.
+   */
+  maxConcurrentModels?: number;
+  /**
    * Number of repetitions per (model, fixture, path) cell. Reps run
    * sequentially within a model so cleanup stays correct. Default 1.
    */
   reps?: number;
+  /**
+   * If set, the full {@link GradientResult} is rewritten to this path after
+   * every completed cell. Lets a long sweep be interrupted (or sharded) while
+   * still leaving a usable, populated report on disk.
+   */
+  checkpointPath?: string;
+  /**
+   * Pre-populated runs from a previous checkpoint. Cells that already have a
+   * successful (no `error`) record for the same `(model, fixture, level, rep)`
+   * key are skipped, so an interrupted sweep can be resumed without re-running
+   * already-completed work.
+   */
+  resumeRuns?: GradientRunRecord[];
+}
+
+/**
+ * Bounded-concurrency worker pool: process `items` with at most `limit`
+ * `worker` calls in flight at once. Used to cap how many model lanes hit the
+ * provider in parallel so a wide sweep doesn't trip rate limits. Caller is
+ * responsible for flattening if `R` is itself an array.
+ */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const launch = async (): Promise<void> => {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await worker(items[i] as T);
+    }
+  };
+  const lanes = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: lanes }, () => launch()));
+  return results;
 }
 
 async function runOneLevel(opts: {
@@ -194,6 +249,10 @@ async function runOneLevel(opts: {
       artifactDir: workingDir,
       fixtureDir: opts.fixture,
     });
+    // Ground-truth readiness, measured by the harness before we tear down.
+    const ready = await probeDeployReady(opts.ctx);
+    record.deployReady = ready.ready;
+    record.deployDetail = ready.detail;
   } catch (err) {
     record.error = err instanceof Error ? err.message : String(err);
   } finally {
@@ -224,6 +283,63 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   const reps = Math.max(1, Math.floor(opts.reps ?? 1));
   const t0 = Date.now();
 
+  // Make the cluster disposable: create-if-missing, wait out any in-progress
+  // deletion, attach ACR, refresh kubeconfig, ensure the namespace, and push the
+  // GC TTL forward. The sandbox subscription auto-deletes the cluster when its
+  // `deletion_due_time` tag expires, so without this a sweep can start against a
+  // cluster that's mid-deletion (kubectl can't even resolve the API server).
+  await ensureEvalCluster(baseCtx);
+
+  // Refresh the ACR credential once up front. Without this a stale token makes
+  // every pushImage fail (and the kubectlApply gate then blocks every deploy).
+  await ensureRegistryLogin(baseCtx);
+
+  // Provision the shared DB sidecars (Postgres + MySQL) so DB-backed fixtures
+  // can actually become Ready. Mirrors the Azure-customer reality of managed
+  // DBs already living in the namespace; the agent's job is to wire env, not
+  // to provision the DB. Best-effort: warns if it can't reach the cluster.
+  await provisionEvalDatabases(baseCtx);
+
+  // Shared collector + serialized checkpoint writer. Model lanes run in
+  // parallel, so every completed cell pushes here and rewrites the full result
+  // to disk. Writes are chained so concurrent lanes can't corrupt the file.
+  // Resume: seed with any prior successful records so they're preserved in the
+  // checkpoint and the cells aren't re-run below.
+  const collected: GradientRunRecord[] = [];
+  const cellKey = (r: { fixture: string; model: string; level: string; rep?: number }): string =>
+    `${r.model}|${r.fixture}|${r.level}|${r.rep ?? 0}`;
+  const completed = new Set<string>();
+  if (opts.resumeRuns?.length) {
+    let resumed = 0;
+    for (const r of opts.resumeRuns) {
+      if (!r.error && r.fixture && r.model && r.level != null) {
+        collected.push(r);
+        completed.add(cellKey(r));
+        resumed += 1;
+      }
+    }
+    if (resumed) console.error(`[gradient] resuming with ${resumed} prior cell(s) skipped`);
+  }
+  let writeChain: Promise<void> = Promise.resolve();
+  const writeCheckpoint = (): Promise<void> => {
+    if (!opts.checkpointPath) return Promise.resolve();
+    const path = opts.checkpointPath;
+    writeChain = writeChain.then(async () => {
+      const snapshot: GradientResult = {
+        models: opts.models,
+        levels,
+        timestamp: new Date().toISOString(),
+        runs: collected,
+      };
+      try {
+        await fs.writeFile(path, JSON.stringify(snapshot, null, 2));
+      } catch (err) {
+        console.error(`[gradient] checkpoint write failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    });
+    return writeChain;
+  };
+
   // One model's worth of work — sequential over reps × fixtures × paths.
   // Rep is the outer loop so partial runs still give >=1 complete rep per cell.
   const runModel = async (model: string): Promise<GradientRunRecord[]> => {
@@ -237,6 +353,14 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
     for (let rep = 0; rep < reps; rep++) {
       for (const fixture of opts.fixtures) {
         for (const level of levels) {
+          const key = cellKey({ fixture, model, level: level.id, rep });
+          if (completed.has(key)) {
+            console.error(
+              `[gradient] skip  model=${model} rep=${rep + 1}/${reps} ` +
+                `fixture=${fixture.split('/').pop()} path=${level.id} (resumed)`,
+            );
+            continue;
+          }
           const r = await runOneLevel({ fixture, level, model, ctx, checkSpecs, rep });
           console.error(
             `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +
@@ -245,6 +369,9 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
               `(${r.durationMs ? Math.round(r.durationMs / 1000) + 's' : '?'})`,
           );
           out.push(r);
+          collected.push(r);
+          if (!r.error) completed.add(key);
+          void writeCheckpoint();
         }
       }
     }
@@ -252,12 +379,18 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
     return out;
   };
 
-  const all = parallel
-    ? (await Promise.all(opts.models.map(runModel))).flat()
-    : (await opts.models.reduce<Promise<GradientRunRecord[]>>(
+  const concurrency = parallel
+    ? Math.max(1, Math.min(opts.maxConcurrentModels ?? opts.models.length, opts.models.length))
+    : 1;
+  const all = concurrency === 1
+    ? (await opts.models.reduce<Promise<GradientRunRecord[]>>(
         async (accP, m) => (await accP).concat(await runModel(m)),
         Promise.resolve([]),
-      ));
+      ))
+    : (await runWithConcurrency(opts.models, concurrency, runModel)).flat();
+
+  // Flush the final checkpoint before returning.
+  await writeCheckpoint();
 
   return {
     models: opts.models,
@@ -269,35 +402,7 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
 
 // ---------- Markdown reporting ----------
 
-const fmtNum = (n?: number): string => (n == null ? '—' : Math.round(n).toLocaleString());
-const fmtMs = (ms?: number): string => {
-  if (ms == null) return '—';
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  const m = Math.floor(s / 60);
-  const rest = Math.round(s - m * 60);
-  return `${m}m${rest.toString().padStart(2, '0')}s`;
-};
-const shortFixture = (p: string): string => {
-  const ix = p.indexOf('/fixtures/');
-  return ix >= 0 ? p.slice(ix + '/fixtures/'.length) : p;
-};
 const checkSymbol = (passed?: boolean): string => (passed == null ? '—' : passed ? '✅' : '❌');
-
-function fmtDelta(curr?: number, prev?: number): string {
-  if (curr == null || prev == null) return '—';
-  const d = curr - prev;
-  if (d === 0) return '0';
-  const sign = d > 0 ? '+' : '−';
-  return `${sign}${Math.round(Math.abs(d)).toLocaleString()}`;
-}
-
-function fmtCheckDelta(currPassed?: boolean, prevPassed?: boolean): string {
-  if (currPassed == null || prevPassed == null) return '—';
-  if (currPassed && !prevPassed) return '★ unlocked';
-  if (!currPassed && prevPassed) return '✗ regressed';
-  return '—';
-}
 
 /** All check names across the result, in first-seen order. */
 function allCheckNames(result: GradientResult): string[] {
@@ -328,20 +433,13 @@ function fixtureNick(p: string): string {
   return base.slice(0, 12);
 }
 
+/** Compact token count: 1234 → "1.2K", 1_200_000 → "1.2M". Shared by both reports. */
 function fmtKTokens(n?: number): string {
   if (n == null) return '—';
   const abs = Math.abs(n);
   if (abs < 1000) return String(Math.round(n));
   if (abs < 1_000_000) return `${(n / 1000).toFixed(abs >= 10_000 ? 0 : 1)}K`;
   return `${(n / 1_000_000).toFixed(1)}M`;
-}
-
-function fmtDeltaTokens(curr?: number, prev?: number): string {
-  if (curr == null || prev == null) return '—';
-  const d = curr - prev;
-  if (d === 0) return '0';
-  const sign = d > 0 ? '+' : '−';
-  return `${sign}${fmtKTokens(Math.abs(d))}`;
 }
 
 export function formatGradientMarkdown(result: GradientResult): string {
@@ -438,6 +536,50 @@ export function formatGradientMarkdown(result: GradientResult): string {
     lines.push('');
   }
 
+  // ---------- Deploy readiness summary (ground truth) ----------
+  // Distinct from the artifact-quality checks above: did the workload the agent
+  // pushed actually reach Running/Ready on the cluster (harness-measured), and
+  // how many apply attempts did it take to get there?
+  const anyReadiness = result.runs.some((r) => typeof r.deployReady === 'boolean');
+  if (anyReadiness) {
+    lines.push('## Deploy readiness (pods reached Running/Ready, harness-measured)');
+    lines.push('');
+    lines.push(
+      '_Independent of the quality checks above. ✅ = every Deployment this run pushed reached ' +
+        '`readyReplicas ≥ replicas`. The number in parentheses is **apply attempts** ' +
+        '(`kubectlApply` calls) — how many fix→reapply rounds the agent took._',
+    );
+    lines.push('');
+    for (const level of result.levels) {
+      lines.push(`### Readiness (${level.id} path)`);
+      lines.push('');
+      const header = ['model', ...fixtures.map((f) => fixtureNick(f)), 'ready'];
+      lines.push(`| ${header.join(' | ')} |`);
+      lines.push(`| ${header.map(() => '---').join(' | ')} |`);
+      for (const model of result.models) {
+        const cells: string[] = [`\`${model}\``];
+        let readyCount = 0;
+        let total = 0;
+        for (const fix of fixtures) {
+          const run = result.runs.find(
+            (r) => r.model === model && r.fixture === fix && r.level === level.id,
+          );
+          total++;
+          if (!run || typeof run.deployReady !== 'boolean') {
+            cells.push(run?.error ? '⚠' : '—');
+            continue;
+          }
+          const attempts = run.toolCallsByName?.kubectlApply ?? 0;
+          cells.push(`${run.deployReady ? '✅' : '❌'} (${attempts})`);
+          if (run.deployReady) readyCount++;
+        }
+        cells.push(`**${readyCount}/${total}**`);
+        lines.push(`| ${cells.join(' | ')} |`);
+      }
+      lines.push('');
+    }
+  }
+
   // ---------- Cross-model cost summary ----------
   if (result.models.length > 1) {
     for (const [label, key] of [
@@ -513,6 +655,34 @@ const rateColour = (rate: number): string => {
     G = lerp(0x99, 0xb9, t);
     B = lerp(0x22, 0x50, t);
   }
+  return `#${R.toString(16).padStart(2, '0')}${G.toString(16).padStart(2, '0')}${B.toString(16).padStart(2, '0')}`;
+};
+
+/**
+ * Brand/identity colour per delivery path. Deliberately distinct from the
+ * red→green performance ramp: `bare` is a neutral grey (it's the control,
+ * not a "failure"), so method identity never reads as a pass/fail signal.
+ */
+const METHOD_COLOURS: Record<LevelId, string> = {
+  bare: '#8b949e',
+  mcp: '#a371f7',
+  skills: '#3fb950',
+};
+
+/**
+ * Diverging colour for a lift value `d` (Δ check-pass fraction vs `bare`,
+ * in [-1, 1]). Neutral slate at ~0, saturating to green for gains and red
+ * for regressions. Uses sqrt magnitude so small but real lifts stay visible.
+ */
+const liftColour = (d: number): string => {
+  if (!Number.isFinite(d)) return '#21262d';
+  if (Math.abs(d) < 0.005) return '#2d333b';
+  const mag = Math.min(1, Math.sqrt(Math.abs(d)));
+  const neutral = [0x2d, 0x33, 0x3b] as const;
+  const target = d > 0 ? ([0x3f, 0xb9, 0x50] as const) : ([0xf8, 0x51, 0x49] as const);
+  const R = lerp(neutral[0], target[0], mag);
+  const G = lerp(neutral[1], target[1], mag);
+  const B = lerp(neutral[2], target[2], mag);
   return `#${R.toString(16).padStart(2, '0')}${G.toString(16).padStart(2, '0')}${B.toString(16).padStart(2, '0')}`;
 };
 
@@ -597,19 +767,10 @@ const aggregateCell = (
 };
 
 /**
- * Render a self-contained HTML report. One file, inline CSS + SVG, no deps.
- *
- * Layout, top-to-bottom:
- *   1. Banner — three giant pass/total numbers, one per path.
- *   2. Heatmap — single grid: rows = models, columns = path × fixture.
- *      Each cell is a large saturated square coloured by pass-rate. Reps
- *      are auto-aggregated, so the same view shows 0/100% today and
- *      gradient shades once reps land.
- *   3. Cost-vs-effectiveness scatter — log-scale tokens (x) vs pass rate
- *      (y). One dot per (path × model); quadrants highlight the
- *      cheap-and-effective winner zone.
- *   4. Token bars — compact reference view of absolute token spend.
- *   5. Errors footer (only if any).
+ * Render a self-contained HTML report (inline CSS + SVG + a little vanilla JS,
+ * no external deps). Sections: scoreboard + verdict, method-grouped quality
+ * heatmap (absolute / lift-vs-bare toggle), cost-vs-effectiveness scatter,
+ * per-validation breakdown, token-spend bars, and an errors footer.
  */
 export function formatGradientHtml(result: GradientResult): string {
   const allChecks = allCheckNames(result);
@@ -637,117 +798,215 @@ export function formatGradientHtml(result: GradientResult): string {
     return -1;
   })();
 
-  // Per-path tally: how many (model × fixture) cells are "perfect" — i.e.
-  // every rep passed every check. This is the strict headline number.
-  const passingByLevel: Record<LevelId, { pass: number; total: number }> = {
-    bare: { pass: 0, total: 0 },
-    mcp: { pass: 0, total: 0 },
-    skills: { pass: 0, total: 0 },
-  };
-  for (const level of result.levels) {
-    for (const m of result.models) {
+  // ---------- Per-level rollups (drive the scoreboard + verdict) ----------
+  interface Rollup {
+    level: LevelConfig;
+    perfectCells: number;
+    totalCells: number;
+    checksPassed: number;
+    checksTotal: number;
+    tokensIn: number;
+    tokensOut: number;
+    validReps: number;
+    erroredReps: number;
+  }
+  const rollupFor = (level: LevelConfig): Rollup => {
+    let perfectCells = 0;
+    let totalCells = 0;
+    let checksPassed = 0;
+    let checksTotal = 0;
+    let validReps = 0;
+    let erroredReps = 0;
+    for (const model of result.models) {
       for (const fix of fixtures) {
-        const cell = aggregateCell(result.runs, m, level.id, fix, headlineNames);
-        passingByLevel[level.id].total++;
-        if (cell.fullPassRatio === 1) passingByLevel[level.id].pass++;
+        const cell = aggregateCell(result.runs, model, level.id, fix, headlineNames);
+        if (cell.reps === 0) continue;
+        totalCells++;
+        if (cell.fullPassRatio === 1) perfectCells++;
+        checksPassed += cell.checksPassed;
+        checksTotal += cell.checksTotal;
+        validReps += cell.reps - cell.errored;
+        erroredReps += cell.errored;
       }
     }
-  }
+    const tokensIn = result.runs
+      .filter((r) => r.level === level.id && !r.error)
+      .reduce((s, r) => s + (r.tokensIn ?? 0), 0);
+    const tokensOut = result.runs
+      .filter((r) => r.level === level.id && !r.error)
+      .reduce((s, r) => s + (r.tokensOut ?? 0), 0);
+    return {
+      level,
+      perfectCells,
+      totalCells,
+      checksPassed,
+      checksTotal,
+      tokensIn,
+      tokensOut,
+      validReps,
+      erroredReps,
+    };
+  };
+  const rollups = result.levels.map(rollupFor);
+  const rollupById = new Map<LevelId, Rollup>(rollups.map((r) => [r.level.id, r]));
+  const ratioOf = (r: Rollup): number => (r.checksTotal === 0 ? 0 : r.checksPassed / r.checksTotal);
+  const bareRoll = rollupById.get('bare');
+  const bestByRatio = [...rollups].sort((a, b) => ratioOf(b) - ratioOf(a))[0];
 
-  const bannerColour = (p: number, t: number): string =>
-    t === 0 ? '#6e7681' : rateColour(p / t);
-
-  // ---------- Big banner ----------
-  const bannerCard = (level: LevelConfig): string => {
-    const stat = passingByLevel[level.id];
-    const subline = repsPerCell === 1
-      ? 'cells passing all checks'
-      : 'cells where every rep passes every check';
-    return `<div class="banner-card">
-      <div class="banner-num" style="color:${bannerColour(stat.pass, stat.total)}">${stat.pass}<span class="banner-denom">/${stat.total}</span></div>
-      <div class="banner-label">${escapeHtml(level.label)}</div>
-      <div class="banner-sub">${escapeHtml(level.id)} · ${subline}</div>
+  // ---------- Scoreboard (exec comparison of the 3 paths) ----------
+  const scoreCard = (r: Rollup): string => {
+    const ratio = ratioOf(r);
+    const isWinner = bestByRatio != null && r.level.id === bestByRatio.level.id && ratio > 0;
+    const lift = bareRoll && r.level.id !== 'bare' ? ratio - ratioOf(bareRoll) : null;
+    const liftHtml =
+      lift == null
+        ? '<span class="score-delta muted">baseline / control</span>'
+        : `<span class="score-delta" style="color:${lift >= 0 ? '#3fb950' : '#f85149'}">${lift >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(lift * 100))} pts vs bare</span>`;
+    const costMult = bareRoll && bareRoll.tokensIn > 0 ? r.tokensIn / bareRoll.tokensIn : null;
+    return `<div class="score-card${isWinner ? ' winner' : ''}" style="--accent:${METHOD_COLOURS[r.level.id]}">
+      ${isWinner ? '<div class="score-crown">★ best quality</div>' : ''}
+      <div class="score-method"><span class="score-dot" style="background:${METHOD_COLOURS[r.level.id]}"></span>${escapeHtml(r.level.label)} <span class="score-id">${escapeHtml(r.level.id)}</span></div>
+      <div class="score-ratio" style="color:${rateColour(ratio)}">${Math.round(ratio * 100)}<span class="score-pct">%</span></div>
+      <div class="score-ratio-sub">checks passed (${r.checksPassed}/${r.checksTotal})</div>
+      ${liftHtml}
+      <div class="score-stats">
+        <div><span class="score-stat-label">perfect cells</span><span class="score-stat-val">${r.perfectCells}/${r.totalCells}</span></div>
+        <div><span class="score-stat-label">tokens in</span><span class="score-stat-val">${fmtKTokens(r.tokensIn)}</span></div>
+        <div><span class="score-stat-label">cost vs bare</span><span class="score-stat-val">${costMult == null ? '—' : `${costMult.toFixed(1)}×`}</span></div>
+        <div><span class="score-stat-label">tok / passing check</span><span class="score-stat-val">${r.checksPassed > 0 ? fmtKTokens(r.tokensIn / r.checksPassed) : '—'}</span></div>
+      </div>
     </div>`;
   };
+  const scoreboardSection = `<div class="scoreboard">${rollups.map(scoreCard).join('')}</div>`;
 
-  // ---------- The Heatmap ----------
-  // Rows = models. Columns = path × fixture (grouped, with a thicker
-  // separator between paths so the eye reads "this whole block is bare,
-  // this whole block is mcp, this block is skills").
+  // ---------- Verdict line ----------
+  const verdictSection = ((): string => {
+    if (!bareRoll || rollups.length === 0 || bestByRatio == null) return '';
+    const winner = bestByRatio;
+    const lift = ratioOf(winner) - ratioOf(bareRoll);
+    const costMult = bareRoll.tokensIn > 0 ? winner.tokensIn / bareRoll.tokensIn : null;
+    if (winner.level.id === 'bare') {
+      return `<p class="verdict">No CA path beat the <strong>bare</strong> control on check pass-rate in this run.</p>`;
+    }
+    return `<p class="verdict">
+      <strong style="color:${METHOD_COLOURS[winner.level.id]}">${escapeHtml(winner.level.label)}</strong>
+      leads on quality — <strong>${Math.round(ratioOf(winner) * 100)}%</strong> of checks pass,
+      <strong style="color:#3fb950">+${Math.round(lift * 100)} pts</strong> over bare${
+        costMult ? ` for <strong>${costMult.toFixed(1)}×</strong> the input tokens` : ''
+      }. Use the cost view to judge whether that lift is worth the spend.
+    </p>`;
+  })();
+
+  // ---------- Heatmaps (absolute + lift), METHOD-GROUPED ----------
+  // Columns are grouped by method in bare → mcp → skills order, each method
+  // spanning all fixtures. This puts every `bare` (red) cell on the left and
+  // every `skills` (green) cell on the right, so the whole grid sweeps
+  // red→green left-to-right — the headline "skills is more effective" signal.
   const colCount = result.levels.length * fixtures.length;
-  const fixtureLabels = fixtures.map(fixtureNick);
 
   const heatmapHeaderTop = [
     `<div class="heatmap-corner"></div>`,
     ...result.levels.map(
       (l) =>
-        `<div class="heatmap-path-label" style="grid-column: span ${fixtures.length};">${escapeHtml(l.label)}</div>`,
+        `<div class="heatmap-method-group" style="grid-column: span ${fixtures.length};"><span class="hm-dot" style="background:${METHOD_COLOURS[l.id]}"></span>${escapeHtml(l.label)}</div>`,
     ),
   ].join('');
 
   const heatmapHeaderBot = [
     `<div class="heatmap-corner"></div>`,
     ...result.levels.flatMap(() =>
-      fixtureLabels.map(
-        (f) => `<div class="heatmap-fixture-label">${escapeHtml(f)}</div>`,
+      fixtures.map(
+        (f) => `<div class="heatmap-fixture-label">${escapeHtml(fixtureNick(f))}</div>`,
       ),
     ),
   ].join('');
 
-  const heatmapRows = result.models
-    .map((model) => {
-      const cells = result.levels
-        .flatMap((level) =>
-          fixtures.map((fix) => {
-            const cell = aggregateCell(result.runs, model, level.id, fix, headlineNames);
-            if (cell.reps === 0) {
-              return `<div class="heatmap-cell empty" title="${escapeHtml(`${model} / ${level.id} / ${fixtureNick(fix)}: no data`)}"></div>`;
-            }
-            if (cell.checkRatio === null) {
-              // All reps errored before checks could run.
-              return `<div class="heatmap-cell errored" title="${escapeHtml(`${model} / ${level.id} / ${fixtureNick(fix)}: ${cell.errored}/${cell.reps} errored`)}"><span class="cell-pct">err</span><span class="cell-sub">${cell.errored}/${cell.reps}</span></div>`;
-            }
-            const validReps = cell.reps - cell.errored;
-            const pct = Math.round(cell.checkRatio * 100);
-            // Subtext shows the full-pass rate when reps > 1 so you can see
-            // both "% of checks" and "% of perfect runs".
-            const sub =
-              validReps > 1 && cell.fullPassRatio !== null
-                ? `${cell.fullPass}/${validReps} perfect`
-                : '';
-            const fullPct =
-              cell.fullPassRatio === null
-                ? '—'
-                : `${Math.round(cell.fullPassRatio * 100)}%`;
-            const tooltip =
-              `${model} / ${level.id} / ${fixtureNick(fix)}\n` +
-              `${cell.checksPassed}/${cell.checksTotal} checks passed (${pct}%)\n` +
-              `${cell.fullPass}/${validReps} reps with all checks passing (${fullPct})` +
-              (cell.errored ? `\n+${cell.errored} rep(s) errored` : '');
-            return `<div class="heatmap-cell" style="background:${rateColour(cell.checkRatio)}" title="${escapeHtml(tooltip)}"><span class="cell-pct">${pct}%</span>${sub ? `<span class="cell-sub">${sub}</span>` : ''}</div>`;
-          }),
-        )
-        .join('');
-      return `<div class="heatmap-row-label">${escapeHtml(model)}</div>${cells}`;
-    })
-    .join('');
+  const renderAbsCell = (model: string, level: LevelConfig, fix: string): string => {
+    const cell = aggregateCell(result.runs, model, level.id, fix, headlineNames);
+    if (cell.reps === 0) {
+      return `<div class="heatmap-cell empty" title="${escapeHtml(`${model} / ${level.id} / ${fixtureNick(fix)}: no data`)}"></div>`;
+    }
+    if (cell.checkRatio === null) {
+      return `<div class="heatmap-cell errored" title="${escapeHtml(`${model} / ${level.id} / ${fixtureNick(fix)}: ${cell.errored}/${cell.reps} errored`)}"><span class="cell-pct">err</span><span class="cell-sub">${cell.errored}/${cell.reps}</span></div>`;
+    }
+    const validReps = cell.reps - cell.errored;
+    const pct = Math.round(cell.checkRatio * 100);
+    const sub = validReps > 1 && cell.fullPassRatio !== null ? `${cell.fullPass}/${validReps} perfect` : '';
+    const fullPct = cell.fullPassRatio === null ? '—' : `${Math.round(cell.fullPassRatio * 100)}%`;
+    const tooltip =
+      `${model} / ${level.id} / ${fixtureNick(fix)}\n` +
+      `${cell.checksPassed}/${cell.checksTotal} checks passed (${pct}%)\n` +
+      `${cell.fullPass}/${validReps} reps with all checks passing (${fullPct})` +
+      (cell.errored ? `\n+${cell.errored} rep(s) errored` : '');
+    return `<div class="heatmap-cell" style="background:${rateColour(cell.checkRatio)}" title="${escapeHtml(tooltip)}"><span class="cell-pct">${pct}%</span>${sub ? `<span class="cell-sub">${sub}</span>` : ''}</div>`;
+  };
 
-  const heatmapBlock = `<section class="heatmap-block">
-    <p class="heatmap-explainer">
-      Each cell = one (model × fixture) combo on the path shown above it.
-      <strong>Color &amp; %</strong> = fraction of <em>individual checks</em>
-      that passed across ${repsPerCell === 1 ? 'the run' : 'all reps'}.
-      With ${headlineNames.length} checks (${headlineNames.map((n) => `<code>${escapeHtml(n)}</code>`).join(' · ')})${repsPerCell === 1 ? '' : ` × ${repsPerCell} reps = ${headlineNames.length * repsPerCell} chances per cell`},
-      a partial result like <strong>67%</strong> means “two of three checks pass every time” — you see the gradient, not just pass/fail.
-      ${repsPerCell > 1 ? 'Subtext <strong>M/N perfect</strong> shows how many reps were flawless (the strict bar from the banner above).' : ''}
-      Hover any cell for the full breakdown.
-    </p>
-    <div class="heatmap-grid" style="grid-template-columns: minmax(110px, auto) repeat(${colCount}, minmax(0, 1fr));">
+  const renderLiftCell = (model: string, level: LevelConfig, fix: string): string => {
+    const cell = aggregateCell(result.runs, model, level.id, fix, headlineNames);
+    if (level.id === 'bare') {
+      const base = cell.checkRatio;
+      const baseTxt = base == null ? '—' : `${Math.round(base * 100)}%`;
+      return `<div class="heatmap-cell base" title="${escapeHtml(`${model} / bare / ${fixtureNick(fix)}: baseline ${baseTxt}`)}"><span class="cell-pct">${baseTxt}</span><span class="cell-sub">base</span></div>`;
+    }
+    const bareCell = aggregateCell(result.runs, model, 'bare', fix, headlineNames);
+    if (cell.checkRatio === null || bareCell.checkRatio === null) {
+      return `<div class="heatmap-cell empty" title="${escapeHtml(`${model} / ${level.id} / ${fixtureNick(fix)}: no comparison`)}">—</div>`;
+    }
+    const d = cell.checkRatio - bareCell.checkRatio;
+    const pts = Math.round(d * 100);
+    const sign = pts > 0 ? '+' : pts < 0 ? '−' : '±';
+    const tooltip =
+      `${model} / ${level.id} vs bare / ${fixtureNick(fix)}\n` +
+      `${Math.round(cell.checkRatio * 100)}% vs ${Math.round(bareCell.checkRatio * 100)}% bare\n` +
+      `Δ ${sign}${Math.abs(pts)} pts`;
+    return `<div class="heatmap-cell lift" style="background:${liftColour(d)}" title="${escapeHtml(tooltip)}"><span class="cell-pct">${sign}${Math.abs(pts)}</span><span class="cell-sub">pts</span></div>`;
+  };
+
+  const buildRows = (render: (m: string, l: LevelConfig, f: string) => string): string =>
+    result.models
+      .map((model) => {
+        const cells = result.levels
+          .flatMap((level) => fixtures.map((fix) => render(model, level, fix)))
+          .join('');
+        return `<div class="heatmap-row-label">${escapeHtml(model)}</div>${cells}`;
+      })
+      .join('');
+
+  const heatmapRowsAbs = buildRows(renderAbsCell);
+  const heatmapRowsLift = buildRows(renderLiftCell);
+  const hasBare = result.levels.some((l) => l.id === 'bare');
+  const gridStyle = `grid-template-columns: minmax(110px, auto) repeat(${colCount}, minmax(0, 1fr));`;
+
+  const heatmapSection = `<section class="heatmap-block">
+    <div class="heatmap-toolbar">
+      <div class="heatmap-tabs">
+        <button id="btn-abs" class="hm-tab active" onclick="hmView('abs')">Absolute</button>
+        <button id="btn-lift" class="hm-tab" onclick="hmView('lift')"${hasBare ? '' : ' disabled title="needs the bare control"'}>Lift vs bare</button>
+      </div>
+      <p class="heatmap-explainer" id="hm-explainer-abs">
+        Rows = models. Columns grouped by method in <strong>bare → mcp → skills</strong> order, so the grid
+        sweeps <span style="color:#f85149">red</span> on the left to <span style="color:#3fb950">green</span>
+        on the right — the further right, the more effective. <strong>Colour &amp; %</strong> = fraction of
+        individual checks that passed${repsPerCell > 1 ? ` across ${repsPerCell} reps` : repsPerCell === -1 ? ' across all reps' : ''}.
+        ${repsPerCell !== 1 ? 'Subtext <strong>M/N perfect</strong> = flawless reps. ' : ''}Hover any cell for detail.
+      </p>
+      <p class="heatmap-explainer" id="hm-explainer-lift" style="display:none">
+        Each non-bare cell shows its <strong>lift in percentage points vs the bare control</strong> for the
+        same model × fixture. <span style="color:#3fb950">Green</span> = CA improved it,
+        <span style="color:#f85149">red</span> = regressed, slate = no change.
+      </p>
+    </div>
+    <div id="heatmap-abs" class="heatmap-grid" style="${gridStyle}">
       ${heatmapHeaderTop}
       ${heatmapHeaderBot}
-      ${heatmapRows}
+      ${heatmapRowsAbs}
     </div>
-    <div class="heatmap-legend">
+    <div id="heatmap-lift" class="heatmap-grid" style="${gridStyle} display:none;">
+      ${heatmapHeaderTop}
+      ${heatmapHeaderBot}
+      ${heatmapRowsLift}
+    </div>
+    <div class="heatmap-legend" id="legend-abs">
       <span>0% checks</span>
       <div class="heatmap-legend-bar"></div>
       <span>100% checks</span>
@@ -755,9 +1014,61 @@ export function formatGradientHtml(result: GradientResult): string {
       <span class="legend-item"><span class="swatch errored"></span>errored</span>
       <span class="legend-item"><span class="swatch empty"></span>no data</span>
     </div>
+    <div class="heatmap-legend" id="legend-lift" style="display:none">
+      <span>−100 pts</span>
+      <div class="heatmap-legend-bar lift"></div>
+      <span>+100 pts</span>
+      <span class="legend-spacer"></span>
+      <span class="legend-item"><span class="swatch base"></span>bare baseline</span>
+    </div>
   </section>`;
 
-  // ---------- Cost-vs-effectiveness scatter ----------
+  // ---------- Deploy-readiness grid (ground truth, harness-measured) ----------
+  // Distinct from the quality heatmap: did the workload actually reach
+  // Running/Ready on the cluster? Only rendered if any run carries the signal.
+  const anyReadiness = result.runs.some((r) => typeof r.deployReady === 'boolean');
+  const readinessSection = !anyReadiness
+    ? ''
+    : `<section class="heatmap-block">
+    <p class="heatmap-explainer">
+      Ground truth, measured by the harness (not the agent's own claims): did every Deployment the run
+      pushed reach <strong>readyReplicas ≥ replicas</strong>?
+      <span style="color:#3fb950">✅ ready</span> · <span style="color:#f85149">❌ not ready</span> ·
+      <span class="muted">— no deploy</span>. The number is <strong>apply attempts</strong>
+      (<code>kubectlApply</code> calls) — the fix→reapply rounds the agent took.
+    </p>
+    <div class="heatmap-grid" style="${gridStyle}">
+      ${heatmapHeaderTop}
+      ${heatmapHeaderBot}
+      ${result.models
+        .map((model) => {
+          // One full row spanning every level × fixture, matching the heatmap header.
+          const rowCells = result.levels
+            .flatMap((level) =>
+              fixtures.map((fix) => {
+                const run = result.runs.find(
+                  (r) => r.model === model && r.level === level.id && r.fixture === fix,
+                );
+                if (!run || typeof run.deployReady !== 'boolean') {
+                  const errored = Boolean(run?.error);
+                  return `<div class="heatmap-cell ${errored ? 'errored' : 'empty'}" title="${escapeHtml(
+                    `${model} / ${level.id} / ${fixtureNick(fix)}: ${errored ? 'errored' : 'no deploy signal'}`,
+                  )}"><span class="cell-pct">${errored ? 'err' : '—'}</span></div>`;
+                }
+                const attempts = run.toolCallsByName?.kubectlApply ?? 0;
+                const bg = run.deployReady ? '#1f6f3f' : '#6f1f2a';
+                return `<div class="heatmap-cell" style="background:${bg}" title="${escapeHtml(
+                  `${model} / ${level.id} / ${fixtureNick(fix)}: ${run.deployReady ? 'Ready' : 'NOT ready'} · ${attempts} apply attempt(s)${run.deployDetail ? ` · ${run.deployDetail}` : ''}`,
+                )}"><span class="cell-pct">${run.deployReady ? '✅' : '❌'}</span><span class="cell-sub">${attempts}×</span></div>`;
+              }),
+            )
+            .join('');
+          return `<div class="heatmap-row-label">${escapeHtml(model)}</div>${rowCells}`;
+        })
+        .join('')}
+    </div>
+  </section>`;
+
   // One dot per (path × model). Position = (total tokens IN, overall
   // check pass rate). Dot size scales with tokens OUT. Using check-level
   // pass rate (not full-pass) keeps it consistent with the heatmap colour.
@@ -809,17 +1120,6 @@ export function formatGradientHtml(result: GradientResult): string {
       });
     }
   }
-
-  const pathColours: Record<LevelId, string> = {
-    bare: '#f85149',
-    mcp: '#d29922',
-    skills: '#3fb950',
-  };
-  const fmtTokens = (n: number): string => {
-    if (n < 1000) return String(Math.round(n));
-    if (n < 1_000_000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`;
-    return `${(n / 1_000_000).toFixed(2)}M`;
-  };
 
   const scatterBlock = ((): string => {
     if (scatterPoints.length === 0) return '';
@@ -877,7 +1177,7 @@ export function formatGradientHtml(result: GradientResult): string {
       const x = xOf(Math.pow(10, exp));
       parts.push(
         `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT + innerH}" class="grid"/>`,
-        `<text x="${x}" y="${MT + innerH + 18}" class="axis-label" text-anchor="middle">${fmtTokens(Math.pow(10, exp))}</text>`,
+        `<text x="${x}" y="${MT + innerH + 18}" class="axis-label" text-anchor="middle">${fmtKTokens(Math.pow(10, exp))}</text>`,
       );
     }
     // Axis lines
@@ -889,6 +1189,18 @@ export function formatGradientHtml(result: GradientResult): string {
       `<text x="18" y="${MT + innerH / 2}" class="axis-title" text-anchor="middle" transform="rotate(-90 18 ${MT + innerH / 2})">checks passed (%) — higher is better ↑</text>`,
     );
 
+    // Journey lines: connect bare→mcp→skills for each model so you can see
+    // how adding CA moves that model up-and-(usually)-right through the chart.
+    const levelOrder = result.levels.map((l) => l.id);
+    for (const model of result.models) {
+      const pts = scatterPoints
+        .filter((p) => p.model === model)
+        .sort((a, b) => levelOrder.indexOf(a.level.id) - levelOrder.indexOf(b.level.id));
+      if (pts.length < 2) continue;
+      const poly = pts.map((p) => `${xOf(p.tokensIn).toFixed(1)},${yOf(p.rate).toFixed(1)}`).join(' ');
+      parts.push(`<polyline points="${poly}" class="journey"/>`);
+    }
+
     // Dots (drawn after gridlines so they sit on top). Sort so smaller
     // dots draw last to stay visible.
     const sorted = [...scatterPoints].sort((a, b) => b.tokensOut - a.tokensOut);
@@ -899,8 +1211,8 @@ export function formatGradientHtml(result: GradientResult): string {
       const x = xOf(p.tokensIn);
       const y = yOf(p.rate);
       const r = rOf(p.tokensOut);
-      const colour = pathColours[p.level.id];
-      const title = `${p.level.id} · ${p.model}  —  ${p.checksPassed}/${p.checksTotal} checks passed (${Math.round(p.rate * 100)}%)  ·  ${p.fullPass}/${p.validReps} reps perfect  ·  ${fmtTokens(p.tokensIn)} in  ·  ${fmtTokens(p.tokensOut)} out`;
+      const colour = METHOD_COLOURS[p.level.id];
+      const title = `${p.level.id} · ${p.model}  —  ${p.checksPassed}/${p.checksTotal} checks passed (${Math.round(p.rate * 100)}%)  ·  ${p.fullPass}/${p.validReps} reps perfect  ·  ${fmtKTokens(p.tokensIn)} in  ·  ${fmtKTokens(p.tokensOut)} out`;
       // Find any existing dot within 28px; stack the label below it.
       const slot = placed.find((s) => Math.hypot(s.x - x, s.y - y) < 28);
       let labelDy = 4;
@@ -927,7 +1239,7 @@ export function formatGradientHtml(result: GradientResult): string {
         ${result.levels
           .map(
             (l) =>
-              `<span class="legend-item"><span class="swatch" style="background:${pathColours[l.id]}"></span>${escapeHtml(l.label)}</span>`,
+              `<span class="legend-item"><span class="swatch" style="background:${METHOD_COLOURS[l.id]}"></span>${escapeHtml(l.label)}</span>`,
           )
           .join('')}
         <span class="legend-spacer"></span>
@@ -964,13 +1276,13 @@ export function formatGradientHtml(result: GradientResult): string {
     const renderRow = (r: Row): string => {
       const inPct = (r.tokensIn / maxIn) * 100;
       const outPct = (r.tokensOut / maxOut) * 100;
-      const colour = pathColours[r.level.id];
+      const colour = METHOD_COLOURS[r.level.id];
       return `<div class="bar-row">
         <div class="bar-label-cell"><span class="bar-path-dot" style="background:${colour}"></span>${escapeHtml(r.level.id)} · <code>${escapeHtml(r.model)}</code></div>
         <div class="bar-track"><div class="bar-fill" style="width:${inPct}%; background:${colour}"></div></div>
-        <div class="bar-value">${fmtTokens(r.tokensIn)}</div>
+        <div class="bar-value">${fmtKTokens(r.tokensIn)}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${outPct}%; background:${colour}; opacity:0.6"></div></div>
-        <div class="bar-value">${fmtTokens(r.tokensOut)}</div>
+        <div class="bar-value">${fmtKTokens(r.tokensOut)}</div>
       </div>`;
     };
 
@@ -984,6 +1296,50 @@ export function formatGradientHtml(result: GradientResult): string {
         <div class="bar-header value">total</div>
         ${rows.map(renderRow).join('')}
       </div>
+    </section>`;
+  })();
+
+  // ---------- Per-validation breakdown ----------
+  // For each headline check, how often does each path pass it? Answers the
+  // concrete question "which specific guarantees does CA actually buy me?"
+  const validationsSection = ((): string => {
+    if (headlineNames.length === 0) return '';
+    const passRate = (checkName: string, levelId: LevelId): { passed: number; total: number } => {
+      let passed = 0;
+      let total = 0;
+      for (const r of result.runs) {
+        if (r.level !== levelId || r.error) continue;
+        const c = r.checks.find((x) => x.name === checkName);
+        if (!c) continue;
+        total++;
+        if (c.passed) passed++;
+      }
+      return { passed, total };
+    };
+    const panels = headlineNames
+      .map((name) => {
+        const bars = result.levels
+          .map((level) => {
+            const { passed, total } = passRate(name, level.id);
+            const rate = total === 0 ? 0 : passed / total;
+            const pct = Math.round(rate * 100);
+            const colour = METHOD_COLOURS[level.id];
+            return `<div class="vbar-row" title="${escapeHtml(`${level.id} · ${name}: ${passed}/${total} passed`)}">
+              <div class="vbar-label"><span class="hm-dot" style="background:${colour}"></span>${escapeHtml(level.id)}</div>
+              <div class="vbar-track"><div class="vbar-fill" style="width:${pct}%; background:${colour}"></div><span class="vbar-pct">${total === 0 ? '—' : pct + '%'}</span></div>
+              <div class="vbar-count">${passed}/${total}</div>
+            </div>`;
+          })
+          .join('');
+        return `<div class="vpanel">
+          <div class="vpanel-title"><code>${escapeHtml(name)}</code></div>
+          ${bars}
+        </div>`;
+      })
+      .join('');
+    return `<section class="chart-block">
+      <h3>Per-validation pass rate <span class="subtle">— which checks each path actually satisfies, across all models × fixtures × reps</span></h3>
+      <div class="vpanels">${panels}</div>
     </section>`;
   })();
 
@@ -1041,19 +1397,51 @@ export function formatGradientHtml(result: GradientResult): string {
   .meta { color: var(--muted); margin-bottom: 24px; }
   .meta code { background: var(--panel); padding: 1px 6px; border-radius: 4px; }
 
-  /* Banner */
-  .banner { display: grid; grid-template-columns: repeat(${result.levels.length}, 1fr); gap: 16px; margin: 8px 0 24px; }
-  .banner-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 24px;
-    text-align: center;
+  /* Sticky section nav */
+  .nav {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    background: rgba(13,17,23,0.92); backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
+    margin: 0 -32px 24px; padding: 12px 32px;
   }
-  .banner-num { font-size: 80px; font-weight: 800; line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
-  .banner-denom { font-size: 32px; color: var(--muted); font-weight: 500; }
-  .banner-label { font-size: 22px; font-weight: 600; margin-top: 4px; }
-  .banner-sub { font-size: 13px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; }
+  .nav a {
+    color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
+    padding: 5px 12px; border-radius: 6px; border: 1px solid transparent;
+  }
+  .nav a:hover { color: var(--text); background: var(--panel); border-color: var(--border); }
+
+  /* Verdict */
+  .verdict {
+    background: var(--panel); border: 1px solid var(--border); border-left: 3px solid #3fb950;
+    border-radius: 8px; padding: 14px 18px; margin: 0 0 20px; font-size: 15px; line-height: 1.5;
+  }
+  .verdict strong { color: var(--text); }
+
+  /* Scoreboard */
+  .scoreboard { display: grid; grid-template-columns: repeat(${result.levels.length}, 1fr); gap: 16px; margin: 8px 0 8px; }
+  .score-card {
+    position: relative; background: var(--panel); border: 1px solid var(--border);
+    border-top: 3px solid var(--accent); border-radius: 8px; padding: 20px; text-align: center;
+  }
+  .score-card.winner { box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgba(63,185,80,0.12); }
+  .score-crown {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    background: #3fb950; color: #0d1117; font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+    padding: 2px 10px; border-radius: 10px; text-transform: uppercase; white-space: nowrap;
+  }
+  .score-method { font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .score-id { color: var(--muted); font-weight: 500; font-size: 12px; font-family: ui-monospace, SFMono-Regular, monospace; }
+  .score-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .score-ratio { font-size: 56px; font-weight: 800; line-height: 1.05; letter-spacing: -2px; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  .score-pct { font-size: 26px; font-weight: 600; opacity: 0.7; }
+  .score-ratio-sub { font-size: 12px; color: var(--muted); }
+  .score-delta { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 700; }
+  .score-delta.muted { color: var(--muted); font-weight: 500; }
+  .score-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 16px; text-align: left; border-top: 1px solid var(--border); padding-top: 14px; }
+  .score-stats > div { display: flex; flex-direction: column; }
+  .score-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .score-stat-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
   /* Heatmap */
   .heatmap-block {
@@ -1077,26 +1465,26 @@ export function formatGradientHtml(result: GradientResult): string {
     align-items: stretch;
   }
   .heatmap-corner { background: transparent; }
-  .heatmap-path-label {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text);
-    text-align: center;
-    padding: 6px 8px 4px;
-    border-bottom: 1px solid var(--border);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  .heatmap-toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .heatmap-tabs { display: inline-flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; align-self: flex-start; }
+  .hm-tab { background: transparent; color: var(--muted); border: 0; border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .hm-tab.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+  .hm-tab:disabled { opacity: 0.4; cursor: not-allowed; }
+  .heatmap-method-group {
+    font-size: 14px; font-weight: 700; color: var(--text); text-align: center;
+    padding: 6px 8px 5px; border-bottom: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .heatmap-fixture-label {
-    font-size: 11px;
-    color: var(--muted);
-    text-align: center;
-    padding: 4px 4px 8px;
+    font-size: 11px; color: var(--muted); text-align: center; padding: 5px 2px 8px;
     font-family: ui-monospace, SFMono-Regular, monospace;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .hm-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  .heatmap-cell.base { background: #21262d; color: var(--muted); }
+  .heatmap-cell.lift { color: var(--text); }
   .heatmap-row-label {
     font-size: 13px;
     font-weight: 600;
@@ -1183,7 +1571,25 @@ export function formatGradientHtml(result: GradientResult): string {
   .bar-fill { height: 100%; border-radius: 3px; transition: width 0.2s; }
   .bar-value { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; color: var(--text); text-align: right; }
 
+  .heatmap-legend-bar.lift { background: linear-gradient(to right, #f85149, #2d333b, #3fb950); }
+  .legend-item .swatch.base { background: #21262d; }
+  svg .journey { fill: none; stroke: #8b949e; stroke-width: 1.5; stroke-dasharray: 3 4; opacity: 0.45; }
+
+  /* Per-validation panels */
+  .vpanels { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .vpanel { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .vpanel-title { margin-bottom: 12px; }
+  .vpanel-title code { background: var(--panel); padding: 2px 8px; border-radius: 4px; font-size: 12px; color: var(--text); }
+  .vbar-row { display: grid; grid-template-columns: 64px 1fr 44px; gap: 8px; align-items: center; margin: 7px 0; }
+  .vbar-label { font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .vbar-track { position: relative; background: #21262d; border-radius: 4px; height: 20px; overflow: hidden; }
+  .vbar-fill { height: 100%; border-radius: 4px; transition: width 0.2s; }
+  .vbar-pct { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 700; color: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+  .vbar-count { font-size: 11px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; text-align: right; }
+
   /* Errors */
+  html { scroll-behavior: smooth; }
+  h2[id] { scroll-margin-top: 72px; }
   .errors-block { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-top: 16px; }
   .errors-block ul { margin: 8px 0 0; padding-left: 20px; color: var(--muted); }
   .errors-block code { background: var(--bg); padding: 1px 6px; border-radius: 3px; }
@@ -1199,18 +1605,55 @@ export function formatGradientHtml(result: GradientResult): string {
     · ${escapeHtml(result.timestamp)}
   </p>
 
-  <div class="banner">${result.levels.map(bannerCard).join('')}</div>
+  <nav class="nav">
+    <a href="#overview">Overview</a>
+    <a href="#quality">Quality heatmap</a>
+    ${anyReadiness ? '<a href="#readiness">Deploy readiness</a>' : ''}
+    <a href="#cost">Cost vs effectiveness</a>
+    <a href="#validations">Validations</a>
+    <a href="#spend">Token spend</a>
+    ${errored.length ? '<a href="#errors">Errors</a>' : ''}
+  </nav>
 
-  <h2>Pass-rate heatmap <span class="subtle">— rows: models · columns: path × fixture</span></h2>
-  ${heatmapBlock}
+  <h2 id="overview">Scoreboard <span class="subtle">— who wins on quality, and what it costs</span></h2>
+  ${verdictSection}
+  ${scoreboardSection}
 
-  <h2>Cost vs effectiveness</h2>
+  <h2 id="quality">Quality heatmap <span class="subtle">— rows: models · columns: bare → mcp → skills (red → green)</span></h2>
+  ${heatmapSection}
+
+  ${
+    anyReadiness
+      ? '<h2 id="readiness">Deploy readiness <span class="subtle">— did the pods actually reach Running/Ready? (apply attempts in each cell)</span></h2>'
+      : ''
+  }
+  ${readinessSection}
+
+  <h2 id="cost">Cost vs effectiveness</h2>
   ${scatterBlock}
 
-  <h2>Token spend reference</h2>
+  <h2 id="validations">Per-validation breakdown</h2>
+  ${validationsSection}
+
+  <h2 id="spend">Token spend reference</h2>
   ${tokenBars}
 
+  ${errored.length ? '<h2 id="errors">Errors</h2>' : ''}
   ${errorsBlock}
+
+  <script>
+    function hmView(v){
+      var abs = v === 'abs';
+      document.getElementById('heatmap-abs').style.display = abs ? '' : 'none';
+      document.getElementById('heatmap-lift').style.display = abs ? 'none' : '';
+      document.getElementById('legend-abs').style.display = abs ? '' : 'none';
+      document.getElementById('legend-lift').style.display = abs ? 'none' : '';
+      document.getElementById('hm-explainer-abs').style.display = abs ? '' : 'none';
+      document.getElementById('hm-explainer-lift').style.display = abs ? 'none' : '';
+      document.getElementById('btn-abs').classList.toggle('active', abs);
+      document.getElementById('btn-lift').classList.toggle('active', !abs);
+    }
+  </script>
 </body>
 </html>`;
 }

@@ -1,26 +1,18 @@
 # Agent Eval
 
-A local test framework that compares **agent success rate** and **token usage**
-across three CA delivery paths on the same legacy-app fixtures:
+A local harness that compares **check pass-rate** and **token cost** across
+three CA delivery paths on the same legacy-app fixtures — same model, same live
+Azure infra (ACR + AKS):
 
-| Path     | What the agent gets                                                                 |
-| -------- | ----------------------------------------------------------------------------------- |
-| `bare`   | Generic "containerize and deploy this app to AKS" prompt. No CA help.               |
-| `skills` | Same task + the CA `deploy-to-aks` SKILL bundle (markdown how-to + CA MCP tools).   |
-| `mcp`    | Same task + the CA aks-loop MCP **prompt** + CA MCP tools.                          |
+| Path     | What the agent gets |
+| -------- | ------------------- |
+| `bare`   | Generic "containerize and deploy this app to AKS" prompt. The control. |
+| `mcp`    | Same task + the CA `aks-loop` MCP prompt + CA MCP tools. |
+| `skills` | Same task + the CA `deploy-to-aks` SKILL bundle + CA MCP tools. |
 
-All three paths run against the same fixture, with the same model, against the
-same live Azure infra (ACR + AKS). After each run we score the produced
-artifacts with deterministic checks and compare tokens-out vs the `bare`
-control.
-
-## What it answers
-
-- **Do skills move the needle?** `bare` → `skills` Δ on success checks and Δtokens.
-- **Does the MCP prompt move it further?** `bare` → `mcp` Δ on the same.
-- **Cost vs quality across models.** Sweep `azure:gpt-4.1,azure:gpt-4o,azure:gpt-4.1-mini`
-  in one command; report renders one table per model plus a cross-model cost
-  summary.
+After each run, deterministic checks score the produced artifacts and the report
+shows each path's lift over the `bare` control, swept across every model in one
+command.
 
 ## Checks ([`checks.ts`](checks.ts))
 
@@ -32,31 +24,23 @@ control.
 
 A run passes when every selected check passes.
 
-## Local setup
+## Setup
 
-The harness needs three things: Foundry creds, Docker, and an Azure
-ACR + AKS the agent can push/deploy to.
+Needs Foundry creds, Docker, and an Azure ACR + AKS the agent can push/deploy to.
 
-### 1. `.env` (repo root)
+**1. `.env` (repo root)** — see
+[`docs/agent-eval-foundry-setup.md`](../../docs/agent-eval-foundry-setup.md) to
+provision the Foundry resource:
 
 ```
 AZURE_FOUNDRY_API_KEY=...
 AZURE_FOUNDRY_ENDPOINT=https://<resource>.services.ai.azure.com/openai/v1
 ```
 
-See [`docs/agent-eval-foundry-setup.md`](../../docs/agent-eval-foundry-setup.md)
-for how to provision the Foundry resource.
-
-### 2. Azure infra (one-time)
+**2. Azure infra (one-time):**
 
 ```sh
-# Resource group + ACR + small AKS cluster + ACR attach.
-# Replace names / region as needed.
-RG=ca-eval-rg
-LOC=eastus
-ACR=caevalacr
-AKS=ca-eval-aks
-
+RG=ca-eval-rg; LOC=eastus; ACR=caevalacr; AKS=ca-eval-aks
 az group create -n $RG -l $LOC
 az acr create  -n $ACR -g $RG --sku Basic
 az aks create  -n $AKS -g $RG --node-count 1 --enable-managed-identity --attach-acr $ACR
@@ -64,94 +48,71 @@ az aks get-credentials -n $AKS -g $RG
 kubectl create namespace eval-ns
 ```
 
-### 3. Tell the harness where it is (optional — these are the defaults)
+**3. Point the harness at it** (optional — these are the defaults):
 
 ```sh
 export AGENT_EVAL_REGISTRY=caevalacr.azurecr.io
 export AGENT_EVAL_RESOURCE_GROUP=ca-eval-rg
 export AGENT_EVAL_CLUSTER=ca-eval-aks
 export AGENT_EVAL_NAMESPACE=eval-ns
-export AGENT_EVAL_IMAGE=eval-image     # base name; sloid per model under the hood
+export AGENT_EVAL_IMAGE=eval-image
 ```
 
-### 4. Sanity check
-
-```sh
-npm run eval -- ping --model azure:gpt-4o-mini
-```
+**4. Sanity check:** `npm run eval -- ping --model azure:gpt-4o-mini`
 
 ## Run the gradient
 
-`gradient` is the headline command. One invocation, one markdown report
-covering every (path × fixture × model) combination.
+The headline command — one invocation covers every (path × fixture × model) cell:
 
 ```sh
 npm run eval -- gradient \
-  --fixtures test/fixtures/legacy-java/spring-boot-rest-api,test/fixtures/legacy-java/coolstore,test/fixtures/legacy-java/spring-mvc-war \
+  --fixtures test/fixtures/legacy-java/spring-boot-rest-api,test/fixtures/legacy-java/coolstore \
   --models azure:gpt-4.1,azure:gpt-4o,azure:gpt-4.1-mini \
   --out /tmp/gradient.json
 ```
 
-Defaults:
+- All three paths run unless scoped with `--paths bare,skills`.
+- Models run **sequentially** by default (safer on small clusters); add
+  `--parallel` to overlap them (each gets its own ACR repo + Deployment).
+- `--reps <n>` repeats each cell; `--fixtures-dir <dir>` auto-discovers fixtures
+  from a parent directory instead of listing them with `--fixtures`.
+- kubectl cleanup runs before **and** after each cell, so a stuck Deployment
+  can't poison the next path.
 
-- Models run **in parallel** (each gets its own ACR repo + Deployment name to
-  avoid cross-talk). Pass `--sequential` to serialize.
-- All three paths run unless you scope with `--paths bare,skills`.
-- Per-run kubectl cleanup happens before **and** after each run, so a stuck
-  Deployment never poisons the next path.
-
-Output:
-
-1. Definitions of `bare` / `skills` / `mcp`.
-2. **One table per model.** Rows = paths. Columns grouped by fixture, with
-   `docker-builds | requires-azure-base | has-required-labels | Δtok` per
-   group. ✅ / ❌ for checks, `+24K` style deltas for tokens.
-3. **Cross-model cost table.** Tokens-out per (path × model), summed across
-   fixtures.
-4. **Errors footer.** Any cell that errored is listed once with its message.
+`--out results.json` also writes companion `results.md` and a self-contained
+`results.html` (the heatmap report) alongside it. The report shows per-path
+scores, the quality heatmap, a cost-vs-effectiveness scatter, and an errors
+footer.
 
 ## Other commands
 
 ```
 agent-eval ping     --model <spec>
-agent-eval run      --fixture <dir> --mode <bare|skills|mcp> --model <spec>
+agent-eval run      --fixture <dir> --mode <baseline|skills|mcp> --model <spec>
 agent-eval check    --dir <artifactDir> [--fixture <dir>] [--checks <names>]
-agent-eval gradient --fixtures <dirs> --models <specs> [--paths bare,skills,mcp]
-                    [--sequential] [--out results.json]
+agent-eval gradient (--fixtures <dirs> | --fixtures-dir <dir>) --models <specs>
+                    [--paths ...] [--parallel] [--reps <n>] [--out results.json]
 ```
 
-`run` is the single-shot version of one gradient cell — useful when iterating
-on a prompt or skill and you want raw stdout, not a report.
+`run` is the single-shot version of one gradient cell — raw stdout, no report.
 
-## Adding a new app fixture
+## Extending
 
-1. Drop the source under `test/fixtures/legacy-java/my-app/`.
-2. Add it to the `--fixtures` list (or implement `--fixtures-dir` discovery if
-   you want auto-pickup).
-
-No code change required.
-
-## Adding a new check
-
-1. Implement a `Check` in [`checks.ts`](checks.ts): single async function
-   returning `{ name, passed, message, details? }`.
-2. Append it to `ALL_CHECKS` and `selectChecks` in the same file.
-3. Reference it in [`gradient.ts`](gradient.ts)'s `headlineNames` if you want
-   it surfaced as a column in the per-model table.
+- **New fixture:** drop source under `test/fixtures/legacy-java/my-app/` and add
+  it to `--fixtures` (or point `--fixtures-dir` at its parent). No code change.
+- **New check:** add a `Check` in [`checks.ts`](checks.ts) (async, returns
+  `{ name, passed, message, details? }`), append it to `ALL_CHECKS` /
+  `selectChecks`, and add its name to `headlineNames` in
+  [`gradient.ts`](gradient.ts) to surface it as a report column.
 
 ## Providers ([`providers.ts`](providers.ts))
 
-Both `azure:` and `foundry:` prefixes hit the same Foundry resource via the
-same OpenAI-compatible v1 endpoint. The model id is your **deployment name**:
-
-| Prefix     | Used for                                                       |
-| ---------- | -------------------------------------------------------------- |
-| `azure:`   | OpenAI catalog deployments (`gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, …) |
-| `foundry:` | Partner / community catalog deployments                        |
+`azure:` and `foundry:` both hit the same Foundry v1 endpoint; the model id is
+your **deployment name**. Use `azure:` for OpenAI-catalog deployments (`gpt-4o`,
+`gpt-4.1`, …) and `foundry:` for partner/community deployments.
 
 ## CI
 
-Not wired up yet. The plan after this demo is to trigger on PR pushes to
-`skills/**` (and probably `knowledge/**`, `src/prompts/**`, `src/mcp/**`),
-but only after we agree on (a) whether CI should hit live Azure on every PR
-or run a cheaper subset, and (b) which signals should fail vs inform a PR.
+Not wired up yet — planned to trigger on PRs touching `skills/**` (and likely
+`knowledge/**`, `src/prompts/**`, `src/mcp/**`) once we settle whether CI hits
+live Azure per-PR or a cheaper subset, and which signals fail vs inform.
