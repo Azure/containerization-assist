@@ -60,9 +60,13 @@ import { pluralize } from '@/lib/summary-helpers';
 // by the calling agent in its own terminal.
 const execFileAsync = promisify(execFile);
 
-const KIND_VERSION = 'v0.20.0';
+// kind v0.25.0 is the minimum release that publishes arm64 binaries/node images, so
+// older defaults (e.g. v0.20.0) make the emitted install plan fail on arm64 hosts
+// (Apple Silicon, Windows on ARM). We pin the current latest (v0.32.0) and its default
+// node image (Kubernetes v1.36.1) so the binary and node image stay version-consistent.
+const KIND_VERSION = 'v0.32.0';
 const KIND_AMD64_NODE_IMAGE =
-  'kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72';
+  'kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5';
 
 /**
  * Validate and escape cluster name to prevent command injection.
@@ -269,8 +273,10 @@ function buildKindInstallCommand(): { command: string; goal: string } {
     // "%USERPROFILE%" folder. Create the target dir first (move fails if it is
     // missing) and use `move /Y` so re-runs overwrite without an interactive
     // prompt. Inner quotes keep the destination path space-safe under cmd.exe.
+    // `curl.exe -f` makes HTTP errors (404/5xx) exit non-zero instead of writing the
+    // error body into kind.exe, so a failed download aborts the chain loudly.
     return {
-      command: `cmd /c "curl.exe -Lo kind.exe ${url} && if not exist "%USERPROFILE%\\bin" mkdir "%USERPROFILE%\\bin" && move /Y kind.exe "%USERPROFILE%\\bin\\kind.exe""`,
+      command: `cmd /c "curl.exe -fLo kind.exe ${url} && if not exist "%USERPROFILE%\\bin" mkdir "%USERPROFILE%\\bin" && move /Y kind.exe "%USERPROFILE%\\bin\\kind.exe""`,
       goal: 'Install the kind binary (Windows) and place it on your PATH',
     };
   }
@@ -284,8 +290,10 @@ function buildKindInstallCommand(): { command: string; goal: string } {
   // if it does not: on macOS ~/.local/bin is not on PATH by default, so a silent fallback
   // would install kind somewhere the next command (`kind create cluster`) can't find,
   // surfacing as a confusing "command not found" instead of a clear install error.
+  // `curl -f` makes HTTP errors (404/5xx) exit non-zero instead of writing the error
+  // body into ./kind, so a failed download aborts the chain before chmod/mv run.
   const curlInstall =
-    `curl -Lo ./kind ${url} && chmod +x ./kind && ` +
+    `curl -fLo ./kind ${url} && chmod +x ./kind && ` +
     `if [ -w /usr/local/bin ]; then DEST=/usr/local/bin; else mkdir -p "$HOME/.local/bin" && DEST="$HOME/.local/bin"; fi && ` +
     `mv ./kind "$DEST/kind" && ` +
     `{ command -v kind >/dev/null || { echo "kind installed to $DEST but it is not on PATH. Add it: export PATH=$DEST:$PATH" >&2; exit 1; }; }`;

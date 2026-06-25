@@ -113,7 +113,7 @@ function mockKindReadyExec() {
       return { stdout: 'linux', stderr: '' };
     }
     if (cmd.includes('kind version')) {
-      return { stdout: 'kind v0.20.0 go1.20.5 linux/amd64', stderr: '' };
+      return { stdout: 'kind v0.32.0 go1.24.0 linux/amd64', stderr: '' };
     }
     if (cmd.includes('kind get clusters')) {
       return { stdout: 'containerization-assist\n', stderr: '' };
@@ -163,7 +163,7 @@ function mockKindStoppedRegistryExec() {
       return { stdout: 'linux', stderr: '' };
     }
     if (cmd.includes('kind version')) {
-      return { stdout: 'kind v0.20.0 go1.20.5 linux/amd64', stderr: '' };
+      return { stdout: 'kind v0.32.0 go1.24.0 linux/amd64', stderr: '' };
     }
     if (cmd.includes('kind get clusters')) {
       return { stdout: 'containerization-assist\n', stderr: '' };
