@@ -31,7 +31,7 @@ import type {
   TagImageResult,
   PushImageResult,
   ManifestPlan,
-  PrepareClusterResult,
+  ClusterPlan,
   VerifyDeploymentResult,
   OpsResult,
   PingResult,
@@ -620,47 +620,51 @@ export const formatGenerateK8sManifestsResult = createFormatter(
 );
 
 /**
- * Format prepare-cluster result prose output.
+ * Format prepare-cluster plan prose output.
  */
 function formatPrepareClusterResultProse(
-  result: PrepareClusterResult,
+  result: ClusterPlan,
   opts: Required<FormatterOptions>,
 ): string {
   const sections: string[] = [];
 
-  if (result.summary) {
-    sections.push(formatSection('Cluster Preparation', result.summary));
-  } else {
-    sections.push(
-      formatSection(
-        'Cluster Preparation',
-        result.clusterReady ? '✅ Cluster is ready' : '❌ Cluster preparation incomplete',
-      ),
-    );
+  sections.push(formatSection('Cluster Plan Summary', result.summary));
+
+  // Detected state
+  const detected = result.detected;
+  const detectedItems: string[] = [];
+  detectedItems.push(`- **Cluster type**: ${result.clusterType}`);
+  if (result.clusterType === 'kind') {
+    detectedItems.push(`- Kind installed: ${detected.kindInstalled ? '✓' : '✗'}`);
+    detectedItems.push(`- Cluster exists: ${detected.clusterExists ? '✓' : '✗'}`);
+    detectedItems.push(`- Local registry running: ${detected.registryRunning ? '✓' : '✗'}`);
+  }
+  detectedItems.push(`- Namespace exists: ${detected.namespaceExists ? '✓' : '✗'}`);
+  detectedItems.push(`- Cluster platform: ${detected.clusterPlatform ?? 'not detected'}`);
+  sections.push(formatSection('Detected State', detectedItems.join('\n')));
+
+  // Setup commands
+  const setupCommands = result.recommendations.setupCommands;
+  if (setupCommands.length > 0) {
+    const cmdList = setupCommands
+      .map(
+        (c) =>
+          `- ${c.goal}${c.optional ? ' (optional)' : ''}:\n  \`\`\`sh\n  ${c.command}\n  \`\`\``,
+      )
+      .join('\n');
+    sections.push(formatSection('Setup Commands', truncate(cmdList, opts.maxFieldLength)));
   }
 
-  // Cluster details
-  const details: string[] = [];
-  details.push(`- **Cluster**: ${result.cluster}`);
-  details.push(`- **Namespace**: ${result.namespace}`);
-  if (result.localRegistryUrl) {
-    details.push(`- **Local Registry**: ${result.localRegistryUrl}`);
+  // Manifests
+  const manifests = result.recommendations.manifests;
+  if (manifests.length > 0) {
+    const manifestList = manifests.map((m) => `- ${m.kind} (namespace: ${m.namespace})`).join('\n');
+    sections.push(formatSection('Manifests to Apply', manifestList));
   }
-  sections.push(formatSection('Configuration', details.join('\n')));
 
-  // Checks status
-  const checks = result.checks;
-  const checkItems: string[] = [];
-  checkItems.push(`- Connectivity: ${checks.connectivity ? '✓' : '✗'}`);
-  checkItems.push(`- Permissions: ${checks.permissions ? '✓' : '✗'}`);
-  checkItems.push(`- Namespace: ${checks.namespaceExists ? '✓' : '✗'}`);
-  if (checks.kindClusterCreated !== undefined) {
-    checkItems.push(`- Kind Cluster: ${checks.kindClusterCreated ? '✓' : '✗'}`);
-  }
-  if (checks.localRegistryCreated !== undefined) {
-    checkItems.push(`- Local Registry: ${checks.localRegistryCreated ? '✓' : '✗'}`);
-  }
-  sections.push(formatSection('Status Checks', checkItems.join('\n')));
+  // Platform guidance
+  const guidance = result.recommendations.platformGuidance;
+  sections.push(formatSection('Platform Guidance', guidance.note));
 
   // Warnings
   if (result.warnings && result.warnings.length > 0) {
@@ -672,7 +676,7 @@ function formatPrepareClusterResultProse(
     sections.push(
       formatSection(
         'Suggested Next Step',
-        'Apply your Kubernetes manifests using kubectl, then use `verify_deploy` to check status.',
+        'Run the setup commands and apply the manifests, then use `verify_deploy` to check status.',
       ),
     );
   }
@@ -855,7 +859,7 @@ interface FormatterRegistry {
   tagImage: FormatterFunction<TagImageResult>;
   pushImage: FormatterFunction<PushImageResult>;
   generateK8sManifests: FormatterFunction<ManifestPlan>;
-  prepareCluster: FormatterFunction<PrepareClusterResult>;
+  prepareCluster: FormatterFunction<ClusterPlan>;
   verifyDeploy: FormatterFunction<VerifyDeploymentResult>;
   ops: FormatterFunction<OpsResult>;
 }
