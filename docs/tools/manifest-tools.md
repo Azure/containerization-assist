@@ -41,7 +41,7 @@ Gathers insights and returns a structured plan with requirements for Kubernetes,
 
 ## `prepare-cluster` — Cluster Setup
 
-Prepares a Kubernetes cluster for deployment. For Kind clusters, creates a local cluster with a Docker registry. For generic clusters (AKS, EKS, GKE, minikube), validates connectivity and namespace readiness.
+Analyzes a Kubernetes cluster's state read-only and returns a **plan** describing the exact commands and manifests needed to prepare it for deployment. The tool does not run commands or modify state itself — the calling agent executes the plan. For Kind clusters, the plan provisions a local cluster with a Docker registry. For generic clusters (AKS, EKS, GKE, minikube), it validates connectivity and namespace readiness.
 
 | Input | Required | Description |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ Prepares a Kubernetes cluster for deployment. For Kind clusters, creates a local
 | `targetPlatform` | No | Platform for cluster validation (e.g., `linux/amd64`). Defaults to `linux/amd64` |
 | `strictPlatformValidation` | No | Fail if cluster architecture doesn't match target platform (default: `true`) |
 
-**Output**: Cluster status, namespace readiness, and for Kind clusters: `localRegistryUrl` for pushing images.
+**Output**: A `ClusterPlan` with the detected cluster/host state, ordered `setupCommands` to run, `manifests` to apply, and platform compatibility guidance. After executing the plan, the local registry URL can be derived from the emitted `docker run` command / registry ConfigMap.
 
 ---
 
