@@ -41,7 +41,21 @@ stages:
             name: package_version
             displayName: Resolve package version
 
-          - publish: $(Build.SourcesDirectory)
+          - task: CopyFiles@2
+            displayName: Stage build outputs for publish stage
+            inputs:
+              sourceFolder: $(Build.SourcesDirectory)
+              # Stage everything needed to run `npm pack` (which honors the
+              # `files` glob in package.json plus the `prepack` script under
+              # ./scripts), but exclude node_modules and .git to keep the
+              # artifact small.
+              contents: |
+                **
+                !node_modules/**
+                !.git/**
+              targetFolder: $(Build.ArtifactStagingDirectory)/build-output
+
+          - publish: $(Build.ArtifactStagingDirectory)/build-output
             artifact: build-artifacts-$(Build.BuildId)
             displayName: Publish build artifacts
 
@@ -57,110 +71,110 @@ stages:
         pool:
           vmImage: ubuntu-latest
         steps:
-        - checkout: none
+          - checkout: none
 
-        - download: current
-          artifact: build-artifacts-$(Build.BuildId)
-          displayName: Download build artifacts
+          - download: current
+            artifact: build-artifacts-$(Build.BuildId)
+            displayName: Download build artifacts
 
-        - task: NodeTool@0
-          displayName: Use Node.js $(NodeVersion)
-          inputs:
-            versionSpec: $(NodeVersion)
+          - task: NodeTool@0
+            displayName: Use Node.js $(NodeVersion)
+            inputs:
+              versionSpec: $(NodeVersion)
 
-        - script: |
-            set -euo pipefail
-            ARTIFACT_DIR="$(Pipeline.Workspace)/build-artifacts-$(Build.BuildId)"
-            echo "##vso[task.setvariable variable=WorkDir]$ARTIFACT_DIR"
-            ls -la "$ARTIFACT_DIR"
-          displayName: Locate downloaded artifacts
+          - script: |
+              set -euo pipefail
+              ARTIFACT_DIR="$(Pipeline.Workspace)/build-artifacts-$(Build.BuildId)"
+              echo "##vso[task.setvariable variable=WorkDir]$ARTIFACT_DIR"
+              ls -la "$ARTIFACT_DIR"
+            displayName: Locate downloaded artifacts
 
-        - script: |
-            set -euo pipefail
-            VERSION="$(PackageVersion)"
-            CHANGELOG="$(WorkDir)/CHANGELOG.md"
-            if [ ! -f "$CHANGELOG" ]; then
-              echo "##vso[task.logissue type=error]CHANGELOG.md not found at $CHANGELOG"
-              exit 1
-            fi
-            # Extract the section for this version: from the matching
-            # heading until the next "## " heading.
-            NOTES=$(awk -v ver="$VERSION" '
-              BEGIN {
-                esc=ver
-                gsub(/[][(){}.^$*+?|\\]/, "\\\\&", esc)
-              }
-              $0 ~ ("^## \\[?" esc "\\]?([[:space:]]*-.*)?$") {flag=1; next}
-              /^## / {flag=0}
-              flag {print}
-            ' "$CHANGELOG")
-            if [ -z "$(echo "$NOTES" | tr -d '[:space:]')" ]; then
-              echo "##vso[task.logissue type=error]No CHANGELOG.md entry found for version $VERSION"
-              exit 1
-            fi
-            NOTES_FILE="$(Build.ArtifactStagingDirectory)/release-notes.md"
-            {
-              echo "Publish $VERSION"
-              echo
-              echo "$NOTES"
-            } > "$NOTES_FILE"
-            echo "##vso[task.setvariable variable=ReleaseNotesFile]$NOTES_FILE"
-            echo "Release notes written to $NOTES_FILE"
-          displayName: Validate CHANGELOG and extract notes
+          - script: |
+              set -euo pipefail
+              VERSION="$(PackageVersion)"
+              CHANGELOG="$(WorkDir)/CHANGELOG.md"
+              if [ ! -f "$CHANGELOG" ]; then
+                echo "##vso[task.logissue type=error]CHANGELOG.md not found at $CHANGELOG"
+                exit 1
+              fi
+              # Extract the section for this version: from the matching
+              # heading until the next "## " heading.
+              NOTES=$(awk -v ver="$VERSION" '
+                BEGIN {
+                  esc=ver
+                  gsub(/[][(){}.^$*+?|\\]/, "\\\\&", esc)
+                }
+                $0 ~ ("^## \\[?" esc "\\]?([[:space:]]*-.*)?$") {flag=1; next}
+                /^## / {flag=0}
+                flag {print}
+              ' "$CHANGELOG")
+              if [ -z "$(echo "$NOTES" | tr -d '[:space:]')" ]; then
+                echo "##vso[task.logissue type=error]No CHANGELOG.md entry found for version $VERSION"
+                exit 1
+              fi
+              NOTES_FILE="$(Build.ArtifactStagingDirectory)/release-notes.md"
+              {
+                echo "Publish $VERSION"
+                echo
+                echo "$NOTES"
+              } > "$NOTES_FILE"
+              echo "##vso[task.setvariable variable=ReleaseNotesFile]$NOTES_FILE"
+              echo "Release notes written to $NOTES_FILE"
+            displayName: Validate CHANGELOG and extract notes
 
-        - script: |
-            set -euo pipefail
-            cd "$(WorkDir)"
-            TARBALL=$(npm pack | tail -n 1)
-            if [ ! -f "$TARBALL" ]; then
-              echo "##vso[task.logissue type=error]Expected tarball not found: $TARBALL"
-              exit 1
-            fi
-            echo "##vso[task.setvariable variable=TarballName]$TARBALL"
-            echo "##vso[task.setvariable variable=TarballPath]$(WorkDir)/$TARBALL"
-            ls -la "$TARBALL"
-          displayName: Create package tarball
+          - script: |
+              set -euo pipefail
+              cd "$(WorkDir)"
+              TARBALL=$(npm pack | tail -n 1)
+              if [ ! -f "$TARBALL" ]; then
+                echo "##vso[task.logissue type=error]Expected tarball not found: $TARBALL"
+                exit 1
+              fi
+              echo "##vso[task.setvariable variable=TarballName]$TARBALL"
+              echo "##vso[task.setvariable variable=TarballPath]$(WorkDir)/$TARBALL"
+              ls -la "$TARBALL"
+            displayName: Create package tarball
 
-        - task: CopyFiles@2
-          displayName: Stage tarball as build artifact
-          inputs:
-            sourceFolder: "$(WorkDir)"
-            contents: "$(TarballName)"
-            targetFolder: "$(Build.ArtifactStagingDirectory)"
+          - task: CopyFiles@2
+            displayName: Stage tarball as build artifact
+            inputs:
+              sourceFolder: "$(WorkDir)"
+              contents: "$(TarballName)"
+              targetFolder: "$(Build.ArtifactStagingDirectory)"
 
-        - publish: "$(Build.ArtifactStagingDirectory)/$(TarballName)"
-          artifact: partner-drop-$(PackageVersion)
-          displayName: Publish tarball as pipeline artifact
+          - publish: "$(Build.ArtifactStagingDirectory)/$(TarballName)"
+            artifact: partner-drop-$(PackageVersion)
+            displayName: Publish tarball as pipeline artifact
 
-        - task: GitHubRelease@1
-          displayName: Create GitHub release
-          inputs:
-            gitHubConnection: $(GitHubServiceConnection)
-            repositoryName: $(Build.Repository.Name)
-            action: create
-            target: $(Build.SourceVersion)
-            tagSource: userGivenTag
-            tag: $(PackageVersion)
-            title: $(PackageVersion)
-            releaseNotesFilePath: $(ReleaseNotesFile)
-            isDraft: false
-            isPreRelease: false
-            addChangeLog: false
+          - task: GitHubRelease@1
+            displayName: Create GitHub release
+            inputs:
+              gitHubConnection: $(GitHubServiceConnection)
+              repositoryName: $(Build.Repository.Name)
+              action: create
+              target: $(Build.SourceVersion)
+              tagSource: userGivenTag
+              tag: $(PackageVersion)
+              title: $(PackageVersion)
+              releaseNotesFilePath: $(ReleaseNotesFile)
+              isDraft: false
+              isPreRelease: false
+              addChangeLog: false
 
-        - task: AzurePowerShell@5
-          displayName: Upload tarball to partner drop storage
-          inputs:
-            azureSubscription: "$(AzureServiceConnection)"
-            ScriptType: InlineScript
-            azurePowerShellVersion: LatestVersion
-            pwsh: true
-            Inline: |
-              $ErrorActionPreference = 'Stop'
-              $version  = "$(PackageVersion)"
-              $tarball  = "$(TarballPath)"
-              $blobPath = "drops/$(PackageName)/$(Language)/$version"
-              $dest     = "https://$(StorageAccountName).blob.core.windows.net/$blobPath/"
-              Write-Host "Uploading $tarball to $dest"
-              azcopy copy "$tarball" "$dest"
-          env:
-            AZCOPY_AUTO_LOGIN_TYPE: PSCRED
+          - task: AzurePowerShell@5
+            displayName: Upload tarball to partner drop storage
+            inputs:
+              azureSubscription: "$(AzureServiceConnection)"
+              ScriptType: InlineScript
+              azurePowerShellVersion: LatestVersion
+              pwsh: true
+              Inline: |
+                $ErrorActionPreference = 'Stop'
+                $version  = "$(PackageVersion)"
+                $tarball  = "$(TarballPath)"
+                $blobPath = "drops/$(PackageName)/$(Language)/$version"
+                $dest     = "https://$(StorageAccountName).blob.core.windows.net/$blobPath/"
+                Write-Host "Uploading $tarball to $dest"
+                azcopy copy "$tarball" "$dest"
+            env:
+              AZCOPY_AUTO_LOGIN_TYPE: PSCRED
