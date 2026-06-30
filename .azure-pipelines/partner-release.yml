@@ -168,7 +168,6 @@ extends:
                     exit 1
                   fi
                   echo "##vso[task.setvariable variable=TarballName]$TARBALL"
-                  echo "##vso[task.setvariable variable=TarballPath]$(WorkDir)/$TARBALL"
                   ls -la "$TARBALL"
                 displayName: Create package tarball
 
@@ -187,13 +186,7 @@ extends:
                   azurePowerShellVersion: LatestVersion
                   pwsh: true
                   Inline: |
-                    $ErrorActionPreference = 'Stop'
-                    $version  = "$(PackageVersion)"
-                    $tarball  = "$(TarballPath)"
-                    $blobPath = "drops/$(PackageName)/$(Language)/$version"
-                    $dest     = "https://$(StorageAccountName).blob.core.windows.net/$blobPath/"
-                    Write-Host "Uploading $tarball to $dest"
-                    azcopy copy "$tarball" "$dest"
+                    azcopy copy "$(Build.ArtifactStagingDirectory)/partner-drop/*" "https://$(StorageAccountName).blob.core.windows.net/drops/$(PackageName)/$(Language)/$(PackageVersion)/"
                 env:
                   AZCOPY_AUTO_LOGIN_TYPE: PSCRED
 
