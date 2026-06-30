@@ -61,7 +61,7 @@ extends:
 
               - script: |
                   set -euo pipefail
-                  VERSION=$(jq -r '.version' package.json)
+                  VERSION=$(node -p "require('./package.json').version")
                   echo "Resolved version: $VERSION"
                   echo "##vso[task.setvariable variable=PackageVersion;isOutput=true]$VERSION"
                 name: package_version
@@ -159,7 +159,10 @@ extends:
               - script: |
                   set -euo pipefail
                   cd "$(WorkDir)"
-                  TARBALL=$(npm pack | tail -n 1)
+                  # Use `npm pack --json` and parse the filename out of the
+                  # structured output. Parsing `npm pack` stdout is brittle
+                  # because warnings/notices can be interleaved.
+                  TARBALL=$(npm pack --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>process.stdout.write(JSON.parse(d)[0].filename))')
                   if [ ! -f "$TARBALL" ]; then
                     echo "##vso[task.logissue type=error]Expected tarball not found: $TARBALL"
                     exit 1
@@ -175,21 +178,6 @@ extends:
                   sourceFolder: "$(WorkDir)"
                   contents: "$(TarballName)"
                   targetFolder: "$(Build.ArtifactStagingDirectory)/partner-drop"
-
-              - task: GitHubRelease@1
-                displayName: Create GitHub release
-                inputs:
-                  gitHubConnection: $(GitHubServiceConnection)
-                  repositoryName: $(Build.Repository.Name)
-                  action: create
-                  target: $(Build.SourceVersion)
-                  tagSource: userGivenTag
-                  tag: $(PackageVersion)
-                  title: $(PackageVersion)
-                  releaseNotesFilePath: $(ReleaseNotesFile)
-                  isDraft: false
-                  isPreRelease: false
-                  addChangeLog: false
 
               - task: AzurePowerShell@5
                 displayName: Upload tarball to partner drop storage
@@ -208,3 +196,21 @@ extends:
                     azcopy copy "$tarball" "$dest"
                 env:
                   AZCOPY_AUTO_LOGIN_TYPE: PSCRED
+
+              # Create the GitHub release only after the partner drop upload
+              # has succeeded, so we never end up with a published release
+              # tag that has no corresponding tarball in storage.
+              - task: GitHubRelease@1
+                displayName: Create GitHub release
+                inputs:
+                  gitHubConnection: $(GitHubServiceConnection)
+                  repositoryName: $(Build.Repository.Name)
+                  action: create
+                  target: $(Build.SourceVersion)
+                  tagSource: userGivenTag
+                  tag: $(PackageVersion)
+                  title: $(PackageVersion)
+                  releaseNotesFilePath: $(ReleaseNotesFile)
+                  isDraft: false
+                  isPreRelease: false
+                  addChangeLog: false
