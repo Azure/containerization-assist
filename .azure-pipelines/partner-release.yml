@@ -71,14 +71,22 @@ extends:
                 displayName: Stage build outputs for publish stage
                 inputs:
                   sourceFolder: $(Build.SourcesDirectory)
-                  # Stage everything needed to run `npm pack` (which honors the
-                  # `files` glob in package.json plus the `prepack` script under
-                  # ./scripts), but exclude node_modules and .git to keep the
-                  # artifact small.
                   contents: |
-                    **
-                    !node_modules/**
-                    !.git/**
+                    package.json
+                    package-lock.json
+                    README.md
+                    LICENSE
+                    CHANGELOG.md
+                    dist/**
+                    dist-cjs/**
+                    skills/**/SKILL.md
+                    policies/**/*.rego
+                    policies/compiled/*.wasm
+                    policies.user.examples/**/*.rego
+                    policies.user.examples/**/*.md
+                    knowledge/packs/**/*.json
+                    scripts/prepare-cjs-package.cjs
+                    scripts/restore-package.cjs
                   targetFolder: $(Build.ArtifactStagingDirectory)/build-output
 
       - stage: Publish
