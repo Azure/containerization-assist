@@ -17,7 +17,6 @@ NODE_COUNT="${AGENT_EVAL_NODE_COUNT:-3}"
 # Empty = let AKS pick its default (don't pin a version that may be unavailable).
 K8S_VERSION="${AGENT_EVAL_K8S_VERSION:-}"
 NAMESPACE="${AGENT_EVAL_NAMESPACE:-eval-ns}"
-TTL_DAYS="${AGENT_EVAL_TTL_DAYS:-7}"
 REGISTRY="${AGENT_EVAL_REGISTRY:-caevalacr.azurecr.io}"
 ACR_NAME="${REGISTRY%%.*}"
 

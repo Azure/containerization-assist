@@ -22,10 +22,8 @@ import {
   buildMcpAksLoopUserPrompt,
   createMcpToolBundle,
   cleanupAzureResources,
-  probeDeployReady,
   ensureRegistryLogin,
   ensureEvalCluster,
-  provisionEvalDatabases,
   loadAzureContext,
   slugifyModel,
   type AzureContext,
@@ -65,7 +63,8 @@ export const LEVELS: readonly LevelConfig[] = [
   {
     id: 'skills',
     label: 'CA skills',
-    description: 'BASELINE + CA `deploy-to-aks` SKILL bundle in system + CA MCP tools (real-world delivery).',
+    description:
+      'BASELINE + CA `deploy-to-aks` SKILL bundle in system + CA MCP tools (real-world delivery).',
   },
 ];
 
@@ -78,7 +77,11 @@ interface ResolvedLevel {
 }
 
 /** Build runtime config. `mcp` spins up MCP harness — caller must await cleanup. */
-async function resolveLevel(level: LevelId, workingDir: string, ctx: AzureContext): Promise<ResolvedLevel> {
+async function resolveLevel(
+  level: LevelId,
+  workingDir: string,
+  ctx: AzureContext,
+): Promise<ResolvedLevel> {
   switch (level) {
     case 'bare':
       return {
@@ -125,14 +128,13 @@ export interface GradientRunRecord {
   toolCallCount?: number;
   toolCallsByName?: Record<string, number>;
   durationMs?: number;
-  checks: CheckResult[];
   /**
-   * Harness-measured ground truth: did the workload this run pushed actually
-   * reach Running/Ready on the cluster? Independent of the agent's own claims.
+   * True once the harness's verifyDeploy confirmed the workload reached
+   * Running/Ready on the cluster. Informational only — NOT part of the scored
+   * checks. Absent for the `bare` control (no deploy is attempted there).
    */
-  deployReady?: boolean;
-  /** Human-readable readiness detail (per-Deployment ready/desired replicas). */
-  deployDetail?: string;
+  deployVerified?: boolean;
+  checks: CheckResult[];
   /** Final assistant text. Useful for debugging "agent bailed early" runs. */
   finalText?: string;
   error?: string;
@@ -235,6 +237,9 @@ async function runOneLevel(opts: {
       userPrompt: resolved.userPrompt,
       workingDir,
       tools: resolved.tools,
+      // bare is the no-deploy control; mcp/skills are expected to deploy, so let
+      // the harness nudge them through push→apply→verify if they stall early.
+      requireDeploy: opts.level.id !== 'bare',
     });
     record.tokensIn = result.tokensIn;
     record.tokensOut = result.tokensOut;
@@ -245,14 +250,8 @@ async function runOneLevel(opts: {
     }, {});
     record.durationMs = result.durationMs;
     record.finalText = result.text;
-    record.checks = await runChecks(opts.checkSpecs, {
-      artifactDir: workingDir,
-      fixtureDir: opts.fixture,
-    });
-    // Ground-truth readiness, measured by the harness before we tear down.
-    const ready = await probeDeployReady(opts.ctx);
-    record.deployReady = ready.ready;
-    record.deployDetail = ready.detail;
+    if (opts.level.id !== 'bare') record.deployVerified = result.deployVerified;
+    record.checks = await runChecks(opts.checkSpecs, { artifactDir: workingDir });
   } catch (err) {
     record.error = err instanceof Error ? err.message : String(err);
   } finally {
@@ -283,22 +282,14 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   const reps = Math.max(1, Math.floor(opts.reps ?? 1));
   const t0 = Date.now();
 
-  // Make the cluster disposable: create-if-missing, wait out any in-progress
-  // deletion, attach ACR, refresh kubeconfig, ensure the namespace, and push the
-  // GC TTL forward. The sandbox subscription auto-deletes the cluster when its
-  // `deletion_due_time` tag expires, so without this a sweep can start against a
-  // cluster that's mid-deletion (kubectl can't even resolve the API server).
+  // Make the cluster disposable: reuse a healthy cluster or create the next-
+  // indexed one if none is, wire ACR pull, refresh kubeconfig, and ensure the
+  // namespace — so a sweep never blocks on a cluster that's mid-deletion.
   await ensureEvalCluster(baseCtx);
 
   // Refresh the ACR credential once up front. Without this a stale token makes
   // every pushImage fail (and the kubectlApply gate then blocks every deploy).
   await ensureRegistryLogin(baseCtx);
-
-  // Provision the shared DB sidecars (Postgres + MySQL) so DB-backed fixtures
-  // can actually become Ready. Mirrors the Azure-customer reality of managed
-  // DBs already living in the namespace; the agent's job is to wire env, not
-  // to provision the DB. Best-effort: warns if it can't reach the cluster.
-  await provisionEvalDatabases(baseCtx);
 
   // Shared collector + serialized checkpoint writer. Model lanes run in
   // parallel, so every completed cell pushes here and rewrites the full result
@@ -334,7 +325,9 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
       try {
         await fs.writeFile(path, JSON.stringify(snapshot, null, 2));
       } catch (err) {
-        console.error(`[gradient] checkpoint write failed: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(
+          `[gradient] checkpoint write failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     });
     return writeChain;
@@ -345,9 +338,10 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   const runModel = async (model: string): Promise<GradientRunRecord[]> => {
     // Slug imageName per model so concurrent runs don't `kubectl delete` each
     // other's deployment. Single-model runs keep the default `eval-image`.
-    const ctx: AzureContext = opts.models.length > 1
-      ? { ...baseCtx, imageName: `${baseCtx.imageName}-${slugifyModel(model)}` }
-      : baseCtx;
+    const ctx: AzureContext =
+      opts.models.length > 1
+        ? { ...baseCtx, imageName: `${baseCtx.imageName}-${slugifyModel(model)}` }
+        : baseCtx;
     console.error(`[gradient] start model=${model} imageName=${ctx.imageName} reps=${reps}`);
     const out: GradientRunRecord[] = [];
     for (let rep = 0; rep < reps; rep++) {
@@ -375,34 +369,39 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
         }
       }
     }
-    console.error(`[gradient] finish model=${model} (${Math.round((Date.now() - t0) / 1000)}s wall so far)`);
+    console.error(
+      `[gradient] finish model=${model} (${Math.round((Date.now() - t0) / 1000)}s wall so far)`,
+    );
     return out;
   };
 
   const concurrency = parallel
     ? Math.max(1, Math.min(opts.maxConcurrentModels ?? opts.models.length, opts.models.length))
     : 1;
-  const all = concurrency === 1
-    ? (await opts.models.reduce<Promise<GradientRunRecord[]>>(
-        async (accP, m) => (await accP).concat(await runModel(m)),
-        Promise.resolve([]),
-      ))
-    : (await runWithConcurrency(opts.models, concurrency, runModel)).flat();
+  const all =
+    concurrency === 1
+      ? await opts.models.reduce<Promise<GradientRunRecord[]>>(
+          async (accP, m) => (await accP).concat(await runModel(m)),
+          Promise.resolve([]),
+        )
+      : (await runWithConcurrency(opts.models, concurrency, runModel)).flat();
 
   // Flush the final checkpoint before returning.
   await writeCheckpoint();
 
+  // `collected` includes any resumed (seeded) records plus everything run this
+  // session; `all` holds only cells run this session. Returning `collected`
+  // keeps resumed cells in the final result/report instead of dropping them.
+  void all;
   return {
     models: opts.models,
     levels,
     timestamp: new Date().toISOString(),
-    runs: all,
+    runs: collected,
   };
 }
 
-// ---------- Markdown reporting ----------
-
-const checkSymbol = (passed?: boolean): string => (passed == null ? '—' : passed ? '✅' : '❌');
+// ---------- Report helpers (shared by the HTML report) ----------
 
 /** All check names across the result, in first-seen order. */
 function allCheckNames(result: GradientResult): string[] {
@@ -417,6 +416,28 @@ function allCheckNames(result: GradientResult): string[] {
     }
   }
   return order;
+}
+
+const HEADLINE_CHECK_NAMES = [
+  'docker-builds',
+  'requires-azure-base',
+  'has-required-labels',
+] as const;
+
+/** Headline check names present in this result, in canonical order. */
+function headlineChecks(result: GradientResult): string[] {
+  const present = new Set(allCheckNames(result));
+  return HEADLINE_CHECK_NAMES.filter((n) => present.has(n));
+}
+
+/** Distinct fixtures across the result, first-seen order. */
+function uniqueFixtures(result: GradientResult): string[] {
+  return Array.from(new Set(result.runs.map((r) => r.fixture)));
+}
+
+/** Sum a token field across non-errored runs. */
+function sumTokens(runs: GradientRunRecord[], key: 'tokensIn' | 'tokensOut'): number {
+  return runs.reduce((s, r) => s + (r.error ? 0 : (r[key] ?? 0)), 0);
 }
 
 function checkPassed(r: GradientRunRecord, name: string): boolean | undefined {
@@ -440,183 +461,6 @@ function fmtKTokens(n?: number): string {
   if (abs < 1000) return String(Math.round(n));
   if (abs < 1_000_000) return `${(n / 1000).toFixed(abs >= 10_000 ? 0 : 1)}K`;
   return `${(n / 1_000_000).toFixed(1)}M`;
-}
-
-export function formatGradientMarkdown(result: GradientResult): string {
-  const lines: string[] = [];
-  const allChecks = allCheckNames(result);
-  // Headline checks shown per fixture in the per-model table.
-  const headlineNames = ['docker-builds', 'requires-azure-base', 'has-required-labels'].filter(
-    (n) => allChecks.includes(n),
-  );
-  const fixtures = Array.from(new Set(result.runs.map((r) => r.fixture)));
-
-  lines.push('# Gradient eval');
-  lines.push('');
-  lines.push(
-    `_models: ${result.models.map((m) => `\`${m}\``).join(', ')} · ` +
-      `paths: ${result.levels.map((l) => `**${l.id}**`).join(' · ')} · ` +
-      `fixtures: ${fixtures.length}_`,
-  );
-  lines.push('');
-  lines.push('## Path definitions');
-  lines.push('');
-  lines.push('| path | description |');
-  lines.push('| --- | --- |');
-  for (const l of result.levels) {
-    lines.push(`| **${l.id}** | ${l.description} |`);
-  }
-  lines.push('');
-  lines.push(
-    `Three quality summary tables follow — one per path. Rows are models, ` +
-      `columns are fixtures, and each fixture cell shows the **${headlineNames.join(
-        '** / **',
-      )}** result side by side, with a final **passing** tally counting cells where ` +
-      `all ${headlineNames.length} checks pass.`,
-  );
-  lines.push('');
-
-  // ---------- Per-path quality summary tables ----------
-  // One table per path. Rows = models. Columns grouped by fixture, sub-cols =
-  // the headline checks. Final column = pass tally ("3/3" etc).
-  for (const level of result.levels) {
-    lines.push(`## Quality (${level.id} path)`);
-    lines.push('');
-
-    // Header row 1: fixture group names; pad with blanks to span sub-columns.
-    const headerTopParts = ['model'];
-    for (const fix of fixtures) {
-      headerTopParts.push(fixtureNick(fix));
-      for (let i = 1; i < headlineNames.length; i++) headerTopParts.push(' ');
-    }
-    headerTopParts.push('passing');
-    lines.push(`| ${headerTopParts.join(' | ')} |`);
-    lines.push(`| ${headerTopParts.map(() => '---').join(' | ')} |`);
-
-    // Header row 2: sub-column labels per fixture
-    const headerSubParts = [' '];
-    for (const _ of fixtures) {
-      for (const name of headlineNames) headerSubParts.push(name);
-    }
-    headerSubParts.push(' ');
-    lines.push(`| ${headerSubParts.join(' | ')} |`);
-
-    // Body: one row per model
-    let passCounted = 0;
-    for (const model of result.models) {
-      const cells: string[] = [`\`${model}\``];
-      let cellsPassedAll = 0;
-      let cellsTotal = 0;
-      for (const fix of fixtures) {
-        const run = result.runs.find(
-          (r) => r.model === model && r.fixture === fix && r.level === level.id,
-        );
-        cellsTotal++;
-        if (!run) {
-          for (const _ of headlineNames) cells.push('—');
-          continue;
-        }
-        if (run.error) {
-          for (const _ of headlineNames) cells.push('⚠');
-          continue;
-        }
-        const passed = headlineNames.map((n) => checkPassed(run, n));
-        for (const p of passed) cells.push(checkSymbol(p));
-        if (passed.every((p) => p === true)) cellsPassedAll++;
-      }
-      cells.push(`**${cellsPassedAll}/${cellsTotal}**`);
-      passCounted += cellsPassedAll;
-      lines.push(`| ${cells.join(' | ')} |`);
-    }
-    lines.push('');
-    lines.push(
-      `_${passCounted}/${result.models.length * fixtures.length} (model × fixture) ` +
-        `cells pass all ${headlineNames.length} checks._`,
-    );
-    lines.push('');
-  }
-
-  // ---------- Deploy readiness summary (ground truth) ----------
-  // Distinct from the artifact-quality checks above: did the workload the agent
-  // pushed actually reach Running/Ready on the cluster (harness-measured), and
-  // how many apply attempts did it take to get there?
-  const anyReadiness = result.runs.some((r) => typeof r.deployReady === 'boolean');
-  if (anyReadiness) {
-    lines.push('## Deploy readiness (pods reached Running/Ready, harness-measured)');
-    lines.push('');
-    lines.push(
-      '_Independent of the quality checks above. ✅ = every Deployment this run pushed reached ' +
-        '`readyReplicas ≥ replicas`. The number in parentheses is **apply attempts** ' +
-        '(`kubectlApply` calls) — how many fix→reapply rounds the agent took._',
-    );
-    lines.push('');
-    for (const level of result.levels) {
-      lines.push(`### Readiness (${level.id} path)`);
-      lines.push('');
-      const header = ['model', ...fixtures.map((f) => fixtureNick(f)), 'ready'];
-      lines.push(`| ${header.join(' | ')} |`);
-      lines.push(`| ${header.map(() => '---').join(' | ')} |`);
-      for (const model of result.models) {
-        const cells: string[] = [`\`${model}\``];
-        let readyCount = 0;
-        let total = 0;
-        for (const fix of fixtures) {
-          const run = result.runs.find(
-            (r) => r.model === model && r.fixture === fix && r.level === level.id,
-          );
-          total++;
-          if (!run || typeof run.deployReady !== 'boolean') {
-            cells.push(run?.error ? '⚠' : '—');
-            continue;
-          }
-          const attempts = run.toolCallsByName?.kubectlApply ?? 0;
-          cells.push(`${run.deployReady ? '✅' : '❌'} (${attempts})`);
-          if (run.deployReady) readyCount++;
-        }
-        cells.push(`**${readyCount}/${total}**`);
-        lines.push(`| ${cells.join(' | ')} |`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ---------- Cross-model cost summary ----------
-  if (result.models.length > 1) {
-    for (const [label, key] of [
-      ['tokens IN (prompt + tool results)', 'tokensIn'],
-      ['tokens OUT (model generations)', 'tokensOut'],
-    ] as const) {
-      lines.push(`## Cross-model cost: ${label}, summed across fixtures`);
-      lines.push('');
-      const header = ['path', ...result.models.map((m) => `\`${m}\``)];
-      lines.push(`| ${header.join(' | ')} |`);
-      lines.push(`| ${header.map(() => '---').join(' | ')} |`);
-      for (const level of result.levels) {
-        const row = [`**${level.id}**`];
-        for (const m of result.models) {
-          const total = result.runs
-            .filter((r) => r.model === m && r.level === level.id && !r.error)
-            .reduce((sum, r) => sum + (r[key] ?? 0), 0);
-          row.push(fmtKTokens(total));
-        }
-        lines.push(`| ${row.join(' | ')} |`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ---------- Errors footer (one section, lists all) ----------
-  const errored = result.runs.filter((r) => r.error);
-  if (errored.length) {
-    lines.push('## Errored runs');
-    lines.push('');
-    for (const r of errored) {
-      lines.push(`- \`${r.model}\` / ${fixtureNick(r.fixture)} / **${r.level}**: ${r.error}`);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n');
 }
 
 // ---------- HTML reporting ----------
@@ -773,11 +617,8 @@ const aggregateCell = (
  * per-validation breakdown, token-spend bars, and an errors footer.
  */
 export function formatGradientHtml(result: GradientResult): string {
-  const allChecks = allCheckNames(result);
-  const headlineNames = ['docker-builds', 'requires-azure-base', 'has-required-labels'].filter(
-    (n) => allChecks.includes(n),
-  );
-  const fixtures = Array.from(new Set(result.runs.map((r) => r.fixture)));
+  const headlineNames = headlineChecks(result);
+  const fixtures = uniqueFixtures(result);
 
   // Reps per cell — used in the heatmap explainer and the banner subline.
   // If every cell has the same N, we surface that; -1 if mixed; 0 if empty.
@@ -829,12 +670,9 @@ export function formatGradientHtml(result: GradientResult): string {
         erroredReps += cell.errored;
       }
     }
-    const tokensIn = result.runs
-      .filter((r) => r.level === level.id && !r.error)
-      .reduce((s, r) => s + (r.tokensIn ?? 0), 0);
-    const tokensOut = result.runs
-      .filter((r) => r.level === level.id && !r.error)
-      .reduce((s, r) => s + (r.tokensOut ?? 0), 0);
+    const levelRuns = result.runs.filter((r) => r.level === level.id);
+    const tokensIn = sumTokens(levelRuns, 'tokensIn');
+    const tokensOut = sumTokens(levelRuns, 'tokensOut');
     return {
       level,
       perfectCells,
@@ -899,9 +737,7 @@ export function formatGradientHtml(result: GradientResult): string {
 
   // ---------- Heatmaps (absolute + lift), METHOD-GROUPED ----------
   // Columns are grouped by method in bare → mcp → skills order, each method
-  // spanning all fixtures. This puts every `bare` (red) cell on the left and
-  // every `skills` (green) cell on the right, so the whole grid sweeps
-  // red→green left-to-right — the headline "skills is more effective" signal.
+  // spanning all fixtures, so a method's cells are read together as a block.
   const colCount = result.levels.length * fixtures.length;
 
   const heatmapHeaderTop = [
@@ -915,9 +751,7 @@ export function formatGradientHtml(result: GradientResult): string {
   const heatmapHeaderBot = [
     `<div class="heatmap-corner"></div>`,
     ...result.levels.flatMap(() =>
-      fixtures.map(
-        (f) => `<div class="heatmap-fixture-label">${escapeHtml(fixtureNick(f))}</div>`,
-      ),
+      fixtures.map((f) => `<div class="heatmap-fixture-label">${escapeHtml(fixtureNick(f))}</div>`),
     ),
   ].join('');
 
@@ -931,7 +765,8 @@ export function formatGradientHtml(result: GradientResult): string {
     }
     const validReps = cell.reps - cell.errored;
     const pct = Math.round(cell.checkRatio * 100);
-    const sub = validReps > 1 && cell.fullPassRatio !== null ? `${cell.fullPass}/${validReps} perfect` : '';
+    const sub =
+      validReps > 1 && cell.fullPassRatio !== null ? `${cell.fullPass}/${validReps} perfect` : '';
     const fullPct = cell.fullPassRatio === null ? '—' : `${Math.round(cell.fullPassRatio * 100)}%`;
     const tooltip =
       `${model} / ${level.id} / ${fixtureNick(fix)}\n` +
@@ -984,10 +819,10 @@ export function formatGradientHtml(result: GradientResult): string {
         <button id="btn-lift" class="hm-tab" onclick="hmView('lift')"${hasBare ? '' : ' disabled title="needs the bare control"'}>Lift vs bare</button>
       </div>
       <p class="heatmap-explainer" id="hm-explainer-abs">
-        Rows = models. Columns grouped by method in <strong>bare → mcp → skills</strong> order, so the grid
-        sweeps <span style="color:#f85149">red</span> on the left to <span style="color:#3fb950">green</span>
-        on the right — the further right, the more effective. <strong>Colour &amp; %</strong> = fraction of
-        individual checks that passed${repsPerCell > 1 ? ` across ${repsPerCell} reps` : repsPerCell === -1 ? ' across all reps' : ''}.
+        Rows = models. Columns are grouped by method in <strong>bare → mcp → skills</strong> order.
+        <strong>Colour &amp; %</strong> = fraction of
+        individual checks that passed${repsPerCell > 1 ? ` across ${repsPerCell} reps` : repsPerCell === -1 ? ' across all reps' : ''},
+        on a <span style="color:#f85149">red</span> (low) to <span style="color:#3fb950">green</span> (high) scale.
         ${repsPerCell !== 1 ? 'Subtext <strong>M/N perfect</strong> = flawless reps. ' : ''}Hover any cell for detail.
       </p>
       <p class="heatmap-explainer" id="hm-explainer-lift" style="display:none">
@@ -1023,49 +858,50 @@ export function formatGradientHtml(result: GradientResult): string {
     </div>
   </section>`;
 
-  // ---------- Deploy-readiness grid (ground truth, harness-measured) ----------
-  // Distinct from the quality heatmap: did the workload actually reach
-  // Running/Ready on the cluster? Only rendered if any run carries the signal.
-  const anyReadiness = result.runs.some((r) => typeof r.deployReady === 'boolean');
-  const readinessSection = !anyReadiness
+  // ---------- Deploy-readiness grid (informational, harness-measured) --------
+  // Distinct from the quality heatmap and NOT part of the scored checks: did the
+  // run's workload actually reach Running/Ready on the cluster (verifyDeploy
+  // success)? Only the deploy-expected paths (mcp/skills) carry the signal; the
+  // bare control attempts no deploy. Rendered only if any run has the signal.
+  const anyDeploySignal = result.runs.some((r) => typeof r.deployVerified === 'boolean');
+  const renderReadyCell = (model: string, level: LevelConfig, fix: string): string => {
+    const matching = result.runs.filter(
+      (r) => r.model === model && r.level === level.id && r.fixture === fix,
+    );
+    if (matching.length === 0) {
+      return `<div class="heatmap-cell empty" title="${escapeHtml(`${model} / ${level.id} / ${fixtureNick(fix)}: no data`)}"></div>`;
+    }
+    const signal = matching.filter((r) => typeof r.deployVerified === 'boolean');
+    if (signal.length === 0) {
+      return `<div class="heatmap-cell empty" title="${escapeHtml(`${model} / ${level.id} / ${fixtureNick(fix)}: no deploy attempted`)}"><span class="cell-pct">—</span></div>`;
+    }
+    const ready = signal.filter((r) => r.deployVerified === true).length;
+    const total = signal.length;
+    const bg = ready === total ? '#1f6f3f' : ready > 0 ? '#7a5a1f' : '#6f1f2a';
+    const icon = ready === total ? '✅' : ready > 0 ? '◐' : '❌';
+    const sub = total > 1 ? `${ready}/${total}` : '';
+    const tooltip =
+      `${model} / ${level.id} / ${fixtureNick(fix)}\n` +
+      `${ready}/${total} rep(s) reached Running/Ready on the cluster (verifyDeploy success)`;
+    return `<div class="heatmap-cell" style="background:${bg}" title="${escapeHtml(tooltip)}"><span class="cell-pct">${icon}</span>${sub ? `<span class="cell-sub">${sub}</span>` : ''}</div>`;
+  };
+
+  const readinessSection = !anyDeploySignal
     ? ''
     : `<section class="heatmap-block">
     <p class="heatmap-explainer">
-      Ground truth, measured by the harness (not the agent's own claims): did every Deployment the run
-      pushed reach <strong>readyReplicas ≥ replicas</strong>?
-      <span style="color:#3fb950">✅ ready</span> · <span style="color:#f85149">❌ not ready</span> ·
-      <span class="muted">— no deploy</span>. The number is <strong>apply attempts</strong>
-      (<code>kubectlApply</code> calls) — the fix→reapply rounds the agent took.
+      Ground truth measured by the harness (not the agent's own claims): did the run's workload
+      actually reach <strong>Running/Ready</strong> on the cluster (<code>verifyDeploy</code> success)?
+      <span style="color:#3fb950">✅ all reps ready</span> ·
+      <span style="color:#d8a13a">◐ some ready</span> ·
+      <span style="color:#f85149">❌ not ready</span> ·
+      <span style="color:#8b949e">— no deploy attempted</span>.
+      Informational only — <strong>not part of the scored checks</strong>.
     </p>
     <div class="heatmap-grid" style="${gridStyle}">
       ${heatmapHeaderTop}
       ${heatmapHeaderBot}
-      ${result.models
-        .map((model) => {
-          // One full row spanning every level × fixture, matching the heatmap header.
-          const rowCells = result.levels
-            .flatMap((level) =>
-              fixtures.map((fix) => {
-                const run = result.runs.find(
-                  (r) => r.model === model && r.level === level.id && r.fixture === fix,
-                );
-                if (!run || typeof run.deployReady !== 'boolean') {
-                  const errored = Boolean(run?.error);
-                  return `<div class="heatmap-cell ${errored ? 'errored' : 'empty'}" title="${escapeHtml(
-                    `${model} / ${level.id} / ${fixtureNick(fix)}: ${errored ? 'errored' : 'no deploy signal'}`,
-                  )}"><span class="cell-pct">${errored ? 'err' : '—'}</span></div>`;
-                }
-                const attempts = run.toolCallsByName?.kubectlApply ?? 0;
-                const bg = run.deployReady ? '#1f6f3f' : '#6f1f2a';
-                return `<div class="heatmap-cell" style="background:${bg}" title="${escapeHtml(
-                  `${model} / ${level.id} / ${fixtureNick(fix)}: ${run.deployReady ? 'Ready' : 'NOT ready'} · ${attempts} apply attempt(s)${run.deployDetail ? ` · ${run.deployDetail}` : ''}`,
-                )}"><span class="cell-pct">${run.deployReady ? '✅' : '❌'}</span><span class="cell-sub">${attempts}×</span></div>`;
-              }),
-            )
-            .join('');
-          return `<div class="heatmap-row-label">${escapeHtml(model)}</div>${rowCells}`;
-        })
-        .join('')}
+      ${buildRows(renderReadyCell)}
     </div>
   </section>`;
 
@@ -1146,8 +982,7 @@ export function formatGradientHtml(result: GradientResult): string {
     const yOf = (rate: number): number => MT + (1 - rate) * innerH;
 
     const maxOut = Math.max(...scatterPoints.map((p) => p.tokensOut), 1);
-    const rOf = (tokensOut: number): number =>
-      6 + 14 * Math.sqrt(tokensOut / maxOut);
+    const rOf = (tokensOut: number): number => 6 + 14 * Math.sqrt(tokensOut / maxOut);
 
     // Axes + gridlines
     const xTicks: number[] = [];
@@ -1197,7 +1032,9 @@ export function formatGradientHtml(result: GradientResult): string {
         .filter((p) => p.model === model)
         .sort((a, b) => levelOrder.indexOf(a.level.id) - levelOrder.indexOf(b.level.id));
       if (pts.length < 2) continue;
-      const poly = pts.map((p) => `${xOf(p.tokensIn).toFixed(1)},${yOf(p.rate).toFixed(1)}`).join(' ');
+      const poly = pts
+        .map((p) => `${xOf(p.tokensIn).toFixed(1)},${yOf(p.rate).toFixed(1)}`)
+        .join(' ');
       parts.push(`<polyline points="${poly}" class="journey"/>`);
     }
 
@@ -1260,13 +1097,13 @@ export function formatGradientHtml(result: GradientResult): string {
     const rows: Row[] = [];
     for (const level of result.levels) {
       for (const model of result.models) {
-        const tokensIn = result.runs
-          .filter((r) => r.model === model && r.level === level.id && !r.error)
-          .reduce((s, r) => s + (r.tokensIn ?? 0), 0);
-        const tokensOut = result.runs
-          .filter((r) => r.model === model && r.level === level.id && !r.error)
-          .reduce((s, r) => s + (r.tokensOut ?? 0), 0);
-        rows.push({ level, model, tokensIn, tokensOut });
+        const cellRuns = result.runs.filter((r) => r.model === model && r.level === level.id);
+        rows.push({
+          level,
+          model,
+          tokensIn: sumTokens(cellRuns, 'tokensIn'),
+          tokensOut: sumTokens(cellRuns, 'tokensOut'),
+        });
       }
     }
     if (rows.length === 0) return '';
@@ -1608,7 +1445,7 @@ export function formatGradientHtml(result: GradientResult): string {
   <nav class="nav">
     <a href="#overview">Overview</a>
     <a href="#quality">Quality heatmap</a>
-    ${anyReadiness ? '<a href="#readiness">Deploy readiness</a>' : ''}
+    ${readinessSection ? '<a href="#deploy">Deploy readiness</a>' : ''}
     <a href="#cost">Cost vs effectiveness</a>
     <a href="#validations">Validations</a>
     <a href="#spend">Token spend</a>
@@ -1623,11 +1460,10 @@ export function formatGradientHtml(result: GradientResult): string {
   ${heatmapSection}
 
   ${
-    anyReadiness
-      ? '<h2 id="readiness">Deploy readiness <span class="subtle">— did the pods actually reach Running/Ready? (apply attempts in each cell)</span></h2>'
+    readinessSection
+      ? `<h2 id="deploy">Deploy readiness <span class="subtle">— did it actually run on the cluster (informational, not scored)</span></h2>\n  ${readinessSection}`
       : ''
   }
-  ${readinessSection}
 
   <h2 id="cost">Cost vs effectiveness</h2>
   ${scatterBlock}

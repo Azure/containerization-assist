@@ -1,6 +1,3 @@
-// Resolves `<provider>:<deployment>` specs to a Vercel AI SDK LanguageModel.
-// Both `azure:` and `foundry:` hit the same Foundry v1 endpoint; the prefix
-// is purely for grouping reports (OpenAI catalog vs partner deployments).
 import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
 

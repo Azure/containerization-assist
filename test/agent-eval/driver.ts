@@ -3,7 +3,7 @@ import { join, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tool, Experimental_Agent as Agent } from 'ai';
-import type { LanguageModel } from 'ai';
+import type { LanguageModel, ModelMessage } from 'ai';
 import { z } from 'zod';
 
 const execFileP = promisify(execFile);
@@ -23,16 +23,24 @@ export interface AgentRunInput {
   tools: ToolSpec[];
   maxSteps?: number;
   providerOptions?: Record<string, Record<string, unknown>>;
-  /** Install built-in `dockerBuild` tool. Default true. */
-  includeDockerBuild?: boolean;
-  /** Hard cap on `dockerBuild` calls. Undefined = no cap. */
-  dockerBuildMaxRetries?: number;
   /**
    * Max retries for upstream HTTP 429 / rate-limit errors raised by the model
    * provider. Honors `Retry-After` when present, otherwise exponential backoff.
    * Default 3.
    */
   maxRateLimitRetries?: number;
+  /**
+   * When true, the run is expected to deploy to the cluster, not just produce
+   * artifacts. If the agent stops before `verifyDeploy` reports success, the
+   * harness resumes the same conversation with a pointed instruction to finish
+   * the push→apply→verify loop (fixing failed builds / pod errors). Default false.
+   */
+  requireDeploy?: boolean;
+  /**
+   * Max deploy-completion nudges when `requireDeploy` is set and the deploy has
+   * not been verified. Each nudge gives the agent a fresh step budget. Default 3.
+   */
+  maxDeployNudges?: number;
 }
 
 export interface AgentRunResult {
@@ -43,15 +51,42 @@ export interface AgentRunResult {
   toolCalls: Array<{ name: string; argsSummary: string }>;
   durationMs: number;
   text: string;
-}
-
-export interface AgentDriver {
-  run(input: AgentRunInput): Promise<AgentRunResult>;
+  /** True once `verifyDeploy` reported the workload reached Running/Ready. */
+  deployVerified: boolean;
 }
 
 function summarize(args: unknown): string {
   const s = JSON.stringify(args ?? {});
   return s.length > 80 ? s.slice(0, 77) + '...' : s;
+}
+
+/**
+ * Sent by the harness when a deploy-expected run stops before `verifyDeploy`
+ * succeeds. Pushes the agent to finish the operational loop on its own — the
+ * same recovery a human operator would do — without re-prompting the user.
+ */
+const DEPLOY_NUDGE =
+  'You have not finished the deployment yet. The task is only complete once `verifyDeploy` ' +
+  'returns success:true. Continue now without asking for confirmation:\n' +
+  '1. If the image is not yet in the registry, call `pushImage`.\n' +
+  '2. Write the Kubernetes manifests (if you have not) and call `kubectlApply`.\n' +
+  '3. Call `verifyDeploy` to confirm the pods reach Running/Ready.\n' +
+  'If `dockerBuild` failed earlier, read the error, fix the Dockerfile, and rebuild. ' +
+  'If `verifyDeploy` reports failing pods (ImagePullBackOff, CrashLoopBackOff, ' +
+  'CreateContainerConfigError, etc.), read the waiting reasons/messages and logs, fix the ' +
+  'root cause (manifest, image reference, or a missing backing service), reapply, and verify ' +
+  'again. Do not stop until verifyDeploy succeeds.';
+
+/**
+ * Normalize assistant/tool messages returned by `agent.generate` so they can be
+ * fed back as conversation history on a follow-up call. MCP tool results often
+ * carry non-strict-JSON values (e.g. `undefined` fields) that survive in the JS
+ * object but fail the SDK's `modelMessageSchema` (`jsonValueSchema`) when the
+ * messages are re-validated as input. A JSON round-trip drops those values,
+ * yielding clean `ModelMessage[]` the SDK accepts.
+ */
+function toModelMessages(messages: readonly ModelMessage[]): ModelMessage[] {
+  return JSON.parse(JSON.stringify(messages)) as ModelMessage[];
 }
 
 /**
@@ -107,7 +142,7 @@ async function imageExistsInRegistry(ref: string): Promise<{ exists: boolean | n
   }
 }
 
-export class AISDKDriver implements AgentDriver {
+export class AISDKDriver {
   async run(input: AgentRunInput): Promise<AgentRunResult> {
     // 64 covers ~18-step aks-loop + tool calls + retries.
     const maxSteps = input.maxSteps ?? 64;
@@ -115,6 +150,7 @@ export class AISDKDriver implements AgentDriver {
     let tokensIn = 0;
     let tokensOut = 0;
     let createFileCalled = false;
+    let deployVerified = false;
 
     const resolveInWorkingDir = (p: string): string => {
       const full = isAbsolute(p) ? p : join(input.workingDir, p);
@@ -173,87 +209,58 @@ export class AISDKDriver implements AgentDriver {
       }),
     };
 
-    if (input.includeDockerBuild !== false) {
-      const maxRetries = input.dockerBuildMaxRetries;
-      let dockerBuildCalls = 0;
-      sdkTools.dockerBuild = tool({
-        description:
-          'Build the Docker image from the current Dockerfile in the working directory using `docker buildx build --platform linux/amd64`. ' +
-          'The image is built for linux/amd64 because the target AKS nodes are amd64 — building for the host arch (e.g. arm64) causes `no match for platform` ImagePullBackOff. ' +
-          'Returns the build exit status, the last ~6000 chars of combined stdout/stderr, and the tagged image name on success. ' +
-          'Call this AFTER you have written the Dockerfile to disk to verify it actually builds. ' +
-          'If the build fails, READ the error output, FIX the Dockerfile (use createFile to overwrite, or the fix-dockerfile MCP tool if available), then call dockerBuild again. ' +
-          (maxRetries != null
-            ? `You may retry up to ${maxRetries} times total. After ${maxRetries} attempts the tool refuses further calls. `
-            : 'You may retry up to 3 times. ') +
-          'Do not call any deploy/push/scan steps until dockerBuild succeeds.',
-        inputSchema: z.object({
-          tag: z
-            .string()
-            .optional()
-            .describe('Optional image tag (default: agent-eval-build:check)'),
-        }),
-        execute: async ({ tag }) => {
-          dockerBuildCalls += 1;
-          if (maxRetries != null && dockerBuildCalls > maxRetries) {
-            return {
-              success: false,
-              budgetExhausted: true,
-              attempts: dockerBuildCalls - 1,
-              maxRetries,
-              message:
-                `dockerBuild retry budget exhausted (${maxRetries} attempts used). ` +
-                'Do not call dockerBuild again. Finish the workflow with whatever Dockerfile is currently on disk.',
-            };
-          }
-          const imageTag = (tag as string | undefined) ?? `agent-eval-build-${Date.now()}:check`;
-          try {
-            // Build for linux/amd64 (the AKS node arch). On an arm64 host a plain
-            // `docker build` produces an arm64 image that the amd64 nodes can't
-            // run, surfacing as `no match for platform` ImagePullBackOff. buildx
-            // with --load puts the single-arch image in the local store so
-            // pushImage can tag+push it.
-            const { stdout, stderr } = await execFileP(
-              'docker',
-              ['buildx', 'build', '--platform', 'linux/amd64', '--load', '-t', imageTag, input.workingDir],
-              {
-                maxBuffer: 16 * 1024 * 1024,
-                // Hard wall-clock cap. buildkit can wedge indefinitely when a
-                // referenced base image errors mid-stream (e.g. registry 404 +
-                // missing cgroup) — without this the agent loop blocks forever
-                // and stalls the whole gradient. SIGTERM lets the agent see a
-                // timeout error and iterate on the Dockerfile instead.
-                timeout: 10 * 60 * 1000,
-                killSignal: 'SIGTERM',
-              },
-            );
-            return {
-              success: true,
-              imageTag,
-              attempt: dockerBuildCalls,
-              output: ((stdout ?? '') + (stderr ?? '')).slice(-6000),
-            };
-          } catch (err) {
-            const e = err as { code?: string | number; stderr?: string; stdout?: string; message?: string };
-            const combined = ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-6000);
-            const remaining =
-              maxRetries != null ? Math.max(0, maxRetries - dockerBuildCalls) : null;
-            return {
-              success: false,
-              imageTag,
-              exitCode: typeof e.code === 'number' ? e.code : null,
-              attempt: dockerBuildCalls,
-              ...(remaining != null ? { remainingRetries: remaining } : {}),
-              output: combined,
-              hint:
-                remaining != null && remaining === 0
-                  ? 'Last attempt failed and no retries remain. Do not call dockerBuild again.'
-                  : 'Read the error above, fix the Dockerfile, then call dockerBuild again.',
-            };
-          }
-        },
-      });
-    }
+    let dockerBuildCalls = 0;
+    sdkTools.dockerBuild = tool({
+      description:
+        'Build the Docker image from the current Dockerfile in the working directory using `docker buildx build --platform linux/amd64`. ' +
+        'The image is built for linux/amd64 because the target AKS nodes are amd64 — building for the host arch (e.g. arm64) causes `no match for platform` ImagePullBackOff. ' +
+        'Returns the build exit status, the last ~6000 chars of combined stdout/stderr, and the tagged image name on success. ' +
+        'Call this AFTER you have written the Dockerfile to disk to verify it actually builds. ' +
+        'If the build fails, READ the error output, FIX the Dockerfile (use createFile to overwrite, or the fix-dockerfile MCP tool if available), then call dockerBuild again. ' +
+        'You may retry up to 3 times. ' +
+        'Do not call any deploy/push/scan steps until dockerBuild succeeds.',
+      inputSchema: z.object({
+        tag: z
+          .string()
+          .optional()
+          .describe('Optional image tag (default: agent-eval-build:check)'),
+      }),
+      execute: async ({ tag }) => {
+        dockerBuildCalls += 1;
+        const imageTag = (tag as string | undefined) ?? `agent-eval-build-${Date.now()}:check`;
+        try {
+          // Build for linux/amd64 (AKS node arch): a plain build on an arm64 host
+          // yields an image the amd64 nodes reject as `no match for platform`.
+          const { stdout, stderr } = await execFileP(
+            'docker',
+            ['buildx', 'build', '--platform', 'linux/amd64', '--load', '-t', imageTag, input.workingDir],
+            {
+              maxBuffer: 16 * 1024 * 1024,
+              // Hard wall-clock cap so a wedged buildkit can't block the loop forever.
+              timeout: 10 * 60 * 1000,
+              killSignal: 'SIGTERM',
+            },
+          );
+          return {
+            success: true,
+            imageTag,
+            attempt: dockerBuildCalls,
+            output: ((stdout ?? '') + (stderr ?? '')).slice(-6000),
+          };
+        } catch (err) {
+          const e = err as { code?: string | number; stderr?: string; stdout?: string; message?: string };
+          const combined = ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-6000);
+          return {
+            success: false,
+            imageTag,
+            exitCode: typeof e.code === 'number' ? e.code : null,
+            attempt: dockerBuildCalls,
+            output: combined,
+            hint: 'Read the error above, fix the Dockerfile, then call dockerBuild again.',
+          };
+        }
+      },
+    });
 
     sdkTools.pushImage = tool({
       description:
@@ -485,6 +492,7 @@ export class AISDKDriver implements AgentDriver {
           lastPods = pods;
           const allReady = pods.length > 0 && pods.every((p) => p.ready && p.phase === 'Running');
           if (allReady) {
+            deployVerified = true;
             return {
               success: true,
               deployments: deployNames,
@@ -554,34 +562,62 @@ export class AISDKDriver implements AgentDriver {
     });
 
     const start = Date.now();
-    // Wrap the agent run with a transparent 429 / rate-limit backoff so a brief
-    // Azure Foundry throttle doesn't lose a whole eval cell. We honor the
-    // upstream `Retry-After` header when present (the SDK surfaces it on the
-    // error's `responseHeaders` / `data` payload); otherwise we fall back to a
-    // bounded exponential backoff (30s, 60s, 120s). Total of `maxRateLimitRetries`
-    // attempts. Non-429 errors propagate immediately.
     const maxRetries = input.maxRateLimitRetries ?? 3;
-    let result: Awaited<ReturnType<typeof agent.generate>>;
-    let attempt = 0;
-    while (true) {
-      try {
-        result = await agent.generate({
-          prompt: input.userPrompt,
-          ...(input.providerOptions ? { providerOptions: input.providerOptions } : {}),
-        });
-        break;
-      } catch (err) {
-        const info = classifyRateLimit(err);
-        if (!info.isRateLimit || attempt >= maxRetries) throw err;
-        const waitMs = info.retryAfterMs ?? Math.min(120_000, 30_000 * 2 ** attempt);
-        attempt += 1;
+
+    // One generate() call with transparent 429 backoff so a brief provider
+    // throttle doesn't lose a cell: honor `Retry-After` when present, else
+    // exponential backoff (30s/60s/120s), up to `maxRateLimitRetries` attempts.
+    // Non-429 errors propagate immediately.
+    const generateWithBackoff = async (
+      promptArgs: { prompt: string } | { messages: ModelMessage[] },
+    ): Promise<Awaited<ReturnType<typeof agent.generate>>> => {
+      const args = {
+        ...promptArgs,
+        ...(input.providerOptions ? { providerOptions: input.providerOptions } : {}),
+      };
+      let attempt = 0;
+      while (true) {
+        try {
+          return await agent.generate(args);
+        } catch (err) {
+          const info = classifyRateLimit(err);
+          if (!info.isRateLimit || attempt >= maxRetries) throw err;
+          const waitMs = info.retryAfterMs ?? Math.min(120_000, 30_000 * 2 ** attempt);
+          attempt += 1;
+          console.error(
+            `[driver] rate-limited (attempt ${attempt}/${maxRetries}); ` +
+              `sleeping ${Math.round(waitMs / 1000)}s before retry. ${info.detail}`,
+          );
+          await new Promise((r) => setTimeout(r, waitMs));
+        }
+      }
+    };
+
+    let result = await generateWithBackoff({ prompt: input.userPrompt });
+
+    // Harness-side deploy-completion nudge. Weak models often stop after
+    // dockerBuild without pushing/applying/verifying. When the run is expected
+    // to deploy (`requireDeploy`) and `verifyDeploy` hasn't succeeded yet,
+    // resume the SAME conversation with a pointed instruction to finish the
+    // push→apply→verify loop (fixing failed builds / pod errors along the way).
+    // Each nudge gives the agent a fresh step budget; bounded by maxDeployNudges.
+    if (input.requireDeploy && !deployVerified) {
+      const maxNudges = input.maxDeployNudges ?? 3;
+      const messages: ModelMessage[] = [
+        { role: 'user', content: input.userPrompt },
+        ...toModelMessages(result.response.messages),
+      ];
+      for (let n = 0; n < maxNudges && !deployVerified; n++) {
         console.error(
-          `[driver] rate-limited (attempt ${attempt}/${maxRetries}); ` +
-            `sleeping ${Math.round(waitMs / 1000)}s before retry. ${info.detail}`,
+          `[driver] deploy not verified — nudging agent to finish push→apply→verify ` +
+            `(nudge ${n + 1}/${maxNudges}).`,
         );
-        await new Promise((r) => setTimeout(r, waitMs));
+        messages.push({ role: 'user', content: DEPLOY_NUDGE });
+        result = await generateWithBackoff({ messages });
+        messages.push(...toModelMessages(result.response.messages));
       }
     }
+
     const durationMs = Date.now() - start;
 
     return {
@@ -592,6 +628,7 @@ export class AISDKDriver implements AgentDriver {
       toolCalls,
       durationMs,
       text: result.text ?? '',
+      deployVerified,
     };
   }
 }

@@ -131,6 +131,17 @@ Node 16, Java 7):
 The following bases may appear when, and only when, no MCR row in G2.1
 applies. Anything not in this list MUST NOT appear in a `FROM` line.
 
+**Hard rule — build images are build-only.** The images in the **Build
+stage** column below (`maven:*`, `gradle:*`, `golang:*`, `rust:*`,
+`composer:*`) are builders. They MUST NOT be the final / runtime stage. Using
+a non-MCR build image obligates a **multi-stage** Dockerfile whose final
+`FROM` is the matching **Runtime stage** image (an MCR `*-distroless` row from
+G2.1 wherever one exists). A single-stage Dockerfile that ships a
+`maven` / `gradle` / `golang` / `rust` builder as the runtime image is a policy
+violation: it defeats the MCR-runtime goal and ships the full build toolchain
+plus source in the running image — even though a lone `maven`/`gradle` `FROM`
+looks "allowed" here.
+
 | Stack / Reason | Build stage | Runtime stage |
 |---|---|---|
 | Maven builder (MCR ships no Maven-with-JDK image) | `maven:3.9-eclipse-temurin-<LV>` (where `<LV>` ∈ {8, 11, 17, 21}) | use the matching MCR `openjdk/jdk:<LV>-distroless` for runtime |
@@ -188,6 +199,40 @@ Apply every rule in this checklist:
   instructions.
 - For multi-stage, give each stage a name (`AS build`, `AS runtime`).
 
+**Build output & dependencies (derive, never assume)**
+
+Where a build writes its artifact, and which dependencies it needs to run,
+are determined by the project's own config — not by framework convention.
+Two recurring build failures come from guessing instead of reading:
+
+- **Derive the build-output directory; never hardcode it.** Before you
+  `COPY` build output into the runtime stage, find where the build tool
+  actually writes it:
+  1. Read the build tool's config for a configured output path — e.g.
+     `build.outDir` in `vite.config.*`, `compilerOptions.outDir` in
+     `tsconfig.json`, `outputPath` in `angular.json`, `distDir` in
+     `next.config.*`, `output.path` in `webpack.config.*`, `buildDir` in
+     `nuxt.config.*`.
+  2. If none is set, use that tool's documented default.
+  3. If still unsure, run the build in the build stage and `COPY` the
+     directory it actually produced.
+  `build/` is only Create React App's default. Vite, Vue CLI, Angular and
+  most bundlers emit to `dist/`; Next.js to `.next/`. Hardcoding
+  `COPY build/ ...` fails with `"/app/build": not found` on any of them.
+
+- **Install full dependencies in the build stage; prune only for runtime.**
+  Compilers and bundlers (`tsc`, `vite`, `webpack`, `rollup`, `esbuild`)
+  almost always live in `devDependencies`. In the build stage run a full
+  install (`npm ci` / `npm install` with **no** `--omit=dev` /
+  `--production`). Running `npm ci --omit=dev` before `npm run build`
+  removes the compiler and fails with `tsc: not found` / exit 127. Only the
+  **runtime** stage may drop dev deps — or, better, copy just the built
+  artifact into a clean runtime image and install nothing there.
+
+These two rules hold for any compiled or bundled stack — present or future
+— so they replace per-framework "copy from X" recipes rather than adding to
+them.
+
 **Security baseline (mandatory)**
 - Final stage MUST end with a `USER` instruction set to a non-root user.
   - If the base image already provides one (e.g. `nonroot`, `appuser`), use
@@ -234,9 +279,20 @@ with `exec: "/bin/sh": stat /bin/sh: no such file or directory`. Rules:
 - **No `RUN` instructions in the distroless stage.** Do all setup
   (chmod, package install, user creation) in the build stage and `COPY`
   the prepared artifacts in.
-- **Do not try to `RUN useradd` / `RUN adduser` on distroless.** The MCR
-  distroless images already define a non-root user with UID 1000 named
-  `app`. Emit `USER app` (or `USER 1000`) directly — no `RUN` required.
+- **Do not try to `RUN useradd` / `RUN adduser` on distroless** (no shell).
+  Set the user with a numeric `USER` instead — which non-root user the base
+  provides depends on the image:
+  - **Node.js / Python** (`mcr.microsoft.com/azurelinux/distroless/{nodejs,python}`)
+    predefine a non-root user `app` at UID 1000 — emit `USER 1000` (preferred)
+    or `USER app`.
+  - **Java** (`mcr.microsoft.com/openjdk/jdk:<LV>-distroless`) does **NOT**
+    predefine a non-root user — its default is root, and there is no `app`
+    user. Emit the numeric `USER 1000` (do **not** write `USER app`: that name
+    does not exist on the Java distroless image, and a Kubernetes
+    `runAsNonRoot` securityContext then fails at deploy with
+    `CreateContainerConfigError: ... non-numeric user`).
+  Always prefer the **numeric** `USER 1000` on distroless: a numeric UID
+  satisfies `runAsNonRoot` without needing an `/etc/passwd` entry.
 - **Do not try to `RUN chmod` / `RUN chown` on distroless.** Set the
   mode/owner with `COPY --chmod=…` / `COPY --chown=app:app …` instead
   (BuildKit syntax, supported by default).
@@ -283,7 +339,14 @@ LABEL com.azure.containerizationassist.version="<version>"
 Otherwise omit the version label — never hard-code a stale version string.
 Do NOT substitute either key for `org.opencontainers.image.*`.
 
-**Framework-specific tweaks**
+**Framework-specific tweaks (illustrative, not an allowlist)**
+
+These rows are worked examples of the general rules above — not an
+exhaustive list. For a framework not listed here, apply the same approach:
+derive the build-output directory and the run command from the project's
+own config and the framework's documented defaults. Never skip
+containerizing a stack, or fall back to a guess, just because it lacks a
+row in this table.
 
 | Framework | Add |
 |---|---|
@@ -301,6 +364,7 @@ Before emitting, confirm:
 
 - [ ] **Required label present.** The runtime stage contains `LABEL com.azure.containerizationassist.createdby="containerization-assist"` immediately after its `FROM` line. (If missing, add it now — do not skip.)
 - [ ] **Azure base.** Every `FROM` line either starts with `mcr.microsoft.com/` (using a tag from the G2.1 catalog) **or** matches a row in the G2.3 fallback list with a `# WHY-NOT-MCR:` comment above it. No invented MCR tags.
+- [ ] **No builder as runtime.** If any `FROM` uses a G2.3 *Build stage* image (`maven`/`gradle`/`golang`/`rust`/`composer`), the Dockerfile is multi-stage and its **final** `FROM` is the matching G2.3 *Runtime stage* image (or an MCR G2.1 image) — never the builder itself.
 - [ ] **Source copied before build.** Every `RUN` that invokes a build tool (`mvn`/`mvnw`, `gradle`/`gradlew`, `npm run build`, `tsc`, `dotnet publish`, `go build`, `cargo build`) is preceded by a `COPY` of the source tree.
 - [ ] Single non-root `USER` in the final stage
 - [ ] No hardcoded secrets in any `ENV`

@@ -16,7 +16,6 @@ import { resolveMode, USER_PROMPT, type Mode } from './modes.js';
 import { runChecks, selectChecks } from './checks.js';
 import {
   runGradient,
-  formatGradientMarkdown,
   formatGradientHtml,
   discoverFixtures,
   LEVELS,
@@ -78,14 +77,10 @@ program
   .command('check')
   .description('Run validation checks against an existing artifact directory')
   .requiredOption('--dir <path>', 'artifact directory produced by `eval run`')
-  .option('--fixture <path>', 'original fixture directory (for checks that compare against source)', '')
   .option('--checks <names>', "'all', 'none', or comma-separated check names", 'all')
-  .action(async (opts: { dir: string; fixture: string; checks: string }) => {
+  .action(async (opts: { dir: string; checks: string }) => {
     const checks = selectChecks(opts.checks);
-    const results = await runChecks(checks, {
-      artifactDir: opts.dir,
-      fixtureDir: opts.fixture,
-    });
+    const results = await runChecks(checks, { artifactDir: opts.dir });
     console.log(JSON.stringify(results, null, 2));
     const failed = results.filter((r) => !r.passed).length;
     if (failed > 0) process.exitCode = 1;
@@ -257,19 +252,13 @@ program
         ...(levels ? { levels } : {}),
         ...(resumeRuns ? { resumeRuns } : {}),
       });
-      console.log(formatGradientMarkdown(result));
       const html = formatGradientHtml(result);
       if (opts.out) {
         await fs.writeFile(opts.out, JSON.stringify(result, null, 2), 'utf8');
         console.log(`\nResults written to ${opts.out}`);
-        // Companion files next to the JSON: a markdown report and a
-        // self-contained HTML heatmap-style view.
-        const base = opts.out.replace(/\.json$/, '');
-        const mdPath = `${base}.md`;
-        const htmlPath = `${base}.html`;
-        await fs.writeFile(mdPath, formatGradientMarkdown(result), 'utf8');
+        // Companion file next to the JSON: a self-contained HTML heatmap view.
+        const htmlPath = `${opts.out.replace(/\.json$/, '')}.html`;
         await fs.writeFile(htmlPath, html, 'utf8');
-        console.log(`Markdown report:   ${mdPath}`);
         console.log(`HTML heatmap view: ${htmlPath}`);
       }
       if (opts.serve) {

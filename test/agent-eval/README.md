@@ -19,7 +19,7 @@ command.
 | Check                  | What it asserts                                                                  |
 | ---------------------- | -------------------------------------------------------------------------------- |
 | `docker-builds`        | The produced Dockerfile actually builds (`docker build .`).                      |
-| `requires-azure-base`  | Every `FROM` in the Dockerfile is from `mcr.microsoft.com/`.                     |
+| `requires-azure-base`  | Strict allowlist: every `FROM` must be on `mcr.microsoft.com/`, or a recognized stack with no MCR equivalent (Maven/Tomcat/WildFly/Go/…), or carry a `# WHY-NOT-MCR:` annotation. Public bases with a known MCR equivalent (Node/JDK/Python/.NET) and unrecognized/unparseable bases **fail**. |
 | `has-required-labels`  | Dockerfile carries `com.azure.containerizationassist.createdby`; K8s manifests carry `app.kubernetes.io/{name,managed-by}`. |
 
 A run passes when every selected check passes.
@@ -28,9 +28,8 @@ A run passes when every selected check passes.
 
 Needs Foundry creds, Docker, and an Azure ACR + AKS the agent can push/deploy to.
 
-**1. `.env` (repo root)** — see
-[`docs/agent-eval-foundry-setup.md`](../../docs/agent-eval-foundry-setup.md) to
-provision the Foundry resource:
+**1. `.env` (repo root)** — create it with your Foundry resource's key and
+endpoint:
 
 ```
 AZURE_FOUNDRY_API_KEY=...
@@ -66,7 +65,7 @@ The headline command — one invocation covers every (path × fixture × model) 
 
 ```sh
 npm run eval -- gradient \
-  --fixtures test/fixtures/legacy-java/spring-boot-rest-api,test/fixtures/legacy-java/coolstore \
+  --fixtures test/fixtures/legacy-java/spring-boot-rest-api,test/fixtures/legacy-java/spring-mvc-war \
   --models azure:gpt-4.1,azure:gpt-4o,azure:gpt-4.1-mini \
   --out /tmp/gradient.json
 ```
@@ -79,17 +78,16 @@ npm run eval -- gradient \
 - kubectl cleanup runs before **and** after each cell, so a stuck Deployment
   can't poison the next path.
 
-`--out results.json` also writes companion `results.md` and a self-contained
-`results.html` (the heatmap report) alongside it. The report shows per-path
-scores, the quality heatmap, a cost-vs-effectiveness scatter, and an errors
-footer.
+`--out results.json` also writes a companion self-contained `results.html`
+(the heatmap report) alongside it. The report shows per-path scores, the
+quality heatmap, a cost-vs-effectiveness scatter, and an errors footer.
 
 ## Other commands
 
 ```
 agent-eval ping     --model <spec>
 agent-eval run      --fixture <dir> --mode <baseline|skills|mcp> --model <spec>
-agent-eval check    --dir <artifactDir> [--fixture <dir>] [--checks <names>]
+agent-eval check    --dir <artifactDir> [--checks <names>]
 agent-eval gradient (--fixtures <dirs> | --fixtures-dir <dir>) --models <specs>
                     [--paths ...] [--parallel] [--reps <n>] [--out results.json]
 ```
@@ -102,7 +100,7 @@ agent-eval gradient (--fixtures <dirs> | --fixtures-dir <dir>) --models <specs>
   it to `--fixtures` (or point `--fixtures-dir` at its parent). No code change.
 - **New check:** add a `Check` in [`checks.ts`](checks.ts) (async, returns
   `{ name, passed, message, details? }`), append it to `ALL_CHECKS` /
-  `selectChecks`, and add its name to `headlineNames` in
+  `selectChecks`, and add its name to `HEADLINE_CHECK_NAMES` in
   [`gradient.ts`](gradient.ts) to surface it as a report column.
 
 ## Providers ([`providers.ts`](providers.ts))
@@ -113,6 +111,13 @@ your **deployment name**. Use `azure:` for OpenAI-catalog deployments (`gpt-4o`,
 
 ## CI
 
-Not wired up yet — planned to trigger on PRs touching `skills/**` (and likely
-`knowledge/**`, `src/prompts/**`, `src/mcp/**`) once we settle whether CI hits
-live Azure per-PR or a cheaper subset, and which signals fail vs inform.
+[`azure-pipelines.yml`](../../azure-pipelines.yml) runs the gradient sweep in
+Azure DevOps on pushes and PRs that touch `skills/**`, and on manual runs. It
+authenticates to Azure through a **service connection** (no stored Azure
+secrets) and reads the Foundry credentials from the `agent-eval-foundry`
+variable group. Every run uses the full matrix — all three paths (`bare`,
+`mcp`, `skills`) across every fixture and model — so each run shows the skills
+path's lift over the `bare` control and `mcp`. A **PR to main** runs 1 rep for
+a fast signal; a **push/merge to main** runs 3 reps for a robust comparison.
+The JSON and HTML reports are published as a pipeline artifact. See the pipeline
+header for the one-time service-connection + variable-group setup.
