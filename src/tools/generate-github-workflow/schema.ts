@@ -113,7 +113,6 @@ export interface WorkflowJobDescription {
   steps: string[];
   /** Runner to use (always ubuntu-latest) */
   runsOn: string;
-
 }
 
 /**

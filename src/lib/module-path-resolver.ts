@@ -62,10 +62,7 @@ export interface ModulePathResolverOptions {
 /**
  * Attempt to resolve module path using CJS __dirname
  */
-function tryResolveCJSPath(
-  relativePathFromDistSrc: string,
-  logger: Logger,
-): PathResolution {
+function tryResolveCJSPath(relativePathFromDistSrc: string, logger: Logger): PathResolution {
   try {
     const dirName = new Function(
       'return typeof __dirname !== "undefined" ? __dirname : undefined',
@@ -75,10 +72,7 @@ function tryResolveCJSPath(
       // From dist/src/knowledge or dist-cjs/src/app:
       //   Go up to package root, then down to target directory
       const moduleRelativePath = resolve(dirName, relativePathFromDistSrc);
-      logger.debug(
-        { moduleRelativePath, method: 'CJS __dirname' },
-        'Resolved module path',
-      );
+      logger.debug({ moduleRelativePath, method: 'CJS __dirname' }, 'Resolved module path');
       return { resolved: true, path: moduleRelativePath, method: 'CJS __dirname' };
     }
   } catch (error) {
@@ -105,10 +99,7 @@ function tryResolveESMPath(
     const __dirname = dirname(__filename);
     const moduleRelativePath = resolve(__dirname, relativePathFromDistSrc);
 
-    logger.debug(
-      { moduleRelativePath, method: 'ESM import.meta.url' },
-      'Resolved module path',
-    );
+    logger.debug({ moduleRelativePath, method: 'ESM import.meta.url' }, 'Resolved module path');
     return { resolved: true, path: moduleRelativePath, method: 'ESM import.meta.url' };
   } catch (error) {
     logger.debug({ error }, 'Failed to resolve module path from import.meta.url');
@@ -134,10 +125,7 @@ function resolveSymlink(path: string, logger: Logger): string {
  *
  * Handles npm bin symlinks and works across platforms.
  */
-function tryResolveFromArgv(
-  targetSubdir: string,
-  logger: Logger,
-): PathResolution {
+function tryResolveFromArgv(targetSubdir: string, logger: Logger): PathResolution {
   if (!process.argv[1]) {
     return { resolved: false };
   }
@@ -314,10 +302,7 @@ export function resolveModulePaths(options: ModulePathResolverOptions): string[]
  * @param logger - Optional logger for debugging
  * @returns The first path that exists as a directory, or undefined
  */
-export function findExistingDirectory(
-  searchPaths: string[],
-  logger?: Logger,
-): string | undefined {
+export function findExistingDirectory(searchPaths: string[], logger?: Logger): string | undefined {
   for (const path of searchPaths) {
     if (existsSync(path)) {
       logger?.debug({ path, exists: true }, 'Found existing directory');

@@ -17,7 +17,10 @@ import { promisify } from 'node:util';
 import { join, dirname, basename } from 'node:path';
 import tmp from 'tmp';
 import type { Logger } from 'pino';
-import { loadPolicy as loadWasmPolicy, LoadedPolicy as WasmPolicy } from '@open-policy-agent/opa-wasm';
+import {
+  loadPolicy as loadWasmPolicy,
+  LoadedPolicy as WasmPolicy,
+} from '@open-policy-agent/opa-wasm';
 import { type Result, Success, Failure } from '@/types';
 import { ERROR_MESSAGES } from '@/lib/errors';
 
@@ -349,10 +352,7 @@ function evaluateAllWasmPolicies(
   const allSuggestions: RegoPolicyViolation[] = [];
   let overallAllow = true;
 
-  logger.debug(
-    { policyCount: policyPaths.length },
-    'Evaluating all WASM policy modules',
-  );
+  logger.debug({ policyCount: policyPaths.length }, 'Evaluating all WASM policy modules');
 
   for (const policyPath of policyPaths) {
     // Use path.basename() instead of regex splitting
@@ -405,10 +405,7 @@ function evaluateAllWasmPolicies(
         'WASM policy evaluated',
       );
     } catch (error) {
-      logger.warn(
-        { error, policyModule, fileName },
-        'WASM policy evaluation failed, skipping',
-      );
+      logger.warn({ error, policyModule, fileName }, 'WASM policy evaluation failed, skipping');
       // Continue with other policies even if one fails
     }
   }
@@ -490,7 +487,10 @@ export async function loadRegoPolicy(
     const wasmPath = join(projectRoot, 'policies', 'compiled', 'policies.wasm');
     if (isBuiltInPolicy && existsSync(wasmPath)) {
       try {
-        logger.info({ wasmPath, policyFile: policyFileName }, 'Loading pre-compiled WASM policy bundle (fast path)');
+        logger.info(
+          { wasmPath, policyFile: policyFileName },
+          'Loading pre-compiled WASM policy bundle (fast path)',
+        );
         const wasmBytes = await readFile(wasmPath);
         const wasmPolicy = await loadWasmPolicy(wasmBytes);
 
@@ -516,7 +516,10 @@ export async function loadRegoPolicy(
             }
             return evaluateWasmPolicyModule(wasmPolicy, input, entrypointName, logger);
           }),
-          queryConfig: async <T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null> => {
+          queryConfig: async <T = unknown>(
+            packageName: string,
+            input: Record<string, unknown>,
+          ): Promise<T | null> => {
             try {
               logger.debug({ packageName, wasmMode: true }, 'Querying WASM policy for config');
               const inputData = input;
@@ -533,7 +536,10 @@ export async function loadRegoPolicy(
               return resultSet[0].result as T;
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
-              logger.warn({ error: message, packageName }, 'WASM policy config query failed, returning null');
+              logger.warn(
+                { error: message, packageName },
+                'WASM policy config query failed, returning null',
+              );
               return null;
             }
           },
@@ -595,7 +601,10 @@ export async function loadRegoPolicy(
       evaluatePolicy: createEvaluatePolicyWrapper(async (input) => {
         return evaluateRegoPolicy(policyPath, input, logger);
       }),
-      queryConfig: async <T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null> => {
+      queryConfig: async <T = unknown>(
+        packageName: string,
+        input: Record<string, unknown>,
+      ): Promise<T | null> => {
         return queryRegoConfig<T>(policyPath, packageName, input, logger);
       },
       close: () => {
@@ -643,19 +652,13 @@ async function queryRegoConfig<T = unknown>(
 
       // Build args with multiple -d flags for each policy file
       const paths = Array.isArray(policyPaths) ? policyPaths : [policyPaths];
-      const policyArgs = paths.flatMap(p => ['-d', p]);
+      const policyArgs = paths.flatMap((p) => ['-d', p]);
 
       // Query the specific package for configuration
       const query = `data.${packageName}`;
       const { stdout, stderr } = await execFileAsync(
         opaBinary,
-        [
-          'eval',
-          ...policyArgs,
-          '-i', tmpFile.name,
-          '-f', 'json',
-          query,
-        ],
+        ['eval', ...policyArgs, '-i', tmpFile.name, '-f', 'json', query],
         {
           maxBuffer: 10 * 1024 * 1024, // 10MB buffer
         },
@@ -670,9 +673,7 @@ async function queryRegoConfig<T = unknown>(
       const opaOutput = output as OpaEvalOutput;
 
       // OPA JSON format: { result: [{ expressions: [{ value: ... }] }] }
-      if (
-        opaOutput?.result && Array.isArray(opaOutput.result) && opaOutput.result.length > 0
-      ) {
+      if (opaOutput?.result && Array.isArray(opaOutput.result) && opaOutput.result.length > 0) {
         const firstResult = opaOutput.result[0];
         if (
           firstResult?.expressions &&
@@ -733,19 +734,13 @@ async function evaluateRegoPolicy(
 
       // Build args with multiple -d flags for each policy file (OPA will merge them)
       const paths = Array.isArray(policyPaths) ? policyPaths : [policyPaths];
-      const policyArgs = paths.flatMap(p => ['-d', p]);
+      const policyArgs = paths.flatMap((p) => ['-d', p]);
 
       // Run OPA eval command to evaluate the policy
       // Use -f json for JSON output and query data.containerization to get all results
       const { stdout, stderr } = await execFileAsync(
         opaBinary,
-        [
-          'eval',
-          ...policyArgs,
-          '-i', tmpFile.name,
-          '-f', 'json',
-          `data.${POLICY_NAMESPACE}`,
-        ],
+        ['eval', ...policyArgs, '-i', tmpFile.name, '-f', 'json', `data.${POLICY_NAMESPACE}`],
         {
           maxBuffer: 10 * 1024 * 1024, // 10MB buffer
         },
@@ -768,9 +763,7 @@ async function evaluateRegoPolicy(
         const opaOutput = output as OpaEvalOutput;
 
         // OPA JSON format: { result: [{ expressions: [{ value: ... }] }] }
-        if (
-          opaOutput?.result && Array.isArray(opaOutput.result) && opaOutput.result.length > 0
-        ) {
+        if (opaOutput?.result && Array.isArray(opaOutput.result) && opaOutput.result.length > 0) {
           const firstResult = opaOutput.result[0];
           if (
             firstResult?.expressions &&
@@ -839,7 +832,7 @@ async function evaluateRegoPolicy(
           violations: violations.length,
           warnings: warnings.length,
           suggestions: suggestions.length,
-          violationDetails: violations.map(v => ({ rule: v.rule, message: v.message })),
+          violationDetails: violations.map((v) => ({ rule: v.rule, message: v.message })),
         },
         'Rego policy evaluation completed',
       );
@@ -921,10 +914,13 @@ export async function loadAndMergeRegoPolicies(
     }
   }
 
-  logger.info({ policyCount: policyPaths.length, policies: policyPaths }, 'Loading and merging Rego policies');
+  logger.info(
+    { policyCount: policyPaths.length, policies: policyPaths },
+    'Loading and merging Rego policies',
+  );
 
   // Check if all policies are built-in (can use WASM bundle)
-  const allBuiltIn = policyPaths.every(path => {
+  const allBuiltIn = policyPaths.every((path) => {
     const fileName = basename(path);
     return fileName in BUILT_IN_POLICY_MODULES;
   });
@@ -932,9 +928,7 @@ export async function loadAndMergeRegoPolicies(
   // Fast path: Use pre-compiled WASM bundle for built-in policies (no OPA needed)
   // Try multiple locations for the WASM bundle (development, packaged, installed)
   let wasmPath: string | undefined;
-  const wasmSearchPaths: string[] = [
-    join(projectRoot, 'policies', 'compiled', 'policies.wasm'),
-  ];
+  const wasmSearchPaths: string[] = [join(projectRoot, 'policies', 'compiled', 'policies.wasm')];
 
   // If policies are in the package, try relative to the first policy path
   if (policyPaths.length > 0 && policyPaths[0]) {
@@ -950,7 +944,10 @@ export async function loadAndMergeRegoPolicies(
 
   if (allBuiltIn && wasmPath) {
     try {
-      logger.info({ wasmPath, policyCount: policyPaths.length }, 'Loading pre-compiled WASM bundle for built-in policies');
+      logger.info(
+        { wasmPath, policyCount: policyPaths.length },
+        'Loading pre-compiled WASM bundle for built-in policies',
+      );
       const wasmBytes = await readFile(wasmPath);
       const wasmPolicy = await loadWasmPolicy(wasmBytes);
 
@@ -966,7 +963,10 @@ export async function loadAndMergeRegoPolicies(
           const inputData = typeof input === 'string' ? { content: input } : input;
           return evaluateAllWasmPolicies(wasmPolicy, inputData, policyPaths, logger);
         }),
-        queryConfig: async <T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null> => {
+        queryConfig: async <T = unknown>(
+          packageName: string,
+          input: Record<string, unknown>,
+        ): Promise<T | null> => {
           try {
             const wasmResult = wasmPolicy.evaluate(input, packageName);
             if (wasmResult?.[0]?.result) {
@@ -983,7 +983,10 @@ export async function loadAndMergeRegoPolicies(
         },
       };
 
-      logger.info({ policyPaths }, 'Built-in policies loaded via WASM bundle (zero-dependency mode)');
+      logger.info(
+        { policyPaths },
+        'Built-in policies loaded via WASM bundle (zero-dependency mode)',
+      );
       return Success(evaluator);
     } catch (wasmError) {
       logger.warn(
@@ -1022,7 +1025,10 @@ export async function loadAndMergeRegoPolicies(
     evaluatePolicy: createEvaluatePolicyWrapper(async (input) => {
       return evaluateRegoPolicy(policyPaths, input, logger);
     }),
-    queryConfig: async <T = unknown>(packageName: string, input: Record<string, unknown>): Promise<T | null> => {
+    queryConfig: async <T = unknown>(
+      packageName: string,
+      input: Record<string, unknown>,
+    ): Promise<T | null> => {
       return queryRegoConfig<T>(policyPaths, packageName, input, logger);
     },
     close: () => {
@@ -1052,7 +1058,8 @@ export async function loadPolicies(
   },
   logger?: Logger,
 ): Promise<Result<RegoPolicy>> {
-  const log = logger || (await import('@/lib/logger')).createLogger({ name: 'policy-loader', level: 'info' });
+  const log =
+    logger || (await import('@/lib/logger')).createLogger({ name: 'policy-loader', level: 'info' });
 
   // Use glob to find matching policy files
   const { glob } = await import('glob');

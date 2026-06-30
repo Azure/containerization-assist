@@ -61,18 +61,18 @@ export function mapNodeArchToPlatform(arch: string, os: string = 'linux'): Docke
 
   // Map common Kubernetes arch values to Docker platform format
   const archMap: Record<string, string> = {
-    'amd64': 'amd64',
-    'x86_64': 'amd64',
-    'arm64': 'arm64',
-    'aarch64': 'arm64',
-    'armv7l': 'arm/v7',
-    'armv6l': 'arm/v6',
+    amd64: 'amd64',
+    x86_64: 'amd64',
+    arm64: 'arm64',
+    aarch64: 'arm64',
+    armv7l: 'arm/v7',
+    armv6l: 'arm/v6',
     '386': '386',
-    'i386': '386',
-    'i686': '386',
-    'ppc64le': 'ppc64le',
-    's390x': 's390x',
-    'riscv64': 'riscv64',
+    i386: '386',
+    i686: '386',
+    ppc64le: 'ppc64le',
+    s390x: 's390x',
+    riscv64: 'riscv64',
   };
 
   const mappedArch = archMap[normalized];
