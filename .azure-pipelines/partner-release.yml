@@ -13,7 +13,10 @@ variables:
   StorageAccountName: azuresdkpartnerdrops
   AzureServiceConnection: azuresdkpartnerdrops
   GitHubServiceConnection: github-containerization-assist
-  PackageName: containerization-assist
+  # Name of the folder under `drops/` in the partner drop storage account.
+  # This is the partner-drop path convention, NOT the npm package name
+  # (the tarball produced by `npm pack` is `containerization-assist-mcp-*.tgz`).
+  PartnerDropFolder: containerization-assist
   Language: js
   NodeVersion: "22.x"
 
@@ -186,7 +189,7 @@ extends:
                   azurePowerShellVersion: LatestVersion
                   pwsh: true
                   Inline: |
-                    azcopy copy "$(Build.ArtifactStagingDirectory)/partner-drop/*" "https://$(StorageAccountName).blob.core.windows.net/drops/$(PackageName)/$(Language)/$(PackageVersion)/"
+                    azcopy copy "$(Build.ArtifactStagingDirectory)/partner-drop/*" "https://$(StorageAccountName).blob.core.windows.net/drops/$(PartnerDropFolder)/$(Language)/$(PackageVersion)/"
                 env:
                   AZCOPY_AUTO_LOGIN_TYPE: PSCRED
 
