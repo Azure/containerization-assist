@@ -22,13 +22,13 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
   parameters:
     pool:
-      name: production-pool-amd64-mariner-2
+      name: staging-pool-amd64-mariner-2
       image: 1es-azlinux-3-amd64-custom-disk
       os: linux
       hostArchitecture: amd64
     sdl:
       sourceAnalysisPool:
-        name: production-pool-amd64-mariner-2
+        name: staging-pool-amd64-mariner-2
         image: azcu-agent-amd64-windows-22-img
         os: windows
         hostArchitecture: amd64
