@@ -190,9 +190,6 @@ extends:
                 env:
                   AZCOPY_AUTO_LOGIN_TYPE: PSCRED
 
-              # Create the GitHub release only after the partner drop upload
-              # has succeeded, so we never end up with a published release
-              # tag that has no corresponding tarball in storage.
               - task: GitHubRelease@1
                 displayName: Create GitHub release
                 inputs:
