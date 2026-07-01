@@ -13,9 +13,7 @@ variables:
   StorageAccountName: azuresdkpartnerdrops
   AzureServiceConnection: azuresdkpartnerdrops
   GitHubServiceConnection: github-containerization-assist
-  # Name of the folder under `drops/` in the partner drop storage account.
-  # This is the partner-drop path convention, NOT the npm package name
-  # (the tarball produced by `npm pack` is `containerization-assist-mcp-*.tgz`).
+  # Folder name under `drops/` in partner drop storage (not the npm package name).
   PartnerDropFolder: containerization-assist
   Language: js
   NodeVersion: "22.x"
