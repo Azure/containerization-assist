@@ -1,5 +1,11 @@
 # Change Log
 
+## [1.5.0]
+
+- Add GitHub Actions workflow generation tool (#687)
+- refactor prepare-cluster to return advisory ClusterPlan instead of executing (#695)
+- dependency updates (#682, #708, #711, #712)
+
 ## [1.4.1]
 
 - add chat skills for VS Code (via GitHub Copilot) (#685)
