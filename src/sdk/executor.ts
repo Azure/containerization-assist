@@ -86,9 +86,7 @@ export const _testing = {
  * @param onProgress - SDK progress callback or undefined
  * @returns ProgressReporter function or undefined
  */
-function wrapProgressCallback(
-  onProgress: SDKOptions['onProgress'],
-): ProgressReporter | undefined {
+function wrapProgressCallback(onProgress: SDKOptions['onProgress']): ProgressReporter | undefined {
   if (!onProgress) return undefined;
 
   return async (message, progress, total) => {

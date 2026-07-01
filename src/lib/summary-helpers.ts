@@ -230,7 +230,10 @@ export function formatVulnerabilities(vulns: VulnerabilitySummary): string {
 export function formatTimestamp(timestamp: string | Date): string {
   try {
     const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-    return date.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+    return date
+      .toISOString()
+      .replace('T', ' ')
+      .replace(/\.\d+Z$/, '');
   } catch {
     return String(timestamp);
   }

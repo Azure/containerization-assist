@@ -75,6 +75,9 @@ jobs:
       - name: Validate examples compile
         run: node scripts/validate-examples.js
 
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Run lint and cache output
         run: npm run lint 2>&1 | tee eslint-output.txt || true
 
