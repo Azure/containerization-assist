@@ -33,7 +33,7 @@ parameters:
 variables:
   - group: agent-eval-foundry
   - name: azureServiceConnection
-    value: ca-agent-eval
+    value: ca-agent-eval-svc-conn
   - name: NODE_VERSION
     value: '22'
 
