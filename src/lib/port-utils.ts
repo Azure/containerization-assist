@@ -42,7 +42,10 @@ export async function isPortAvailable(port: number): Promise<boolean> {
  * Find an available port starting from startPort and checking up to endPort
  * Returns the first available port found, or null if none are available
  */
-export async function findAvailablePort(startPort: number, endPort: number): Promise<number | null> {
+export async function findAvailablePort(
+  startPort: number,
+  endPort: number,
+): Promise<number | null> {
   for (let port = startPort; port <= endPort; port++) {
     if (await isPortAvailable(port)) {
       return port;

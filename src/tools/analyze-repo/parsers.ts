@@ -209,7 +209,8 @@ export async function parseGradle(filePath: string): Promise<ParsedConfig> {
 
     // Extract dependencies (limited to first 20)
     const dependencies: string[] = [];
-    const depPattern = /(?:implementation|runtimeOnly|api|compileOnly)\s*(?:\(\s*)?['"]([^'"]+)['"](?:\s*\))?/g;
+    const depPattern =
+      /(?:implementation|runtimeOnly|api|compileOnly)\s*(?:\(\s*)?['"]([^'"]+)['"](?:\s*\))?/g;
     let match;
     while ((match = depPattern.exec(content)) !== null) {
       if (match[1]) dependencies.push(match[1]);

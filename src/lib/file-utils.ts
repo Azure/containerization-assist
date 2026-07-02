@@ -142,4 +142,3 @@ export async function readDockerfile(options: {
     resolution: 'Add either path or content parameter',
   });
 }
-
