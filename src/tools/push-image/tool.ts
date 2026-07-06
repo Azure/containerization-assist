@@ -77,15 +77,18 @@ async function handlePushImage(
 
       // Check if the image already contains the registry (avoid double prefixing)
       // Reconstruct the full image path (without tag) to compare with target registry
-      const fullImagePath = parsedImage.value.registry ?
-        `${parsedImage.value.registry}/${parsedImage.value.repository}` :
-        parsedImage.value.repository;
+      const fullImagePath = parsedImage.value.registry
+        ? `${parsedImage.value.registry}/${parsedImage.value.repository}`
+        : parsedImage.value.repository;
 
       // Check if the image already starts with the target registry
       if (fullImagePath === registryHost || fullImagePath.startsWith(`${registryHost}/`)) {
         // Image already contains the target registry - use the full path as-is
         repository = fullImagePath;
-      } else if (parsedImage.value.repository.includes('/') && !parsedImage.value.repository.startsWith('docker.io/')) {
+      } else if (
+        parsedImage.value.repository.includes('/') &&
+        !parsedImage.value.repository.startsWith('docker.io/')
+      ) {
         // Image has namespace or registry prefix that doesn't match input registry
         // Only strip first part if it looks like a registry hostname (contains '.' or ':')
         const imageParts = parsedImage.value.repository.split('/');
@@ -116,16 +119,25 @@ async function handlePushImage(
       const credResult = await getRegistryCredentials(input.registry, logger);
       if (credResult.ok && credResult.value) {
         authConfig = credResult.value;
-        logger.info({
-          registry: input.registry,
-          username: authConfig.username,
-          serveraddress: authConfig.serveraddress,
-          passwordProvided: !!authConfig.password,
-        }, 'Using credentials from Docker credential helper');
+        logger.info(
+          {
+            registry: input.registry,
+            username: authConfig.username,
+            serveraddress: authConfig.serveraddress,
+            passwordProvided: !!authConfig.password,
+          },
+          'Using credentials from Docker credential helper',
+        );
       } else if (credResult.ok) {
-        logger.debug({ registry: input.registry }, 'No credentials found in Docker credential helpers');
+        logger.debug(
+          { registry: input.registry },
+          'No credentials found in Docker credential helpers',
+        );
       } else {
-        logger.debug({ registry: input.registry, error: credResult.error }, 'Credential helper lookup failed');
+        logger.debug(
+          { registry: input.registry, error: credResult.error },
+          'Credential helper lookup failed',
+        );
       }
     }
 
@@ -185,13 +197,16 @@ async function handlePushImage(
     }
 
     // Push the image with auth config if provided
-    logger.info({
-      repository,
-      tag,
-      hasAuthConfig: !!authConfig,
-      authServerAddress: authConfig?.serveraddress,
-      authUsername: authConfig?.username,
-    }, 'Pushing image to registry');
+    logger.info(
+      {
+        repository,
+        tag,
+        hasAuthConfig: !!authConfig,
+        authServerAddress: authConfig?.serveraddress,
+        authUsername: authConfig?.username,
+      },
+      'Pushing image to registry',
+    );
 
     const pushResult = await dockerClient.pushImage(repository, tag, authConfig);
     if (!pushResult.ok) {
@@ -201,7 +216,9 @@ async function handlePushImage(
 
     const pushTime = Date.now() - startTime;
     // Build pushed tag for the response - use original image format if no registry, otherwise use the resolved repository
-    const pushedTag = input.registry ? `${repository}:${tag}` : `${parsedImage.value.repository}:${tag}`;
+    const pushedTag = input.registry
+      ? `${repository}:${tag}`
+      : `${parsedImage.value.repository}:${tag}`;
 
     // Build display tag for summary based on the actual registry used
     let displayTag: string;
@@ -222,9 +239,10 @@ async function handlePushImage(
     const digest = pushResult.value.digest;
     // Truncate digest to algorithm + 6 chars (e.g. "sha256:abcdef...")
     const colonIndex = digest.indexOf(':');
-    const digestShort = colonIndex >= 0 && digest.length > colonIndex + 7
-      ? `${digest.substring(0, colonIndex + 7)}...`
-      : digest;
+    const digestShort =
+      colonIndex >= 0 && digest.length > colonIndex + 7
+        ? `${digest.substring(0, colonIndex + 7)}...`
+        : digest;
     const summary = `✅ Pushed image to registry. Image: ${displayTag}. Digest: ${digestShort}`;
 
     // Return success response
@@ -242,7 +260,8 @@ async function handlePushImage(
     return Failure(`Push image failed: ${message}`, {
       message: `Push image failed: ${message}`,
       hint: 'An unexpected error occurred while pushing the image to the registry',
-      resolution: 'Check the error message for details. Common issues include network connectivity, registry authentication, or insufficient permissions',
+      resolution:
+        'Check the error message for details. Common issues include network connectivity, registry authentication, or insufficient permissions',
     });
   }
 }

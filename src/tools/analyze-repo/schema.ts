@@ -51,7 +51,9 @@ const moduleInfo = z.object({
   detectedEnvVars: z
     .array(detectedEnvVarSchema)
     .optional()
-    .describe('Environment variables detected from config files (.env, docker-compose, Spring config) and framework inference'),
+    .describe(
+      'Environment variables detected from config files (.env, docker-compose, Spring config) and framework inference',
+    ),
   ports: z.array(z.number()).optional(),
   entryPoint: z.string().optional(),
 });

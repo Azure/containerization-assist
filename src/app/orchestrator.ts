@@ -391,7 +391,8 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 
     // Extract workspacePath from params (with repositoryPath fallback for project policy discovery)
     const params = request.params as Record<string, unknown> | undefined;
-    const workspacePath = (params?.workspacePath as string) ?? (params?.repositoryPath as string) ?? undefined;
+    const workspacePath =
+      (params?.workspacePath as string) ?? (params?.repositoryPath as string) ?? undefined;
 
     // Discover policies on every execution and reload if files changed
     const discoveredPolicies = discoverPolicies(logger, workspacePath);
