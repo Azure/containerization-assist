@@ -105,7 +105,8 @@ async function handleTagImage(
     return Failure(extractErrorMessage(error), {
       message: extractErrorMessage(error),
       hint: 'An unexpected error occurred while tagging the image',
-      resolution: 'Verify that Docker is running, the source image exists, and the tag format is valid',
+      resolution:
+        'Verify that Docker is running, the source image exists, and the tag format is valid',
     });
   }
 }

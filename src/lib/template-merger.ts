@@ -192,7 +192,7 @@ export function mergeTemplateRecommendations<T extends { id: string; policyDrive
 export function mergeTemplatesIntoPlan<
   TPlan extends {
     recommendations: Record<string, unknown[] | unknown>;
-  }
+  },
 >(
   plan: TPlan,
   templateAdditions: TemplateAdditions | null | undefined,
@@ -252,16 +252,15 @@ export function mergeTemplatesIntoPlan<
 
   // Merge K8s templates if present
   if (templateAdditions.kubernetes && templateAdditions.kubernetes.length > 0) {
-    const k8sTemplateRecs = k8sTemplatesToRecommendations(
-      templateAdditions.kubernetes,
-      context,
-    );
+    const k8sTemplateRecs = k8sTemplatesToRecommendations(templateAdditions.kubernetes, context);
 
     // Merge into appropriate recommendation categories
     // For K8s plans, merge into securityConsiderations and bestPractices
     if ('securityConsiderations' in updatedPlan.recommendations) {
       const securityTemplates = k8sTemplateRecs.filter(
-        (rec) => rec.category.includes('security') || rec.recommendation.toLowerCase().includes('security'),
+        (rec) =>
+          rec.category.includes('security') ||
+          rec.recommendation.toLowerCase().includes('security'),
       );
       const securityRecs = updatedPlan.recommendations.securityConsiderations;
       if (Array.isArray(securityRecs)) {
@@ -277,7 +276,9 @@ export function mergeTemplatesIntoPlan<
 
     if ('bestPractices' in updatedPlan.recommendations) {
       const otherTemplates = k8sTemplateRecs.filter(
-        (rec) => !rec.category.includes('security') && !rec.recommendation.toLowerCase().includes('security'),
+        (rec) =>
+          !rec.category.includes('security') &&
+          !rec.recommendation.toLowerCase().includes('security'),
       );
       const bestPracticesRecs = updatedPlan.recommendations.bestPractices;
       if (Array.isArray(bestPracticesRecs)) {
