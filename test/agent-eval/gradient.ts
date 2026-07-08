@@ -269,16 +269,17 @@ async function runOneLevel(opts: {
 }
 
 /**
- * Run every selected path for every (fixture, model). Models run concurrently
- * by default (each gets its own slugged `imageName` so cleanup is isolated);
- * inside one model, fixtures and paths are sequential.
+ * Run every selected path for every (fixture, model). Models run sequentially
+ * by default; set `parallelModels: true` to overlap them (each lane gets its
+ * own slugged `imageName` so cleanup is isolated). Inside one model, fixtures
+ * and paths are always sequential.
  */
 export async function runGradient(opts: GradientOptions): Promise<GradientResult> {
   const checkSpecs = selectChecks(opts.checks);
   const selectedIds = new Set<LevelId>(opts.levels ?? LEVELS.map((l) => l.id));
   const levels = LEVELS.filter((l) => selectedIds.has(l.id));
   const baseCtx = loadAzureContext();
-  const parallel = opts.parallelModels ?? opts.models.length > 1;
+  const parallel = opts.parallelModels ?? false;
   const reps = Math.max(1, Math.floor(opts.reps ?? 1));
   const t0 = Date.now();
 

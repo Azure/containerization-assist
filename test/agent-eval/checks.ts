@@ -402,7 +402,7 @@ export const hasRequiredLabels: Check = {
     const dockerfile = await readDockerfile(artifactDir);
     if (dockerfile === null) {
       missing.push('Dockerfile not found');
-    } else if (!new RegExp(`LABEL[\\s\\S]*?${REQUIRED_DOCKERFILE_LABEL}`).test(dockerfile)) {
+    } else if (!new RegExp(`^\\s*LABEL\\s+${REQUIRED_DOCKERFILE_LABEL}\\s*=`, 'm').test(dockerfile)) {
       missing.push(`Dockerfile is missing LABEL ${REQUIRED_DOCKERFILE_LABEL}`);
     }
 

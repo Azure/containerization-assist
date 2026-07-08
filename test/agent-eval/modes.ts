@@ -318,15 +318,17 @@ export async function resolveMode(opts: {
         resolved: { systemPrompt: BASELINE_PROMPT, tools: [] },
         cleanup: async () => {},
       };
-    case 'skills':
+    case 'skills': {
+      const { tools, cleanup } = await createMcpToolBundle(opts.workingDir);
       return {
         resolved: {
           systemPrompt: await loadDeployToAksSkill(),
           userPrompt: buildSkillsAksLoopUserPrompt(opts.workingDir),
-          tools: [],
+          tools,
         },
-        cleanup: async () => {},
+        cleanup,
       };
+    }
     case 'mcp': {
       const { tools, cleanup } = await createMcpToolBundle(opts.workingDir);
       return {

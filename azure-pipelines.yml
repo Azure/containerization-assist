@@ -83,11 +83,7 @@ jobs:
             set -euo pipefail
             kubectl version --client >/dev/null 2>&1 || az aks install-cli
 
-            # Full matrix (all fixtures x 3 paths x 3 models) on every trigger.
-            # PR to main runs 1 rep for a fast signal; push/merge to main runs 3
-            # reps for a robust comparison. Manual runs honor the reps parameter.
             case "${BUILD_REASON:-}" in
-              PullRequest) REPS="1" ;;
               IndividualCI|BatchedCI) REPS="3" ;;
             esac
 

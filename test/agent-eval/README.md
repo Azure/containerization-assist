@@ -112,12 +112,13 @@ your **deployment name**. Use `azure:` for OpenAI-catalog deployments (`gpt-4o`,
 ## CI
 
 [`azure-pipelines.yml`](../../azure-pipelines.yml) runs the gradient sweep in
-Azure DevOps on pushes and PRs that touch `skills/**`, and on manual runs. It
+Azure DevOps on merges to `main` that touch `skills/**` and on manual runs
+(PRs do not trigger it — the sweep is too slow to gate PRs on). It
 authenticates to Azure through a **service connection** (no stored Azure
 secrets) and reads the Foundry credentials from the `agent-eval-foundry`
 variable group. Every run uses the full matrix — all three paths (`bare`,
 `mcp`, `skills`) across every fixture and model — so each run shows the skills
-path's lift over the `bare` control and `mcp`. A **PR to main** runs 1 rep for
-a fast signal; a **push/merge to main** runs 3 reps for a robust comparison.
-The JSON and HTML reports are published as a pipeline artifact. See the pipeline
-header for the one-time service-connection + variable-group setup.
+path's lift over the `bare` control and `mcp`. Merges to `main` run 3 reps for
+a robust comparison; manual runs honor the `reps` parameter. The JSON and HTML
+reports are published as a pipeline artifact. See the pipeline header for the
+one-time service-connection + variable-group setup.

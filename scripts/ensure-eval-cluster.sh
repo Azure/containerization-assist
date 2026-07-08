@@ -77,10 +77,10 @@ az aks get-credentials -g "$RG" -n "$CLUSTER" --overwrite-existing >/dev/null
 
 kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE" >/dev/null
 
-# ACR pull without a role assignment: enable the ACR admin user, create a
-# docker-registry secret and attach it to the namespace's default SA.
 PULL_SECRET="${ACR_NAME}-pull"
-if az acr update -n "$ACR_NAME" --admin-enabled true -o none 2>/dev/null; then
+if [[ "${AGENT_EVAL_ACR_ADMIN:-0}" != "1" ]]; then
+  log "AGENT_EVAL_ACR_ADMIN not set — skipping ACR admin fallback. Grant AcrPull to the kubelet identity, or set AGENT_EVAL_ACR_ADMIN=1 to enable admin-user + docker-registry secret (broad shared credential, off by default). Pods may ImagePullBackOff."
+elif az acr update -n "$ACR_NAME" --admin-enabled true -o none 2>/dev/null; then
   acr_user="$(az acr credential show -n "$ACR_NAME" --query username -o tsv 2>/dev/null)"
   acr_pass="$(az acr credential show -n "$ACR_NAME" --query 'passwords[0].value' -o tsv 2>/dev/null)"
   if [[ -n "$acr_user" && -n "$acr_pass" ]]; then
