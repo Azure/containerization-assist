@@ -103,6 +103,7 @@ jobs:
           AGENT_EVAL_CLUSTER: ca-eval-aks
           AGENT_EVAL_REGISTRY: caevalacr.azurecr.io
           AGENT_EVAL_NAMESPACE: eval-ns
+          AGENT_EVAL_ACR_ADMIN: '1'
           BUILD_REASON: $(Build.Reason)
           FIXTURES: ${{ parameters.fixtures }}
           MODELS: ${{ parameters.models }}

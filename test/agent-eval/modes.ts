@@ -103,6 +103,45 @@ export async function ensureRegistryLogin(ctx: AzureContext = loadAzureContext()
 }
 
 /**
+ * Create `namespace` in the current cluster if missing, and (if the canonical
+ * `ctx.namespace` has an ACR imagePullSecret wired to its default SA) copy that
+ * secret into `namespace` and wire it to that namespace's default SA too.
+ * No-op when `namespace === ctx.namespace` (already ensured by ensure-eval-cluster.sh).
+ */
+export async function ensureNamespace(ctx: AzureContext, namespace: string): Promise<void> {
+  if (namespace === ctx.namespace) return;
+  try {
+    await execFileP('bash', [
+      '-c',
+      `kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -`,
+    ], { timeout: 30_000 });
+  } catch (err) {
+    console.error(
+      `[gradient] WARNING: could not ensure namespace ${namespace}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return;
+  }
+  const acrName = ctx.registry.split('.')[0] ?? '';
+  if (!acrName) return;
+  const pullSecret = `${acrName}-pull`;
+  try {
+    await execFileP('bash', [
+      '-c',
+      `kubectl -n ${ctx.namespace} get secret ${pullSecret} -o yaml 2>/dev/null | ` +
+        `sed 's/namespace: ${ctx.namespace}/namespace: ${namespace}/' | ` +
+        `kubectl apply -f -`,
+    ], { timeout: 30_000 });
+    await execFileP('kubectl', [
+      '-n', namespace,
+      'patch', 'serviceaccount', 'default',
+      '-p', `{"imagePullSecrets":[{"name":"${pullSecret}"}]}`,
+    ], { timeout: 30_000 });
+  } catch {
+    // Canonical namespace has no admin pull secret (managed-identity path) — nothing to copy.
+  }
+}
+
+/**
  * Idempotent preflight that makes the eval AKS cluster disposable: reuse a
  * healthy cluster or create the next-indexed one, wire ACR pull, refresh
  * kubeconfig, and ensure the namespace — so a sweep never blocks on teardown.

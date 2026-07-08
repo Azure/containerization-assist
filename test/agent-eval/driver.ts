@@ -436,6 +436,24 @@ export class AISDKDriver {
           };
         }
 
+        // When a specific deployment was requested, scope pod queries to its
+        // spec.selector.matchLabels so unrelated pods in the same namespace
+        // (e.g. parallel eval lanes or backing services) don't skew readiness.
+        let podSelectorArgs: string[] = [];
+        if (deploymentName) {
+          const selectorJson = await kget([
+            'get', 'deploy', String(deploymentName),
+            '-o', 'jsonpath={.spec.selector.matchLabels}',
+          ]);
+          try {
+            const labels = JSON.parse(selectorJson || '{}') as Record<string, string>;
+            const pairs = Object.entries(labels).map(([k, v]) => `${k}=${v}`);
+            if (pairs.length) podSelectorArgs = ['-l', pairs.join(',')];
+          } catch {
+            // Selector fetch failed — fall back to unscoped query.
+          }
+        }
+
         interface PodView {
           name?: string;
           phase?: string;
@@ -450,10 +468,10 @@ export class AISDKDriver {
         while (Date.now() < deadline) {
           let items: Array<Record<string, unknown>> = [];
           try {
-            const raw = await kget(['get', 'pods', '-o', 'json']);
+            const raw = await kget(['get', 'pods', '-o', 'json', ...podSelectorArgs]);
             items = (JSON.parse(raw).items ?? []) as Array<Record<string, unknown>>;
           } catch {
-            items = [];
+            items = [];];
           }
           const pods: PodView[] = items.map((p) => {
             const status = (p.status ?? {}) as Record<string, unknown>;

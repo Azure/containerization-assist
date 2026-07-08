@@ -6,6 +6,19 @@ export interface ResolvedModel {
   providerOptions?: Record<string, Record<string, unknown>>;
 }
 
+export function validateProviderEnv(): void {
+  if (!process.env.AZURE_FOUNDRY_API_KEY) {
+    throw new Error(
+      'AZURE_FOUNDRY_API_KEY not set. Create a .env file at the repo root with AZURE_FOUNDRY_API_KEY and AZURE_FOUNDRY_ENDPOINT.',
+    );
+  }
+  if (!process.env.AZURE_FOUNDRY_ENDPOINT) {
+    throw new Error(
+      "AZURE_FOUNDRY_ENDPOINT not set (e.g. 'https://<resource>.services.ai.azure.com/').",
+    );
+  }
+}
+
 export function getModel(spec: string): ResolvedModel {
   const [provider, ...rest] = spec.split(':');
   const deployment = rest.join(':');

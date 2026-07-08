@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { program } from 'commander';
 import { generateText } from 'ai';
-import { getModel } from './providers.js';
+import { getModel, validateProviderEnv } from './providers.js';
 import { AISDKDriver } from './driver.js';
 import { resolveMode, USER_PROMPT, type Mode } from './modes.js';
 import { runChecks, selectChecks } from './checks.js';
@@ -34,6 +34,7 @@ program
   .requiredOption('--mode <mode>', 'bare | skills | mcp (baseline accepted as alias for bare)')
   .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o-mini or foundry:llama-3-3-70b')
   .action(async (opts: { fixture: string; mode: string; model: string }) => {
+    validateProviderEnv();
     const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-'));
     await fs.cp(opts.fixture, workingDir, { recursive: true });
 
@@ -198,6 +199,7 @@ program
         console.error(`Error: ${msg}`);
         process.exit(2);
       };
+      validateProviderEnv();
       if (!opts.fixtures === !opts.fixturesDir) {
         fail('provide exactly one of --fixtures or --fixtures-dir');
       }

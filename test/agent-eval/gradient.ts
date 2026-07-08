@@ -24,6 +24,7 @@ import {
   cleanupAzureResources,
   ensureRegistryLogin,
   ensureEvalCluster,
+  ensureNamespace,
   loadAzureContext,
   slugifyModel,
   type AzureContext,
@@ -224,6 +225,8 @@ async function runOneLevel(opts: {
   };
   // Wipe any leftover deployment so verify-deploy doesn't read stale state.
   await cleanupAzureResources(opts.ctx);
+  // Refresh ACR credentials per cell — tokens expire (~3h) mid-sweep otherwise.
+  await ensureRegistryLogin(opts.ctx);
   const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-grad-'));
   let resolved: ResolvedLevel | undefined;
   try {
@@ -299,7 +302,7 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   // checkpoint and the cells aren't re-run below.
   const collected: GradientRunRecord[] = [];
   const cellKey = (r: { fixture: string; model: string; level: string; rep?: number }): string =>
-    `${r.model}|${r.fixture}|${r.level}|${r.rep ?? 0}`;
+    JSON.stringify([r.model, r.fixture, r.level, r.rep ?? 0]);
   const completed = new Set<string>();
   if (opts.resumeRuns?.length) {
     let resumed = 0;
@@ -313,6 +316,7 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
     if (resumed) console.error(`[gradient] resuming with ${resumed} prior cell(s) skipped`);
   }
   let writeChain: Promise<void> = Promise.resolve();
+  let checkpointWriteFailures = 0;
   const writeCheckpoint = (): Promise<void> => {
     if (!opts.checkpointPath) return Promise.resolve();
     const path = opts.checkpointPath;
@@ -326,6 +330,7 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
       try {
         await fs.writeFile(path, JSON.stringify(snapshot, null, 2));
       } catch (err) {
+        checkpointWriteFailures += 1;
         console.error(
           `[gradient] checkpoint write failed: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -337,13 +342,22 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   // One model's worth of work — sequential over reps × fixtures × paths.
   // Rep is the outer loop so partial runs still give >=1 complete rep per cell.
   const runModel = async (model: string): Promise<GradientRunRecord[]> => {
-    // Slug imageName per model so concurrent runs don't `kubectl delete` each
-    // other's deployment. Single-model runs keep the default `eval-image`.
+    // Slug imageName AND namespace per model lane so concurrent runs cannot
+    // interfere via `kubectl delete`, verifyDeploy scoping, or shared backing
+    // services. Single-model runs keep the canonical `eval-image` / namespace.
+    const slug = slugifyModel(model);
     const ctx: AzureContext =
       opts.models.length > 1
-        ? { ...baseCtx, imageName: `${baseCtx.imageName}-${slugifyModel(model)}` }
+        ? {
+            ...baseCtx,
+            imageName: `${baseCtx.imageName}-${slug}`,
+            namespace: `${baseCtx.namespace}-${slug}`,
+          }
         : baseCtx;
-    console.error(`[gradient] start model=${model} imageName=${ctx.imageName} reps=${reps}`);
+    await ensureNamespace(baseCtx, ctx.namespace);
+    console.error(
+      `[gradient] start model=${model} imageName=${ctx.imageName} namespace=${ctx.namespace} reps=${reps}`,
+    );
     const out: GradientRunRecord[] = [];
     for (let rep = 0; rep < reps; rep++) {
       for (const fixture of opts.fixtures) {
@@ -389,6 +403,11 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
 
   // Flush the final checkpoint before returning.
   await writeCheckpoint();
+  if (checkpointWriteFailures > 0) {
+    console.error(
+      `[gradient] WARNING: ${checkpointWriteFailures} checkpoint write(s) failed during this run — resume data on disk may be incomplete.`,
+    );
+  }
 
   // `collected` includes any resumed (seeded) records plus everything run this
   // session; `all` holds only cells run this session. Returning `collected`
