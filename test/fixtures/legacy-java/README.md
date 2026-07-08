@@ -22,7 +22,7 @@ fixture directory:
 # Baseline LLM, no skills, no MCP
 tsx test/agent-eval/cli.ts run \
   --fixture test/fixtures/legacy-java/spring-mvc-war \
-  --mode baseline \
+  --mode bare \
   --model github-models:gpt-4o-mini
 
 # With containerization-assist MCP tools available

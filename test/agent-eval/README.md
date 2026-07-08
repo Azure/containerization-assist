@@ -87,7 +87,7 @@ quality heatmap, a cost-vs-effectiveness scatter, and an errors footer.
 
 ```
 agent-eval ping     --model <spec>
-agent-eval run      --fixture <dir> --mode <baseline|skills|mcp> --model <spec>
+agent-eval run      --fixture <dir> --mode <bare|skills|mcp> --model <spec>
 agent-eval check    --dir <artifactDir> [--checks <names>]
 agent-eval gradient (--fixtures <dirs> | --fixtures-dir <dir>) --models <specs>
                     [--paths ...] [--sequential | --parallel] [--reps <n>] [--out results.json]

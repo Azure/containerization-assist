@@ -37,7 +37,7 @@ const DEPLOY_TO_AKS_SKILL_BUNDLE: readonly string[] = [
   'fix-dockerfile',
 ];
 
-export type Mode = 'baseline' | 'skills' | 'mcp';
+export type Mode = 'bare' | 'baseline' | 'skills' | 'mcp';
 
 export interface ResolvedMode {
   systemPrompt: string;
@@ -313,6 +313,7 @@ export async function resolveMode(opts: {
   workingDir: string;
 }): Promise<ResolvedModeBundle> {
   switch (opts.mode) {
+    case 'bare':
     case 'baseline':
       return {
         resolved: { systemPrompt: BASELINE_PROMPT, tools: [] },
@@ -341,6 +342,6 @@ export async function resolveMode(opts: {
       };
     }
     default:
-      throw new Error(`Unknown mode '${opts.mode as string}'. Supported: baseline, skills, mcp`);
+      throw new Error(`Unknown mode '${opts.mode as string}'. Supported: bare (alias: baseline), skills, mcp`);
   }
 }

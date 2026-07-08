@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * Agent Evaluation CLI
- * Compare agent success rate and token usage across modes (baseline | skills | mcp).
+ * Compare agent success rate and token usage across modes (bare | skills | mcp).
  */
 
 import { promises as fs } from 'node:fs';
@@ -31,7 +31,7 @@ program
   .command('run')
   .description('Run a single agent evaluation against a fixture')
   .requiredOption('--fixture <path>', 'path to fixture directory')
-  .requiredOption('--mode <mode>', 'baseline | skills | mcp')
+  .requiredOption('--mode <mode>', 'bare | skills | mcp (baseline accepted as alias for bare)')
   .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o-mini or foundry:llama-3-3-70b')
   .action(async (opts: { fixture: string; mode: string; model: string }) => {
     const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-'));
