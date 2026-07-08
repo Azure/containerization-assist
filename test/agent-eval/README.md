@@ -39,7 +39,7 @@ AZURE_FOUNDRY_ENDPOINT=https://<resource>.services.ai.azure.com/openai/v1
 **2. Azure infra (one-time):**
 
 ```sh
-RG=ca-eval-rg; LOC=eastus; ACR=caevalacr; AKS=ca-eval-aks
+RG=ca-test-suite; LOC=eastus2; ACR=caevalacr; AKS=ca-eval-aks
 az group create -n $RG -l $LOC
 az acr create  -n $ACR -g $RG --sku Basic
 az aks create  -n $AKS -g $RG --node-count 1 --enable-managed-identity --attach-acr $ACR
@@ -51,7 +51,7 @@ kubectl create namespace eval-ns
 
 ```sh
 export AGENT_EVAL_REGISTRY=caevalacr.azurecr.io
-export AGENT_EVAL_RESOURCE_GROUP=ca-eval-rg
+export AGENT_EVAL_RESOURCE_GROUP=ca-test-suite
 export AGENT_EVAL_CLUSTER=ca-eval-aks
 export AGENT_EVAL_NAMESPACE=eval-ns
 export AGENT_EVAL_IMAGE=eval-image

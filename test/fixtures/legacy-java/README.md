@@ -1,6 +1,6 @@
 # Legacy Java fixture repos
 
-Two representative "legacy" Java backends used to evaluate how well
+Representative "legacy" Java backends used to evaluate how well
 containerization-assist (and bare LLM agents) handle real-world enterprise apps.
 
 These are **not** intended to actually compile in CI — they exist so the analyzer,

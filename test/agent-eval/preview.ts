@@ -16,7 +16,7 @@ import type { CheckResult } from './checks.js';
 const MODELS = ['azure:gpt-4.1', 'azure:gpt-4o', 'azure:gpt-4.1-mini'];
 const FIXTURES = [
   '/repo/test/fixtures/legacy-java/spring-boot-rest-api',
-  '/repo/test/fixtures/legacy-java/coolstore',
+  '/repo/test/fixtures/legacy-java/ejb-ant-monolith',
   '/repo/test/fixtures/legacy-java/spring-mvc-war',
 ];
 const CHECKS = ['docker-builds', 'requires-azure-base', 'has-required-labels'];
