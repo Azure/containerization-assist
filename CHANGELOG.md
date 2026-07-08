@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.5.1-dev.1]
+
+- test partner release pipeline
+
 ## [1.5.0]
 
 - Add GitHub Actions workflow generation tool (#687)
