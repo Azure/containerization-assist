@@ -71,8 +71,9 @@ npm run eval -- gradient \
 ```
 
 - All three paths run unless scoped with `--paths bare,skills`.
-- Models run **sequentially** by default (safer on small clusters); add
-  `--parallel` to overlap them (each gets its own ACR repo + Deployment).
+- Models run **in parallel** when more than one is passed (each lane gets its
+  own ACR repo + Deployment). Pass `--sequential` to force serial execution,
+  or `--max-concurrent-models <n>` to cap concurrency for provider rate limits.
 - `--reps <n>` repeats each cell; `--fixtures-dir <dir>` auto-discovers fixtures
   from a parent directory instead of listing them with `--fixtures`.
 - kubectl cleanup runs before **and** after each cell, so a stuck Deployment
@@ -89,7 +90,7 @@ agent-eval ping     --model <spec>
 agent-eval run      --fixture <dir> --mode <baseline|skills|mcp> --model <spec>
 agent-eval check    --dir <artifactDir> [--checks <names>]
 agent-eval gradient (--fixtures <dirs> | --fixtures-dir <dir>) --models <specs>
-                    [--paths ...] [--parallel] [--reps <n>] [--out results.json]
+                    [--paths ...] [--sequential | --parallel] [--reps <n>] [--out results.json]
 ```
 
 `run` is the single-shot version of one gradient cell — raw stdout, no report.

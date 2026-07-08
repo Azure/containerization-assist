@@ -352,7 +352,7 @@ export class AISDKDriver {
           .describe('Kubernetes namespace to apply into. Defaults to the namespace already set on the kube-context.'),
       }),
       execute: async ({ path: relPath, namespace }) => {
-        const fullPath = join(input.workingDir, String(relPath));
+        const fullPath = resolveInWorkingDir(String(relPath));
         // No pre-apply image check: a real `kubectl apply` never pre-verifies
         // the registry. If an image isn't there yet, the pod will surface
         // ImagePullBackOff via verifyDeploy and the agent must recover via the

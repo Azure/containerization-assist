@@ -161,10 +161,11 @@ program
     '',
   )
   .option('--out <path>', 'write JSON results to this file (default: do not write)', '')
-  .option('--parallel', 'run models in parallel (default: sequential, safer on small clusters)', false)
+  .option('--parallel', 'force models to run in parallel (default: parallel when >1 model)', false)
+  .option('--sequential', 'force models to run sequentially (overrides the default parallel-when-multi behavior)', false)
   .option(
     '--max-concurrent-models <n>',
-    'cap on how many model lanes run concurrently (default: unlimited when --parallel is set). Use to stay under provider rate limits.',
+    'cap on how many model lanes run concurrently. Use to stay under provider rate limits.',
     '',
   )
   .option(
@@ -184,6 +185,7 @@ program
       paths: string;
       out: string;
       parallel: boolean;
+      sequential: boolean;
       maxConcurrentModels: string;
       resume: string;
       reps: string;
@@ -219,6 +221,9 @@ program
         }
       }
 
+      if (opts.parallel && opts.sequential) fail('--parallel and --sequential are mutually exclusive');
+      const parallelModels: boolean | undefined = opts.sequential ? false : opts.parallel ? true : undefined;
+
       const reps = Number.parseInt(opts.reps, 10);
       if (!Number.isFinite(reps) || reps < 1) fail('--reps must be a positive integer');
 
@@ -245,7 +250,7 @@ program
         fixtures,
         models,
         checks: opts.checks,
-        parallelModels: opts.parallel,
+        ...(parallelModels != null ? { parallelModels } : {}),
         reps,
         ...(maxConcurrentModels != null ? { maxConcurrentModels } : {}),
         ...(opts.out ? { checkpointPath: opts.out } : {}),
