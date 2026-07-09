@@ -471,7 +471,7 @@ export class AISDKDriver {
             const raw = await kget(['get', 'pods', '-o', 'json', ...podSelectorArgs]);
             items = (JSON.parse(raw).items ?? []) as Array<Record<string, unknown>>;
           } catch {
-            items = [];];
+            items = [];
           }
           const pods: PodView[] = items.map((p) => {
             const status = (p.status ?? {}) as Record<string, unknown>;

@@ -26,7 +26,8 @@ log() { printf '[ensure-cluster] %s\n' "$*" >&2; }
 idx_of() {
   local n="$1"
   if [[ "$n" == "$BASE" ]]; then echo 1; return; fi
-  if [[ "$n" =~ ^${BASE}-([0-9]+)$ ]]; then echo "${BASH_REMATCH[1]}"; return; fi
+  local base_re="${BASE//./\\.}"
+  if [[ "$n" =~ ^${base_re}-([0-9]+)$ ]]; then echo "${BASH_REMATCH[1]}"; return; fi
   echo 0
 }
 name_for_idx() { local i="$1"; if [[ "$i" -le 1 ]]; then echo "$BASE"; else echo "${BASE}-${i}"; fi; }

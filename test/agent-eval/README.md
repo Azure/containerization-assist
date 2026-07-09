@@ -42,10 +42,16 @@ AZURE_FOUNDRY_ENDPOINT=https://<resource>.services.ai.azure.com/openai/v1
 RG=ca-test-suite; LOC=eastus2; ACR=caevalacr; AKS=ca-eval-aks
 az group create -n $RG -l $LOC
 az acr create  -n $ACR -g $RG --sku Basic
-az aks create  -n $AKS -g $RG --node-count 1 --enable-managed-identity --attach-acr $ACR
+az aks create  -n $AKS -g $RG --node-count 1 --enable-managed-identity
 az aks get-credentials -n $AKS -g $RG
 kubectl create namespace eval-ns
 ```
+
+`--attach-acr` is intentionally omitted (needs Owner on the ACR to create the
+AcrPull role assignment). The harness wires ACR pull automatically via
+[`scripts/ensure-eval-cluster.sh`](../../scripts/ensure-eval-cluster.sh) —
+either grant `AcrPull` to the kubelet identity, or set `AGENT_EVAL_ACR_ADMIN=1`
+to fall back to an ACR admin-user imagePullSecret.
 
 **3. Point the harness at it** (optional — these are the defaults):
 
@@ -72,8 +78,9 @@ npm run eval -- gradient \
 
 - All three paths run unless scoped with `--paths bare,skills`.
 - Models run **in parallel** when more than one is passed (each lane gets its
-  own ACR repo + Deployment). Pass `--sequential` to force serial execution,
-  or `--max-concurrent-models <n>` to cap concurrency for provider rate limits.
+  own namespace + ACR repo + Deployment). Pass `--sequential` to force serial
+  execution, or `--max-concurrent-models <n>` to cap concurrency for provider
+  rate limits.
 - `--reps <n>` repeats each cell; `--fixtures-dir <dir>` auto-discovers fixtures
   from a parent directory instead of listing them with `--fixtures`.
 - kubectl cleanup runs before **and** after each cell, so a stuck Deployment

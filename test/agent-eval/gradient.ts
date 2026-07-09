@@ -342,16 +342,20 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   // One model's worth of work — sequential over reps × fixtures × paths.
   // Rep is the outer loop so partial runs still give >=1 complete rep per cell.
   const runModel = async (model: string): Promise<GradientRunRecord[]> => {
-    // Slug imageName AND namespace per model lane so concurrent runs cannot
-    // interfere via `kubectl delete`, verifyDeploy scoping, or shared backing
-    // services. Single-model runs keep the canonical `eval-image` / namespace.
     const slug = slugifyModel(model);
+    const nsBudget = 63 - baseCtx.namespace.length - 1;
+    if (opts.models.length > 1 && nsBudget < 1) {
+      throw new Error(
+        `baseCtx.namespace '${baseCtx.namespace}' is too long (${baseCtx.namespace.length} chars) — needs room for '-<model-slug>' within 63 chars (RFC1123).`,
+      );
+    }
+    const nsSlug = slug.slice(0, nsBudget).replace(/-+$/, '');
     const ctx: AzureContext =
       opts.models.length > 1
         ? {
             ...baseCtx,
             imageName: `${baseCtx.imageName}-${slug}`,
-            namespace: `${baseCtx.namespace}-${slug}`,
+            namespace: `${baseCtx.namespace}-${nsSlug}`,
           }
         : baseCtx;
     await ensureNamespace(baseCtx, ctx.namespace);

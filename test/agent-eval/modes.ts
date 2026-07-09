@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { MCPTestHarness } from '../llm-integration/infrastructure/mcp-test-harness.js';
 import { buildAksRemoteDevLoopPrompt } from '../../src/prompts/aks-loop/prompt.js';
@@ -102,42 +103,60 @@ export async function ensureRegistryLogin(ctx: AzureContext = loadAzureContext()
   }
 }
 
-/**
- * Create `namespace` in the current cluster if missing, and (if the canonical
- * `ctx.namespace` has an ACR imagePullSecret wired to its default SA) copy that
- * secret into `namespace` and wire it to that namespace's default SA too.
- * No-op when `namespace === ctx.namespace` (already ensured by ensure-eval-cluster.sh).
- */
+const K8S_NAME_RE = /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/;
+
+function assertK8sName(kind: string, value: string): void {
+  if (!K8S_NAME_RE.test(value)) {
+    throw new Error(`Invalid ${kind} '${value}': must match RFC1123 label (^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$).`);
+  }
+}
+
 export async function ensureNamespace(ctx: AzureContext, namespace: string): Promise<void> {
   if (namespace === ctx.namespace) return;
+  assertK8sName('namespace', namespace);
+  assertK8sName('ctx.namespace', ctx.namespace);
   try {
-    await execFileP('bash', [
-      '-c',
-      `kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -`,
-    ], { timeout: 30_000 });
+    await execFileP('kubectl', ['create', 'namespace', namespace], { timeout: 30_000 });
   } catch (err) {
-    console.error(
-      `[gradient] WARNING: could not ensure namespace ${namespace}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return;
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/AlreadyExists/i.test(msg)) {
+      throw new Error(`ensureNamespace failed to create ${namespace}: ${msg}`);
+    }
   }
-  const acrName = ctx.registry.split('.')[0] ?? '';
-  if (!acrName) return;
+  const host = ctx.registry.split('/')[0] ?? '';
+  if (!host.endsWith('.azurecr.io')) return;
+  const acrName = host.slice(0, -'.azurecr.io'.length);
+  if (!K8S_NAME_RE.test(acrName)) return;
   const pullSecret = `${acrName}-pull`;
   try {
-    await execFileP('bash', [
-      '-c',
-      `kubectl -n ${ctx.namespace} get secret ${pullSecret} -o yaml 2>/dev/null | ` +
-        `sed 's/namespace: ${ctx.namespace}/namespace: ${namespace}/' | ` +
-        `kubectl apply -f -`,
-    ], { timeout: 30_000 });
+    const { stdout } = await execFileP(
+      'kubectl',
+      ['-n', ctx.namespace, 'get', 'secret', pullSecret, '-o', 'yaml'],
+      { timeout: 30_000 },
+    );
+    const rewritten = stdout.replace(
+      new RegExp(`^(\\s*namespace:\\s*)${ctx.namespace}\\s*$`, 'm'),
+      `$1${namespace}`,
+    );
+    const tmpPath = join(tmpdir(), `agent-eval-pullsecret-${namespace}-${Date.now()}.yaml`);
+    await fs.writeFile(tmpPath, rewritten, 'utf8');
+    try {
+      await execFileP('kubectl', ['apply', '-f', tmpPath], { timeout: 30_000 });
+    } finally {
+      await fs.unlink(tmpPath).catch(() => {});
+    }
     await execFileP('kubectl', [
       '-n', namespace,
       'patch', 'serviceaccount', 'default',
-      '-p', `{"imagePullSecrets":[{"name":"${pullSecret}"}]}`,
+      '-p', JSON.stringify({ imagePullSecrets: [{ name: pullSecret }] }),
     ], { timeout: 30_000 });
-  } catch {
-    // Canonical namespace has no admin pull secret (managed-identity path) — nothing to copy.
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/NotFound|not found/i.test(msg)) {
+      console.error(
+        `[gradient] WARNING: could not copy ACR pull secret to ${namespace} — pods may ImagePullBackOff. ${msg.slice(0, 200)}`,
+      );
+    }
   }
 }
 
