@@ -6,7 +6,7 @@ Azure infra (ACR + AKS):
 
 | Path     | What the agent gets |
 | -------- | ------------------- |
-| `bare`   | Generic "containerize and deploy this app to AKS" prompt. The control. |
+| `bare`   | Generic "containerize this application" prompt (generate Dockerfile + manifests, then `dockerBuild`). No deploy loop. The control. |
 | `mcp`    | Same task + the CA `aks-loop` MCP prompt + CA MCP tools. |
 | `skills` | Same task + the CA `deploy-to-aks` SKILL bundle + CA MCP tools. |
 
@@ -63,7 +63,7 @@ export AGENT_EVAL_NAMESPACE=eval-ns
 export AGENT_EVAL_IMAGE=eval-image
 ```
 
-**4. Sanity check:** `npm run eval -- ping --model azure:gpt-4o-mini`
+**4. Sanity check:** `npm run eval -- ping --model azure:gpt-4o`
 
 ## Run the gradient
 
@@ -72,7 +72,7 @@ The headline command — one invocation covers every (path × fixture × model) 
 ```sh
 npm run eval -- gradient \
   --fixtures test/fixtures/legacy-java/spring-boot-rest-api,test/fixtures/legacy-java/spring-mvc-war \
-  --models azure:gpt-4.1,azure:gpt-4o,azure:gpt-4.1-mini \
+  --models azure:gpt-4o,azure:gpt-4.1,azure:gpt-5.4 \
   --out /tmp/gradient.json
 ```
 

@@ -32,7 +32,7 @@ program
   .description('Run a single agent evaluation against a fixture')
   .requiredOption('--fixture <path>', 'path to fixture directory')
   .requiredOption('--mode <mode>', 'bare | skills | mcp (baseline accepted as alias for bare)')
-  .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o-mini or foundry:llama-3-3-70b')
+  .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o or foundry:llama-3-3-70b')
   .action(async (opts: { fixture: string; mode: string; model: string }) => {
     validateProviderEnv();
     const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-'));
@@ -62,7 +62,7 @@ program
 program
   .command('ping')
   .description('Verify model connectivity with a tiny prompt')
-  .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o-mini or foundry:llama-3-3-70b')
+  .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o or foundry:llama-3-3-70b')
   .action(async (opts: { model: string }) => {
     const { model, providerOptions } = getModel(opts.model);
     const result = await generateText({
@@ -154,7 +154,7 @@ program
   )
   .option('--fixtures <paths>', 'comma-separated fixture directories (one run per fixture × model × path)')
   .option('--fixtures-dir <path>', 'directory whose subdirectories are each treated as one fixture')
-  .requiredOption('--models <specs>', 'comma-separated provider:model list, e.g. azure:gpt-4.1,azure:gpt-4o,azure:gpt-4.1-mini')
+  .requiredOption('--models <specs>', 'comma-separated provider:model list, e.g. azure:gpt-4o,azure:gpt-4.1,azure:gpt-5.4')
   .option('--checks <names>', "'all', 'none', or comma-separated check names", 'all')
   .option(
     '--paths <ids>',

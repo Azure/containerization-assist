@@ -78,15 +78,14 @@ const DEPLOY_NUDGE =
   'again. Do not stop until verifyDeploy succeeds.';
 
 /**
- * Normalize assistant/tool messages returned by `agent.generate` so they can be
- * fed back as conversation history on a follow-up call. MCP tool results often
- * carry non-strict-JSON values (e.g. `undefined` fields) that survive in the JS
- * object but fail the SDK's `modelMessageSchema` (`jsonValueSchema`) when the
- * messages are re-validated as input. A JSON round-trip drops those values,
- * yielding clean `ModelMessage[]` the SDK accepts.
+ * Detect the provider "context window exceeded" error so the deploy nudge can
+ * degrade to a minimal prompt instead of failing the whole cell.
  */
-function toModelMessages(messages: readonly ModelMessage[]): ModelMessage[] {
-  return JSON.parse(JSON.stringify(messages)) as ModelMessage[];
+function isContextLengthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /context length|context window|maximum context|too many tokens|reduce the length of the messages|resulted in \d+ tokens/i.test(
+    msg,
+  );
 }
 
 /**
@@ -151,6 +150,7 @@ export class AISDKDriver {
     let tokensOut = 0;
     let createFileCalled = false;
     let deployVerified = false;
+    let lastVerifyFailure: string | undefined;
 
     const resolveInWorkingDir = (p: string): string => {
       const full = isAbsolute(p) ? p : join(input.workingDir, p);
@@ -538,6 +538,12 @@ export class AISDKDriver {
           }
           logs[String(p.name)] = (log ?? '').slice(-3000);
         }
+        lastVerifyFailure =
+          lastPods
+            .flatMap((p) => [...p.waitingReasons, ...p.waitingMessages])
+            .filter(Boolean)
+            .slice(0, 6)
+            .join(' | ') || 'workload did not become Ready';
         return {
           success: false,
           deployments: deployNames,
@@ -621,18 +627,44 @@ export class AISDKDriver {
     // Each nudge gives the agent a fresh step budget; bounded by maxDeployNudges.
     if (input.requireDeploy && !deployVerified) {
       const maxNudges = input.maxDeployNudges ?? 3;
-      const messages: ModelMessage[] = [
-        { role: 'user', content: input.userPrompt },
-        ...toModelMessages(result.response.messages),
-      ];
+      const progressSummary = (): string => {
+        const counts: Record<string, number> = {};
+        for (const c of toolCalls) counts[c.name] = (counts[c.name] ?? 0) + 1;
+        const parts = Object.entries(counts).map(([k, v]) => `${k}×${v}`);
+        return parts.length ? parts.join(', ') : 'none yet';
+      };
       for (let n = 0; n < maxNudges && !deployVerified; n++) {
         console.error(
           `[driver] deploy not verified — nudging agent to finish push→apply→verify ` +
             `(nudge ${n + 1}/${maxNudges}).`,
         );
-        messages.push({ role: 'user', content: DEPLOY_NUDGE });
-        result = await generateWithBackoff({ messages });
-        messages.push(...toModelMessages(result.response.messages));
+        // Compact continuation: re-seed a FRESH, short conversation each round
+        // instead of replaying the whole tool transcript. Replaying compounds
+        // token usage across rounds and pushed small-context models (e.g. gpt-4o
+        // at 128k) over their limit. The on-disk artifacts and live cluster
+        // state are the real source of truth — the agent re-inspects them with
+        // readFile / listDir / verifyDeploy.
+        const progress =
+          `Progress so far — tools already used: ${progressSummary()}. ` +
+          `Your Dockerfile and Kubernetes manifests are already written in the working ` +
+          `directory; inspect them with readFile/listDir rather than regenerating from scratch.` +
+          (lastVerifyFailure ? `\nMost recent verifyDeploy failure: ${lastVerifyFailure}` : '');
+        const nudgeMessages: ModelMessage[] = [
+          { role: 'user', content: input.userPrompt },
+          { role: 'user', content: progress },
+          { role: 'user', content: DEPLOY_NUDGE },
+        ];
+        try {
+          result = await generateWithBackoff({ messages: nudgeMessages });
+        } catch (err) {
+          if (!isContextLengthError(err)) throw err;
+          console.error(
+            '[driver] nudge hit the model context limit — retrying with a minimal prompt.',
+          );
+          result = await generateWithBackoff({
+            messages: [{ role: 'user', content: `${input.userPrompt}\n\n${DEPLOY_NUDGE}` }],
+          });
+        }
       }
     }
 

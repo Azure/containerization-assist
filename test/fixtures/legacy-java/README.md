@@ -23,13 +23,13 @@ fixture directory:
 tsx test/agent-eval/cli.ts run \
   --fixture test/fixtures/legacy-java/spring-mvc-war \
   --mode bare \
-  --model azure:gpt-4o-mini
+  --model azure:gpt-4o
 
 # With containerization-assist MCP tools available
 tsx test/agent-eval/cli.ts run \
   --fixture test/fixtures/legacy-java/ejb-ant-monolith \
   --mode mcp \
-  --model azure:gpt-4o-mini
+  --model azure:gpt-4o
 ```
 
 The CLI copies the fixture into a temp directory before running, so the agent

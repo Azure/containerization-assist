@@ -220,41 +220,27 @@ export async function ensureEvalCluster(ctx: AzureContext = loadAzureContext()):
  * per repo (so `eval-image` doesn't also match `eval-image-mini`).
  */
 export async function cleanupAzureResources(ctx: AzureContext = loadAzureContext()): Promise<void> {
-  const needle = `${ctx.registry}/${ctx.imageName}:`;
+  // Wipe ALL agent-created workloads in the eval namespace, not just the
+  // canonical eval-image Deployment. Agents self-provision backing services
+  // (mysql/postgres), init Jobs, ConfigMaps and PVCs; leaving those behind let
+  // cross-run cruft accumulate and could skew a later verifyDeploy that checks
+  // every Deployment in the namespace. We intentionally do NOT delete the
+  // namespace itself, ServiceAccounts, or Secrets (the ACR pull secret wired to
+  // the default SA must survive between cells).
   try {
-    const { stdout } = await execFileP(
+    await execFileP(
       'kubectl',
       [
-        'get',
-        'deployment',
+        'delete',
+        'deployment,statefulset,daemonset,replicaset,service,job,cronjob,pod,configmap,pvc',
+        '--all',
         '-n',
         ctx.namespace,
-        '-o',
-        'jsonpath={range .items[*]}{.metadata.name}{"\\t"}{.spec.template.spec.containers[*].image}{"\\n"}{end}',
+        '--ignore-not-found',
+        '--wait=false',
       ],
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     );
-    const names = stdout
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.includes(needle))
-      .map((l) => l.split('\t')[0])
-      .filter((n): n is string => Boolean(n));
-    for (const name of names) {
-      await execFileP(
-        'kubectl',
-        [
-          'delete',
-          'deployment,service',
-          name,
-          '-n',
-          ctx.namespace,
-          '--ignore-not-found',
-          '--wait=false',
-        ],
-        { timeout: 30_000 },
-      ).catch(() => {});
-    }
   } catch {
     // best-effort; ignore (no kubectl, no cluster, namespace absent, etc.)
   }
