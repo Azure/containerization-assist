@@ -15,8 +15,15 @@ const SKILLS_DIR = join(__dirname, '..', '..', 'skills');
 
 export const BASELINE_PROMPT =
   'You are a helpful AI programming assistant. The user has asked you to ' +
-  'containerize an application. Use the createFile tool to write any artifacts ' +
-  '(Dockerfile, Kubernetes manifests, etc.) to disk.';
+  'containerize an application for deployment to Azure Kubernetes Service (AKS). ' +
+  'Use the createFile tool to write any artifacts (Dockerfile, Kubernetes ' +
+  'manifests, etc.) to disk. Follow these policies:\n' +
+  '- Prefer Microsoft Container Registry base images (mcr.microsoft.com/...) ' +
+  'over public-registry equivalents (e.g. docker.io/node, eclipse-temurin, ' +
+  'python, dotnet/sdk) when one exists.\n' +
+  '- Add the label `com.azure.containerizationassist.createdby` to the Dockerfile.\n' +
+  '- Add the labels `app.kubernetes.io/name` and `app.kubernetes.io/managed-by` ' +
+  'to every Kubernetes object you generate.';
 
 export const USER_PROMPT = (workingDir: string): string =>
   `The application source is at: ${workingDir}\n\n` +

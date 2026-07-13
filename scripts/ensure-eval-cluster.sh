@@ -78,26 +78,7 @@ az aks get-credentials -g "$RG" -n "$CLUSTER" --overwrite-existing >/dev/null
 
 kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE" >/dev/null
 
-PULL_SECRET="${ACR_NAME}-pull"
-if [[ "${AGENT_EVAL_ACR_ADMIN:-0}" != "1" ]]; then
-  log "AGENT_EVAL_ACR_ADMIN not set — skipping ACR admin fallback. Grant AcrPull to the kubelet identity, or set AGENT_EVAL_ACR_ADMIN=1 to enable admin-user + docker-registry secret (broad shared credential, off by default). Pods may ImagePullBackOff."
-elif az acr update -n "$ACR_NAME" --admin-enabled true -o none 2>/dev/null; then
-  acr_user="$(az acr credential show -n "$ACR_NAME" --query username -o tsv 2>/dev/null)"
-  acr_pass="$(az acr credential show -n "$ACR_NAME" --query 'passwords[0].value' -o tsv 2>/dev/null)"
-  if [[ -n "$acr_user" && -n "$acr_pass" ]]; then
-    kubectl -n "$NAMESPACE" create secret docker-registry "$PULL_SECRET" \
-      --docker-server="${REGISTRY}" --docker-username="$acr_user" --docker-password="$acr_pass" \
-      --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-    kubectl -n "$NAMESPACE" patch serviceaccount default \
-      -p "{\"imagePullSecrets\":[{\"name\":\"$PULL_SECRET\"}]}" >/dev/null
-    log "ACR pull secret $PULL_SECRET wired to default service account"
-  else
-    log "WARN: could not read ACR admin credentials — pods may ImagePullBackOff"
-  fi
-  unset acr_pass
-else
-  log "WARN: could not enable ACR admin on $ACR_NAME — pods may ImagePullBackOff"
-fi
+log "assuming AcrPull is granted to the AKS kubelet identity on $ACR_NAME — pods will ImagePullBackOff if that role is missing"
 
 log "ready: cluster=$CLUSTER ns=$NAMESPACE"
 printf 'RESOLVED_CLUSTER=%s\n' "$CLUSTER"

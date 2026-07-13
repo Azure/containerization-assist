@@ -22,7 +22,7 @@ parameters:
     default: azure:gpt-4o,azure:gpt-4.1,azure:gpt-5.4
   - name: reps
     type: string
-    default: '1'
+    default: '3'
   - name: paths
     type: string
     default: ''
@@ -83,10 +83,6 @@ jobs:
             set -euo pipefail
             kubectl version --client >/dev/null 2>&1 || az aks install-cli
 
-            case "${BUILD_REASON:-}" in
-              IndividualCI|BatchedCI) REPS="3" ;;
-            esac
-
             PATHS_ARG=()
             if [ -n "${PATHS_INPUT:-}" ]; then PATHS_ARG=(--paths "$PATHS_INPUT"); fi
 
@@ -103,8 +99,6 @@ jobs:
           AGENT_EVAL_CLUSTER: ca-eval-aks
           AGENT_EVAL_REGISTRY: caevalacr.azurecr.io
           AGENT_EVAL_NAMESPACE: eval-ns
-          AGENT_EVAL_ACR_ADMIN: '1'
-          BUILD_REASON: $(Build.Reason)
           FIXTURES: ${{ parameters.fixtures }}
           MODELS: ${{ parameters.models }}
           REPS: ${{ parameters.reps }}
@@ -114,3 +108,20 @@ jobs:
         artifact: gradient-report
         displayName: Publish report artifact
         condition: always()
+
+      - task: AzureCLI@2
+        displayName: Purge eval ACR
+        condition: always()
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            ACR="${AGENT_EVAL_REGISTRY%%.*}"
+            for repo in $(az acr repository list --name "$ACR" -o tsv); do
+              echo "deleting $ACR/$repo"
+              az acr repository delete --name "$ACR" --repository "$repo" --yes
+            done
+        env:
+          AGENT_EVAL_REGISTRY: caevalacr.azurecr.io

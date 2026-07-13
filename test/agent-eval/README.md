@@ -48,10 +48,8 @@ kubectl create namespace eval-ns
 ```
 
 `--attach-acr` is intentionally omitted (needs Owner on the ACR to create the
-AcrPull role assignment). The harness wires ACR pull automatically via
-[`scripts/ensure-eval-cluster.sh`](../../scripts/ensure-eval-cluster.sh) —
-either grant `AcrPull` to the kubelet identity, or set `AGENT_EVAL_ACR_ADMIN=1`
-to fall back to an ACR admin-user imagePullSecret.
+AcrPull role assignment). Grant `AcrPull` to the AKS kubelet identity out of
+band instead — pods will `ImagePullBackOff` otherwise.
 
 **3. Point the harness at it** (optional — these are the defaults):
 
