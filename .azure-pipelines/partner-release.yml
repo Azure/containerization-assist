@@ -54,6 +54,18 @@ extends:
                 inputs:
                   versionSpec: $(NodeVersion)
 
+              # Route npm through the CFS proxy for this build only.
+              - script: |
+                  set -euo pipefail
+                  npm config set registry https://packagefeedproxy.microsoft.io/npm/
+                  npm config set always-auth true
+                  # npm ci fetches tarballs from the 'resolved' URLs pinned in
+                  # the lockfile, not from the registry setting, so redirect
+                  # those to the proxy as well (integrity hashes are unchanged).
+                  find . -name package-lock.json -not -path '*/node_modules/*' -print0 \
+                    | xargs -0 sed -i 's#https://registry\.npmjs\.org/#https://packagefeedproxy.microsoft.io/npm/#g'
+                displayName: Route npm through CFS proxy (1ES agents block public registry)
+
               - script: npm ci
                 displayName: Install dependencies
 
