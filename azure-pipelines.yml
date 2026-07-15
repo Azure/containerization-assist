@@ -1,16 +1,5 @@
-trigger:
-  branches:
-    include:
-      - main
-  paths:
-    include:
-      - skills
-      - azure-pipelines.yml
+trigger: none
 
-# Do not auto-run the gradient sweep on pull requests — it is too slow to gate
-# PRs on (a single rep still takes a while). Trigger it manually instead from the
-# Azure DevOps UI (Run pipeline → choose the source branch). Merges to main still
-# run automatically via the `trigger` block above.
 pr: none
 
 parameters:
