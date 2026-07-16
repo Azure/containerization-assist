@@ -1,0 +1,116 @@
+trigger: none
+
+pr: none
+
+parameters:
+  - name: fixtures
+    type: string
+    default: test/fixtures/legacy-java/spring-boot-rest-api,test/fixtures/legacy-java/spring-mvc-war,test/fixtures/legacy-java/ejb-ant-monolith,test/fixtures/legacy-java/wildfly-container-quickstart
+  - name: models
+    type: string
+    default: azure:gpt-4o,azure:gpt-4.1,azure:gpt-5.4
+  - name: reps
+    type: string
+    default: '3'
+  - name: paths
+    type: string
+    default: ''
+  - name: timeoutInMinutes
+    type: number
+    default: 360
+
+variables:
+  - group: ca-agent-eval-foundry
+  - name: azureServiceConnection
+    value: ca-agent-eval-svc-conn
+  - name: NODE_VERSION
+    value: '22'
+
+pool:
+  name: azcu-test-staging-pool-amd64
+
+jobs:
+  - job: gradient
+    displayName: Gradient sweep
+    timeoutInMinutes: ${{ parameters.timeoutInMinutes }}
+    steps:
+      - checkout: self
+        fetchDepth: 0
+
+      - task: NodeTool@0
+        displayName: Setup Node.js
+        inputs:
+          versionSpec: $(NODE_VERSION)
+
+      - script: |
+          set -euo pipefail
+          missing=()
+          [ -z "${AZURE_FOUNDRY_API_KEY:-}"  ] && missing+=(AZURE_FOUNDRY_API_KEY)
+          [ -z "${AZURE_FOUNDRY_ENDPOINT:-}" ] && missing+=(AZURE_FOUNDRY_ENDPOINT)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "##vso[task.logissue type=error]Missing required variables: ${missing[*]} (add them to the 'ca-agent-eval-foundry' variable group)"
+            exit 1
+          fi
+        displayName: Preflight - verify Foundry variables
+        env:
+          AZURE_FOUNDRY_API_KEY: $(AZURE_FOUNDRY_API_KEY)
+          AZURE_FOUNDRY_ENDPOINT: $(AZURE_FOUNDRY_ENDPOINT)
+
+      - script: npm ci
+        displayName: Install dependencies
+
+      - script: npm run build
+        displayName: Build project
+
+      - task: AzureCLI@2
+        displayName: Run gradient sweep
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            kubectl version --client >/dev/null 2>&1 || az aks install-cli
+
+            PATHS_ARG=()
+            if [ -n "${PATHS_INPUT:-}" ]; then PATHS_ARG=(--paths "$PATHS_INPUT"); fi
+
+            npm run eval -- gradient \
+              --fixtures "$FIXTURES" \
+              --models "$MODELS" \
+              --reps "$REPS" \
+              "${PATHS_ARG[@]}" \
+              --out "$(Build.ArtifactStagingDirectory)/gradient.json"
+        env:
+          AZURE_FOUNDRY_API_KEY: $(AZURE_FOUNDRY_API_KEY)
+          AZURE_FOUNDRY_ENDPOINT: $(AZURE_FOUNDRY_ENDPOINT)
+          AGENT_EVAL_RESOURCE_GROUP: ca-agent-eval
+          AGENT_EVAL_CLUSTER: ca-agent-eval-aks
+          AGENT_EVAL_REGISTRY: caagentevalacr.azurecr.io
+          AGENT_EVAL_NAMESPACE: eval-ns
+          FIXTURES: ${{ parameters.fixtures }}
+          MODELS: ${{ parameters.models }}
+          REPS: ${{ parameters.reps }}
+          PATHS_INPUT: ${{ parameters.paths }}
+
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: gradient-report
+        displayName: Publish report artifact
+        condition: always()
+
+      - task: AzureCLI@2
+        displayName: Purge eval ACR
+        condition: always()
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            ACR="${AGENT_EVAL_REGISTRY%%.*}"
+            for repo in $(az acr repository list --name "$ACR" -o tsv); do
+              echo "deleting $ACR/$repo"
+              az acr repository delete --name "$ACR" --repository "$repo" --yes
+            done
+        env:
+          AGENT_EVAL_REGISTRY: caagentevalacr.azurecr.io
