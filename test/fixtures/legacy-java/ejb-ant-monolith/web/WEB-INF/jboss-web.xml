@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss-web>
+    <context-root>/invoices</context-root>
+    <resource-ref>
+        <res-ref-name>jdbc/InvoicesDS</res-ref-name>
+        <jndi-name>java:jboss/datasources/InvoicesDS</jndi-name>
+    </resource-ref>
+</jboss-web>
