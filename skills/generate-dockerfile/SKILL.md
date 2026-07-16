@@ -58,24 +58,129 @@ from the final image — typically 70–90% smaller and a smaller attack surface
 
 ### G2 — Choose the base image(s)
 
-Prefer the **first matching row**. Substitute the major version into the tag.
+**Hard rule: every `FROM` line MUST start with `mcr.microsoft.com/` unless
+the stack appears in the explicit non-MCR list (G2.3) below.**
 
-| Language / Stack | Build stage | Runtime stage |
+The Dockerfile is the contract for an Azure-hosted image. Public-registry
+images (`eclipse-temurin`, `tomcat`, `node`, `python`, `golang`, `rust`)
+are **not** "alternatives" — they are fallbacks for the few stacks where
+MCR genuinely does not publish a base. Pick from the catalog in G2.1
+first; only if no row matches, drop to G2.3.
+
+#### G2.1 — MCR catalog (use these tags, do not invent others)
+
+Use only the tags listed here. If your `<LV>` is not in the list, see
+G2.2 (modernize) or G2.3 (documented fallback) — do NOT guess a tag.
+
+**Java — `mcr.microsoft.com/openjdk/jdk`**
+
+| `<LV>` | Build tag | Runtime tag |
 |---|---|---|
-| `java` (Spring Boot, generic) | `mcr.microsoft.com/openjdk/jdk:<LV>-azurelinux` or `eclipse-temurin:<LV>-jdk` | `mcr.microsoft.com/openjdk/jdk:<LV>-distroless` or `eclipse-temurin:<LV>-jre-alpine` |
-| `dotnet` (ASP.NET Core) | `mcr.microsoft.com/dotnet/sdk:<LV>-azurelinux` | `mcr.microsoft.com/dotnet/aspnet:<LV>-azurelinux` |
-| `dotnet` (worker / CLI) | `mcr.microsoft.com/dotnet/sdk:<LV>-azurelinux` | `mcr.microsoft.com/dotnet/runtime:<LV>-azurelinux` |
-| `javascript` / `typescript` | `mcr.microsoft.com/azurelinux/base/nodejs:<LV>` or `node:<LV>-alpine` | `mcr.microsoft.com/azurelinux/distroless/nodejs:<LV>` or `node:<LV>-alpine` |
-| `python` | `mcr.microsoft.com/azurelinux/base/python:<LV>` or `python:<LV>-slim` | `mcr.microsoft.com/azurelinux/distroless/python:<LV>` or `python:<LV>-slim` |
-| `go` | `golang:<LV>-alpine` | `gcr.io/distroless/static-debian12:nonroot` (CGO disabled) or `gcr.io/distroless/base-debian12:nonroot` (CGO enabled) |
-| `rust` | `rust:<LV>-slim` | `gcr.io/distroless/cc-debian12:nonroot` |
-| `php` (web) | `composer:2` | `php:<LV>-fpm-alpine` or `php:<LV>-apache` |
-| `ruby` (rails) | `ruby:<LV>-slim` | `ruby:<LV>-slim` |
+| 8 | `8-azurelinux` | `8-distroless` |
+| 11 | `11-azurelinux` | `11-distroless` |
+| 17 | `17-azurelinux` | `17-distroless` |
+| 21 | `21-azurelinux` | `21-distroless` |
+| 25 | `25-azurelinux` | `25-distroless` |
 
-Defaults if `languageVersion` is missing: `java=21`, `dotnet=8.0`, `node=20`,
-`python=3.11`, `go=1.22`, `rust=1.75`, `php=8.3`, `ruby=3.3`.
+These are the only Java major versions on MCR (verified against
+`https://mcr.microsoft.com/v2/openjdk/jdk/tags/list`). The published tag
+format is a **single digit major** — `8-azurelinux`, never `1.8-azurelinux`
+or `8u292-jdk-slim` (those do not exist and fail with `image not found`).
+MCR does **not** publish a separate `openjdk/jre` repository — for the
+runtime stage of a JRE-only image, use the `-distroless` variant of the
+same major (`8-distroless`, `17-distroless`, …) which ships only the JRE.
+
+**.NET — `mcr.microsoft.com/dotnet/{sdk,aspnet,runtime}`**
+
+| `<LV>` | SDK | ASP.NET runtime | Generic runtime |
+|---|---|---|---|
+| 8.0 | `sdk:8.0-azurelinux3.0` | `aspnet:8.0-azurelinux3.0` | `runtime:8.0-azurelinux3.0` |
+| 9.0 | `sdk:9.0-azurelinux3.0` | `aspnet:9.0-azurelinux3.0` | `runtime:9.0-azurelinux3.0` |
+
+**Node.js — `mcr.microsoft.com/azurelinux/{base,distroless}/nodejs`**
+
+| `<LV>` | Build tag | Runtime tag |
+|---|---|---|
+| 18 | `base/nodejs:18` | `distroless/nodejs:18` |
+| 20 | `base/nodejs:20` | `distroless/nodejs:20` |
+| 22 | `base/nodejs:22` | `distroless/nodejs:22` |
+
+**Python — `mcr.microsoft.com/azurelinux/{base,distroless}/python`**
+
+| `<LV>` | Build tag | Runtime tag |
+|---|---|---|
+| 3.11 | `base/python:3.11` | `distroless/python:3.11` |
+| 3.12 | `base/python:3.12` | `distroless/python:3.12` |
+
+Defaults if `languageVersion` is missing: `java=21`, `dotnet=8.0`,
+`node=20`, `python=3.12`.
+
+#### G2.2 — Modernize before falling back
+
+If the project targets a version not in G2.1 (typically Python 3.9/3.10,
+Node 16, Java 7):
+
+1. **Preferred:** bump the build target to the nearest LTS in G2.1
+   (Python → 3.11, Node → 18). Update package metadata, keep MCR images.
+2. Only if modernization is genuinely impossible, drop to G2.3 and
+   document the reason in a `# WHY-NOT-MCR:` comment above the
+   offending `FROM` line.
+
+#### G2.3 — Allowed non-MCR fallbacks (closed list)
+
+The following bases may appear when, and only when, no MCR row in G2.1
+applies. Anything not in this list MUST NOT appear in a `FROM` line.
+
+**Hard rule — build images are build-only.** The images in the **Build
+stage** column below (`maven:*`, `gradle:*`, `golang:*`, `rust:*`,
+`composer:*`) are builders. They MUST NOT be the final / runtime stage. Using
+a non-MCR build image obligates a **multi-stage** Dockerfile whose final
+`FROM` is the matching **Runtime stage** image (an MCR `*-distroless` row from
+G2.1 wherever one exists). A single-stage Dockerfile that ships a
+`maven` / `gradle` / `golang` / `rust` builder as the runtime image is a policy
+violation: it defeats the MCR-runtime goal and ships the full build toolchain
+plus source in the running image — even though a lone `maven`/`gradle` `FROM`
+looks "allowed" here.
+
+| Stack / Reason | Build stage | Runtime stage |
+|---|---|---|
+| Maven builder (MCR ships no Maven-with-JDK image) | `maven:3.9-eclipse-temurin-<LV>` (where `<LV>` ∈ {8, 11, 17, 21}) | use the matching MCR `openjdk/jdk:<LV>-distroless` for runtime |
+| Gradle builder (MCR ships no Gradle image) | `gradle:<ver>-jdk<LV>` | use the matching MCR `openjdk/jdk:<LV>-distroless` for runtime |
+| Java EE / Jakarta EE app server (EJB, JSF, full profile — MCR ships no app server) | `maven:3.9-eclipse-temurin-<LV>` or MCR `openjdk/jdk:<LV>-azurelinux` | `jboss/wildfly:<ver>` (WildFly), `payara/server-full:<ver>` (Payara), `tomee:<ver>` (TomEE), or `tomcat:<ver>-jdk<LV>` (servlet-only WAR) |
+| Servlet/JSP WAR with no EJB | MCR `openjdk/jdk:<LV>-azurelinux` | `tomcat:<ver>-jdk<LV>` |
+| Go (no MCR base) | `golang:<LV>-alpine` | `gcr.io/distroless/static-debian12:nonroot` (CGO off) or `gcr.io/distroless/base-debian12:nonroot` (CGO on) |
+| Rust (no MCR base) | `rust:<LV>-slim` | `gcr.io/distroless/cc-debian12:nonroot` |
+| PHP (no MCR base) | `composer:2` | `php:<LV>-fpm-alpine` or `php:<LV>-apache` |
+| Ruby (no MCR base) | `ruby:<LV>-slim` | `ruby:<LV>-slim` |
+
+**Bare JDK/JRE images (`eclipse-temurin`, `openjdk`, `adoptopenjdk`,
+`amazoncorretto`, `ibmjava`) are NOT on this list.** For Java versions
+8, 11, 17, 21, or 25, the MCR `openjdk/jdk:<LV>-{azurelinux,distroless}`
+row in G2.1 is mandatory — falling back to `eclipse-temurin:8-jre-alpine`
+or `adoptopenjdk:8-jre-hotspot` when MCR has the same major is a policy
+violation, even with a `# WHY-NOT-MCR:` comment.
+
+**Tag-name precision for Docker Hub `maven` images:** the only published
+`maven:3.9-eclipse-temurin-*` tags are `8`, `11`, `17`, `21` — there is
+**no** `…-jdk` suffix on these. Tags such as `maven:3.9-eclipse-temurin-8-jdk`
+or `maven:3.9-eclipse-temurin-17-jdk` do **not** exist and fail with
+`not found`. Use `maven:3.9-eclipse-temurin-17`, not
+`maven:3.9-eclipse-temurin-17-jdk`.
+
+When you use any row from G2.3, prepend a `# WHY-NOT-MCR:` comment
+above the `FROM` line explaining which condition triggered the
+fallback (e.g. `# WHY-NOT-MCR: Java EE app server, no MCR equivalent`).
+
+**Never invent a tag.** If you are tempted to write
+`mcr.microsoft.com/<anything>:<LV>-<suffix>` and the exact tag is not
+in G2.1, stop — either modernize per G2.2 or fall back per G2.3.
 
 ### G3 — Construct the Dockerfile
+
+**Hard rule: every Dockerfile MUST contain
+`LABEL com.azure.containerizationassist.createdby="containerization-assist"`,
+emitted on the line immediately after the `FROM` of the runtime / final
+stage. No exceptions. A Dockerfile without this label is rejected.**
 
 Apply every rule in this checklist:
 
@@ -83,9 +188,50 @@ Apply every rule in this checklist:
 - One `WORKDIR` early (use `/app`); never use `cd` in `RUN`.
 - Copy **dependency manifests first**, install deps, then copy source — to
   preserve layer cache.
+- **Source MUST be copied before any build/compile command.** Every build
+  stage that runs `mvn` / `./mvnw` / `gradle` / `./gradlew` / `npm run build`
+  / `tsc` / `dotnet publish` / `go build` / `cargo build` MUST be preceded
+  by a `COPY src ./src` (or equivalent — `COPY . .` for languages without
+  a conventional `src/` layout). Skipping the source copy produces an empty
+  build that fails with errors like "Unable to find main class" or
+  "no main module" at runtime.
 - Use `RUN` chaining with `&&` to keep layers small. Aim for ≤ 6 `RUN`
   instructions.
 - For multi-stage, give each stage a name (`AS build`, `AS runtime`).
+
+**Build output & dependencies (derive, never assume)**
+
+Where a build writes its artifact, and which dependencies it needs to run,
+are determined by the project's own config — not by framework convention.
+Two recurring build failures come from guessing instead of reading:
+
+- **Derive the build-output directory; never hardcode it.** Before you
+  `COPY` build output into the runtime stage, find where the build tool
+  actually writes it:
+  1. Read the build tool's config for a configured output path — e.g.
+     `build.outDir` in `vite.config.*`, `compilerOptions.outDir` in
+     `tsconfig.json`, `outputPath` in `angular.json`, `distDir` in
+     `next.config.*`, `output.path` in `webpack.config.*`, `buildDir` in
+     `nuxt.config.*`.
+  2. If none is set, use that tool's documented default.
+  3. If still unsure, run the build in the build stage and `COPY` the
+     directory it actually produced.
+  `build/` is only Create React App's default. Vite, Vue CLI, Angular and
+  most bundlers emit to `dist/`; Next.js to `.next/`. Hardcoding
+  `COPY build/ ...` fails with `"/app/build": not found` on any of them.
+
+- **Install full dependencies in the build stage; prune only for runtime.**
+  Compilers and bundlers (`tsc`, `vite`, `webpack`, `rollup`, `esbuild`)
+  almost always live in `devDependencies`. In the build stage run a full
+  install (`npm ci` / `npm install` with **no** `--omit=dev` /
+  `--production`). Running `npm ci --omit=dev` before `npm run build`
+  removes the compiler and fails with `tsc: not found` / exit 127. Only the
+  **runtime** stage may drop dev deps — or, better, copy just the built
+  artifact into a clean runtime image and install nothing there.
+
+These two rules hold for any compiled or bundled stack — present or future
+— so they replace per-framework "copy from X" recipes rather than adding to
+them.
 
 **Security baseline (mandatory)**
 - Final stage MUST end with a `USER` instruction set to a non-root user.
@@ -110,6 +256,49 @@ Apply every rule in this checklist:
 - Do NOT run `apt-get upgrade` / `apt-get dist-upgrade`.
 - If using `apt-get install`, clean up:
   `apt-get update && apt-get install -y --no-install-recommends <pkgs> && rm -rf /var/lib/apt/lists/*`.
+- **Package manager per base image** — using the wrong one fails with `command not found`:
+
+  | Base image family | Package manager | Install one-liner |
+  |---|---|---|
+  | `mcr.microsoft.com/openjdk/jdk:*-azurelinux`, `mcr.microsoft.com/azurelinux/base/*`, `mcr.microsoft.com/dotnet/*-azurelinux*`, `*-mariner*` | **`tdnf`** | `tdnf install -y <pkg> && tdnf clean all` |
+  | `mcr.microsoft.com/*-distroless`, `gcr.io/distroless/*` | **none** — no shell, no package manager. Install in the build stage instead and copy artifacts in. |
+  | `eclipse-temurin:*-jre-alpine`, `node:*-alpine`, `python:*-alpine` | `apk` | `apk add --no-cache <pkg>` |
+  | `eclipse-temurin:*-jdk`, `python:*-slim`, `node:*` (Debian-based) | `apt-get` | as above |
+
+  **`microdnf` does NOT exist on Azure Linux / Mariner.** It ships on RHEL/UBI
+  only. Using `microdnf install …` on any `*-azurelinux` or `*-mariner`
+  base image fails with `microdnf: command not found`. Use `tdnf` instead
+  — same syntax, same flags. Do NOT use `apt-get` on Azure Linux either.
+
+**Distroless final-stage rules (hard):** when the runtime stage `FROM`
+ends in `-distroless` (or starts with `gcr.io/distroless/`), the image
+has no shell, no package manager, no `useradd`/`adduser`, no `chmod`,
+no `mkdir`. Any `RUN` in the distroless stage will fail at build time
+with `exec: "/bin/sh": stat /bin/sh: no such file or directory`. Rules:
+
+- **No `RUN` instructions in the distroless stage.** Do all setup
+  (chmod, package install, user creation) in the build stage and `COPY`
+  the prepared artifacts in.
+- **Do not try to `RUN useradd` / `RUN adduser` on distroless** (no shell).
+  Set the user with a numeric `USER` instead — which non-root user the base
+  provides depends on the image:
+  - **Node.js / Python** (`mcr.microsoft.com/azurelinux/distroless/{nodejs,python}`)
+    predefine a non-root user `app` at UID 1000 — emit `USER 1000` (preferred)
+    or `USER app`.
+  - **Java** (`mcr.microsoft.com/openjdk/jdk:<LV>-distroless`) does **NOT**
+    predefine a non-root user — its default is root, and there is no `app`
+    user. Emit the numeric `USER 1000` (do **not** write `USER app`: that name
+    does not exist on the Java distroless image, and a Kubernetes
+    `runAsNonRoot` securityContext then fails at deploy with
+    `CreateContainerConfigError: ... non-numeric user`).
+  Always prefer the **numeric** `USER 1000` on distroless: a numeric UID
+  satisfies `runAsNonRoot` without needing an `/etc/passwd` entry.
+- **Do not try to `RUN chmod` / `RUN chown` on distroless.** Set the
+  mode/owner with `COPY --chmod=…` / `COPY --chown=app:app …` instead
+  (BuildKit syntax, supported by default).
+- **Skip `HEALTHCHECK`** on distroless — there is no shell to run the
+  probe command. Document with `# HEALTHCHECK: skipped — distroless,
+  use Kubernetes liveness/readiness probe`.
 - Pin **major** version tags (`:21`, `:8.0`, `:3.11`), never `:latest` and
   never floating patch versions like `21.0.3`.
 
@@ -131,7 +320,13 @@ Apply every rule in this checklist:
 
 **Required labels (attribution)**
 
-Always emit:
+`LABEL` is a Dockerfile instruction that only takes effect inside a build
+stage — it MUST appear after a `FROM` line or `docker build` errors out
+with `no build stage in current context`. Emit attribution labels
+**immediately after the `FROM` line of the final / runtime stage** (and
+not before the first `FROM`, not in the build stage).
+
+Always emit, in the runtime stage:
 ```
 LABEL com.azure.containerizationassist.createdby="containerization-assist"
 ```
@@ -144,7 +339,14 @@ LABEL com.azure.containerizationassist.version="<version>"
 Otherwise omit the version label — never hard-code a stale version string.
 Do NOT substitute either key for `org.opencontainers.image.*`.
 
-**Framework-specific tweaks**
+**Framework-specific tweaks (illustrative, not an allowlist)**
+
+These rows are worked examples of the general rules above — not an
+exhaustive list. For a framework not listed here, apply the same approach:
+derive the build-output directory and the run command from the project's
+own config and the framework's documented defaults. Never skip
+containerizing a stack, or fall back to a guess, just because it lacks a
+row in this table.
 
 | Framework | Add |
 |---|---|
@@ -160,13 +362,16 @@ Do NOT substitute either key for `org.opencontainers.image.*`.
 
 Before emitting, confirm:
 
+- [ ] **Required label present.** The runtime stage contains `LABEL com.azure.containerizationassist.createdby="containerization-assist"` immediately after its `FROM` line. (If missing, add it now — do not skip.)
+- [ ] **Azure base.** Every `FROM` line either starts with `mcr.microsoft.com/` (using a tag from the G2.1 catalog) **or** matches a row in the G2.3 fallback list with a `# WHY-NOT-MCR:` comment above it. No invented MCR tags.
+- [ ] **No builder as runtime.** If any `FROM` uses a G2.3 *Build stage* image (`maven`/`gradle`/`golang`/`rust`/`composer`), the Dockerfile is multi-stage and its **final** `FROM` is the matching G2.3 *Runtime stage* image (or an MCR G2.1 image) — never the builder itself.
+- [ ] **Source copied before build.** Every `RUN` that invokes a build tool (`mvn`/`mvnw`, `gradle`/`gradlew`, `npm run build`, `tsc`, `dotnet publish`, `go build`, `cargo build`) is preceded by a `COPY` of the source tree.
 - [ ] Single non-root `USER` in the final stage
 - [ ] No hardcoded secrets in any `ENV`
 - [ ] No `:latest` tag, no `apt-get upgrade`
 - [ ] `WORKDIR` set, no `cd` in `RUN`
 - [ ] Multi-stage chosen per rule G1
 - [ ] `EXPOSE` matches detected listener port
-- [ ] `LABEL com.azure.containerizationassist.createdby` is present
 - [ ] `CMD`/`ENTRYPOINT` in exec form
 
 If any item fails, fix the Dockerfile **before** showing it to the user.
