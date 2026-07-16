@@ -257,8 +257,5 @@ const MARKDOWN_SPECIAL_CHARS = /[\\`*_[\]()<>]/g;
 export function sanitizeForMarkdown(input: string): string {
   // The regex only matches characters that exist in MARKDOWN_ESCAPE_MAP,
   // so the lookup is guaranteed to succeed
-  return input.replace(
-    MARKDOWN_SPECIAL_CHARS,
-    (char) => MARKDOWN_ESCAPE_MAP[char] ?? char,
-  );
+  return input.replace(MARKDOWN_SPECIAL_CHARS, (char) => MARKDOWN_ESCAPE_MAP[char] ?? char);
 }

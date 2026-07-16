@@ -70,8 +70,7 @@ const runPattern = createKnowledgeTool<
   categorization: {
     categoryNames: ['auth', 'build', 'deploy', 'bestPractices'] as const,
     categorize: createSimpleCategorizer<WorkflowCategory>({
-      auth: (s) =>
-        Boolean(s.tags?.includes('azure-oidc') || s.tags?.includes('azure-login')),
+      auth: (s) => Boolean(s.tags?.includes('azure-oidc') || s.tags?.includes('azure-login')),
       build: (s) =>
         Boolean(
           s.tags?.includes('docker-build') ||
@@ -131,7 +130,8 @@ const runPattern = createKnowledgeTool<
       // Reduce the workflow file name to a bare basename (project convention) so a value
       // like "../escape.yml" or "nested/path.yml" cannot escape .github/workflows/.
       // basename strips any directory/traversal segments; fall back for slash-only input.
-      const workflowFileBaseName = path.basename(workflowFileName.replace(/\\/g, '/')) || 'deploy.yml';
+      const workflowFileBaseName =
+        path.basename(workflowFileName.replace(/\\/g, '/')) || 'deploy.yml';
       const workflowFilePath = `.github/workflows/${workflowFileBaseName}`;
 
       // ── Collect categorised snippets for the instruction ────────────────────

@@ -77,12 +77,13 @@ function normalizeRegistryHostname(registry: string): string {
     const url = new URL(urlString);
     hostname = url.hostname ?? registry;
   } catch {
-    hostname = (registry
-      .replace(/^https?:\/\//, '')
-      .split('/')[0]
-      ?.split('?')[0]
-      ?.split('#')[0]
-      ?.split(':')[0]) ?? registry;
+    hostname =
+      registry
+        .replace(/^https?:\/\//, '')
+        .split('/')[0]
+        ?.split('?')[0]
+        ?.split('#')[0]
+        ?.split(':')[0] ?? registry;
   }
 
   hostname = hostname.toLowerCase().trim();
@@ -107,10 +108,11 @@ function isAzureACR(serverUrl: string): boolean {
     const url = new URL(urlString);
     hostname = url.hostname ?? serverUrl;
   } catch {
-    hostname = (serverUrl
-      .replace(/^https?:\/\//, '')
-      .split('/')[0]
-      ?.split(':')[0]) ?? serverUrl;
+    hostname =
+      serverUrl
+        .replace(/^https?:\/\//, '')
+        .split('/')[0]
+        ?.split(':')[0] ?? serverUrl;
   }
 
   hostname = hostname.toLowerCase().trim();
@@ -181,19 +183,23 @@ async function executeCredentialHelper(
       const errorMessage = error.message;
 
       if (errorMessage.includes('ENOENT') || errorMessage.includes('command not found')) {
-        resolve(Failure(`Credential helper not found: ${helperCommand}`, {
-          message: 'Docker credential helper not installed',
-          hint: `The credential helper '${helperCommand}' is not available`,
-          resolution: 'Install the required credential helper or use explicit credentials',
-          details: { helperName, serverUrl },
-        }));
+        resolve(
+          Failure(`Credential helper not found: ${helperCommand}`, {
+            message: 'Docker credential helper not installed',
+            hint: `The credential helper '${helperCommand}' is not available`,
+            resolution: 'Install the required credential helper or use explicit credentials',
+            details: { helperName, serverUrl },
+          }),
+        );
       } else {
-        resolve(Failure(`Credential helper failed: ${errorMessage}`, {
-          message: 'Failed to retrieve credentials from helper',
-          hint: 'Credential helper execution failed',
-          resolution: 'Check credential helper installation and registry authentication',
-          details: { helperName, serverUrl, error: errorMessage },
-        }));
+        resolve(
+          Failure(`Credential helper failed: ${errorMessage}`, {
+            message: 'Failed to retrieve credentials from helper',
+            hint: 'Credential helper execution failed',
+            resolution: 'Check credential helper installation and registry authentication',
+            details: { helperName, serverUrl, error: errorMessage },
+          }),
+        );
       }
     });
 
@@ -201,20 +207,27 @@ async function executeCredentialHelper(
       if (code !== 0) {
         const errorMessage = stderr || `Process exited with code ${code}`;
 
-        if (errorMessage.includes('credentials not found') || errorMessage.includes('not logged in')) {
-          resolve(Failure('No credentials found for registry', {
-            message: 'Registry credentials not found in credential store',
-            hint: 'You may need to log in to the registry first',
-            resolution: 'Run the appropriate login command (e.g., az acr login, docker login)',
-            details: { helperName, serverUrl },
-          }));
+        if (
+          errorMessage.includes('credentials not found') ||
+          errorMessage.includes('not logged in')
+        ) {
+          resolve(
+            Failure('No credentials found for registry', {
+              message: 'Registry credentials not found in credential store',
+              hint: 'You may need to log in to the registry first',
+              resolution: 'Run the appropriate login command (e.g., az acr login, docker login)',
+              details: { helperName, serverUrl },
+            }),
+          );
         } else {
-          resolve(Failure(`Credential helper failed: ${errorMessage}`, {
-            message: 'Failed to retrieve credentials from helper',
-            hint: 'Credential helper execution failed',
-            resolution: 'Check credential helper installation and registry authentication',
-            details: { helperName, serverUrl, error: errorMessage },
-          }));
+          resolve(
+            Failure(`Credential helper failed: ${errorMessage}`, {
+              message: 'Failed to retrieve credentials from helper',
+              hint: 'Credential helper execution failed',
+              resolution: 'Check credential helper installation and registry authentication',
+              details: { helperName, serverUrl, error: errorMessage },
+            }),
+          );
         }
         return;
       }
@@ -228,25 +241,33 @@ async function executeCredentialHelper(
 
         // Validate the result structure
         if (!result.Username || !result.Secret || !result.ServerURL) {
-          resolve(Failure('Invalid credential helper response', {
-            message: 'Credential helper returned incomplete credentials',
-            hint: 'Credential helper response missing required fields',
-            resolution: 'Check credential helper configuration and re-run authentication (e.g., az acr login)',
-            details: { helperCommand, serverUrl, result },
-          }));
+          resolve(
+            Failure('Invalid credential helper response', {
+              message: 'Credential helper returned incomplete credentials',
+              hint: 'Credential helper response missing required fields',
+              resolution:
+                'Check credential helper configuration and re-run authentication (e.g., az acr login)',
+              details: { helperCommand, serverUrl, result },
+            }),
+          );
           return;
         }
 
-        logger.debug({ helperCommand, serverUrl, username: result.Username }, 'Credential helper executed successfully');
+        logger.debug(
+          { helperCommand, serverUrl, username: result.Username },
+          'Credential helper executed successfully',
+        );
         resolve(Success(result));
       } catch (parseError) {
         const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-        resolve(Failure(`Failed to parse credential helper response: ${errorMessage}`, {
-          message: 'Invalid JSON response from credential helper',
-          hint: 'Credential helper returned malformed JSON',
-          resolution: 'Check credential helper configuration and try re-authenticating',
-          details: { helperCommand, serverUrl, stdout, error: errorMessage },
-        }));
+        resolve(
+          Failure(`Failed to parse credential helper response: ${errorMessage}`, {
+            message: 'Invalid JSON response from credential helper',
+            hint: 'Credential helper returned malformed JSON',
+            resolution: 'Check credential helper configuration and try re-authenticating',
+            details: { helperCommand, serverUrl, stdout, error: errorMessage },
+          }),
+        );
       }
     });
 
@@ -313,7 +334,10 @@ export async function getRegistryCredentials(
           const decoded = Buffer.from(auth.auth, 'base64').toString('utf-8');
           const [username, password] = decoded.split(':', 2);
           if (username && password) {
-            logger.debug({ registry: normalizedRegistry }, 'Using base64 encoded credentials from config');
+            logger.debug(
+              { registry: normalizedRegistry },
+              'Using base64 encoded credentials from config',
+            );
             return Success({
               username,
               password,
@@ -321,7 +345,10 @@ export async function getRegistryCredentials(
             });
           }
         } catch (decodeError) {
-          logger.warn({ decodeError, registry: normalizedRegistry }, 'Failed to decode base64 auth');
+          logger.warn(
+            { decodeError, registry: normalizedRegistry },
+            'Failed to decode base64 auth',
+          );
         }
       }
     }
@@ -329,7 +356,10 @@ export async function getRegistryCredentials(
     // Check for registry-specific credential helper
     if (config.credHelpers?.[normalizedRegistry]) {
       const helperName = config.credHelpers[normalizedRegistry];
-      logger.debug({ registry: normalizedRegistry, helperName }, 'Using registry-specific credential helper');
+      logger.debug(
+        { registry: normalizedRegistry, helperName },
+        'Using registry-specific credential helper',
+      );
 
       const credResult = await executeCredentialHelper(helperName, normalizedRegistry, logger);
       if (credResult.ok) {
@@ -357,7 +387,10 @@ export async function getRegistryCredentials(
         }
       } else {
         // Log the credential helper failure but continue to try global helper
-        logger.debug({ error: credResult.error }, 'Registry-specific credential helper failed, trying global helper');
+        logger.debug(
+          { error: credResult.error },
+          'Registry-specific credential helper failed, trying global helper',
+        );
       }
     }
 

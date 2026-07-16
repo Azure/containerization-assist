@@ -95,3 +95,5 @@ coverage-lib
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 .validated-action-refs
+.agent-eval-preview/
+
