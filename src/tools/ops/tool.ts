@@ -231,7 +231,11 @@ export async function serverStatus(
       policies: {
         total: discoveredPolicies.length,
         files: discoveredPolicies.map((p) => ({ path: p.path, source: p.source })),
-        searchPaths: searchPaths.map((sp) => ({ path: sp.path, source: sp.source, exists: sp.exists })),
+        searchPaths: searchPaths.map((sp) => ({
+          path: sp.path,
+          source: sp.source,
+          exists: sp.exists,
+        })),
       },
     };
 

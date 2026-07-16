@@ -265,11 +265,7 @@ export function extractManifestImages(manifest: unknown): Result<string[]> {
   };
 
   // Check spec.containers (Deployment, StatefulSet, DaemonSet, etc.)
-  if (
-    'spec' in manifest &&
-    typeof manifest.spec === 'object' &&
-    manifest.spec !== null
-  ) {
+  if ('spec' in manifest && typeof manifest.spec === 'object' && manifest.spec !== null) {
     const spec = manifest.spec as Record<string, unknown>;
 
     // Direct containers array (Pod)

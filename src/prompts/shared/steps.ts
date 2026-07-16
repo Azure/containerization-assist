@@ -185,7 +185,7 @@ export function azureSubscriptionStep(): Step {
     heading: 'Select and validate the Azure subscription',
     body: [
       '1. Run `az account show --query "{id:id, name:name, tenantId:tenantId}" -o json` to detect the **current default subscription** within the previously selected tenant.',
-      '2. Run `az account list --query "[?state==\'Enabled\' && tenantId==\'<tenantId>\'].{id:id, name:name}" -o json` to list all enabled subscriptions in the selected tenant.',
+      "2. Run `az account list --query \"[?state=='Enabled' && tenantId=='<tenantId>'].{id:id, name:name}\" -o json` to list all enabled subscriptions in the selected tenant.",
       `3. ${pickerBlock({
         defaultLabel: 'the current subscription (`<name> (<id>)`)',
         additionalLabel: 'other subscriptions from the list (if any)',
@@ -216,7 +216,8 @@ export function aksClusterValidationStep(): Step {
     body: [
       '1. Run `az aks list -g <resourceGroup> --query "[].{name:name, sku:sku.name, fqdn:fqdn}" -o json`.',
       `2. ${pickerBlock({
-        defaultLabel: 'the cluster name from the prompt arguments (if any), or the first cluster in the list',
+        defaultLabel:
+          'the cluster name from the prompt arguments (if any), or the first cluster in the list',
         additionalLabel: 'other clusters in the resource group',
         freeTextLabel: 'allow the user to type a cluster name manually',
       })}`,
@@ -273,7 +274,8 @@ export function aksRbacPreDeployCheck(): Step {
       '   - If this command **fails** (non-zero exit), the caller likely lacks the cluster-level role required to obtain a kubeconfig. **HALT** the workflow.',
       canSelfRemediateProbeSnippet(),
       rbacRemediationBlock({
-        failureSummary: 'Cannot fetch kubeconfig for AKS [Automatic|Azure-RBAC] cluster <clusterName>.',
+        failureSummary:
+          'Cannot fetch kubeconfig for AKS [Automatic|Azure-RBAC] cluster <clusterName>.',
         missingRoles: [
           { role: 'Azure Kubernetes Service Cluster User Role', scope: '<clusterScope>' },
         ],
@@ -289,7 +291,7 @@ export function aksRbacPreDeployCheck(): Step {
       '   - If polling exceeds the timeout, report the timeout to the user and stop.',
       '',
       '3. **Structured RBAC role-assignment inspection** (best-effort precision; data-plane probes in Step 4 are still the gate):',
-      '   - List the caller\'s role assignments at both scopes:',
+      "   - List the caller's role assignments at both scopes:",
       '     - `az role assignment list --assignee <callerPrincipalId> --scope <clusterScope> --include-inherited -o json`',
       '     - `az role assignment list --assignee <callerPrincipalId> --scope <namespaceScope> --include-inherited -o json`',
       '   - Bucket the result as `rbacListReadable` / `rbacListUnauthorized` / `rbacListEmpty`.',

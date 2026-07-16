@@ -41,10 +41,7 @@ async function queryKnowledgeFilter(
     const startTime = Date.now();
 
     // Query the policy for knowledge filter configuration
-    const filter = await policy.queryConfig<KnowledgeFilter>(
-      KNOWLEDGE_FILTER_PACKAGE,
-      context,
-    );
+    const filter = await policy.queryConfig<KnowledgeFilter>(KNOWLEDGE_FILTER_PACKAGE, context);
 
     const elapsed = Date.now() - startTime;
 
@@ -67,7 +64,10 @@ async function queryKnowledgeFilter(
     return filter;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn({ error: message }, 'Failed to query knowledge filter policy, proceeding without filters');
+    logger.warn(
+      { error: message },
+      'Failed to query knowledge filter policy, proceeding without filters',
+    );
     return null;
   }
 }
@@ -102,8 +102,7 @@ function applyExclusionFilters(
       const allowedRegistries = filter.allowedRegistries ?? [];
       const hasAllowedRegistry = allowedRegistries.some((registry) => {
         const registryLower = registry.toLowerCase();
-        return recommendationLower.includes(registryLower) ||
-          exampleLower?.includes(registryLower);
+        return recommendationLower.includes(registryLower) || exampleLower?.includes(registryLower);
       });
 
       if (!hasAllowedRegistry) {
@@ -125,9 +124,7 @@ function applyExclusionFilters(
 
       // Check if the entry has an allowed base image category tag
       const allowedCategories = filter.allowedBaseImageCategories ?? [];
-      const hasAllowedCategory = entry.tags?.some((tag) =>
-        allowedCategories.includes(tag),
-      );
+      const hasAllowedCategory = entry.tags?.some((tag) => allowedCategories.includes(tag));
 
       if (!hasAllowedCategory) {
         excluded.push(entry.id);
@@ -235,10 +232,7 @@ function applyWeightMultipliers(
  * @param minScore - Minimum score threshold
  * @returns Filtered matches
  */
-function applyMinScore(
-  matches: KnowledgeMatch[],
-  minScore: number,
-): KnowledgeMatch[] {
+function applyMinScore(matches: KnowledgeMatch[], minScore: number): KnowledgeMatch[] {
   return matches.filter((match) => match.score >= minScore);
 }
 

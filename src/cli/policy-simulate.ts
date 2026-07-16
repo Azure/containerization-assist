@@ -71,9 +71,8 @@ async function simulatePolicy(options: SimulationOptions): Promise<SimulationRes
   const policy = policyResult.value;
 
   // Get tool handler
-  const toolHandler = tool === 'generate-dockerfile'
-    ? generateDockerfileTool
-    : generateK8sManifestsTool;
+  const toolHandler =
+    tool === 'generate-dockerfile' ? generateDockerfileTool : generateK8sManifestsTool;
 
   // Run WITHOUT policy
   console.log('📊 Running WITHOUT custom policy...\n');
@@ -98,7 +97,10 @@ async function simulatePolicy(options: SimulationOptions): Promise<SimulationRes
     logger,
     // signal and progress are omitted (optional)
     policy,
-    queryConfig: async <T>(packageName: string, policyInput: Record<string, unknown>): Promise<T | null> => {
+    queryConfig: async <T>(
+      packageName: string,
+      policyInput: Record<string, unknown>,
+    ): Promise<T | null> => {
       return policy.queryConfig<T>(packageName, policyInput);
     },
   };
@@ -152,7 +154,9 @@ function printSimulationResults(result: SimulationResult): void {
 
   // Summary
   console.log('📊 Impact Summary:');
-  console.log(`  • Generation Config: ${differences.configChanged ? '✅ Modified' : '❌ No change'}`);
+  console.log(
+    `  • Generation Config: ${differences.configChanged ? '✅ Modified' : '❌ No change'}`,
+  );
   console.log(`  • Knowledge Filtered: ${differences.knowledgeFiltered} rules`);
   console.log(`  • Templates Injected: ${differences.templatesInjected} templates`);
   console.log(`  • Validation Rules: ${differences.validationRulesAdded} rules added`);
@@ -186,7 +190,12 @@ function printSimulationResults(result: SimulationResult): void {
       console.log(`     Recommendation: ${template.recommendation}`);
       if (template.priority) console.log(`     Priority: ${template.priority}`);
       console.log('     Code Snippet:');
-      console.log(template.code_snippet.split('\n').map((line: string) => `       ${line}`).join('\n'));
+      console.log(
+        template.code_snippet
+          .split('\n')
+          .map((line: string) => `       ${line}`)
+          .join('\n'),
+      );
       console.log('');
     });
   }
@@ -207,24 +216,39 @@ function printSimulationResults(result: SimulationResult): void {
     console.log('📦 Output Comparison:\n');
     console.log('  WITHOUT Policy:');
     console.log(`  ${'-'.repeat(76)}`);
-    if (withoutPolicy.output && typeof withoutPolicy.output === 'object' && 'summary' in withoutPolicy.output) {
+    if (
+      withoutPolicy.output &&
+      typeof withoutPolicy.output === 'object' &&
+      'summary' in withoutPolicy.output
+    ) {
       console.log(`  Summary: ${(withoutPolicy.output as any).summary}`);
       if ('recommendations' in withoutPolicy.output) {
         const recs = (withoutPolicy.output as any).recommendations;
-        const totalRecs = (recs.securityConsiderations?.length || 0) + (recs.bestPractices?.length || 0);
+        const totalRecs =
+          (recs.securityConsiderations?.length || 0) + (recs.bestPractices?.length || 0);
         console.log(`  Recommendations: ${totalRecs} total`);
       }
     } else {
-      console.log(`  ${JSON.stringify(withoutPolicy.output, null, 2).split('\n').map(line => `  ${line}`).join('\n')}`);
+      console.log(
+        `  ${JSON.stringify(withoutPolicy.output, null, 2)
+          .split('\n')
+          .map((line) => `  ${line}`)
+          .join('\n')}`,
+      );
     }
 
     console.log('\n  WITH Policy:');
     console.log(`  ${'-'.repeat(76)}`);
-    if (withPolicy.output && typeof withPolicy.output === 'object' && 'summary' in withPolicy.output) {
+    if (
+      withPolicy.output &&
+      typeof withPolicy.output === 'object' &&
+      'summary' in withPolicy.output
+    ) {
       console.log(`  Summary: ${(withPolicy.output as any).summary}`);
       if ('recommendations' in withPolicy.output) {
         const recs = (withPolicy.output as any).recommendations;
-        const totalRecs = (recs.securityConsiderations?.length || 0) + (recs.bestPractices?.length || 0);
+        const totalRecs =
+          (recs.securityConsiderations?.length || 0) + (recs.bestPractices?.length || 0);
         console.log(`  Recommendations: ${totalRecs} total`);
 
         // Show policy-driven recommendations
@@ -242,7 +266,12 @@ function printSimulationResults(result: SimulationResult): void {
         }
       }
     } else {
-      console.log(`  ${JSON.stringify(withPolicy.output, null, 2).split('\n').map(line => `  ${line}`).join('\n')}`);
+      console.log(
+        `  ${JSON.stringify(withPolicy.output, null, 2)
+          .split('\n')
+          .map((line) => `  ${line}`)
+          .join('\n')}`,
+      );
     }
     console.log('');
   }
