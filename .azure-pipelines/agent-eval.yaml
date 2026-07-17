@@ -15,7 +15,7 @@ parameters:
     default: '3'
   - name: paths
     type: string
-    default: ''
+    default: bare,mcp,skills
   - name: timeoutInMinutes
     type: number
     default: 360
