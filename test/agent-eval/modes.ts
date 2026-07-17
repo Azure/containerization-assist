@@ -80,12 +80,12 @@ export interface AzureContext {
   imageName: string;
 }
 
-/** Load Azure context from env vars with fallbacks to the ca-eval-* defaults. */
+/** Load Azure context from env vars with fallbacks to the ca-agent-eval defaults. */
 export function loadAzureContext(): AzureContext {
   return {
-    registry: process.env.AGENT_EVAL_REGISTRY ?? 'caevalacr.azurecr.io',
-    resourceGroup: process.env.AGENT_EVAL_RESOURCE_GROUP ?? 'ca-test-suite',
-    clusterName: process.env.AGENT_EVAL_CLUSTER ?? 'ca-eval-aks',
+    registry: process.env.AGENT_EVAL_REGISTRY ?? 'caagentevalacr.azurecr.io',
+    resourceGroup: process.env.AGENT_EVAL_RESOURCE_GROUP ?? 'ca-agent-eval',
+    clusterName: process.env.AGENT_EVAL_CLUSTER ?? 'ca-agent-eval-aks',
     namespace: process.env.AGENT_EVAL_NAMESPACE ?? 'eval-ns',
     imageName: process.env.AGENT_EVAL_IMAGE ?? 'eval-image',
   };
