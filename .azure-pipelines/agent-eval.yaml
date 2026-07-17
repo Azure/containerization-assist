@@ -20,7 +20,7 @@ parameters:
     default: 360
 
 variables:
-  - group: agent-eval-foundry
+  - group: ca-agent-eval-foundry
   - name: azureServiceConnection
     value: ca-agent-eval-svc-conn
   - name: NODE_VERSION
@@ -48,7 +48,7 @@ jobs:
           [ -z "${AZURE_FOUNDRY_API_KEY:-}"  ] && missing+=(AZURE_FOUNDRY_API_KEY)
           [ -z "${AZURE_FOUNDRY_ENDPOINT:-}" ] && missing+=(AZURE_FOUNDRY_ENDPOINT)
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "##vso[task.logissue type=error]Missing required variables: ${missing[*]} (add them to the 'agent-eval-foundry' variable group)"
+            echo "##vso[task.logissue type=error]Missing required variables: ${missing[*]} (add them to the 'ca-agent-eval-foundry' variable group)"
             exit 1
           fi
         displayName: Preflight - verify Foundry variables
@@ -84,9 +84,9 @@ jobs:
         env:
           AZURE_FOUNDRY_API_KEY: $(AZURE_FOUNDRY_API_KEY)
           AZURE_FOUNDRY_ENDPOINT: $(AZURE_FOUNDRY_ENDPOINT)
-          AGENT_EVAL_RESOURCE_GROUP: ca-test-suite
-          AGENT_EVAL_CLUSTER: ca-eval-aks
-          AGENT_EVAL_REGISTRY: caevalacr.azurecr.io
+          AGENT_EVAL_RESOURCE_GROUP: ca-agent-eval
+          AGENT_EVAL_CLUSTER: ca-agent-eval-aks
+          AGENT_EVAL_REGISTRY: caagentevalacr.azurecr.io
           AGENT_EVAL_NAMESPACE: eval-ns
           FIXTURES: ${{ parameters.fixtures }}
           MODELS: ${{ parameters.models }}
@@ -113,4 +113,4 @@ jobs:
               az acr repository delete --name "$ACR" --repository "$repo" --yes
             done
         env:
-          AGENT_EVAL_REGISTRY: caevalacr.azurecr.io
+          AGENT_EVAL_REGISTRY: caagentevalacr.azurecr.io

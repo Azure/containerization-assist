@@ -39,7 +39,7 @@ AZURE_FOUNDRY_ENDPOINT=https://<resource>.services.ai.azure.com/openai/v1
 **2. Azure infra (one-time):**
 
 ```sh
-RG=ca-test-suite; LOC=eastus2; ACR=caevalacr; AKS=ca-eval-aks
+RG=ca-agent-eval; LOC=southcentralus; ACR=caagentevalacr; AKS=ca-agent-eval-aks
 az group create -n $RG -l $LOC
 az acr create  -n $ACR -g $RG --sku Basic
 az aks create  -n $AKS -g $RG --node-count 1 --enable-managed-identity
@@ -54,9 +54,9 @@ band instead — pods will `ImagePullBackOff` otherwise.
 **3. Point the harness at it** (optional — these are the defaults):
 
 ```sh
-export AGENT_EVAL_REGISTRY=caevalacr.azurecr.io
-export AGENT_EVAL_RESOURCE_GROUP=ca-test-suite
-export AGENT_EVAL_CLUSTER=ca-eval-aks
+export AGENT_EVAL_REGISTRY=caagentevalacr.azurecr.io
+export AGENT_EVAL_RESOURCE_GROUP=ca-agent-eval
+export AGENT_EVAL_CLUSTER=ca-agent-eval-aks
 export AGENT_EVAL_NAMESPACE=eval-ns
 export AGENT_EVAL_IMAGE=eval-image
 ```
@@ -117,11 +117,11 @@ your **deployment name**. Use `azure:` for OpenAI-catalog deployments (`gpt-4o`,
 
 ## CI
 
-[`azure-pipelines.yml`](../../azure-pipelines.yml) runs the gradient sweep in
+[`.azure-pipelines/agent-eval.yaml`](../../.azure-pipelines/agent-eval.yaml) runs the gradient sweep in
 Azure DevOps on merges to `main` that touch `skills/**` and on manual runs
 (PRs do not trigger it — the sweep is too slow to gate PRs on). It
 authenticates to Azure through a **service connection** (no stored Azure
-secrets) and reads the Foundry credentials from the `agent-eval-foundry`
+secrets) and reads the Foundry credentials from the `ca-agent-eval-foundry`
 variable group. Every run uses the full matrix — all three paths (`bare`,
 `mcp`, `skills`) across every fixture and model — so each run shows the skills
 path's lift over the `bare` control and `mcp`. Merges to `main` run 3 reps for
