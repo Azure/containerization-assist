@@ -101,6 +101,14 @@ extends:
               - script: npm run build
                 displayName: Build project
 
+              - script: |
+                  set -euo pipefail
+                  if ! command -v az >/dev/null 2>&1; then
+                    sudo tdnf install -y azure-cli
+                  fi
+                  az version
+                displayName: Install Azure CLI
+
               - task: AzureCLI@2
                 displayName: Run gradient sweep
                 inputs:
