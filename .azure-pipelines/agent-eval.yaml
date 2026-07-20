@@ -15,7 +15,7 @@ parameters:
     default: '3'
   - name: paths
     type: string
-    default: ''
+    default: bare,mcp,skills
   - name: timeoutInMinutes
     type: number
     default: 360
@@ -67,10 +67,10 @@ extends:
               - checkout: self
                 fetchDepth: 0
 
-              - task: NodeTool@0
+              - task: UseNode@1
                 displayName: Setup Node.js
                 inputs:
-                  versionSpec: $(NODE_VERSION)
+                  version: $(NODE_VERSION)
 
               - script: |
                   set -euo pipefail
@@ -101,6 +101,14 @@ extends:
               - script: npm run build
                 displayName: Build project
 
+              - script: |
+                  set -euo pipefail
+                  if ! command -v az >/dev/null 2>&1; then
+                    sudo tdnf install -y azure-cli
+                  fi
+                  az version
+                displayName: Install Azure CLI
+
               - task: AzureCLI@2
                 displayName: Run gradient sweep
                 inputs:
@@ -109,7 +117,15 @@ extends:
                   scriptLocation: inlineScript
                   inlineScript: |
                     set -euo pipefail
-                    kubectl version --client >/dev/null 2>&1 || az aks install-cli
+                    if ! kubectl version --client >/dev/null 2>&1; then
+                      # Non-root agent cannot write to /usr/local/bin, so install
+                      # kubectl/kubelogin into a user-writable dir and add to PATH.
+                      mkdir -p "$HOME/.local/bin"
+                      az aks install-cli \
+                        --install-location "$HOME/.local/bin/kubectl" \
+                        --kubelogin-install-location "$HOME/.local/bin/kubelogin"
+                      export PATH="$HOME/.local/bin:$PATH"
+                    fi
 
                     PATHS_ARG=()
                     if [ -n "${PATHS_INPUT:-}" ]; then PATHS_ARG=(--paths "$PATHS_INPUT"); fi
