@@ -48,6 +48,7 @@ function createMockToolContext(): ToolContext {
 // Import after mocks
 import generateGithubWorkflowTool from '@/tools/generate-github-workflow/tool';
 import { generateGithubWorkflowSchema } from '@/tools/generate-github-workflow/schema';
+import { ACTION_PINS, pinnedUses } from '@/tools/generate-github-workflow/action-pins';
 
 // ─── Knowledge mock helpers ───────────────────────────────────────────────────
 
@@ -421,6 +422,34 @@ describe('generate-github-workflow', () => {
 
   // ── Tool metadata ──────────────────────────────────────────────────────────
 
+  describe('SHA pinning', () => {
+    it('emits SHA-pinned actions (no floating major tags) in the instruction', async () => {
+      const result = await generateGithubWorkflowTool.handler(
+        {
+          repositoryPath: '/home/user/myapp',
+          registry: 'myregistry.azurecr.io',
+          clusterName: 'my-aks',
+          resourceGroup: 'my-rg',
+          branches: ['main'],
+        },
+        mockContext,
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const { instruction } = result.value.nextAction;
+        // actions are pinned to the current ACTION_PINS SHAs (refresh-proof — no hardcoded SHA)
+        expect(instruction).toContain(pinnedUses(ACTION_PINS.checkout));
+        expect(instruction).toContain(pinnedUses(ACTION_PINS.azureLogin));
+        // no floating major tag for a pinned action
+        expect(instruction).not.toContain('actions/checkout@v6');
+        // structured job steps carry the SHA pin too
+        const build = result.value.workflowJobs.find((j) => j.name === 'buildImage');
+        expect(build?.steps.some((s) => s.includes(ACTION_PINS.checkout.sha))).toBe(true);
+      }
+    });
+  });
+
   describe('Tool metadata', () => {
     it('should have the correct tool name', () => {
       expect(generateGithubWorkflowTool.name).toBe('generate-github-workflow');
@@ -434,6 +463,10 @@ describe('generate-github-workflow', () => {
       expect(generateGithubWorkflowTool.chainHints).toBeDefined();
       expect(generateGithubWorkflowTool.chainHints?.success).toBeDefined();
       expect(generateGithubWorkflowTool.chainHints?.failure).toBeDefined();
+      // Success chains straight into the validator as the immediate next action.
+      expect(generateGithubWorkflowTool.chainHints?.success).toContain(
+        'validate-github-workflow',
+      );
     });
 
     it('should expose an inputSchema', () => {
