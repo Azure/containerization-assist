@@ -1055,6 +1055,14 @@ export function formatWorkflowValidationNarrative(
     parts.push('');
   }
 
+  // On failure, surface the structured fix-files instruction verbatim — it carries the
+  // target path and the enumerated required issues the fix loop acts on.
+  if (!passed && plan.nextAction?.action === 'fix-files') {
+    parts.push('**Fix instruction:**');
+    parts.push(plan.nextAction.instruction);
+    parts.push('');
+  }
+
   if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
     parts.push('**Next Steps:**');
     if (passed) {

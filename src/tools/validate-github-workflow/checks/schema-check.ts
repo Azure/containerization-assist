@@ -27,7 +27,6 @@ const JOB_KEYS = new Set([
   'needs',
   'if',
   'runs-on',
-  'runs-on-group',
   'environment',
   'concurrency',
   'outputs',
