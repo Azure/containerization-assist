@@ -187,14 +187,14 @@ extends:
                         az storage blob upload \
                           --account-name "$ACCT" --auth-mode login \
                           --container-name "$CONTAINER" --name "$DEST/gradient.html" \
-                          --file "$SRC/gradient.html" --content-type "text/html" --overwrite true
+                          --file "$SRC/gradient.html" --content-type "text/html" --overwrite true || return 1
                         published=1
                       fi
                       if [ -f "$SRC/gradient.json" ]; then
                         az storage blob upload \
                           --account-name "$ACCT" --auth-mode login \
                           --container-name "$CONTAINER" --name "$DEST/gradient.json" \
-                          --file "$SRC/gradient.json" --content-type "application/json" --overwrite true
+                          --file "$SRC/gradient.json" --content-type "application/json" --overwrite true || return 1
                         published=1
                       fi
                       if [ "$published" -eq 0 ]; then
@@ -207,7 +207,7 @@ extends:
                       url=$(az storage blob generate-sas \
                         --account-name "$ACCT" --auth-mode login --as-user \
                         --container-name "$CONTAINER" --name "$DEST/gradient.html" \
-                        --permissions r --expiry "$expiry" --full-uri -o tsv)
+                        --permissions r --expiry "$expiry" --full-uri -o tsv) || return 1
                       echo "Gradient report published (SAS valid until $expiry):"
                       echo "$url"
                       echo "##vso[task.setvariable variable=reportUrl]$url"

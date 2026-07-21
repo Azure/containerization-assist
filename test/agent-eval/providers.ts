@@ -29,11 +29,19 @@ const timeoutFetch: typeof fetch = (input, init) => {
     REQUEST_TIMEOUT_MS,
   );
   const callerSignal = init?.signal;
+  let onCallerAbort: (() => void) | undefined;
   if (callerSignal) {
-    if (callerSignal.aborted) controller.abort(callerSignal.reason);
-    else callerSignal.addEventListener('abort', () => controller.abort(callerSignal.reason), { once: true });
+    if (callerSignal.aborted) {
+      controller.abort(callerSignal.reason);
+    } else {
+      onCallerAbort = () => controller.abort(callerSignal.reason);
+      callerSignal.addEventListener('abort', onCallerAbort, { once: true });
+    }
   }
-  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => {
+    clearTimeout(timer);
+    if (onCallerAbort) callerSignal!.removeEventListener('abort', onCallerAbort);
+  });
 };
 
 export function validateProviderEnv(): void {
