@@ -146,9 +146,9 @@ const runPattern = createKnowledgeTool<
   },
 
   plan: {
-    buildPlan: (_input, _knowledge, rules, confidence): WorkflowValidationPlan => {
+    buildPlan: (input, _knowledge, rules, confidence): WorkflowValidationPlan => {
       const { findings, filePath } = rules;
-      return buildReport(findings, filePath, confidence);
+      return buildReport(findings, filePath, confidence, input);
     },
   },
 });
@@ -167,6 +167,7 @@ function buildReport(
   findings: WorkflowValidationIssue[],
   filePath: string,
   confidence: number,
+  input: ValidateGithubWorkflowParams,
 ): WorkflowValidationPlan {
   let errors = 0;
   let warnings = 0;
@@ -225,7 +226,7 @@ function buildReport(
   };
 
   if (errors > 0) {
-    plan.nextAction = buildFixAction(findings, filePath);
+    plan.nextAction = buildFixAction(findings, filePath, input);
   }
 
   return plan;
@@ -234,13 +235,18 @@ function buildReport(
 function buildFixAction(
   findings: WorkflowValidationIssue[],
   filePath: string,
+  input: ValidateGithubWorkflowParams,
 ): NonNullable<WorkflowValidationPlan['nextAction']> {
   const errorFindings = findings.filter(
     (f) => f.metadata?.severity === ValidationSeverity.ERROR,
   );
 
+  // For inline content there is no on-disk path; direct the fix loop at the
+  // caller's workflowFileName (e.g. ci.yml) rather than a hardcoded default.
+  const targetPath = filePath === '<inline>' ? workflowRelativePath(input) : filePath;
+
   const instruction = [
-    `The GitHub Actions workflow at ${filePath} has ${pluralize(errorFindings.length, 'required issue')} that must be fixed:`,
+    `The GitHub Actions workflow at ${targetPath} has ${pluralize(errorFindings.length, 'required issue')} that must be fixed:`,
     '',
     ...errorFindings.map((f, i) => {
       const loc = f.metadata?.location ? ` (${f.metadata.location})` : '';
@@ -256,7 +262,7 @@ function buildFixAction(
     instruction,
     files: [
       {
-        path: filePath === '<inline>' ? '.github/workflows/deploy.yml' : filePath,
+        path: targetPath,
         purpose: 'GitHub Actions CI/CD workflow to fix so it passes validation',
       },
     ],

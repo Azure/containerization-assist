@@ -2,10 +2,11 @@
  * SHA-pinned GitHub Action references — single source of truth.
  *
  * Every `uses:` the generate-github-workflow tool emits points at an immutable commit
- * SHA with a trailing `# vX.Y.Z` comment (what validate-github-workflow enforces as a
- * required check). Pinning to a reviewed SHA — rather than a floating tag that can be
- * repointed — is the recommended supply-chain posture, and mirrors how prepare-cluster
- * pins its `kind` version + node-image digest.
+ * SHA (validate-github-workflow enforces SHA-pinning as a `required` check) with a
+ * trailing `# vX.Y.Z` comment for readability (an advisory `low`-severity check —
+ * `refs/version-comment` — not required). Pinning to a reviewed SHA — rather than a
+ * floating tag that can be repointed — is the recommended supply-chain posture, and
+ * mirrors how prepare-cluster pins its `kind` version + node-image digest.
  *
  * These pins are kept fresh by `scripts/refresh-action-pins.ts`, which resolves the
  * latest commit SHA within each action's current major from GitHub and rewrites this

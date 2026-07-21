@@ -286,6 +286,16 @@ describe('validate-github-workflow', () => {
       expect(plan.nextAction?.instruction).toContain('refs/sha-pin');
     });
 
+    it('targets the caller workflowFileName in the fix-files path for inline content', async () => {
+      const plan = await validate({
+        workflowContent: sad('unpinned'),
+        workflowFileName: 'ci.yml',
+      });
+      expect(plan.nextAction?.action).toBe('fix-files');
+      expect(plan.nextAction?.files[0]?.path).toBe('.github/workflows/ci.yml');
+      expect(plan.nextAction?.instruction).toContain('.github/workflows/ci.yml');
+    });
+
     it('reports a not-found error when neither content nor file is available', async () => {
       const plan = await validate({ repositoryPath: '/definitely/not/here' });
       expect(plan.report.errors).toBeGreaterThanOrEqual(1);
