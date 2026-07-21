@@ -240,11 +240,20 @@ extends:
                   scriptType: bash
                   scriptLocation: inlineScript
                   inlineScript: |
-                    set -euo pipefail
+                    set -uo pipefail
                     ACR="${AGENT_EVAL_REGISTRY%%.*}"
-                    for repo in $(az acr repository list --name "$ACR" -o tsv); do
+                    # Cleanup is non-blocking: warn and continue on any failure so a
+                    # purge hiccup never fails an otherwise-successful eval run.
+                    repos=$(az acr repository list --name "$ACR" -o tsv) || {
+                      echo "##vso[task.logissue type=warning]Could not list repositories in $ACR — skipping ACR purge."
+                      exit 0
+                    }
+                    for repo in $repos; do
                       echo "deleting $ACR/$repo"
-                      az acr repository delete --name "$ACR" --repository "$repo" --yes
+                      if ! az acr repository delete --name "$ACR" --repository "$repo" --yes; then
+                        echo "##vso[task.logissue type=warning]Failed to delete $ACR/$repo — continuing (non-blocking cleanup)."
+                      fi
                     done
+                    exit 0
                 env:
                   AGENT_EVAL_REGISTRY: caagentevalacr.azurecr.io
