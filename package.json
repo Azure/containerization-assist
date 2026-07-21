@@ -88,6 +88,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist dist-cjs coverage .tsbuildinfo*",
+    "prepare": "husky",
     "build": "npm run clean && npm run build:version && npm run build:knowledge && npm run build:policies && npm run build:esm && npm run build:cjs",
     "build:version": "tsx scripts/generate-version.ts",
     "build:knowledge": "tsx scripts/generate-embedded-packs.ts",
