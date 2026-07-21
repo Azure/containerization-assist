@@ -38,10 +38,12 @@ const timeoutFetch: typeof fetch = (input, init) => {
       callerSignal.addEventListener('abort', onCallerAbort, { once: true });
     }
   }
-  return fetch(input, { ...init, signal: controller.signal }).finally(() => {
-    clearTimeout(timer);
-    if (onCallerAbort) callerSignal!.removeEventListener('abort', onCallerAbort);
-  });
+  return Promise.resolve()
+    .then(() => fetch(input, { ...init, signal: controller.signal }))
+    .finally(() => {
+      clearTimeout(timer);
+      if (onCallerAbort) callerSignal!.removeEventListener('abort', onCallerAbort);
+    });
 };
 
 export function validateProviderEnv(): void {

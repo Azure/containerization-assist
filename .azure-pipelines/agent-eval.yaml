@@ -181,6 +181,7 @@ extends:
                         --account-name "$ACCT" --auth-mode login \
                         --name "$CONTAINER" >/dev/null 2>&1 || true
                       local published=0
+                      local sas_blob=""
                       # Upload with explicit content-types so the browser RENDERS
                       # the HTML heatmap (and shows JSON) instead of downloading.
                       if [ -f "$SRC/gradient.html" ]; then
@@ -189,6 +190,7 @@ extends:
                           --container-name "$CONTAINER" --name "$DEST/gradient.html" \
                           --file "$SRC/gradient.html" --content-type "text/html" --overwrite true || return 1
                         published=1
+                        sas_blob="$DEST/gradient.html"
                       fi
                       if [ -f "$SRC/gradient.json" ]; then
                         az storage blob upload \
@@ -196,6 +198,8 @@ extends:
                           --container-name "$CONTAINER" --name "$DEST/gradient.json" \
                           --file "$SRC/gradient.json" --content-type "application/json" --overwrite true || return 1
                         published=1
+                        # Prefer the HTML report for the link; fall back to JSON.
+                        [ -z "$sas_blob" ] && sas_blob="$DEST/gradient.json"
                       fi
                       if [ "$published" -eq 0 ]; then
                         echo "No gradient.{html,json} found in $SRC — nothing to publish."
@@ -206,7 +210,7 @@ extends:
                       expiry=$(date -u -d "+30 days" "+%Y-%m-%dT%H:%MZ")
                       url=$(az storage blob generate-sas \
                         --account-name "$ACCT" --auth-mode login --as-user \
-                        --container-name "$CONTAINER" --name "$DEST/gradient.html" \
+                        --container-name "$CONTAINER" --name "$sas_blob" \
                         --permissions r --expiry "$expiry" --full-uri -o tsv) || return 1
                       echo "Gradient report published (SAS valid until $expiry):"
                       echo "$url"
