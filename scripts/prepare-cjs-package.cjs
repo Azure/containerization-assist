@@ -16,11 +16,11 @@ const isPublishing = process.env.npm_lifecycle_event === 'prepack' ||
                      process.env.npm_lifecycle_event === 'prepublishOnly';
 
 if (!isPublishing) {
-  console.log('Not in publish mode, skipping package.json modification');
+  console.error('Not in publish mode, skipping package.json modification');
   process.exit(0);
 }
 
-console.log('📦 Preparing package.json for CommonJS-only publish...');
+console.error('📦 Preparing package.json for CommonJS-only publish...');
 
 // Read current package.json
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
@@ -61,4 +61,4 @@ if (!pkg.files.includes('dist-cjs/**/*')) {
 // Write modified package.json
 fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2));
 
-console.log('✅ package.json prepared for CommonJS-only publish');
+console.error('✅ package.json prepared for CommonJS-only publish');
