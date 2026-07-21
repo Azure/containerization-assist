@@ -61,10 +61,7 @@ export const validateGithubWorkflowSchema = z.object({
     .optional()
     .describe('Primary programming language from analyze-repo (knowledge query hint).'),
 
-  framework: z
-    .string()
-    .optional()
-    .describe('Framework from analyze-repo (knowledge query hint).'),
+  framework: z.string().optional().describe('Framework from analyze-repo (knowledge query hint).'),
 });
 
 export type ValidateGithubWorkflowParams = z.infer<typeof validateGithubWorkflowSchema>;

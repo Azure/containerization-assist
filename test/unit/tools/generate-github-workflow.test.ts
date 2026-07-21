@@ -184,7 +184,6 @@ describe('generate-github-workflow', () => {
 
       expect(result.success).toBe(false);
     });
-
   });
 
   // ── Happy path ─────────────────────────────────────────────────────────────
@@ -464,9 +463,7 @@ describe('generate-github-workflow', () => {
       expect(generateGithubWorkflowTool.chainHints?.success).toBeDefined();
       expect(generateGithubWorkflowTool.chainHints?.failure).toBeDefined();
       // Success chains straight into the validator as the immediate next action.
-      expect(generateGithubWorkflowTool.chainHints?.success).toContain(
-        'validate-github-workflow',
-      );
+      expect(generateGithubWorkflowTool.chainHints?.success).toContain('validate-github-workflow');
     });
 
     it('should expose an inputSchema', () => {

@@ -58,7 +58,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/job-keys',
         severity: 'high',
-        message: 'Missing the literal `buildImage` job. Job keys must be exactly `buildImage` and `deploy`.',
+        message:
+          'Missing the literal `buildImage` job. Job keys must be exactly `buildImage` and `deploy`.',
         suggestion: jobKeysRec,
       }),
     );
@@ -69,7 +70,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/job-keys',
         severity: 'high',
-        message: 'Missing the literal `deploy` job. Job keys must be exactly `buildImage` and `deploy`.',
+        message:
+          'Missing the literal `deploy` job. Job keys must be exactly `buildImage` and `deploy`.',
         suggestion: jobKeysRec,
       }),
     );
@@ -79,7 +81,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/deploy-needs',
         severity: 'high',
-        message: 'The `deploy` job must declare `needs: [buildImage]` so it runs after the image is in ACR.',
+        message:
+          'The `deploy` job must declare `needs: [buildImage]` so it runs after the image is in ACR.',
         location: 'job "deploy"',
         suggestion: jobKeysRec,
       }),
@@ -118,7 +121,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/az-acr-build',
         severity: 'high',
-        message: 'No `az acr build` command found. The image should be built and pushed with `az acr build`.',
+        message:
+          'No `az acr build` command found. The image should be built and pushed with `az acr build`.',
         suggestion: acrRec,
       }),
     );
@@ -157,7 +161,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/azure-actions',
         severity: 'high',
-        message: 'Forbidden `az aks get-credentials` detected. Use `azure/aks-set-context` (admin: false, use-kubelogin: true) instead.',
+        message:
+          'Forbidden `az aks get-credentials` detected. Use `azure/aks-set-context` (admin: false, use-kubelogin: true) instead.',
         suggestion: azureRec,
       }),
     );
@@ -168,7 +173,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/azure-actions',
         severity: 'high',
-        message: 'Forbidden `azure/setup-kubectl` detected. kubectl is configured via `azure/aks-set-context` with kubelogin.',
+        message:
+          'Forbidden `azure/setup-kubectl` detected. kubectl is configured via `azure/aks-set-context` with kubelogin.',
         suggestion: azureRec,
       }),
     );
@@ -182,7 +188,8 @@ export function checkSemantic(
           layer: 'semantic',
           ruleId: 'semantic/aks-context-flags',
           severity: 'high',
-          message: 'azure/aks-set-context must set `admin: "false"` and `use-kubelogin: "true"` for least-privilege OIDC access.',
+          message:
+            'azure/aks-set-context must set `admin: "false"` and `use-kubelogin: "true"` for least-privilege OIDC access.',
           suggestion: azureRec,
         }),
       );
@@ -194,7 +201,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/azure-actions',
         severity: 'high',
-        message: 'No `azure/login` step found. Each job must authenticate to Azure via azure/login (OIDC).',
+        message:
+          'No `azure/login` step found. Each job must authenticate to Azure via azure/login (OIDC).',
         suggestion: rec(
           knowledge,
           'azure-login-oidc',
@@ -220,7 +228,8 @@ export function checkSemantic(
           layer: 'semantic',
           ruleId: 'semantic/permissions',
           severity: 'high',
-          message: 'The `buildImage` job must set `permissions: id-token: write` (and contents: read) for the OIDC token request.',
+          message:
+            'The `buildImage` job must set `permissions: id-token: write` (and contents: read) for the OIDC token request.',
           location: 'job "buildImage"',
           suggestion: permRec,
         }),
@@ -235,7 +244,8 @@ export function checkSemantic(
           layer: 'semantic',
           ruleId: 'semantic/permissions',
           severity: 'high',
-          message: 'The `deploy` job must set `permissions: actions: read, contents: read, id-token: write`.',
+          message:
+            'The `deploy` job must set `permissions: actions: read, contents: read, id-token: write`.',
           location: 'job "deploy"',
           suggestion: permRec,
         }),
@@ -268,7 +278,8 @@ export function checkSemantic(
         layer: 'semantic',
         ruleId: 'semantic/concurrency',
         severity: 'medium',
-        message: 'Missing a `concurrency` block with `cancel-in-progress: true` to prevent stale deploys from racing.',
+        message:
+          'Missing a `concurrency` block with `cancel-in-progress: true` to prevent stale deploys from racing.',
         suggestion: rec(
           knowledge,
           'workflow-concurrency',

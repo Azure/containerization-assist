@@ -17,7 +17,11 @@ import { type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
 import { CATEGORY } from '@/knowledge/types';
-import { ValidationSeverity, type ValidationGrade, type ValidationReport } from '@/validation/core-types';
+import {
+  ValidationSeverity,
+  type ValidationGrade,
+  type ValidationReport,
+} from '@/validation/core-types';
 import { PACKAGE_VERSION } from '@/lib/package-version';
 import { pluralize } from '@/lib/summary-helpers';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
@@ -138,7 +142,8 @@ const runPattern = createKnowledgeTool<
       // Layers 2 & 4 require a parseable document.
       if (doc && !fatal) {
         if (selected.has('schema')) findings.push(...checkSchema(doc));
-        if (selected.has('semantic')) findings.push(...checkSemantic(doc, content, knowledge, input));
+        if (selected.has('semantic'))
+          findings.push(...checkSemantic(doc, content, knowledge, input));
       }
 
       return { findings, filePath };
@@ -237,9 +242,7 @@ function buildFixAction(
   filePath: string,
   input: ValidateGithubWorkflowParams,
 ): NonNullable<WorkflowValidationPlan['nextAction']> {
-  const errorFindings = findings.filter(
-    (f) => f.metadata?.severity === ValidationSeverity.ERROR,
-  );
+  const errorFindings = findings.filter((f) => f.metadata?.severity === ValidationSeverity.ERROR);
 
   // For inline content there is no on-disk path; direct the fix loop at the
   // caller's workflowFileName (e.g. ci.yml) rather than a hardcoded default.

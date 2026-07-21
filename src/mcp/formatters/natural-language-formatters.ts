@@ -1017,9 +1017,7 @@ export function formatWorkflowValidationNarrative(
   const { report, filePath } = plan;
   const passed = report.errors === 0;
 
-  parts.push(
-    passed ? '✅ WORKFLOW VALIDATION PASSED' : '🔧 WORKFLOW VALIDATION — ACTION REQUIRED',
-  );
+  parts.push(passed ? '✅ WORKFLOW VALIDATION PASSED' : '🔧 WORKFLOW VALIDATION — ACTION REQUIRED');
   parts.push('');
   parts.push(`**File:** ${filePath}`);
   parts.push(`**Score:** ${report.score}/100 (grade ${report.grade})`);

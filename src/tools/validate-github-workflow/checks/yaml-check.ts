@@ -62,10 +62,7 @@ export function parseWorkflow(content: string): ParsedWorkflow {
 }
 
 /** Layer-1 findings that require the parsed document + the raw text. */
-export function checkYaml(
-  content: string,
-  doc: Document.Parsed | null,
-): WorkflowValidationIssue[] {
+export function checkYaml(content: string, doc: Document.Parsed | null): WorkflowValidationIssue[] {
   const findings: WorkflowValidationIssue[] = [];
 
   // Tab indentation — YAML forbids tabs for indentation.
