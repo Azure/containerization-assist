@@ -154,6 +154,7 @@ extends:
               - task: AzureCLI@2
                 displayName: Publish report to blob (SAS URL)
                 condition: always()
+                continueOnError: true
                 inputs:
                   azureSubscription: $(azureServiceConnection)
                   scriptType: bash
@@ -235,6 +236,7 @@ extends:
               - task: AzureCLI@2
                 displayName: Purge eval ACR
                 condition: always()
+                continueOnError: true
                 inputs:
                   azureSubscription: $(azureServiceConnection)
                   scriptType: bash
