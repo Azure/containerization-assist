@@ -25,11 +25,13 @@ import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
 import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
 import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
 import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
+import type { WorkflowValidationPlan } from '@/tools/validate-github-workflow/schema';
 import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { ClusterPlan } from '@/tools/prepare-cluster/schema';
 import type { PingResult, ServerStatusResult } from '@/tools/ops/tool';
 import { formatDuration, formatVulnerabilities, pluralize } from '@/lib/summary-helpers';
+import { ValidationSeverity } from '@/validation/core-types';
 import { CHAINHINTSMODE, ChainHintsMode } from '@/app/orchestrator-types';
 
 /**
@@ -989,6 +991,83 @@ export function formatGithubWorkflowNarrative(
     );
     parts.push('  3. Set up a branch-scoped OIDC federated credential in Azure Entra ID');
     parts.push('  4. Commit and push to trigger the workflow');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Format validate-github-workflow result as natural language narrative
+ *
+ * @param plan - Workflow validation plan with a ValidationReport and optional fix action
+ * @param chainHintsMode - Whether to include "Next Steps" section (default: 'enabled')
+ * @returns Formatted narrative grouping findings by severity, plus the fix directive on failure
+ *
+ * @description
+ * Surfaces the deterministic validation verdict: pass/fail, score/grade, and every
+ * finding grouped by severity (required / warning / info) with its rule id and
+ * location. On failure it also surfaces the `fix-files` nextAction instruction so the
+ * client LLM can edit the workflow and re-validate.
+ */
+export function formatWorkflowValidationNarrative(
+  plan: WorkflowValidationPlan,
+  chainHintsMode: ChainHintsMode = CHAINHINTSMODE.ENABLED,
+): string {
+  const parts: string[] = [];
+  const { report, filePath } = plan;
+  const passed = report.errors === 0;
+
+  parts.push(
+    passed ? '✅ WORKFLOW VALIDATION PASSED' : '🔧 WORKFLOW VALIDATION — ACTION REQUIRED',
+  );
+  parts.push('');
+  parts.push(`**File:** ${filePath}`);
+  parts.push(`**Score:** ${report.score}/100 (grade ${report.grade})`);
+  parts.push(
+    `**Findings:** ${pluralize(report.errors, 'required issue')}, ${pluralize(report.warnings, 'warning')}, ${report.info} info`,
+  );
+  parts.push('');
+
+  const bySeverity = (severity: ValidationSeverity): typeof report.results =>
+    report.results.filter((r) => r.metadata?.severity === severity);
+
+  const renderFinding = (r: (typeof report.results)[number]): string => {
+    const loc = r.metadata?.location ? ` (${r.metadata.location})` : '';
+    const fix = r.suggestions?.[0] ? `\n      ↳ ${r.suggestions[0]}` : '';
+    return `  • [${r.ruleId ?? 'unknown'}]${loc} ${r.message ?? ''}${fix}`;
+  };
+
+  const errs = bySeverity(ValidationSeverity.ERROR);
+  const warns = bySeverity(ValidationSeverity.WARNING);
+  const infos = bySeverity(ValidationSeverity.INFO);
+
+  if (errs.length > 0) {
+    parts.push('**Required issues (must fix):**');
+    errs.forEach((r) => parts.push(renderFinding(r)));
+    parts.push('');
+  }
+  if (warns.length > 0) {
+    parts.push('**Warnings:**');
+    warns.forEach((r) => parts.push(renderFinding(r)));
+    parts.push('');
+  }
+  if (infos.length > 0) {
+    parts.push('**Info:**');
+    infos.forEach((r) => parts.push(renderFinding(r)));
+    parts.push('');
+  }
+
+  if (chainHintsMode === CHAINHINTSMODE.ENABLED) {
+    parts.push('**Next Steps:**');
+    if (passed) {
+      parts.push(`  1. Commit ${filePath} and push`);
+      parts.push(
+        '  2. Ensure AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID are configured as repository secrets',
+      );
+    } else {
+      parts.push('  1. Apply the fixes listed above (edit the workflow file)');
+      parts.push('  2. Re-run validate-github-workflow until no required issues remain');
+    }
   }
 
   return parts.join('\n');

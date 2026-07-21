@@ -41,6 +41,7 @@ import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
 import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
 import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
 import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
+import type { WorkflowValidationPlan } from '@/tools/validate-github-workflow/schema';
 import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { ClusterPlan } from '@/tools/prepare-cluster/schema';
@@ -54,6 +55,7 @@ import {
   formatFixDockerfileNarrative,
   formatGenerateK8sManifestsNarrative,
   formatGithubWorkflowNarrative,
+  formatWorkflowValidationNarrative,
   formatPushImageNarrative,
   formatTagImageNarrative,
   formatPrepareClusterNarrative,
@@ -605,6 +607,9 @@ function formatAsNaturalLanguage(
   if (isGithubWorkflowPlan(output)) {
     return formatGithubWorkflowNarrative(output, chainHintsMode);
   }
+  if (isWorkflowValidationPlan(output)) {
+    return formatWorkflowValidationNarrative(output, chainHintsMode);
+  }
   if (isPushImageResult(output)) {
     return formatPushImageNarrative(output, chainHintsMode);
   }
@@ -684,6 +689,16 @@ function isGithubWorkflowPlan(output: object): output is GithubWorkflowPlan {
     'secretsRequired' in output &&
     'nextAction' in output &&
     Array.isArray((output as GithubWorkflowPlan).workflowJobs)
+  );
+}
+
+function isWorkflowValidationPlan(output: object): output is WorkflowValidationPlan {
+  return (
+    'report' in output &&
+    'filePath' in output &&
+    'attributionLabels' in output &&
+    typeof (output as WorkflowValidationPlan).report === 'object' &&
+    'grade' in (output as WorkflowValidationPlan).report
   );
 }
 
