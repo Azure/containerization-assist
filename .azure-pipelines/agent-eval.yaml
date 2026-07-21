@@ -206,16 +206,24 @@ extends:
                         return 0
                       fi
                       # User-delegation SAS (AAD-signed, no account key). Valid 30 days.
-                      local expiry url
+                      local expiry url summary
                       expiry=$(date -u -d "+30 days" "+%Y-%m-%dT%H:%MZ")
                       url=$(az storage blob generate-sas \
                         --account-name "$ACCT" --auth-mode login --as-user \
                         --container-name "$CONTAINER" --name "$sas_blob" \
                         --permissions r --expiry "$expiry" --full-uri -o tsv) || return 1
-                      echo "Gradient report published (SAS valid until $expiry):"
-                      echo "$url"
+                      echo "Gradient report published (SAS valid until $expiry): $url"
                       echo "##vso[task.setvariable variable=reportUrl]$url"
-                      echo "##vso[task.logissue type=warning]Gradient report (view in browser): $url"
+                      # Render the link as a section on the run's Summary tab.
+                      summary="$(mktemp --suffix=.md)"
+                      {
+                        echo "## Gradient eval report"
+                        echo ""
+                        echo "[View report (renders in browser)]($url)"
+                        echo ""
+                        echo "_SAS link valid until ${expiry}._"
+                      } > "$summary"
+                      echo "##vso[task.uploadsummary]$summary"
                     }
                     if ! publish; then
                       echo "##vso[task.logissue type=warning]Report publish failed (check storage RBAC / account name). Report is still available as the 'gradient-report' pipeline artifact."
