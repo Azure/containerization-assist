@@ -1,17 +1,20 @@
 /**
  * Layer 3 — action reference (`uses:`) SHA-pinning.
  *
- * The extraction regex is shared with scripts/validate-action-refs.ts (single source
- * of truth), extended to also capture the optional trailing `# vX.Y.Z` comment. The
- * SHA *format* check is always offline; the optional *existence* probe is offline-safe.
+ * The extraction regex derives from scripts/validate-action-refs.ts, extended to capture
+ * the optional trailing `# vX.Y.Z` comment and anchored to the start of a YAML line (so
+ * commented-out lines and `uses:` text inside `run:` scripts are ignored). The SHA
+ * *format* check is always offline; the optional *existence* probe is offline-safe.
  */
 
 import type { ToolContext } from '@/core/context';
 import { makeIssue, lineOfOffset } from './helpers';
 import type { WorkflowValidationIssue } from '../schema';
 
-// from scripts/validate-action-refs.ts — reused, then extended for the `# vX.Y.Z` comment
-const USES_RE = /uses:\s*([^#\s]+@[^#\s]+)\s*(?:#\s*(.+))?/g;
+// Anchored to the start of a YAML line (optional indentation + optional list `-`) so only
+// real `uses:` keys match — not commented-out lines (`# uses: ...`) or `uses:` inside a
+// `run:` script. Group 1 = the `owner/repo[/sub]@ref`; group 2 = the trailing `# comment`.
+const USES_RE = /^[ \t]*-?[ \t]*uses:\s*([^#\s]+@[^#\s]+)\s*(?:#\s*(.+))?/gm;
 
 export interface ActionRef {
   /** The raw `owner/repo[/sub]@ref` string. */

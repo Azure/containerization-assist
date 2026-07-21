@@ -217,6 +217,16 @@ describe('validate-github-workflow', () => {
       expect(refs[1]?.comment).toBe('v3.0.0');
     });
 
+    it('ignores commented-out `uses:` and `uses:` text inside run scripts', () => {
+      const content = [
+        '      # uses: actions/checkout@v4',
+        '      - run: echo "uses: actions/checkout@v4"',
+        '      - uses: actions/setup-node@v5',
+      ].join('\n');
+      const refs = extractUsesRefs(content);
+      expect(refs.map((r) => r.raw)).toEqual(['actions/setup-node@v5']);
+    });
+
     it('preserves action subpaths in the sha-pin finding actionRef and message', async () => {
       const content = [
         'on: { push: { branches: [main] } }',
