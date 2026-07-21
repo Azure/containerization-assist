@@ -317,6 +317,13 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   }
   let writeChain: Promise<void> = Promise.resolve();
   let checkpointWriteFailures = 0;
+  // Companion HTML heatmap path derived from the JSON checkpoint path. Written
+  // alongside every checkpoint so an interrupted/timed-out sweep still leaves a
+  // viewable report — not just raw JSON. Both writes ride the same serialized
+  // chain and are fired non-blocking from the loop, so they never slow a cell.
+  const htmlCheckpointPath = opts.checkpointPath
+    ? `${opts.checkpointPath.replace(/\.json$/, '')}.html`
+    : undefined;
   const writeCheckpoint = (): Promise<void> => {
     if (!opts.checkpointPath) return Promise.resolve();
     const path = opts.checkpointPath;
@@ -329,6 +336,9 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
       };
       try {
         await fs.writeFile(path, JSON.stringify(snapshot, null, 2));
+        if (htmlCheckpointPath) {
+          await fs.writeFile(htmlCheckpointPath, formatGradientHtml(snapshot));
+        }
       } catch (err) {
         checkpointWriteFailures += 1;
         console.error(

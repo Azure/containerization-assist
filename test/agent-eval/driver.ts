@@ -605,12 +605,16 @@ export class AISDKDriver {
           return await agent.generate(args);
         } catch (err) {
           const info = classifyRateLimit(err);
-          if (!info.isRateLimit || attempt >= maxRetries) throw err;
-          const waitMs = info.retryAfterMs ?? Math.min(120_000, 30_000 * 2 ** attempt);
+          const timedOut = isRequestTimeout(err);
+          if ((!info.isRateLimit && !timedOut) || attempt >= maxRetries) throw err;
+          const waitMs = info.retryAfterMs ?? (timedOut ? 5_000 : Math.min(120_000, 30_000 * 2 ** attempt));
           attempt += 1;
           console.error(
-            `[driver] rate-limited (attempt ${attempt}/${maxRetries}); ` +
-              `sleeping ${Math.round(waitMs / 1000)}s before retry. ${info.detail}`,
+            timedOut
+              ? `[driver] request timed out (attempt ${attempt}/${maxRetries}); ` +
+                  `retrying in ${Math.round(waitMs / 1000)}s.`
+              : `[driver] rate-limited (attempt ${attempt}/${maxRetries}); ` +
+                  `sleeping ${Math.round(waitMs / 1000)}s before retry. ${info.detail}`,
           );
           await new Promise((r) => setTimeout(r, waitMs));
         }
@@ -681,6 +685,24 @@ export class AISDKDriver {
       deployVerified,
     };
   }
+}
+
+/**
+ * Detect an aborted/timed-out model request so the backoff can retry it. The
+ * per-request timeout in providers.ts aborts stalled Foundry calls; surface
+ * those (and low-level socket timeouts) as transient/retryable here.
+ */
+function isRequestTimeout(err: unknown): boolean {
+  const e = err as { name?: string; message?: string; cause?: { name?: string; message?: string } };
+  const name = e?.name ?? '';
+  const causeName = e?.cause?.name ?? '';
+  const text = `${e?.message ?? ''} ${e?.cause?.message ?? ''}`;
+  return (
+    name === 'AbortError' ||
+    causeName === 'AbortError' ||
+    name === 'TimeoutError' ||
+    /aborted|timed?\s?out|timeout|ETIMEDOUT|UND_ERR_(CONNECT_TIMEOUT|HEADERS_TIMEOUT|BODY_TIMEOUT)/i.test(text)
+  );
 }
 
 /**
