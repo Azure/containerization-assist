@@ -75,7 +75,11 @@ export async function checkRefs(
   let existenceSkipped = false;
 
   for (const r of refs) {
-    const actionRef = `${r.ownerRepo}@${r.ref}`;
+    // Use the raw `uses:` reference so action subpaths (owner/repo/path@ref) are
+    // preserved — reconstructing from ownerRepo alone drops the subpath and can point
+    // sha-pin findings (and remediation) at the wrong action.
+    const actionRef = r.raw;
+    const actionPath = r.raw.slice(0, r.raw.lastIndexOf('@')); // owner/repo[/sub], preserves subpath
 
     if (!isPinnedSha(r.ref)) {
       findings.push(
@@ -86,7 +90,7 @@ export async function checkRefs(
           message: `Action \`${actionRef}\` is pinned to a mutable ref. Pin to a full 40-character commit SHA to prevent supply-chain tampering.`,
           location: `line ${r.line}`,
           actionRef,
-          suggestion: `Replace @${r.ref} with the commit SHA that tag resolves to, e.g. ${r.ownerRepo}@<40-char-sha> # ${r.ref}. Resolve it via: curl -s https://api.github.com/repos/${r.ownerRepo}/commits/${r.ref} | grep -m1 '"sha"'.`,
+          suggestion: `Replace @${r.ref} with the commit SHA that tag resolves to, e.g. ${actionPath}@<40-char-sha> # ${r.ref}. Resolve it via: curl -s https://api.github.com/repos/${r.ownerRepo}/commits/${r.ref} | grep -m1 '"sha"'.`,
         }),
       );
       continue; // no point checking the comment or existence of an unpinned ref
@@ -171,7 +175,9 @@ export async function verifyRefExists(
 ): Promise<'ok' | 'missing' | 'skipped'> {
   const online = await httpStatus('https://api.github.com/zen', 5_000);
   if (online === 0) {
-    ctx.logger.debug('validate-github-workflow: GitHub API unreachable, skipping SHA existence check');
+    ctx.logger.debug(
+      'validate-github-workflow: GitHub API unreachable, skipping SHA existence check',
+    );
     return 'skipped';
   }
 

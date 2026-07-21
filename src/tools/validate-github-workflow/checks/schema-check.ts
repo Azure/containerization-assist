@@ -40,9 +40,10 @@ const JOB_KEYS = new Set([
   'container',
   'services',
   'uses',
-  'with',
-  'secrets',
 ]);
+
+// Keys that are only valid on reusable-workflow-call jobs (those with `uses:`).
+const REUSABLE_ONLY_JOB_KEYS = new Set(['with', 'secrets']);
 
 const KNOWN_RUNNERS = new Set([
   'ubuntu-latest',
@@ -196,19 +197,33 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
       }
     }
 
-    // Unknown job keys.
+    // Unknown job keys. `with`/`secrets` are valid only on reusable-workflow-call
+    // jobs (those with `uses:`); on a normal job they are misplaced, not merely unknown.
     for (const key of Object.keys(jobRaw)) {
-      if (!JOB_KEYS.has(key)) {
-        findings.push(
-          makeIssue({
-            layer: 'schema',
-            ruleId: 'schema/unknown-job-key',
-            severity: 'medium',
-            message: `Unknown key "${key}" in job "${jobId}".`,
-            location: `job "${jobId}"`,
-          }),
-        );
+      if (JOB_KEYS.has(key)) continue;
+      if (REUSABLE_ONLY_JOB_KEYS.has(key)) {
+        if (!isReusable) {
+          findings.push(
+            makeIssue({
+              layer: 'schema',
+              ruleId: 'schema/invalid-job-key',
+              severity: 'medium',
+              message: `Key "${key}" in job "${jobId}" is only valid on reusable-workflow-call jobs (those with \`uses:\`).`,
+              location: `job "${jobId}"`,
+            }),
+          );
+        }
+        continue;
       }
+      findings.push(
+        makeIssue({
+          layer: 'schema',
+          ruleId: 'schema/unknown-job-key',
+          severity: 'medium',
+          message: `Unknown key "${key}" in job "${jobId}".`,
+          location: `job "${jobId}"`,
+        }),
+      );
     }
   }
 

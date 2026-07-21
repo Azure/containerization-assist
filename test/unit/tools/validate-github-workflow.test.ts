@@ -49,10 +49,7 @@ const CHECKOUT_SHA = 'df4cb1c069e1874edd31b4311f1884172cec0e10';
 
 /** Load a workflow fixture from test/fixtures/workflows/{happy,sad}/. */
 function readFixture(kind: 'happy' | 'sad', name: string): string {
-  return readFileSync(
-    join(__dirname, '../../fixtures/workflows', kind, `${name}.yml`),
-    'utf-8',
-  );
+  return readFileSync(join(__dirname, '../../fixtures/workflows', kind, `${name}.yml`), 'utf-8');
 }
 const happy = (name: string): string => readFixture('happy', name);
 const sad = (name: string): string => readFixture('sad', name);
@@ -148,6 +145,38 @@ describe('validate-github-workflow', () => {
       });
       expect(plan.filePath).toBe('<inline>');
     });
+
+    it('flags `with`/`secrets` on a normal (non-reusable) job as invalid job keys', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        '    with: { foo: bar }',
+        '    secrets: { token: abc }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['schema'] });
+      const invalid = plan.report.results.filter((r) => r.ruleId === 'schema/invalid-job-key');
+      expect(invalid.map((r) => r.message).join(' ')).toContain('with');
+      expect(invalid.map((r) => r.message).join(' ')).toContain('secrets');
+      expect(ruleIds(plan)).not.toContain('schema/unknown-job-key');
+    });
+
+    it('allows `with`/`secrets` on a reusable-workflow-call job (`uses:`)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  call:',
+        '    uses: owner/repo/.github/workflows/reusable.yml@main',
+        '    with: { foo: bar }',
+        '    secrets: { token: abc }',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['schema'] });
+      expect(ruleIds(plan)).not.toContain('schema/invalid-job-key');
+      expect(ruleIds(plan)).not.toContain('schema/unknown-job-key');
+    });
   });
 
   // ── Layer 1: YAML ───────────────────────────────────────────────────────────
@@ -186,6 +215,23 @@ describe('validate-github-workflow', () => {
       const refs = extractUsesRefs(content);
       expect(refs.map((r) => r.ownerRepo)).toEqual(['actions/checkout', 'azure/login']);
       expect(refs[1]?.comment).toBe('v3.0.0');
+    });
+
+    it('preserves action subpaths in the sha-pin finding actionRef and message', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        '      - uses: owner/repo/path/to/action@v1',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const shaPin = plan.report.results.find((r) => r.ruleId === 'refs/sha-pin');
+      expect(shaPin).toBeDefined();
+      expect(shaPin?.actionRef).toBe('owner/repo/path/to/action@v1');
+      expect(shaPin?.message).toContain('owner/repo/path/to/action@v1');
+      expect(shaPin?.suggestions?.[0]).toContain('owner/repo/path/to/action@<40-char-sha>');
     });
 
     it('flags every tag-pinned action with a required sha-pin finding', async () => {
