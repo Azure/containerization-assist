@@ -282,6 +282,86 @@ describe('validate-github-workflow', () => {
       expect(errorRuleIds(plan)).toContain('semantic/no-job-environment');
     });
 
+    it('does not flag `docker build` that appears only in a comment or step name', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      # reminder: never use docker build here — use az acr build',
+        '      - name: docker build (do NOT do this locally)',
+        '        run: az acr build --image x .',
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { actions: read, contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      // The only `docker build` text is a YAML comment + a step name — neither is a real
+      // build step, so no az-acr-build finding (forbidden or missing) should be raised.
+      expect(ruleIds(plan)).not.toContain('semantic/az-acr-build');
+    });
+
+    it('flags a `docker build` inside a multiline run block', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - run: |',
+        '          echo "building the image"',
+        '          docker build -t myapp .',
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      expect(errorRuleIds(plan)).toContain('semantic/az-acr-build');
+    });
+
+    it('inspects the real aks-set-context step `with`, ignoring flags in other steps', async () => {
+      // Correct admin/use-kubelogin appear on a DIFFERENT action's `with`, but the actual
+      // azure/aks-set-context step omits them → must still be flagged.
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        `      - uses: some/other-action@${CHECKOUT_SHA}`,
+        "        with: { admin: 'false', use-kubelogin: 'true' }",
+        `      - uses: azure/aks-set-context@${CHECKOUT_SHA}`,
+        '        with: { resource-group: rg, cluster-name: c }',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      expect(ruleIds(plan)).toContain('semantic/aks-context-flags');
+    });
+
+    it('does not flag a correctly configured aks-set-context step', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: azure/aks-set-context@${CHECKOUT_SHA}`,
+        "        with: { admin: 'false', use-kubelogin: 'true' }",
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      expect(ruleIds(plan)).not.toContain('semantic/aks-context-flags');
+    });
+
     it('flags renamed job keys as a warning-level job-keys finding', async () => {
       const plan = await validate({ workflowContent: sad('semantic') });
       const jobKeys = plan.report.results.filter((r) => r.ruleId === 'semantic/job-keys');
@@ -315,6 +395,83 @@ describe('validate-github-workflow', () => {
       const secrets = plan.report.results.find((r) => r.ruleId === 'semantic/required-secrets');
       expect(secrets).toBeDefined();
       expect(secrets?.message).toContain('AZURE_CLIENT_ID');
+    });
+
+    it('does not accept a secret named only in a comment (requires a real ${{ secrets.X }} ref)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - run: az acr build --image x .',
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { actions: read, contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        // Real refs for two secrets; the third appears only in a comment.
+        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        '        with:',
+        '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
+        '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
+        '      # subscription-id: AZURE_SUBSCRIPTION_ID (configure this secret)',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const secrets = plan.report.results.find((r) => r.ruleId === 'semantic/required-secrets');
+      expect(secrets).toBeDefined();
+      expect(secrets?.message).toContain('AZURE_SUBSCRIPTION_ID');
+      expect(secrets?.message).not.toContain('AZURE_CLIENT_ID');
+    });
+
+    it('flags the buildImage job when `contents: read` is missing (only id-token: write set)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - run: az acr build --image x .',
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { actions: read, contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const perms = plan.report.results.filter((r) => r.ruleId === 'semantic/permissions');
+      expect(perms.some((r) => r.metadata?.location === 'job "buildImage"')).toBe(true);
+    });
+
+    it('flags the deploy job when `contents: read` is missing (actions + id-token only)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - run: az acr build --image x .',
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { actions: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const perms = plan.report.results.filter((r) => r.ruleId === 'semantic/permissions');
+      expect(perms.some((r) => r.metadata?.location === 'job "deploy"')).toBe(true);
     });
   });
 

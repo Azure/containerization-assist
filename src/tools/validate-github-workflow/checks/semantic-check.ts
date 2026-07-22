@@ -32,6 +32,36 @@ function needsOf(job: unknown): string[] {
   return [];
 }
 
+/**
+ * Every step (as a mapping) across all jobs, in document order.
+ */
+function collectStepObjects(jobs: Dict): Dict[] {
+  const steps: Dict[] = [];
+  for (const job of Object.values(jobs)) {
+    if (!isDict(job) || !Array.isArray(job.steps)) continue;
+    for (const step of job.steps) {
+      if (isDict(step)) steps.push(step);
+    }
+  }
+  return steps;
+}
+
+/**
+ * Collect every step's `run` script and `uses` ref across all jobs. Evaluating these
+ * parsed values (rather than the raw YAML text) keeps semantic checks from matching
+ * comments, docs, or echoed strings, while still covering multiline `run:` blocks
+ * (which parse to a single string).
+ */
+function collectSteps(jobs: Dict): { runs: string[]; uses: string[] } {
+  const runs: string[] = [];
+  const uses: string[] = [];
+  for (const step of collectStepObjects(jobs)) {
+    if (typeof step.run === 'string') runs.push(step.run);
+    if (typeof step.uses === 'string') uses.push(step.uses);
+  }
+  return { runs, uses };
+}
+
 export function checkSemantic(
   doc: Document.Parsed,
   content: string,
@@ -90,32 +120,40 @@ export function checkSemantic(
   }
 
   // ── 2. Image built with az acr build only ────────────────────────────────────
+  // Evaluate parsed step `run`/`uses` values directly (not the raw YAML text) so
+  // matches in comments/docs/echoed strings don't raise false failures, and multiline
+  // `run:` blocks are still covered (they parse to a single string).
+  const { runs: stepRuns, uses: stepUses } = collectSteps(jobs);
   const acrRec = rec(
     knowledge,
     'docker-build-push-acr',
     "Build and push the image with 'az acr build' ONLY — never docker/build-push-action, docker build, docker buildx, docker/setup-buildx-action, or docker/login-action.",
   );
-  const forbiddenBuild: Array<{ label: string; re: RegExp }> = [
+  const forbiddenUses: Array<{ label: string; re: RegExp }> = [
     { label: 'docker/build-push-action', re: /docker\/build-push-action/ },
     { label: 'docker/setup-buildx-action', re: /docker\/setup-buildx-action/ },
     { label: 'docker/login-action', re: /docker\/login-action/ },
+  ];
+  const forbiddenRun: Array<{ label: string; re: RegExp }> = [
     { label: 'docker buildx', re: /\bdocker\s+buildx\b/ },
     { label: 'docker build', re: /\bdocker\s+build(?!x)/ },
   ];
-  for (const { label, re } of forbiddenBuild) {
-    if (re.test(content)) {
-      findings.push(
-        makeIssue({
-          layer: 'semantic',
-          ruleId: 'semantic/az-acr-build',
-          severity: 'required',
-          message: `Forbidden build method \`${label}\` detected. The image must be built with \`az acr build\` (runs the build in Azure, not on the runner).`,
-          suggestion: acrRec,
-        }),
-      );
-    }
+  const forbiddenBuild = [
+    ...forbiddenUses.filter(({ re }) => stepUses.some((u) => re.test(u))),
+    ...forbiddenRun.filter(({ re }) => stepRuns.some((r) => re.test(r))),
+  ];
+  for (const { label } of forbiddenBuild) {
+    findings.push(
+      makeIssue({
+        layer: 'semantic',
+        ruleId: 'semantic/az-acr-build',
+        severity: 'required',
+        message: `Forbidden build method \`${label}\` detected. The image must be built with \`az acr build\` (runs the build in Azure, not on the runner).`,
+        suggestion: acrRec,
+      }),
+    );
   }
-  if (!/\baz\s+acr\s+build\b/.test(content)) {
+  if (!stepRuns.some((r) => /\baz\s+acr\s+build\b/.test(r))) {
     findings.push(
       makeIssue({
         layer: 'semantic',
@@ -179,9 +217,17 @@ export function checkSemantic(
       }),
     );
   }
-  if (/azure\/aks-set-context/.test(content)) {
-    const adminFalse = /admin:\s*['"]?false['"]?/.test(content);
-    const useKubelogin = /use-kubelogin:\s*['"]?true['"]?/.test(content);
+  // Inspect the actual azure/aks-set-context step's `with` mapping (not the whole YAML)
+  // so admin/use-kubelogin keys from other steps, jobs, or comments can't mask a
+  // misconfigured step. `String(...)` normalizes YAML string ('false') and boolean (false)
+  // scalars alike. Report once per misconfigured step.
+  const aksSetContextSteps = collectStepObjects(jobs).filter(
+    (s) => typeof s.uses === 'string' && /azure\/aks-set-context/i.test(s.uses),
+  );
+  for (const step of aksSetContextSteps) {
+    const w = isDict(step.with) ? step.with : {};
+    const adminFalse = String(w['admin']) === 'false';
+    const useKubelogin = String(w['use-kubelogin']) === 'true';
     if (!adminFalse || !useKubelogin) {
       findings.push(
         makeIssue({
@@ -222,7 +268,7 @@ export function checkSemantic(
     isDict(job) && isDict(job.permissions) ? job.permissions : undefined;
   if (buildImage) {
     const p = perm(buildImage);
-    if (p?.['id-token'] !== 'write') {
+    if (p?.['id-token'] !== 'write' || p?.['contents'] !== 'read') {
       findings.push(
         makeIssue({
           layer: 'semantic',
@@ -238,7 +284,7 @@ export function checkSemantic(
   }
   if (deploy) {
     const p = perm(deploy);
-    if (p?.['actions'] !== 'read' || p?.['id-token'] !== 'write') {
+    if (p?.['actions'] !== 'read' || p?.['contents'] !== 'read' || p?.['id-token'] !== 'write') {
       findings.push(
         makeIssue({
           layer: 'semantic',
@@ -254,7 +300,12 @@ export function checkSemantic(
   }
 
   // ── 6. Required secrets referenced ───────────────────────────────────────────
-  const missingSecrets = REQUIRED_SECRETS.filter((s) => !content.includes(s));
+  // Require a real `${{ secrets.<NAME> }}` expression — a bare substring match would be
+  // satisfied by a comment or unrelated text (e.g. a variable named like the secret).
+  // Case-insensitive: GitHub expression context and secret names are case-insensitive.
+  const missingSecrets = REQUIRED_SECRETS.filter(
+    (s) => !new RegExp(`\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`, 'i').test(content),
+  );
   if (missingSecrets.length > 0) {
     findings.push(
       makeIssue({
