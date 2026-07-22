@@ -55,6 +55,7 @@ export interface IssueInit {
 export function makeIssue(init: IssueInit): WorkflowValidationIssue {
   const severity = mapSeverity(init.severity);
   const isError = severity === ValidationSeverity.ERROR;
+  const isWarning = severity === ValidationSeverity.WARNING;
   return {
     isValid: false,
     passed: false,
@@ -62,7 +63,7 @@ export function makeIssue(init: IssueInit): WorkflowValidationIssue {
     layer: init.layer,
     message: init.message,
     errors: isError ? [init.message] : [],
-    warnings: isError ? [] : [init.message],
+    warnings: isWarning ? [init.message] : [],
     suggestions: init.suggestion ? [init.suggestion] : [],
     ...(init.actionRef !== undefined && { actionRef: init.actionRef }),
     metadata: {

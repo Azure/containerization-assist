@@ -271,6 +271,23 @@ describe('validate-github-workflow', () => {
         global.fetch = originalFetch;
       }
     });
+
+    it('emits INFO findings with an empty warnings array (warnings reserved for WARNING severity)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`, // pinned SHA, no # version comment
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const vc = plan.report.results.find((r) => r.ruleId === 'refs/version-comment');
+      expect(vc).toBeDefined();
+      expect(vc?.metadata?.severity).toBe('info');
+      expect(vc?.warnings).toEqual([]);
+      expect(vc?.errors).toEqual([]);
+    });
   });
 
   // ── Layer 4: CA semantic invariants ───────────────────────────────────────────
@@ -360,6 +377,63 @@ describe('validate-github-workflow', () => {
       ].join('\n');
       const plan = await validate({ workflowContent: content, layers: ['semantic'] });
       expect(ruleIds(plan)).not.toContain('semantic/aks-context-flags');
+    });
+
+    it('does not flag forbidden Azure actions that appear only in comments', async () => {
+      // `az aks get-credentials` / `azure/setup-kubectl` mentioned only in comments must
+      // not raise findings — only real step run/uses values should.
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      # reminder: never run az aks get-credentials',
+        '      # reminder: never use azure/setup-kubectl',
+        `      - uses: azure/login@${CHECKOUT_SHA}`,
+        '      - run: az acr build --image x .',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const azureActionMsgs = plan.report.results
+        .filter((r) => r.ruleId === 'semantic/azure-actions')
+        .map((r) => r.message ?? '');
+      expect(azureActionMsgs.some((m) => m.includes('get-credentials'))).toBe(false);
+      expect(azureActionMsgs.some((m) => m.includes('setup-kubectl'))).toBe(false);
+    });
+
+    it('flags a missing azure/login even when `azure/login` appears only in a comment', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      # TODO: add azure/login here',
+        '      - run: az acr build --image x .',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const msgs = plan.report.results
+        .filter((r) => r.ruleId === 'semantic/azure-actions')
+        .map((r) => r.message ?? '');
+      expect(msgs.some((m) => m.includes('No `azure/login`'))).toBe(true);
+    });
+
+    it('accepts an azure/login step with different casing (case-insensitive)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: Azure/Login@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const msgs = plan.report.results
+        .filter((r) => r.ruleId === 'semantic/azure-actions')
+        .map((r) => r.message ?? '');
+      expect(msgs.some((m) => m.includes('No `azure/login`'))).toBe(false);
     });
 
     it('flags renamed job keys as a warning-level job-keys finding', async () => {

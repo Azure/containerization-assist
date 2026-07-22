@@ -193,7 +193,7 @@ export function checkSemantic(
     'aks-get-credentials',
     'Use azure/aks-set-context@<sha> with admin: false and use-kubelogin: true (with azure/use-kubelogin) instead of az aks get-credentials or azure/setup-kubectl.',
   );
-  if (/az\s+aks\s+get-credentials/.test(content)) {
+  if (stepRuns.some((r) => /az\s+aks\s+get-credentials/.test(r))) {
     findings.push(
       makeIssue({
         layer: 'semantic',
@@ -205,7 +205,7 @@ export function checkSemantic(
       }),
     );
   }
-  if (/azure\/setup-kubectl/.test(content)) {
+  if (stepUses.some((u) => /azure\/setup-kubectl/.test(u))) {
     findings.push(
       makeIssue({
         layer: 'semantic',
@@ -241,7 +241,7 @@ export function checkSemantic(
       );
     }
   }
-  if (!/azure\/login/.test(content)) {
+  if (!stepUses.some((u) => /azure\/login/i.test(u))) {
     findings.push(
       makeIssue({
         layer: 'semantic',
