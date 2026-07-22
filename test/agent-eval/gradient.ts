@@ -135,6 +135,12 @@ export interface GradientRunRecord {
    * checks. Absent for the `bare` control (no deploy is attempted there).
    */
   deployVerified?: boolean;
+  /**
+   * How many deploy-completion nudges the harness issued for this cell. 0 means
+   * the agent finished the deploy loop on its own; higher values mean it stalled
+   * and had to be re-driven. Absent for the `bare` control (no deploy attempted).
+   */
+  deployNudges?: number;
   checks: CheckResult[];
   /** Final assistant text. Useful for debugging "agent bailed early" runs. */
   finalText?: string;
@@ -207,6 +213,15 @@ async function runWithConcurrency<T, R>(
   return results;
 }
 
+// Max deploy-completion nudges per deploy-expected cell. Empirically, once a
+// model stalls before verifyDeploy, extra nudges rarely convert (each also
+// grants a fresh step budget, so they dominate wall-time on slow models like
+// gpt-4o). Default 1; override with AGENT_EVAL_MAX_DEPLOY_NUDGES.
+const MAX_DEPLOY_NUDGES = (() => {
+  const raw = Math.floor(Number(process.env.AGENT_EVAL_MAX_DEPLOY_NUDGES));
+  return Number.isFinite(raw) && raw >= 0 ? raw : 1;
+})();
+
 async function runOneLevel(opts: {
   fixture: string;
   level: LevelConfig;
@@ -243,6 +258,7 @@ async function runOneLevel(opts: {
       // bare is the no-deploy control; mcp/skills are expected to deploy, so let
       // the harness nudge them through push→apply→verify if they stall early.
       requireDeploy: opts.level.id !== 'bare',
+      maxDeployNudges: MAX_DEPLOY_NUDGES,
     });
     record.tokensIn = result.tokensIn;
     record.tokensOut = result.tokensOut;
@@ -254,6 +270,7 @@ async function runOneLevel(opts: {
     record.durationMs = result.durationMs;
     record.finalText = result.text;
     if (opts.level.id !== 'bare') record.deployVerified = result.deployVerified;
+    if (opts.level.id !== 'bare') record.deployNudges = result.deployNudges;
     record.checks = await runChecks(opts.checkSpecs, { artifactDir: workingDir });
   } catch (err) {
     record.error = err instanceof Error ? err.message : String(err);
@@ -385,10 +402,14 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
             continue;
           }
           const r = await runOneLevel({ fixture, level, model, ctx, checkSpecs, rep });
+          const deployTag =
+            r.level === 'bare'
+              ? ''
+              : ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
           console.error(
             `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +
               `fixture=${r.fixture.split('/').pop()} ` +
-              `path=${r.level} ${r.error ? 'ERROR' : 'ok'} ` +
+              `path=${r.level} ${r.error ? 'ERROR' : 'ok'}${deployTag} ` +
               `(${r.durationMs ? Math.round(r.durationMs / 1000) + 's' : '?'})`,
           );
           out.push(r);

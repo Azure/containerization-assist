@@ -53,6 +53,8 @@ export interface AgentRunResult {
   text: string;
   /** True once `verifyDeploy` reported the workload reached Running/Ready. */
   deployVerified: boolean;
+  /** How many deploy-completion nudges were actually issued for this run. */
+  deployNudges: number;
 }
 
 function summarize(args: unknown): string {
@@ -629,6 +631,7 @@ export class AISDKDriver {
     // resume the SAME conversation with a pointed instruction to finish the
     // push→apply→verify loop (fixing failed builds / pod errors along the way).
     // Each nudge gives the agent a fresh step budget; bounded by maxDeployNudges.
+    let deployNudges = 0;
     if (input.requireDeploy && !deployVerified) {
       const maxNudges = input.maxDeployNudges ?? 3;
       const progressSummary = (): string => {
@@ -638,6 +641,7 @@ export class AISDKDriver {
         return parts.length ? parts.join(', ') : 'none yet';
       };
       for (let n = 0; n < maxNudges && !deployVerified; n++) {
+        deployNudges += 1;
         console.error(
           `[driver] deploy not verified — nudging agent to finish push→apply→verify ` +
             `(nudge ${n + 1}/${maxNudges}).`,
@@ -683,6 +687,7 @@ export class AISDKDriver {
       durationMs,
       text: result.text ?? '',
       deployVerified,
+      deployNudges,
     };
   }
 }
