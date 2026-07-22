@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { MCPTestHarness } from '../llm-integration/infrastructure/mcp-test-harness.js';
 import { buildAksRemoteDevLoopPrompt } from '../../src/prompts/aks-loop/prompt.js';
 import type { ToolSpec } from './driver.js';
+import { oneLine } from './log-config.js';
 
 const execFileP = promisify(execFile);
 
@@ -348,7 +349,11 @@ export async function createMcpToolBundle(workingDir: string): Promise<{
         name: t.name,
         arguments: args,
       });
-      return resp.error ? { error: resp.error } : resp.content;
+      if (resp.error) {
+        console.error(`[tool] ${t.name} error: ${oneLine(String(resp.error))}`);
+        return { error: resp.error };
+      }
+      return resp.content;
     },
   }));
   return {

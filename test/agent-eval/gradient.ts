@@ -30,6 +30,7 @@ import {
   type AzureContext,
 } from './modes.js';
 import { runChecks, selectChecks, type CheckResult } from './checks.js';
+import { isVerbose, decisiveLine, oneLine } from './log-config.js';
 
 /** Discover fixtures: each immediate subdirectory of `dir` is one fixture. */
 export async function discoverFixtures(dir: string): Promise<string[]> {
@@ -289,7 +290,59 @@ async function runOneLevel(opts: {
 }
 
 /**
- * Run every selected path for every (fixture, model). Models run concurrently
+ * Print the curated "why did this cell not fully pass" lines under the `done`
+ * line, so the pipeline log explains failures without the CA info-log flood:
+ *   - a run-level error (exception),
+ *   - each failed check with its message, and
+ *   - for `docker-builds`, the last few lines of the build output (the actual
+ *     compiler/registry error), which is the single most-asked-for detail.
+ * Basic mode shows a short tail; verbose (isVerbose()) shows more.
+ */
+function reportCellFailures(r: GradientRunRecord): void {
+  const failedChecks = r.checks.filter((c) => !c.passed);
+  if (!r.error && failedChecks.length === 0) return;
+
+  const cellId = `${r.model} · ${r.fixture.split('/').pop()} · ${r.level}`;
+  console.error(`[gradient]   ──── FAIL: ${cellId} ────`);
+
+  // Run-level error (agent/harness crash, not a check).
+  if (r.error) {
+    if (isVerbose()) {
+      console.error(indentBlock(r.error, 'run error'));
+    } else {
+      console.error(`[gradient]   ✗ run error: ${decisiveLine(r.error)}`);
+    }
+  }
+
+  for (const c of failedChecks) {
+    console.error(`[gradient]   ✗ ${c.name}: ${oneLine(c.message, 200) || 'failed'}`);
+    if (!c.details) continue;
+    if (isVerbose()) {
+      // Verbose: the full captured output, framed so it's easy to scan.
+      console.error(indentBlock(c.details, `${c.name} output`));
+    } else {
+      // Basic: just the single decisive line — keeps the pipeline readable.
+      const line = decisiveLine(c.details);
+      if (line) console.error(`[gradient]       ${line}`);
+    }
+  }
+}
+
+/** Frame a multi-line block with a labelled top/bottom rule for the verbose view. */
+function indentBlock(text: string, label: string): string {
+  const body = text
+    .replace(/\s+$/, '')
+    .split('\n')
+    .map((l) => `[gradient]     │ ${l}`)
+    .join('\n');
+  return [
+    `[gradient]     ┌─ ${label} ` + '─'.repeat(Math.max(3, 40 - label.length)),
+    body,
+    `[gradient]     └` + '─'.repeat(42),
+  ].join('\n');
+}
+
+/**
  * when there is more than one (each lane gets its own slugged `imageName` so
  * cleanup is isolated); pass `parallelModels: false` to force sequential.
  * Inside one model, fixtures and paths are always sequential.
@@ -406,12 +459,15 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
             r.level === 'bare'
               ? ''
               : ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
+          const checksPassed = r.checks.filter((c) => c.passed).length;
           console.error(
             `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +
               `fixture=${r.fixture.split('/').pop()} ` +
               `path=${r.level} ${r.error ? 'ERROR' : 'ok'}${deployTag} ` +
+              `checks=${checksPassed}/${r.checks.length} ` +
               `(${r.durationMs ? Math.round(r.durationMs / 1000) + 's' : '?'})`,
           );
+          reportCellFailures(r);
           out.push(r);
           collected.push(r);
           if (!r.error) completed.add(key);

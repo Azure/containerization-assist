@@ -470,7 +470,7 @@ export const dockerBuilds: Check = {
         name: this.name,
         passed: false,
         message: 'docker build failed',
-        details: (e.stderr ?? e.message ?? '').slice(-2000),
+        details: (e.stderr ?? e.message ?? '').slice(-8000),
       };
     }
     try {
