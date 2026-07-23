@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { environment, platform, workspacePath } from '../shared/schemas';
 import type { ValidationResult } from '@/validation/core-types';
 import type { PolicyValidationResult } from '@/lib/policy-helpers';
+import type { BaseImageSubstitution } from './base-image-fix';
 
 export const fixDockerfileSchema = z
   .object({
@@ -97,6 +98,18 @@ export interface DockerfileFixPlan {
 
   /** Confidence in the fix recommendations (0-1) */
   confidence: number;
+
+  /**
+   * Concrete base-image corrections applied by surgical line substitution
+   * (hallucinated MCR tags or non-MCR images with a verified MCR equivalent).
+   */
+  baseImageFixes?: BaseImageSubstitution[];
+
+  /**
+   * The Dockerfile with base-image substitutions applied, when any were made.
+   * Only the offending FROM lines are rewritten; all other lines are preserved.
+   */
+  fixedDockerfile?: string;
 
   /** Human-readable summary */
   summary: string;

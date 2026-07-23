@@ -28,6 +28,7 @@ import { readDockerfile } from '@/lib/file-utils';
 import { validateContentAgainstPolicy, type PolicyValidationResult } from '@/lib/policy-helpers';
 import { pluralize } from '@/lib/summary-helpers';
 import { fixDockerfileToolDefinition } from './types';
+import { fixBaseImages } from './base-image-fix';
 
 const { name } = fixDockerfileToolDefinition;
 
@@ -318,6 +319,24 @@ async function handleFixDockerfile(
 
   logger.info({ preview: content.substring(0, 100) }, 'Validating Dockerfile for issues');
 
+  // Verify and, where provably wrong, correct the base image(s) via surgical
+  // substitution. This runs regardless of other validation results because a
+  // hallucinated MCR tag is syntactically valid and would otherwise pass.
+  const baseFix = await fixBaseImages(content);
+  if (baseFix.substitutions.length > 0) {
+    logger.info(
+      { substitutions: baseFix.substitutions.map((s) => `${s.original} → ${s.replacement}`) },
+      'Applied base-image corrections',
+    );
+  }
+  const baseFixPlan: Pick<DockerfileFixPlan, 'baseImageFixes' | 'fixedDockerfile'> =
+    baseFix.substitutions.length > 0 && baseFix.fixedDockerfile !== null
+      ? {
+          baseImageFixes: baseFix.substitutions,
+          fixedDockerfile: baseFix.fixedDockerfile,
+        }
+      : {};
+
   const validationReport = await validateDockerfileContent(content, {
     enableExternalLinter: true,
     targetPlatform: input.targetPlatform,
@@ -381,6 +400,7 @@ async function handleFixDockerfile(
         bestPractices: [],
       },
       ...(policyValidation && { policyValidation }),
+      ...baseFixPlan,
       validationScore: validationReport.score,
       validationGrade: validationReport.grade,
       priority: 'low',
@@ -411,6 +431,7 @@ Dockerfile Fix Planning Summary:
     const plan: DockerfileFixPlan = {
       ...result.value,
       ...(policyValidation && { policyValidation }),
+      ...baseFixPlan,
     };
     return Success(plan);
   }

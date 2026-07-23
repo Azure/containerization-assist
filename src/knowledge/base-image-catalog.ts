@@ -177,8 +177,23 @@ export function splitMcrRef(ref: string): { repo: string; tag: string | null } {
 
 // --- Stack + version detection ---------------------------------------------
 
-const JAVA_REPO =
-  /(?:^|\/)(?:openjdk|jdk|jre|java|eclipse-temurin|temurin|amazoncorretto|adoptopenjdk|ibmjava|sapmachine|zulu-openjdk|liberica-openjdk[\w-]*)$/i;
+const JAVA_REPO = new RegExp(
+  `(?:^|/)(?:${[
+    'openjdk',
+    'jdk',
+    'jre',
+    'java',
+    'eclipse-temurin',
+    'temurin',
+    'amazoncorretto',
+    'adoptopenjdk',
+    'ibmjava',
+    'sapmachine',
+    'zulu-openjdk',
+    'liberica-openjdk[\\w-]*',
+  ].join('|')})$`,
+  'i',
+);
 const NODE_REPO = /(?:^|\/)(?:node|nodejs)$/i;
 const PYTHON_REPO = /(?:^|\/)python$/i;
 const DOTNET_REPO = /(?:^|\/)dotnet\/(?:sdk|aspnet|runtime)$/i;
