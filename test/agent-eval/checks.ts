@@ -18,6 +18,10 @@ export interface CheckResult {
   passed: boolean;
   message: string;
   details?: string;
+  // Set when the failure is caused by the sandbox environment (e.g. a blocked
+  // registry/network) rather than the agent's output. Infra-blocked results are
+  // excluded from agent-attributable pass rates so they don't distort scoring.
+  infraBlocked?: boolean;
 }
 
 export interface Check {
@@ -493,6 +497,79 @@ export const hasRequiredLabels: Check = {
   },
 };
 
+// Host names whose failures during a build are environmental, not the agent's
+// fault: base-image registries and dependency mirrors that the sandbox blocks.
+const BLOCKED_HOST_HINTS = [
+  'registry-1.docker.io',
+  'registry.docker.io',
+  'index.docker.io',
+  'auth.docker.io',
+  'docker.io',
+  'ghcr.io',
+  'quay.io',
+  'gcr.io',
+  'registry.k8s.io',
+  'repo.maven.apache.org',
+  'repo1.maven.org',
+  'repo.maven.org',
+  'plugins.gradle.org',
+  'services.gradle.org',
+  'jcenter.bintray.com',
+  'registry.npmjs.org',
+  'pypi.org',
+  'files.pythonhosted.org',
+];
+
+// Signatures that indicate a network/DNS failure (as opposed to a compile or
+// agent-authored error) when they co-occur with a blocked host.
+const NETWORK_FAILURE_HINTS = [
+  'i/o timeout',
+  'context deadline exceeded',
+  'deadlineexceeded',
+  'tls handshake timeout',
+  'failed to do request',
+  'connection timed out',
+  'connect timed out',
+  'connection refused',
+  'network is unreachable',
+  'dial tcp',
+];
+
+// DNS failures are unambiguously environmental regardless of host.
+const DNS_FAILURE_HINTS = [
+  'temporary failure in name resolution',
+  'could not resolve host',
+  'name or service not known',
+  'no such host',
+  'eai_again',
+];
+
+/**
+ * Classify a docker-build failure as environment-blocked (network/DNS/registry
+ * unreachable) rather than agent-attributable. Returns a short reason when the
+ * failure is high-confidence infra, otherwise null. Conservative by design:
+ * genuine compile or Dockerfile errors must not be misclassified.
+ */
+export function classifyInfraFailure(details: string | undefined): string | null {
+  if (!details) return null;
+  const text = details.toLowerCase();
+
+  // Docker Hub sinkhole (RFC 5737 TEST-NET-1) seen on the CI agents.
+  if (text.includes('192.0.2.')) return 'blocked registry (docker hub sinkhole 192.0.2.x)';
+
+  for (const dns of DNS_FAILURE_HINTS) {
+    if (text.includes(dns)) return `dns resolution failure (${dns})`;
+  }
+
+  const host = BLOCKED_HOST_HINTS.find((h) => text.includes(h));
+  if (host) {
+    const net = NETWORK_FAILURE_HINTS.find((n) => text.includes(n));
+    if (net) return `blocked network to ${host} (${net})`;
+  }
+
+  return null;
+}
+
 export const dockerBuilds: Check = {
   name: 'docker-builds',
   async run({ artifactDir }) {
@@ -512,11 +589,22 @@ export const dockerBuilds: Check = {
       if (e.code === 'ENOENT') {
         return { name: this.name, passed: false, message: 'docker not available on PATH' };
       }
+      const details = (e.stderr ?? e.message ?? '').slice(-MAX_FAILURE_DETAIL_CHARS);
+      const infraReason = classifyInfraFailure(details);
+      if (infraReason) {
+        return {
+          name: this.name,
+          passed: false,
+          infraBlocked: true,
+          message: `env-blocked: ${infraReason}`,
+          details,
+        };
+      }
       return {
         name: this.name,
         passed: false,
         message: 'docker build failed',
-        details: (e.stderr ?? e.message ?? '').slice(-MAX_FAILURE_DETAIL_CHARS),
+        details,
       };
     }
     try {
