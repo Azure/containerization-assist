@@ -18,7 +18,10 @@ parameters:
     default: bare,mcp,skills
   - name: timeoutInMinutes
     type: number
-    default: 360
+    default: 480
+  - name: reportStorageAccount
+    type: string
+    default: 'caagentevalreports'
 
 resources:
   repositories:
@@ -149,18 +152,110 @@ extends:
                   PATHS_INPUT: ${{ parameters.paths }}
 
               - task: AzureCLI@2
-                displayName: Purge eval ACR
+                displayName: Publish report to blob (SAS URL)
                 condition: always()
+                continueOnError: true
                 inputs:
                   azureSubscription: $(azureServiceConnection)
                   scriptType: bash
                   scriptLocation: inlineScript
                   inlineScript: |
-                    set -euo pipefail
+                    set -uo pipefail
+                    if [ -z "${REPORT_STORAGE_ACCOUNT:-}" ]; then
+                      echo "reportStorageAccount not set — skipping blob publish."
+                      echo "(Report is still available as the 'gradient-report' pipeline artifact.)"
+                      exit 0
+                    fi
+                    SRC="$(Build.ArtifactStagingDirectory)"
+                    DEST="builds/$(Build.BuildId)"
+                    CONTAINER="reports"
+                    ACCT="$REPORT_STORAGE_ACCOUNT"
+                    # Best-effort: publishing the report must never fail the run
+                    # (the JSON/HTML is always kept as the 'gradient-report' artifact).
+                    publish() {
+                      set -e
+                      # Org policy forbids shared-key and anonymous access, so we use
+                      # the service connection's AAD identity throughout and hand out a
+                      # signed, time-limited (user-delegation) SAS URL that renders in
+                      # the browser — no account key, no public/anonymous access.
+                      az storage container create \
+                        --account-name "$ACCT" --auth-mode login \
+                        --name "$CONTAINER" >/dev/null 2>&1 || true
+                      local published=0
+                      local sas_blob=""
+                      # Upload with explicit content-types so the browser RENDERS
+                      # the HTML heatmap (and shows JSON) instead of downloading.
+                      if [ -f "$SRC/gradient.html" ]; then
+                        az storage blob upload \
+                          --account-name "$ACCT" --auth-mode login \
+                          --container-name "$CONTAINER" --name "$DEST/gradient.html" \
+                          --file "$SRC/gradient.html" --content-type "text/html" --overwrite true || return 1
+                        published=1
+                        sas_blob="$DEST/gradient.html"
+                      fi
+                      if [ -f "$SRC/gradient.json" ]; then
+                        az storage blob upload \
+                          --account-name "$ACCT" --auth-mode login \
+                          --container-name "$CONTAINER" --name "$DEST/gradient.json" \
+                          --file "$SRC/gradient.json" --content-type "application/json" --overwrite true || return 1
+                        published=1
+                        # Prefer the HTML report for the link; fall back to JSON.
+                        [ -z "$sas_blob" ] && sas_blob="$DEST/gradient.json"
+                      fi
+                      if [ "$published" -eq 0 ]; then
+                        echo "No gradient.{html,json} found in $SRC — nothing to publish."
+                        return 0
+                      fi
+                      # User-delegation SAS (AAD-signed, no account key). Valid 30 days.
+                      local expiry url summary
+                      expiry=$(date -u -d "+30 days" "+%Y-%m-%dT%H:%MZ")
+                      url=$(az storage blob generate-sas \
+                        --account-name "$ACCT" --auth-mode login --as-user \
+                        --container-name "$CONTAINER" --name "$sas_blob" \
+                        --permissions r --expiry "$expiry" --full-uri -o tsv) || return 1
+                      echo "Gradient report published (SAS valid until $expiry): $url"
+                      echo "##vso[task.setvariable variable=reportUrl]$url"
+                      # Render the link as a section on the run's Summary tab.
+                      summary="$(mktemp --suffix=.md)"
+                      {
+                        echo "## Gradient eval report"
+                        echo ""
+                        echo "[View report (renders in browser)]($url)"
+                        echo ""
+                        echo "_SAS link valid until ${expiry}._"
+                      } > "$summary"
+                      echo "##vso[task.uploadsummary]$summary"
+                    }
+                    if ! publish; then
+                      echo "##vso[task.logissue type=warning]Report publish failed (check storage RBAC / account name). Report is still available as the 'gradient-report' pipeline artifact."
+                    fi
+                    exit 0
+                env:
+                  REPORT_STORAGE_ACCOUNT: ${{ parameters.reportStorageAccount }}
+
+              - task: AzureCLI@2
+                displayName: Purge eval ACR
+                condition: always()
+                continueOnError: true
+                inputs:
+                  azureSubscription: $(azureServiceConnection)
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    set -uo pipefail
                     ACR="${AGENT_EVAL_REGISTRY%%.*}"
-                    for repo in $(az acr repository list --name "$ACR" -o tsv); do
+                    # Cleanup is non-blocking: warn and continue on any failure so a
+                    # purge hiccup never fails an otherwise-successful eval run.
+                    repos=$(az acr repository list --name "$ACR" -o tsv) || {
+                      echo "##vso[task.logissue type=warning]Could not list repositories in $ACR — skipping ACR purge."
+                      exit 0
+                    }
+                    for repo in $repos; do
                       echo "deleting $ACR/$repo"
-                      az acr repository delete --name "$ACR" --repository "$repo" --yes
+                      if ! az acr repository delete --name "$ACR" --repository "$repo" --yes; then
+                        echo "##vso[task.logissue type=warning]Failed to delete $ACR/$repo — continuing (non-blocking cleanup)."
+                      fi
                     done
+                    exit 0
                 env:
                   AGENT_EVAL_REGISTRY: caagentevalacr.azurecr.io

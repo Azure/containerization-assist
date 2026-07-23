@@ -4,6 +4,9 @@ import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+// Side-effect import BEFORE the harness (which transitively loads CA knowledge/
+// validation modules that build pino loggers at load): sets the LOG_LEVEL default.
+import { oneLine, MAX_INLINE_DETAIL_CHARS } from './log-config.js';
 import { MCPTestHarness } from '../llm-integration/infrastructure/mcp-test-harness.js';
 import { buildAksRemoteDevLoopPrompt } from '../../src/prompts/aks-loop/prompt.js';
 import type { ToolSpec } from './driver.js';
@@ -211,7 +214,7 @@ export async function ensureEvalCluster(ctx: AzureContext = loadAzureContext()):
     }
   } catch (err) {
     const e = err as { stderr?: string; stdout?: string; message?: string };
-    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(-1000);
+    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(-MAX_INLINE_DETAIL_CHARS);
     throw new Error(
       `ensureEvalCluster failed — the eval AKS cluster could not be prepared.\n${detail}\n` +
         'Fix the cluster manually or set AGENT_EVAL_SKIP_CLUSTER_ENSURE=1, then re-run.',
@@ -348,7 +351,11 @@ export async function createMcpToolBundle(workingDir: string): Promise<{
         name: t.name,
         arguments: args,
       });
-      return resp.error ? { error: resp.error } : resp.content;
+      if (resp.error) {
+        console.error(`[tool] ${t.name} error: ${oneLine(String(resp.error))}`);
+        return { error: resp.error };
+      }
+      return resp.content;
     },
   }));
   return {
