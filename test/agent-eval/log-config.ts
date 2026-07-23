@@ -14,9 +14,10 @@
  * An env `LOG_LEVEL` sets the initial mode; the `--verbose` flag forces `info`.
  */
 
-// Runtime verbosity flag. Starts true when LOG_LEVEL=info, and is flipped on by
-// `enableVerboseLogging()` (the `--verbose` flag), which also raises the log level.
-let verbose = process.env.LOG_LEVEL === 'info';
+// Runtime verbosity flag. Starts true when LOG_LEVEL is already at an info-or-more
+// level (info/debug/trace), and is flipped on by `enableVerboseLogging()` (the
+// `--verbose` flag), which also raises the log level.
+let verbose = ['info', 'debug', 'trace'].includes((process.env.LOG_LEVEL ?? '').toLowerCase());
 
 /** True when verbose output is active (the `--verbose` flag). */
 export function isVerbose(): boolean {

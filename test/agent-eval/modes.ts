@@ -4,10 +4,12 @@ import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+// Side-effect import BEFORE the harness (which transitively loads CA knowledge/
+// validation modules that build pino loggers at load): sets the LOG_LEVEL default.
+import { oneLine, MAX_INLINE_DETAIL_CHARS } from './log-config.js';
 import { MCPTestHarness } from '../llm-integration/infrastructure/mcp-test-harness.js';
 import { buildAksRemoteDevLoopPrompt } from '../../src/prompts/aks-loop/prompt.js';
 import type { ToolSpec } from './driver.js';
-import { oneLine, MAX_INLINE_DETAIL_CHARS } from './log-config.js';
 
 const execFileP = promisify(execFile);
 

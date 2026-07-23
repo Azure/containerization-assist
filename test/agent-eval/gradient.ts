@@ -11,6 +11,9 @@
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+// Side-effect import FIRST: sets the CA LOG_LEVEL default before any module
+// (harness, knowledge, validation) constructs its pino logger at load time.
+import { isVerbose, decisiveLine, oneLine } from './log-config.js';
 import { getModel } from './providers.js';
 import { AISDKDriver, type ToolSpec } from './driver.js';
 import {
@@ -30,7 +33,6 @@ import {
   type AzureContext,
 } from './modes.js';
 import { runChecks, selectChecks, type CheckResult } from './checks.js';
-import { isVerbose, decisiveLine, oneLine } from './log-config.js';
 
 /** Discover fixtures: each immediate subdirectory of `dir` is one fixture. */
 export async function discoverFixtures(dir: string): Promise<string[]> {
