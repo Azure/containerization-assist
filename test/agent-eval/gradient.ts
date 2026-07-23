@@ -317,7 +317,8 @@ function reportCellFailures(r: GradientRunRecord): void {
   }
 
   for (const c of failedChecks) {
-    console.error(`[gradient]   ✗ ${c.name}: ${oneLine(c.message, 200) || 'failed'}`);
+    const marker = c.infraBlocked ? '⚠' : '✗';
+    console.error(`[gradient]   ${marker} ${c.name}: ${oneLine(c.message, 200) || 'failed'}`);
     if (!c.details) continue;
     if (isVerbose()) {
       // Verbose: the full captured output, framed so it's easy to scan.
@@ -462,11 +463,13 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
               ? ''
               : ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
           const checksPassed = r.checks.filter((c) => c.passed).length;
+          const infraBlocked = r.checks.filter((c) => c.infraBlocked).length;
+          const checksTotal = r.checks.length - infraBlocked;
           console.error(
             `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +
               `fixture=${r.fixture.split('/').pop()} ` +
               `path=${r.level} ${r.error ? 'ERROR' : 'ok'}${deployTag} ` +
-              `checks=${checksPassed}/${r.checks.length} ` +
+              `checks=${checksPassed}/${checksTotal}${infraBlocked > 0 ? ` (+${infraBlocked} env-blocked)` : ''} ` +
               `(${r.durationMs ? Math.round(r.durationMs / 1000) + 's' : '?'})`,
           );
           reportCellFailures(r);
@@ -556,6 +559,12 @@ function sumTokens(runs: GradientRunRecord[], key: 'tokensIn' | 'tokensOut'): nu
 function checkPassed(r: GradientRunRecord, name: string): boolean | undefined {
   const c = r.checks.find((x) => x.name === name);
   return c?.passed;
+}
+
+/** True when a check failed because the sandbox blocked the network/registry. */
+function checkInfraBlocked(r: GradientRunRecord, name: string): boolean {
+  const c = r.checks.find((x) => x.name === name);
+  return c?.infraBlocked === true;
 }
 
 /** Short fixture nickname used as a column-group header. */
@@ -663,6 +672,8 @@ interface CellAgg {
   checksPassed: number;
   /** Sum of individual headline checks evaluated across all valid reps. */
   checksTotal: number;
+  /** Headline checks skipped because the sandbox blocked the network/registry. */
+  infraBlocked: number;
   /** Total reps recorded for this cell (valid + errored). */
   reps: number;
   /** Reps that errored before checks could run. */
@@ -687,6 +698,7 @@ const aggregateCell = (
     fullPass: 0,
     checksPassed: 0,
     checksTotal: 0,
+    infraBlocked: 0,
     reps: 0,
     errored: 0,
     checkRatio: null,
@@ -698,6 +710,7 @@ const aggregateCell = (
   let valid = 0;
   let checksPassed = 0;
   let checksTotal = 0;
+  let infraBlocked = 0;
   for (const r of matching) {
     if (r.error) {
       errored++;
@@ -706,6 +719,12 @@ const aggregateCell = (
     valid++;
     let allOk = true;
     for (const name of headlineNames) {
+      // Environment-blocked checks are neither agent passes nor failures:
+      // exclude them from the ratio denominator and don't fail fullPass.
+      if (checkInfraBlocked(r, name)) {
+        infraBlocked++;
+        continue;
+      }
       checksTotal++;
       if (checkPassed(r, name) === true) checksPassed++;
       else allOk = false;
@@ -716,6 +735,7 @@ const aggregateCell = (
     fullPass,
     checksPassed,
     checksTotal,
+    infraBlocked,
     reps: matching.length,
     errored,
     checkRatio: checksTotal === 0 ? null : checksPassed / checksTotal,
@@ -759,6 +779,7 @@ export function formatGradientHtml(result: GradientResult): string {
     totalCells: number;
     checksPassed: number;
     checksTotal: number;
+    infraBlocked: number;
     tokensIn: number;
     tokensOut: number;
     validReps: number;
@@ -769,6 +790,7 @@ export function formatGradientHtml(result: GradientResult): string {
     let totalCells = 0;
     let checksPassed = 0;
     let checksTotal = 0;
+    let infraBlocked = 0;
     let validReps = 0;
     let erroredReps = 0;
     for (const model of result.models) {
@@ -779,6 +801,7 @@ export function formatGradientHtml(result: GradientResult): string {
         if (cell.fullPassRatio === 1) perfectCells++;
         checksPassed += cell.checksPassed;
         checksTotal += cell.checksTotal;
+        infraBlocked += cell.infraBlocked;
         validReps += cell.reps - cell.errored;
         erroredReps += cell.errored;
       }
@@ -792,6 +815,7 @@ export function formatGradientHtml(result: GradientResult): string {
       totalCells,
       checksPassed,
       checksTotal,
+      infraBlocked,
       tokensIn,
       tokensOut,
       validReps,
@@ -818,7 +842,7 @@ export function formatGradientHtml(result: GradientResult): string {
       ${isWinner ? '<div class="score-crown">★ best quality</div>' : ''}
       <div class="score-method"><span class="score-dot" style="background:${METHOD_COLOURS[r.level.id]}"></span>${escapeHtml(r.level.label)} <span class="score-id">${escapeHtml(r.level.id)}</span></div>
       <div class="score-ratio" style="color:${rateColour(ratio)}">${Math.round(ratio * 100)}<span class="score-pct">%</span></div>
-      <div class="score-ratio-sub">checks passed (${r.checksPassed}/${r.checksTotal})</div>
+      <div class="score-ratio-sub">checks passed (${r.checksPassed}/${r.checksTotal})${r.infraBlocked > 0 ? ` · ${r.infraBlocked} env-blocked` : ''}</div>
       ${liftHtml}
       <div class="score-stats">
         <div><span class="score-stat-label">perfect cells</span><span class="score-stat-val">${r.perfectCells}/${r.totalCells}</span></div>
@@ -1050,6 +1074,7 @@ export function formatGradientHtml(result: GradientResult): string {
         validReps++;
         let allOk = true;
         for (const name of headlineNames) {
+          if (checkInfraBlocked(r, name)) continue;
           checksTotal++;
           if (checkPassed(r, name) === true) checksPassed++;
           else allOk = false;
@@ -1254,30 +1279,39 @@ export function formatGradientHtml(result: GradientResult): string {
   // concrete question "which specific guarantees does CA actually buy me?"
   const validationsSection = ((): string => {
     if (headlineNames.length === 0) return '';
-    const passRate = (checkName: string, levelId: LevelId): { passed: number; total: number } => {
+    const passRate = (
+      checkName: string,
+      levelId: LevelId,
+    ): { passed: number; total: number; infraBlocked: number } => {
       let passed = 0;
       let total = 0;
+      let infraBlocked = 0;
       for (const r of result.runs) {
         if (r.level !== levelId || r.error) continue;
         const c = r.checks.find((x) => x.name === checkName);
         if (!c) continue;
+        if (c.infraBlocked) {
+          infraBlocked++;
+          continue;
+        }
         total++;
         if (c.passed) passed++;
       }
-      return { passed, total };
+      return { passed, total, infraBlocked };
     };
     const panels = headlineNames
       .map((name) => {
         const bars = result.levels
           .map((level) => {
-            const { passed, total } = passRate(name, level.id);
+            const { passed, total, infraBlocked } = passRate(name, level.id);
             const rate = total === 0 ? 0 : passed / total;
             const pct = Math.round(rate * 100);
             const colour = METHOD_COLOURS[level.id];
-            return `<div class="vbar-row" title="${escapeHtml(`${level.id} · ${name}: ${passed}/${total} passed`)}">
+            const blockedNote = infraBlocked > 0 ? ` · ${infraBlocked} env-blocked` : '';
+            return `<div class="vbar-row" title="${escapeHtml(`${level.id} · ${name}: ${passed}/${total} passed${blockedNote}`)}">
               <div class="vbar-label"><span class="hm-dot" style="background:${colour}"></span>${escapeHtml(level.id)}</div>
               <div class="vbar-track"><div class="vbar-fill" style="width:${pct}%; background:${colour}"></div><span class="vbar-pct">${total === 0 ? '—' : pct + '%'}</span></div>
-              <div class="vbar-count">${passed}/${total}</div>
+              <div class="vbar-count">${passed}/${total}${infraBlocked > 0 ? `<span class="vbar-blocked" title="excluded: sandbox blocked network/registry"> (+${infraBlocked} env)</span>` : ''}</div>
             </div>`;
           })
           .join('');
@@ -1536,6 +1570,7 @@ export function formatGradientHtml(result: GradientResult): string {
   .vbar-fill { height: 100%; border-radius: 4px; transition: width 0.2s; }
   .vbar-pct { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 700; color: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
   .vbar-count { font-size: 11px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; text-align: right; }
+  .vbar-blocked { color: #d8a13a; }
 
   /* Errors */
   html { scroll-behavior: smooth; }
