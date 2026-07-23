@@ -6,7 +6,7 @@
 
 // Side-effect import FIRST: sets the CA LOG_LEVEL default before any module
 // (harness, knowledge, validation) constructs its pino logger at load time.
-import { enableVerboseLogging } from './log-config.js';
+import { enableVerboseLogging, isVerbose } from './log-config.js';
 import { promises as fs } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -259,7 +259,7 @@ program
       }
 
       console.error(
-        `[gradient] log mode: ${process.env.LOG_LEVEL === 'info' ? 'verbose' : 'basic'} ` +
+        `[gradient] log mode: ${isVerbose() ? 'verbose' : 'basic'} ` +
           `(LOG_LEVEL=${process.env.LOG_LEVEL}). Use --verbose (or LOG_LEVEL=info) for full CA logs.`,
       );
       const result = await runGradient({
