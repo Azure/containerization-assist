@@ -11,6 +11,9 @@
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+// Side-effect import FIRST: sets the CA LOG_LEVEL default before any module
+// (harness, knowledge, validation) constructs its pino logger at load time.
+import { isVerbose, decisiveLine, oneLine } from './log-config.js';
 import { getModel } from './providers.js';
 import { AISDKDriver, type ToolSpec } from './driver.js';
 import {
@@ -135,6 +138,12 @@ export interface GradientRunRecord {
    * checks. Absent for the `bare` control (no deploy is attempted there).
    */
   deployVerified?: boolean;
+  /**
+   * How many deploy-completion nudges the harness issued for this cell. 0 means
+   * the agent finished the deploy loop on its own; higher values mean it stalled
+   * and had to be re-driven. Absent for the `bare` control (no deploy attempted).
+   */
+  deployNudges?: number;
   checks: CheckResult[];
   /** Final assistant text. Useful for debugging "agent bailed early" runs. */
   finalText?: string;
@@ -207,6 +216,15 @@ async function runWithConcurrency<T, R>(
   return results;
 }
 
+// Max deploy-completion nudges per deploy-expected cell. Empirically, once a
+// model stalls before verifyDeploy, extra nudges rarely convert (each also
+// grants a fresh step budget, so they dominate wall-time on slow models like
+// gpt-4o). Default 1; override with AGENT_EVAL_MAX_DEPLOY_NUDGES.
+const MAX_DEPLOY_NUDGES = (() => {
+  const raw = Math.floor(Number(process.env.AGENT_EVAL_MAX_DEPLOY_NUDGES));
+  return Number.isFinite(raw) && raw >= 0 ? raw : 1;
+})();
+
 async function runOneLevel(opts: {
   fixture: string;
   level: LevelConfig;
@@ -243,6 +261,7 @@ async function runOneLevel(opts: {
       // bare is the no-deploy control; mcp/skills are expected to deploy, so let
       // the harness nudge them through push→apply→verify if they stall early.
       requireDeploy: opts.level.id !== 'bare',
+      maxDeployNudges: MAX_DEPLOY_NUDGES,
     });
     record.tokensIn = result.tokensIn;
     record.tokensOut = result.tokensOut;
@@ -254,6 +273,7 @@ async function runOneLevel(opts: {
     record.durationMs = result.durationMs;
     record.finalText = result.text;
     if (opts.level.id !== 'bare') record.deployVerified = result.deployVerified;
+    if (opts.level.id !== 'bare') record.deployNudges = result.deployNudges;
     record.checks = await runChecks(opts.checkSpecs, { artifactDir: workingDir });
   } catch (err) {
     record.error = err instanceof Error ? err.message : String(err);
@@ -272,7 +292,59 @@ async function runOneLevel(opts: {
 }
 
 /**
- * Run every selected path for every (fixture, model). Models run concurrently
+ * Print the curated "why did this cell not fully pass" lines under the `done`
+ * line, so the pipeline log explains failures without the CA info-log flood:
+ *   - a run-level error (exception),
+ *   - each failed check with its message, and
+ *   - for `docker-builds`, the last few lines of the build output (the actual
+ *     compiler/registry error), which is the single most-asked-for detail.
+ * Basic mode shows a short tail; verbose (isVerbose()) shows more.
+ */
+function reportCellFailures(r: GradientRunRecord): void {
+  const failedChecks = r.checks.filter((c) => !c.passed);
+  if (!r.error && failedChecks.length === 0) return;
+
+  const cellId = `${r.model} · ${r.fixture.split('/').pop()} · ${r.level}`;
+  console.error(`[gradient]   ──── FAIL: ${cellId} ────`);
+
+  // Run-level error (agent/harness crash, not a check).
+  if (r.error) {
+    if (isVerbose()) {
+      console.error(indentBlock(r.error, 'run error'));
+    } else {
+      console.error(`[gradient]   ✗ run error: ${decisiveLine(r.error)}`);
+    }
+  }
+
+  for (const c of failedChecks) {
+    console.error(`[gradient]   ✗ ${c.name}: ${oneLine(c.message, 200) || 'failed'}`);
+    if (!c.details) continue;
+    if (isVerbose()) {
+      // Verbose: the full captured output, framed so it's easy to scan.
+      console.error(indentBlock(c.details, `${c.name} output`));
+    } else {
+      // Basic: just the single decisive line — keeps the pipeline readable.
+      const line = decisiveLine(c.details);
+      if (line) console.error(`[gradient]       ${line}`);
+    }
+  }
+}
+
+/** Frame a multi-line block with a labelled top/bottom rule for the verbose view. */
+function indentBlock(text: string, label: string): string {
+  const body = text
+    .replace(/\s+$/, '')
+    .split('\n')
+    .map((l) => `[gradient]     │ ${l}`)
+    .join('\n');
+  return [
+    `[gradient]     ┌─ ${label} ` + '─'.repeat(Math.max(3, 40 - label.length)),
+    body,
+    `[gradient]     └` + '─'.repeat(42),
+  ].join('\n');
+}
+
+/**
  * when there is more than one (each lane gets its own slugged `imageName` so
  * cleanup is isolated); pass `parallelModels: false` to force sequential.
  * Inside one model, fixtures and paths are always sequential.
@@ -385,12 +457,19 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
             continue;
           }
           const r = await runOneLevel({ fixture, level, model, ctx, checkSpecs, rep });
+          const deployTag =
+            r.level === 'bare'
+              ? ''
+              : ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
+          const checksPassed = r.checks.filter((c) => c.passed).length;
           console.error(
             `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +
               `fixture=${r.fixture.split('/').pop()} ` +
-              `path=${r.level} ${r.error ? 'ERROR' : 'ok'} ` +
+              `path=${r.level} ${r.error ? 'ERROR' : 'ok'}${deployTag} ` +
+              `checks=${checksPassed}/${r.checks.length} ` +
               `(${r.durationMs ? Math.round(r.durationMs / 1000) + 's' : '?'})`,
           );
+          reportCellFailures(r);
           out.push(r);
           collected.push(r);
           if (!r.error) completed.add(key);

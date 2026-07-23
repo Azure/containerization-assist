@@ -18,7 +18,7 @@ parameters:
     default: bare,mcp,skills
   - name: timeoutInMinutes
     type: number
-    default: 360
+    default: 480
   - name: reportStorageAccount
     type: string
     default: 'caagentevalreports'
