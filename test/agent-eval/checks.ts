@@ -4,6 +4,9 @@ import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { MAX_FAILURE_DETAIL_CHARS } from './log-config.js';
+import { mcrRefExists } from '../../src/validation/mcr-registry.js';
+import { KNOWN_GOOD_MCR_REFS, suggestMcrFix } from '../../src/knowledge/base-image-catalog.js';
+import { prepareMavenBuild } from './maven-ci.js';
 
 const execFileP = promisify(execFile);
 
@@ -16,6 +19,10 @@ export interface CheckResult {
   passed: boolean;
   message: string;
   details?: string;
+  // Set when the failure is caused by the sandbox environment (e.g. a blocked
+  // registry/network) rather than the agent's output. Infra-blocked results are
+  // excluded from agent-attributable pass rates so they don't distort scoring.
+  infraBlocked?: boolean;
 }
 
 export interface Check {
@@ -102,14 +109,35 @@ const NODE_REPO = /^node$/i;
 const PYTHON_REPO = /^python$/i;
 const DOTNET_REPO = /^(?:mcr\.microsoft\.com\/)?dotnet\/(?:sdk|aspnet|runtime)$/i;
 
+// JVM build-tool images (Docker Hub: `maven`, `gradle`). MCR ships no bundled
+// builder image, but the sanctioned pattern IS available: an MCR JDK base plus
+// the build tool installed at build time (e.g. `tdnf install -y maven`). So
+// these are NOT a coverage gap — they have an MCR equivalent path and must be
+// flagged like any other public base with an MCR alternative. Treating them as
+// `no-mcr-equivalent` (the old behaviour) handed a free pass to Dockerfiles
+// that `FROM maven:...` — a Docker Hub image that also fails to pull in the
+// locked-down pipeline — while giving no credit to the correct MCR multi-stage
+// build. That inflated the base-image score and erased the gap between paths.
+const JAVA_BUILDER_REPO = /^(maven|gradle)$/i;
+
+/**
+ * JDK major embedded in a maven/gradle tag. Examples:
+ * `3.9-eclipse-temurin-17` → 17, `3.9.9-amazoncorretto-21-alpine` → 21,
+ * `8.5-jdk17` → 17, `8-jdk21-alpine` → 21. Returns null when the tag carries no
+ * JDK hint (e.g. `maven:latest`, `maven:3.9`).
+ */
+function extractBuilderJdkMajor(tag: string | null): number | null {
+  if (!tag) return null;
+  const m = /(?:jdk|temurin[-_]?|corretto[-_]?|openjdk[-_]?|zulu[-_]?)(\d{1,2})/i.exec(tag);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 // Public-registry repos with no MCR equivalent — using them without a
 // WHY-NOT-MCR annotation is fine (real coverage gaps). REPO patterns only.
 // Kept broad on purpose: a legitimate base that works should never be flagged
 // "not using a Microsoft image" just because the list was too narrow.
 const NO_MCR_EQUIVALENT_REPOS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
   // JVM builders & app servers — MCR ships JDK/JRE bases but no build tools or servers.
-  { pattern: /^maven$/i, reason: 'Maven builder — MCR ships no Maven-with-JDK image' },
-  { pattern: /^gradle$/i, reason: 'Gradle builder — MCR ships no Gradle image' },
   {
     pattern: /^(?:sbt|hseeberger\/scala-sbt)$/i,
     reason: 'sbt/Scala builder — MCR ships no sbt image',
@@ -299,7 +327,25 @@ function classifyBase(parsed: ParsedFrom): Coverage {
   if (DOTNET_REPO.test(repo))
     return coverageFor(extractMajorMinor(tag), MCR_COVERAGE.dotnet, '<major.minor>', '.NET');
 
-  // 6. Stacks with no MCR equivalent at all (Maven, Tomcat, Wildfly, Go, …)
+  // JVM build-tool images have an MCR equivalent path (MCR JDK + install the
+  // tool), so they are flagged rather than passed. The suggested build stage
+  // pins the JDK major embedded in the builder tag when we can read it.
+  const builder = JAVA_BUILDER_REPO.exec(repo);
+  if (builder) {
+    const tool = builder[1].toLowerCase();
+    const major = extractBuilderJdkMajor(tag);
+    const v = major !== null && MCR_COVERAGE.java.versions.has(major) ? String(major) : '<major>';
+    const install =
+      tool === 'gradle'
+        ? 'provide Gradle (wrapper or `tdnf install -y gradle`)'
+        : 'then `tdnf install -y maven`';
+    return {
+      kind: 'mcr-equivalent-exists',
+      suggestion: `mcr.microsoft.com/openjdk/jdk:${v}-azurelinux (${install}) for the build stage`,
+    };
+  }
+
+  // 6. Stacks with no MCR equivalent at all (Tomcat, Wildfly, sbt/Scala, Go, …)
   for (const { pattern, reason } of NO_MCR_EQUIVALENT_REPOS) {
     if (pattern.test(repo)) return { kind: 'no-mcr-equivalent', reason };
   }
@@ -338,8 +384,29 @@ export const requiresAzureBaseImage: Check = {
       if (!parsed) continue;
       const coverage = classifyBase(parsed);
       switch (coverage.kind) {
-        case 'mcr':
+        case 'mcr': {
+          // An `mcr.microsoft.com/...` string is not proof the tag exists —
+          // models hallucinate plausible tags that pass a naive shape check but
+          // fail the real build. Verify against the registry.
+          const mcrTag = parsed.tag ?? 'latest';
+          const fullRef = `${parsed.repo}:${mcrTag}`;
+          const exists = await mcrRefExists(fullRef);
+          if (exists === true) break; // verified real MCR tag
+          if (exists === false) {
+            const fix = suggestMcrFix(fullRef);
+            const hint = fix
+              ? `use ${fix.build} (runtime: ${fix.runtime})`
+              : 'no verified MCR replacement in catalog — pick a published tag';
+            offending.push(`${parsed.raw.trim()}  → MCR tag not found (hallucinated): ${hint}`);
+            break;
+          }
+          // exists === null → registry unreachable (offline). We cannot prove a
+          // tag is bad offline: accept catalog-known-good refs outright, and
+          // otherwise pass but flag as unverified rather than failing.
+          if (KNOWN_GOOD_MCR_REFS.has(fullRef)) break;
+          allowed.push(`${parsed.raw.trim()}  // MCR tag unverified (registry unreachable)`);
           break;
+        }
         case 'no-mcr-equivalent':
           allowed.push(`${parsed.raw.trim()}  // ${coverage.reason}`);
           break;
@@ -395,6 +462,28 @@ export const requiresAzureBaseImage: Check = {
 const REQUIRED_DOCKERFILE_LABEL = 'com.azure.containerizationassist.createdby';
 const REQUIRED_K8S_LABELS = ['app.kubernetes.io/name', 'app.kubernetes.io/managed-by'];
 
+/**
+ * Whether a Dockerfile defines the given label key. Handles the full LABEL
+ * syntax: multiple `key=value` pairs on one instruction, backslash line
+ * continuations, and bare or double-quoted keys. The naive
+ * `^LABEL <key>=` check produced false negatives whenever the required label
+ * was not the first pair on the line or spanned a continuation.
+ */
+function dockerfileDefinesLabel(dockerfile: string, label: string): boolean {
+  // Collapse backslash continuations so each LABEL instruction is one line.
+  const logical = dockerfile.replace(/\\\r?\n/g, ' ');
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // The key may appear anywhere in the argument list, bare or quoted, followed
+  // by `=`. A leading space is prepended so a key at the very start matches.
+  const keyPattern = new RegExp(`(?:^|\\s)"?${esc}"?\\s*=`);
+  for (const rawLine of logical.split(/\r?\n/)) {
+    const m = /^\s*LABEL\s+(.*)$/i.exec(rawLine);
+    if (!m) continue;
+    if (keyPattern.test(` ${m[1]}`)) return true;
+  }
+  return false;
+}
+
 export const hasRequiredLabels: Check = {
   name: 'has-required-labels',
   async run({ artifactDir }) {
@@ -403,7 +492,7 @@ export const hasRequiredLabels: Check = {
     const dockerfile = await readDockerfile(artifactDir);
     if (dockerfile === null) {
       missing.push('Dockerfile not found');
-    } else if (!new RegExp(`^\\s*LABEL\\s+${REQUIRED_DOCKERFILE_LABEL}\\s*=`, 'm').test(dockerfile)) {
+    } else if (!dockerfileDefinesLabel(dockerfile, REQUIRED_DOCKERFILE_LABEL)) {
       missing.push(`Dockerfile is missing LABEL ${REQUIRED_DOCKERFILE_LABEL}`);
     }
 
@@ -448,6 +537,79 @@ export const hasRequiredLabels: Check = {
   },
 };
 
+// Host names whose failures during a build are environmental, not the agent's
+// fault: base-image registries and dependency mirrors that the sandbox blocks.
+const BLOCKED_HOST_HINTS = [
+  'registry-1.docker.io',
+  'registry.docker.io',
+  'index.docker.io',
+  'auth.docker.io',
+  'docker.io',
+  'ghcr.io',
+  'quay.io',
+  'gcr.io',
+  'registry.k8s.io',
+  'repo.maven.apache.org',
+  'repo1.maven.org',
+  'repo.maven.org',
+  'plugins.gradle.org',
+  'services.gradle.org',
+  'jcenter.bintray.com',
+  'registry.npmjs.org',
+  'pypi.org',
+  'files.pythonhosted.org',
+];
+
+// Signatures that indicate a network/DNS failure (as opposed to a compile or
+// agent-authored error) when they co-occur with a blocked host.
+const NETWORK_FAILURE_HINTS = [
+  'i/o timeout',
+  'context deadline exceeded',
+  'deadlineexceeded',
+  'tls handshake timeout',
+  'failed to do request',
+  'connection timed out',
+  'connect timed out',
+  'connection refused',
+  'network is unreachable',
+  'dial tcp',
+];
+
+// DNS failures are unambiguously environmental regardless of host.
+const DNS_FAILURE_HINTS = [
+  'temporary failure in name resolution',
+  'could not resolve host',
+  'name or service not known',
+  'no such host',
+  'eai_again',
+];
+
+/**
+ * Classify a docker-build failure as environment-blocked (network/DNS/registry
+ * unreachable) rather than agent-attributable. Returns a short reason when the
+ * failure is high-confidence infra, otherwise null. Conservative by design:
+ * genuine compile or Dockerfile errors must not be misclassified.
+ */
+export function classifyInfraFailure(details: string | undefined): string | null {
+  if (!details) return null;
+  const text = details.toLowerCase();
+
+  // Docker Hub sinkhole (RFC 5737 TEST-NET-1) seen on the CI agents.
+  if (text.includes('192.0.2.')) return 'blocked registry (docker hub sinkhole 192.0.2.x)';
+
+  for (const dns of DNS_FAILURE_HINTS) {
+    if (text.includes(dns)) return `dns resolution failure (${dns})`;
+  }
+
+  const host = BLOCKED_HOST_HINTS.find((h) => text.includes(h));
+  if (host) {
+    const net = NETWORK_FAILURE_HINTS.find((n) => text.includes(n));
+    if (net) return `blocked network to ${host} (${net})`;
+  }
+
+  return null;
+}
+
 export const dockerBuilds: Check = {
   name: 'docker-builds',
   async run({ artifactDir }) {
@@ -457,29 +619,50 @@ export const dockerBuilds: Check = {
     // that has QEMU/binfmt emulation registered), build for that platform via
     // buildx so the scored result matches the target cluster architecture.
     const platform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim();
+    // Neutralize the Maven-Central network block (Track B): mount a feed-mirror
+    // settings.xml as a BuildKit secret. No-op unless AGENT_EVAL_MAVEN_MIRROR is set.
+    const mavenPrep = await prepareMavenBuild(artifactDir);
+    const secretArgs = mavenPrep?.secretArgs ?? [];
     const buildArgs = platform
-      ? ['buildx', 'build', '--platform', platform, '--load', '-t', tag, artifactDir]
-      : ['build', '-t', tag, artifactDir];
+      ? ['buildx', 'build', '--platform', platform, '--load', ...secretArgs, '-t', tag, artifactDir]
+      : ['build', ...secretArgs, '-t', tag, artifactDir];
+    // Secret mounts require BuildKit; force it on for the plain `docker build` path.
+    const buildEnv = secretArgs.length ? { ...process.env, DOCKER_BUILDKIT: '1' } : process.env;
     try {
-      await execFileP('docker', buildArgs, { maxBuffer: 16 * 1024 * 1024 });
-    } catch (err) {
-      const e = err as { code?: string; stderr?: string; message?: string };
-      if (e.code === 'ENOENT') {
-        return { name: this.name, passed: false, message: 'docker not available on PATH' };
+      try {
+        await execFileP('docker', buildArgs, { maxBuffer: 16 * 1024 * 1024, env: buildEnv });
+      } catch (err) {
+        const e = err as { code?: string; stderr?: string; message?: string };
+        if (e.code === 'ENOENT') {
+          return { name: this.name, passed: false, message: 'docker not available on PATH' };
+        }
+        const details = (e.stderr ?? e.message ?? '').slice(-MAX_FAILURE_DETAIL_CHARS);
+        const infraReason = classifyInfraFailure(details);
+        if (infraReason) {
+          return {
+            name: this.name,
+            passed: false,
+            infraBlocked: true,
+            message: `env-blocked: ${infraReason}`,
+            details,
+          };
+        }
+        return {
+          name: this.name,
+          passed: false,
+          message: 'docker build failed',
+          details,
+        };
       }
-      return {
-        name: this.name,
-        passed: false,
-        message: 'docker build failed',
-        details: (e.stderr ?? e.message ?? '').slice(-MAX_FAILURE_DETAIL_CHARS),
-      };
+      try {
+        await execFileP('docker', ['rmi', tag]);
+      } catch {
+        // ignore cleanup failures
+      }
+      return { name: this.name, passed: true, message: 'docker build succeeded' };
+    } finally {
+      await mavenPrep?.cleanup();
     }
-    try {
-      await execFileP('docker', ['rmi', tag]);
-    } catch {
-      // ignore cleanup failures
-    }
-    return { name: this.name, passed: true, message: 'docker build succeeded' };
   },
 };
 

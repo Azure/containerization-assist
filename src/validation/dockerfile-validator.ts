@@ -256,6 +256,35 @@ const isHealthCheckLine = (lines: string[], lineNumber: number): boolean => {
 };
 
 /**
+ * Check if a specific line is an ARG instruction.
+ * @param lines Pre-split lines array for efficient lookup
+ * @param lineNumber 1-based line number
+ */
+const isArgLine = (lines: string[], lineNumber: number): boolean => {
+  const line = lines[lineNumber - 1]; // lineNumber is 1-based
+  return line?.trim().toUpperCase().startsWith('ARG') ?? false;
+};
+
+/**
+ * Check whether the Dockerfile has a valid FROM after a legal preamble.
+ *
+ * Docker permits only parser directives, comments, blank lines, and ARG
+ * instructions before the first FROM. The legacy validate-dockerfile parser
+ * incorrectly reports "Missing or misplaced FROM" for a leading ARG, so this
+ * helper lets us recognise that shape and treat that specific error as benign.
+ */
+const hasValidFromPreamble = (content: string): boolean => {
+  for (const raw of content.split('\n')) {
+    const line = raw.trim();
+    if (line === '' || line.startsWith('#')) continue; // blank, comment, or parser directive
+    const instruction = line.split(/\s+/)[0]?.toUpperCase();
+    if (instruction === 'ARG') continue; // legal before FROM
+    return instruction === 'FROM';
+  }
+  return false;
+};
+
+/**
  * Validate Dockerfile syntax using external validator
  */
 const validateSyntax = (content: string): Result<boolean> => {
@@ -271,6 +300,11 @@ const validateSyntax = (content: string): Result<boolean> => {
     // Split content once for efficient line lookups
     const lines = content.split('\n');
 
+    // A leading ARG before FROM is valid Docker syntax, but the legacy parser
+    // flags it as "Missing or misplaced FROM". Ignore that specific error when
+    // the file has a valid FROM after a legal preamble.
+    const fromIsValid = hasValidFromPreamble(content);
+
     // Check if there are true syntax/parse errors (priority 0)
     // Exclude HEALTHCHECK instruction which validate-dockerfile incorrectly flags as invalid
     const syntaxErrors =
@@ -284,8 +318,10 @@ const validateSyntax = (content: string): Result<boolean> => {
       )?.filter(
         (err) =>
           err.priority === 0 &&
-          (err.message.includes('Missing or misplaced FROM') ||
-            (err.message.includes('Invalid instruction') && !isHealthCheckLine(lines, err.line))),
+          ((err.message.includes('Missing or misplaced FROM') && !fromIsValid) ||
+            (err.message.includes('Invalid instruction') &&
+              !isHealthCheckLine(lines, err.line) &&
+              !(fromIsValid && isArgLine(lines, err.line)))),
       ) || [];
 
     if (syntaxErrors.length > 0) {
