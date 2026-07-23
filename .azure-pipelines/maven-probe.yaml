@@ -1,0 +1,70 @@
+# Maven reachability probe (1ES) — throwaway diagnostic.
+#
+# Answers two questions that cannot be checked from a dev box, because the Maven
+# build in the agent eval runs *inside* a `docker build` container (not on the
+# 1ES agent host, where the ambient CFS identity lives):
+#   1. Which Maven endpoint is reachable from inside a `docker build`?
+#   2. Which credential authenticates it (unauth / Bearer / Basic with the ADO
+#      System.AccessToken)?
+#
+# Queue it once, then read the "PROBE RESULT" block at the end of the
+# "Run Maven reachability probe" step log.
+trigger: none
+pr: none
+
+resources:
+  repositories:
+    - repository: 1esPipelines
+      type: git
+      name: 1ESPipelineTemplates/1ESPipelineTemplates
+      ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1esPipelines
+  parameters:
+    pool:
+      name: staging-pool-amd64-mariner-2
+      image: 1es-azlinux-3-amd64-custom-disk
+      os: linux
+      hostArchitecture: amd64
+
+    stages:
+      - stage: Probe
+        displayName: Maven reachability probe
+        jobs:
+          - job: probe
+            displayName: Probe Maven endpoints from inside docker build
+            timeoutInMinutes: 20
+            steps:
+              - checkout: self
+                fetchDepth: 1
+
+              - script: |
+                  set -euo pipefail
+                  ctx="$(Build.SourcesDirectory)/.azure-pipelines"
+                  secret="$(Agent.TempDirectory)/aztoken.secret"
+                  printf '%s' "$SYSTEM_ACCESSTOKEN" > "$secret"
+                  trap 'rm -f "$secret"' EXIT
+
+                  export DOCKER_BUILDKIT=1
+                  log="$(Agent.TempDirectory)/mvnprobe.log"
+                  # Bundled BuildKit frontend supports RUN --mount=type=secret,
+                  # so no `# syntax=` directive is needed (that would pull the
+                  # frontend image from the blocked Docker Hub).
+                  docker build \
+                    --progress=plain \
+                    --no-cache \
+                    --build-arg CACHE_BUST="$(date +%s)" \
+                    --secret id=aztoken,src="$secret" \
+                    -f "$ctx/maven-probe.Dockerfile" \
+                    -t mvnprobe:latest \
+                    "$ctx" 2>&1 | tee "$log"
+
+                  docker rmi mvnprobe:latest >/dev/null 2>&1 || true
+
+                  echo
+                  echo '################ PROBE RESULT ################'
+                  sed -n '/=== MAVEN PROBE ===/,/=== END MAVEN PROBE ===/p' "$log" | sed 's/^#[0-9]* [0-9.]* //'
+                displayName: Run Maven reachability probe
+                env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
