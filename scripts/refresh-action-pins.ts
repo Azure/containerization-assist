@@ -125,12 +125,27 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Replace the sha/version for a single pin (anchored by its unique `ref`). */
-function updatePinInSource(src: string, pin: ActionPin, sha: string, version: string): string {
+/**
+ * Replace the sha/version for a single pin (anchored by its unique `ref`). Returns the
+ * rewritten source, or `null` when the pin block was not matched exactly once (so callers
+ * never record an "update" that did not actually change the source, e.g. on formatting drift).
+ */
+export function updatePinInSource(
+  src: string,
+  pin: ActionPin,
+  sha: string,
+  version: string,
+): string | null {
   const re = new RegExp(
     `(ref: '${escapeRegex(pin.ref)}',\\s*\\n\\s*sha: ')[0-9a-fA-F]+(',\\s*\\n\\s*version: ')[^']*(')`,
+    'g',
   );
-  return src.replace(re, `$1${sha}$2${version}$3`);
+  let count = 0;
+  const out = src.replace(re, (_m, p1: string, p2: string, p3: string) => {
+    count++;
+    return `${p1}${sha}${p2}${version}${p3}`;
+  });
+  return count === 1 ? out : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,11 +188,18 @@ async function main(): Promise<void> {
       continue;
     }
 
+    const rewritten = updatePinInSource(src, pin, result.sha, result.version);
+    if (rewritten === null) {
+      missing.push(`${pin.ref}: stale pin could not be rewritten (source pattern not matched)`);
+      console.log(`❌ ${pin.ref} — could not rewrite pin in source (no change written)`);
+      continue;
+    }
+    src = rewritten;
+
     changes.push(
       `${pin.ref}: ${pin.version} ${pin.sha.slice(0, 12)}… → ${result.version} ${result.sha.slice(0, 12)}…`,
     );
     console.log(`🔄 ${pin.ref}: ${pin.version} → ${result.version} (${result.sha.slice(0, 12)}…)`);
-    src = updatePinInSource(src, pin, result.sha, result.version);
   }
 
   console.log('\n📊 Results');
@@ -220,8 +242,12 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error('Unexpected error while refreshing action pins:');
-  console.error(err instanceof Error ? (err.stack ?? err.message) : err);
-  process.exit(1);
-});
+// Skip the CLI entrypoint when imported by tests (e.g. Jest) so pure helpers like
+// updatePinInSource can be unit-tested without triggering a live network refresh.
+if (!process.env.JEST_WORKER_ID) {
+  main().catch((err) => {
+    console.error('Unexpected error while refreshing action pins:');
+    console.error(err instanceof Error ? (err.stack ?? err.message) : err);
+    process.exit(1);
+  });
+}

@@ -108,7 +108,15 @@ export async function resolveWorkflowSource(
   input: ValidateGithubWorkflowParams,
   ctx: ToolContext,
 ): Promise<Result<WorkflowSource>> {
-  if (input.workflowContent !== undefined && input.workflowContent.trim().length > 0) {
+  // A defined `workflowContent` is authoritative (documented precedence) even when blank —
+  // fall back to reading from disk only when it is omitted entirely. A blank inline value
+  // is a caller error, not a signal to validate a possibly-stale file on disk.
+  if (input.workflowContent !== undefined) {
+    if (input.workflowContent.trim().length === 0) {
+      return Failure(
+        'workflowContent was provided but is empty. Supply non-empty workflow YAML, or omit workflowContent to read from .github/workflows/.',
+      );
+    }
     return Success({ content: input.workflowContent, filePath: '<inline>' });
   }
 

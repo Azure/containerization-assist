@@ -146,6 +146,15 @@ describe('validate-github-workflow', () => {
       expect(plan.filePath).toBe('<inline>');
     });
 
+    it('treats an empty inline workflowContent as authoritative (does not silently read disk)', async () => {
+      // A defined-but-blank workflowContent must fail as an empty source rather than
+      // falling back to a possibly-stale file on disk.
+      const plan = await validate({ repositoryPath: '/nonexistent', workflowContent: '   ' });
+      expect(plan.report.errors).toBeGreaterThanOrEqual(1);
+      expect(ruleIds(plan)).toContain('source/not-found');
+      expect(plan.report.results.some((r) => /empty/i.test(r.message ?? ''))).toBe(true);
+    });
+
     it('flags `with`/`secrets` on a normal (non-reusable) job as invalid job keys', async () => {
       const content = [
         'on: { push: { branches: [main] } }',
@@ -225,6 +234,25 @@ describe('validate-github-workflow', () => {
       ].join('\n');
       const refs = extractUsesRefs(content);
       expect(refs.map((r) => r.raw)).toEqual(['actions/setup-node@v5']);
+    });
+
+    it('does not treat `uses:` inside a multiline run script as a real action (parsed nodes)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - name: doc',
+        '        run: |',
+        '          echo "example workflow snippet:"',
+        '          echo "  - uses: actions/checkout@v4"',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      // The only real action is the pinned checkout; the `uses:` inside the run block
+      // must not raise a sha-pin finding.
+      expect(ruleIds(plan)).not.toContain('refs/sha-pin');
     });
 
     it('preserves action subpaths in the sha-pin finding actionRef and message', async () => {
@@ -417,7 +445,8 @@ describe('validate-github-workflow', () => {
       const msgs = plan.report.results
         .filter((r) => r.ruleId === 'semantic/azure-actions')
         .map((r) => r.message ?? '');
-      expect(msgs.some((m) => m.includes('No `azure/login`'))).toBe(true);
+      // The comment-only `azure/login` must not satisfy the per-job deploy contract.
+      expect(msgs.some((m) => /deploy.*must include a `azure\/login`/.test(m))).toBe(true);
     });
 
     it('accepts an azure/login step with different casing (case-insensitive)', async () => {
@@ -433,7 +462,70 @@ describe('validate-github-workflow', () => {
       const msgs = plan.report.results
         .filter((r) => r.ruleId === 'semantic/azure-actions')
         .map((r) => r.message ?? '');
-      expect(msgs.some((m) => m.includes('No `azure/login`'))).toBe(false);
+      // The cased login step satisfies the deploy login requirement (no login-missing finding).
+      expect(msgs.some((m) => /must include a `azure\/login`/.test(m))).toBe(false);
+    });
+
+    it('enforces the per-job deployment contract (login+acr in buildImage; deploy actions in deploy)', async () => {
+      // A structurally valid two-job workflow that omits every deployment action.
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { actions: read, contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const msgs = plan.report.results
+        .filter(
+          (r) => r.ruleId === 'semantic/azure-actions' || r.ruleId === 'semantic/az-acr-build',
+        )
+        .map((r) => r.message ?? '');
+      // buildImage: missing azure/login and az acr build.
+      expect(msgs.some((m) => /buildImage.*azure\/login/.test(m))).toBe(true);
+      expect(msgs.some((m) => /buildImage.*az acr build/.test(m))).toBe(true);
+      // deploy: missing login, kubelogin, aks-set-context, k8s-deploy.
+      expect(msgs.some((m) => /deploy.*azure\/login/.test(m))).toBe(true);
+      expect(msgs.some((m) => /deploy.*azure\/use-kubelogin/.test(m))).toBe(true);
+      expect(msgs.some((m) => /deploy.*azure\/aks-set-context/.test(m))).toBe(true);
+      expect(msgs.some((m) => /deploy.*k8s-deploy/.test(m))).toBe(true);
+    });
+
+    it('flags concurrency when `cancel-in-progress: true` is only in a comment', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        '# concurrency here would set cancel-in-progress: true',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      expect(ruleIds(plan)).toContain('semantic/concurrency');
+    });
+
+    it('accepts a parsed concurrency mapping with cancel-in-progress: true', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      expect(ruleIds(plan)).not.toContain('semantic/concurrency');
     });
 
     it('flags renamed job keys as a warning-level job-keys finding', async () => {

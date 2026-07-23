@@ -62,6 +62,20 @@ function collectSteps(jobs: Dict): { runs: string[]; uses: string[] } {
   return { runs, uses };
 }
 
+/** A single job's `run` scripts and `uses` refs (parsed step values only). */
+function jobStepStreams(job: unknown): { runs: string[]; uses: string[] } {
+  const runs: string[] = [];
+  const uses: string[] = [];
+  if (isDict(job) && Array.isArray(job.steps)) {
+    for (const step of job.steps) {
+      if (!isDict(step)) continue;
+      if (typeof step.run === 'string') runs.push(step.run);
+      if (typeof step.uses === 'string') uses.push(step.uses);
+    }
+  }
+  return { runs, uses };
+}
+
 export function checkSemantic(
   doc: Document.Parsed,
   content: string,
@@ -124,6 +138,8 @@ export function checkSemantic(
   // matches in comments/docs/echoed strings don't raise false failures, and multiline
   // `run:` blocks are still covered (they parse to a single string).
   const { runs: stepRuns, uses: stepUses } = collectSteps(jobs);
+  const buildImageStreams = jobStepStreams(buildImage);
+  const deployStreams = jobStepStreams(deploy);
   const acrRec = rec(
     knowledge,
     'docker-build-push-acr',
@@ -153,14 +169,17 @@ export function checkSemantic(
       }),
     );
   }
-  if (!stepRuns.some((r) => /\baz\s+acr\s+build\b/.test(r))) {
+  // The image build must live in the buildImage job (scoped to that job, not a global
+  // text search that a differently-named job could satisfy).
+  if (buildImage && !buildImageStreams.runs.some((r) => /\baz\s+acr\s+build\b/.test(r))) {
     findings.push(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/az-acr-build',
         severity: 'high',
         message:
-          'No `az acr build` command found. The image should be built and pushed with `az acr build`.',
+          'The `buildImage` job must build and push the image with `az acr build` (no `az acr build` run step found in it).',
+        location: 'job "buildImage"',
         suggestion: acrRec,
       }),
     );
@@ -241,22 +260,6 @@ export function checkSemantic(
       );
     }
   }
-  if (!stepUses.some((u) => /azure\/login/i.test(u))) {
-    findings.push(
-      makeIssue({
-        layer: 'semantic',
-        ruleId: 'semantic/azure-actions',
-        severity: 'high',
-        message:
-          'No `azure/login` step found. Each job must authenticate to Azure via azure/login (OIDC).',
-        suggestion: rec(
-          knowledge,
-          'azure-login-oidc',
-          'Use azure/login with OIDC federated credentials (client-id/tenant-id/subscription-id from secrets).',
-        ),
-      }),
-    );
-  }
 
   // ── 5. Per-job permissions ───────────────────────────────────────────────────
   const permRec = rec(
@@ -299,12 +302,61 @@ export function checkSemantic(
     }
   }
 
+  // Per-job deployment contract — the generator promises specific actions in each job.
+  // Enforcing per job (not via a global text search) prevents an otherwise well-formed
+  // two-job workflow that omits the deployment actions from silently passing.
+  const loginRec = rec(
+    knowledge,
+    'azure-login-oidc',
+    'Use azure/login with OIDC federated credentials (client-id/tenant-id/subscription-id from secrets).',
+  );
+  if (buildImage && !buildImageStreams.uses.some((u) => /azure\/login/i.test(u))) {
+    findings.push(
+      makeIssue({
+        layer: 'semantic',
+        ruleId: 'semantic/azure-actions',
+        severity: 'high',
+        message:
+          'The `buildImage` job must include an `azure/login` step (OIDC authentication to Azure).',
+        location: 'job "buildImage"',
+        suggestion: loginRec,
+      }),
+    );
+  }
+  if (deploy) {
+    const deployRequired: Array<{ re: RegExp; label: string }> = [
+      { re: /azure\/login/i, label: 'azure/login' },
+      { re: /azure\/use-kubelogin/i, label: 'azure/use-kubelogin' },
+      { re: /azure\/aks-set-context/i, label: 'azure/aks-set-context' },
+      { re: /azure\/k8s-deploy/i, label: 'Azure/k8s-deploy' },
+    ];
+    for (const { re, label } of deployRequired) {
+      if (!deployStreams.uses.some((u) => re.test(u))) {
+        findings.push(
+          makeIssue({
+            layer: 'semantic',
+            ruleId: 'semantic/azure-actions',
+            severity: 'high',
+            message: `The \`deploy\` job must include a \`${label}\` step to authenticate and deploy to AKS.`,
+            location: 'job "deploy"',
+            suggestion: azureRec,
+          }),
+        );
+      }
+    }
+  }
+
   // ── 6. Required secrets referenced ───────────────────────────────────────────
-  // Require a real `${{ secrets.<NAME> }}` expression — a bare substring match would be
-  // satisfied by a comment or unrelated text (e.g. a variable named like the secret).
-  // Case-insensitive: GitHub expression context and secret names are case-insensitive.
+  // Inspect the parsed `with` mapping of each azure/login step (where the OIDC secrets are
+  // actually consumed) rather than the raw text — a secret named only in a comment must not
+  // satisfy the check. Case-insensitive: GitHub contexts/secret names are case-insensitive.
+  const loginWithText = collectStepObjects(jobs)
+    .filter((s) => typeof s.uses === 'string' && /azure\/login/i.test(s.uses))
+    .flatMap((s) => (isDict(s.with) ? Object.values(s.with) : []))
+    .map((v) => String(v))
+    .join('\n');
   const missingSecrets = REQUIRED_SECRETS.filter(
-    (s) => !new RegExp(`\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`, 'i').test(content),
+    (s) => !new RegExp(`\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`, 'i').test(loginWithText),
   );
   if (missingSecrets.length > 0) {
     findings.push(
@@ -323,7 +375,14 @@ export function checkSemantic(
   }
 
   // ── 7. Concurrency with cancel-in-progress ───────────────────────────────────
-  if (!('concurrency' in root) || !/cancel-in-progress:\s*true/.test(content)) {
+  // Validate the parsed top-level `concurrency` mapping (not the raw text) so a
+  // commented-out `cancel-in-progress: true` can't satisfy the check. Accept both the
+  // boolean `true` and the string `'true'` scalar forms.
+  const concurrency = root.concurrency;
+  const cancelInProgress =
+    isDict(concurrency) &&
+    (concurrency['cancel-in-progress'] === true || concurrency['cancel-in-progress'] === 'true');
+  if (!cancelInProgress) {
     findings.push(
       makeIssue({
         layer: 'semantic',

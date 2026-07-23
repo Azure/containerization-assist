@@ -7,6 +7,7 @@
  * *format* check is always offline; the optional *existence* probe is offline-safe.
  */
 
+import { visit, isScalar, type Document } from 'yaml';
 import type { ToolContext } from '@/core/context';
 import { makeIssue, lineOfOffset } from './helpers';
 import type { WorkflowValidationIssue } from '../schema';
@@ -29,32 +30,60 @@ export interface ActionRef {
   line: number;
 }
 
-/** Extract every pinnable `uses:` reference; skips local (`./`) and `docker://` refs. */
+/** Build an ActionRef from a raw `owner/repo[/sub]@ref` string; returns null to skip
+ * (local `./`, `docker://`, or non-pinnable shapes). */
+function toActionRef(raw: string, line: number, comment?: string): ActionRef | null {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.startsWith('./') || trimmed.startsWith('docker://')) return null;
+
+  const at = trimmed.lastIndexOf('@');
+  if (at <= 0) return null;
+  const actionPath = trimmed.slice(0, at);
+  const ref = trimmed.slice(at + 1);
+
+  const parts = actionPath.split('/');
+  if (parts.length < 2) return null;
+  const ownerRepo = `${parts[0]}/${parts[1]}`;
+
+  return { raw: trimmed, ownerRepo, ref, ...(comment ? { comment } : {}), line };
+}
+
+/**
+ * Extract every pinnable `uses:` reference from the parsed document. Because it walks real
+ * mapping pairs, `uses:` text inside `run:` scripts or comments is never matched (unlike a
+ * raw line scan). Scalar node ranges give accurate 1-based line numbers, and the trailing
+ * `# vX.Y.Z` comment is read from the node's own comment.
+ */
+export function extractUsesRefsFromDoc(doc: Document.Parsed, content: string): ActionRef[] {
+  const refs: ActionRef[] = [];
+  visit(doc, {
+    Pair(_, pair) {
+      const key = pair.key;
+      const value = pair.value;
+      if (!isScalar(key) || key.value !== 'uses') return;
+      if (!isScalar(value) || typeof value.value !== 'string') return;
+      const offset = Array.isArray(value.range) ? value.range[0] : 0;
+      const comment = typeof value.comment === 'string' ? value.comment.trim() : undefined;
+      const actionRef = toActionRef(value.value, lineOfOffset(content, offset), comment);
+      if (actionRef) refs.push(actionRef);
+    },
+  });
+  return refs;
+}
+
+/** Extract every pinnable `uses:` reference via a line scan; skips local (`./`) and
+ * `docker://` refs. Used only as a fallback when the document could not be parsed. */
 export function extractUsesRefs(content: string): ActionRef[] {
   const refs: ActionRef[] = [];
   const re = new RegExp(USES_RE);
   let match: RegExpExecArray | null;
   while ((match = re.exec(content)) !== null) {
-    const raw = match[1]?.trim();
-    if (!raw) continue;
-    if (raw.startsWith('./') || raw.startsWith('docker://')) continue;
-
-    const at = raw.lastIndexOf('@');
-    if (at <= 0) continue;
-    const actionPath = raw.slice(0, at);
-    const ref = raw.slice(at + 1);
-
-    const parts = actionPath.split('/');
-    if (parts.length < 2) continue;
-    const ownerRepo = `${parts[0]}/${parts[1]}`;
-
-    refs.push({
-      raw,
-      ownerRepo,
-      ref,
-      ...(match[2] ? { comment: match[2].trim() } : {}),
-      line: lineOfOffset(content, match.index),
-    });
+    const actionRef = toActionRef(
+      match[1] ?? '',
+      lineOfOffset(content, match.index),
+      match[2]?.trim(),
+    );
+    if (actionRef) refs.push(actionRef);
   }
   return refs;
 }
@@ -72,9 +101,13 @@ export async function checkRefs(
   content: string,
   opts: RefsCheckOptions,
   ctx: ToolContext,
+  doc?: Document.Parsed | null,
 ): Promise<WorkflowValidationIssue[]> {
   const findings: WorkflowValidationIssue[] = [];
-  const refs = extractUsesRefs(content);
+  // Prefer parsed-node extraction so `uses:` in comments or `run:` scripts is never treated
+  // as a real action; fall back to the line scan only when the YAML could not be parsed
+  // (Layer 3 still runs on structurally-broken YAML).
+  const refs = doc ? extractUsesRefsFromDoc(doc, content) : extractUsesRefs(content);
   let existenceSkipped = false;
 
   for (const r of refs) {

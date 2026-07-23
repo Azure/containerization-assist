@@ -105,7 +105,7 @@ const runPattern = createKnowledgeTool<
       const source = await resolveWorkflowSource(input, ctx);
       if (!source.ok) {
         return {
-          filePath: input.workflowContent ? '<inline>' : workflowRelativePath(input),
+          filePath: input.workflowContent !== undefined ? '<inline>' : workflowRelativePath(input),
           findings: [
             makeIssue({
               layer: 'yaml',
@@ -120,8 +120,13 @@ const runPattern = createKnowledgeTool<
       const { content, filePath } = source.value;
       const findings: WorkflowValidationIssue[] = [];
 
-      // Parse once, only if a doc-consuming layer is selected.
-      const needsDoc = selected.has('yaml') || selected.has('schema') || selected.has('semantic');
+      // Parse once, only if a doc-consuming layer is selected. Refs prefers the parsed
+      // document (ignoring `uses:` in comments/run scripts) but can fall back to a line scan.
+      const needsDoc =
+        selected.has('yaml') ||
+        selected.has('schema') ||
+        selected.has('semantic') ||
+        selected.has('refs');
       let doc = null as ReturnType<typeof parseWorkflow>['doc'];
       let fatal = false;
       if (needsDoc) {
@@ -135,7 +140,12 @@ const runPattern = createKnowledgeTool<
       // Layer 3 (refs) is line-oriented and works even on structurally-broken YAML.
       if (selected.has('refs')) {
         findings.push(
-          ...(await checkRefs(content, { checkActionExistence: input.checkActionExistence }, ctx)),
+          ...(await checkRefs(
+            content,
+            { checkActionExistence: input.checkActionExistence },
+            ctx,
+            fatal ? null : doc,
+          )),
         );
       }
 

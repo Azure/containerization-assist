@@ -33,6 +33,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npm run refresh:action-pins
 
+      # A PR opened with the built-in GITHUB_TOKEN does NOT trigger the `pull_request`
+      # workflows (test-pipeline.yml), so validate the refreshed pins here, before pushing.
+      # (Alternative: push/open the PR with a GitHub App token or PAT so normal PR CI runs.)
+      - name: Build and test refreshed pins
+        run: |
+          npm run build
+          npm run test:unit
+
       - name: Open PR if pins changed
         env:
           GH_TOKEN: ${{ github.token }}
