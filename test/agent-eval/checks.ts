@@ -108,14 +108,35 @@ const NODE_REPO = /^node$/i;
 const PYTHON_REPO = /^python$/i;
 const DOTNET_REPO = /^(?:mcr\.microsoft\.com\/)?dotnet\/(?:sdk|aspnet|runtime)$/i;
 
+// JVM build-tool images (Docker Hub: `maven`, `gradle`). MCR ships no bundled
+// builder image, but the sanctioned pattern IS available: an MCR JDK base plus
+// the build tool installed at build time (e.g. `tdnf install -y maven`). So
+// these are NOT a coverage gap — they have an MCR equivalent path and must be
+// flagged like any other public base with an MCR alternative. Treating them as
+// `no-mcr-equivalent` (the old behaviour) handed a free pass to Dockerfiles
+// that `FROM maven:...` — a Docker Hub image that also fails to pull in the
+// locked-down pipeline — while giving no credit to the correct MCR multi-stage
+// build. That inflated the base-image score and erased the gap between paths.
+const JAVA_BUILDER_REPO = /^(maven|gradle)$/i;
+
+/**
+ * JDK major embedded in a maven/gradle tag. Examples:
+ * `3.9-eclipse-temurin-17` → 17, `3.9.9-amazoncorretto-21-alpine` → 21,
+ * `8.5-jdk17` → 17, `8-jdk21-alpine` → 21. Returns null when the tag carries no
+ * JDK hint (e.g. `maven:latest`, `maven:3.9`).
+ */
+function extractBuilderJdkMajor(tag: string | null): number | null {
+  if (!tag) return null;
+  const m = /(?:jdk|temurin[-_]?|corretto[-_]?|openjdk[-_]?|zulu[-_]?)(\d{1,2})/i.exec(tag);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 // Public-registry repos with no MCR equivalent — using them without a
 // WHY-NOT-MCR annotation is fine (real coverage gaps). REPO patterns only.
 // Kept broad on purpose: a legitimate base that works should never be flagged
 // "not using a Microsoft image" just because the list was too narrow.
 const NO_MCR_EQUIVALENT_REPOS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
   // JVM builders & app servers — MCR ships JDK/JRE bases but no build tools or servers.
-  { pattern: /^maven$/i, reason: 'Maven builder — MCR ships no Maven-with-JDK image' },
-  { pattern: /^gradle$/i, reason: 'Gradle builder — MCR ships no Gradle image' },
   {
     pattern: /^(?:sbt|hseeberger\/scala-sbt)$/i,
     reason: 'sbt/Scala builder — MCR ships no sbt image',
@@ -305,7 +326,25 @@ function classifyBase(parsed: ParsedFrom): Coverage {
   if (DOTNET_REPO.test(repo))
     return coverageFor(extractMajorMinor(tag), MCR_COVERAGE.dotnet, '<major.minor>', '.NET');
 
-  // 6. Stacks with no MCR equivalent at all (Maven, Tomcat, Wildfly, Go, …)
+  // JVM build-tool images have an MCR equivalent path (MCR JDK + install the
+  // tool), so they are flagged rather than passed. The suggested build stage
+  // pins the JDK major embedded in the builder tag when we can read it.
+  const builder = JAVA_BUILDER_REPO.exec(repo);
+  if (builder) {
+    const tool = builder[1].toLowerCase();
+    const major = extractBuilderJdkMajor(tag);
+    const v = major !== null && MCR_COVERAGE.java.versions.has(major) ? String(major) : '<major>';
+    const install =
+      tool === 'gradle'
+        ? 'provide Gradle (wrapper or `tdnf install -y gradle`)'
+        : 'then `tdnf install -y maven`';
+    return {
+      kind: 'mcr-equivalent-exists',
+      suggestion: `mcr.microsoft.com/openjdk/jdk:${v}-azurelinux (${install}) for the build stage`,
+    };
+  }
+
+  // 6. Stacks with no MCR equivalent at all (Tomcat, Wildfly, sbt/Scala, Go, …)
   for (const { pattern, reason } of NO_MCR_EQUIVALENT_REPOS) {
     if (pattern.test(repo)) return { kind: 'no-mcr-equivalent', reason };
   }
