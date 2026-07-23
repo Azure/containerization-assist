@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { MAX_FAILURE_DETAIL_CHARS } from './log-config.js';
 
 const execFileP = promisify(execFile);
 
@@ -470,7 +471,7 @@ export const dockerBuilds: Check = {
         name: this.name,
         passed: false,
         message: 'docker build failed',
-        details: (e.stderr ?? e.message ?? '').slice(-8000),
+        details: (e.stderr ?? e.message ?? '').slice(-MAX_FAILURE_DETAIL_CHARS),
       };
     }
     try {

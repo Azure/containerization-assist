@@ -5,7 +5,14 @@ import { promisify } from 'node:util';
 import { tool, Experimental_Agent as Agent } from 'ai';
 import type { LanguageModel, ModelMessage } from 'ai';
 import { z } from 'zod';
-import { decisiveLine, isVerbose } from './log-config.js';
+import {
+  decisiveLine,
+  isVerbose,
+  MAX_FAILURE_DETAIL_CHARS,
+  MAX_BUILD_OUTPUT_CHARS,
+  MAX_STEP_OUTPUT_CHARS,
+  MAX_PATH_LOG_CHARS,
+} from './log-config.js';
 
 const execFileP = promisify(execFile);
 
@@ -248,11 +255,11 @@ export class AISDKDriver {
             success: true,
             imageTag,
             attempt: dockerBuildCalls,
-            output: ((stdout ?? '') + (stderr ?? '')).slice(-6000),
+            output: ((stdout ?? '') + (stderr ?? '')).slice(-MAX_BUILD_OUTPUT_CHARS),
           };
         } catch (err) {
           const e = err as { code?: string | number; stderr?: string; stdout?: string; message?: string };
-          const combined = ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-8000);
+          const combined = ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_FAILURE_DETAIL_CHARS);
           if (isVerbose()) {
             console.error(`[driver] dockerBuild FAILED (attempt ${dockerBuildCalls}):`);
             console.error(combined.replace(/\s+$/, '') || '(no output)');
@@ -299,7 +306,7 @@ export class AISDKDriver {
               success: false,
               step: 'tag',
               command: `docker tag ${src} ${dst}`,
-              output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-4000),
+              output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
               hint: `Could not tag '${src}'. Use the exact imageTag that dockerBuild returned as 'source'.`,
             };
           }
@@ -309,7 +316,7 @@ export class AISDKDriver {
             maxBuffer: 16 * 1024 * 1024,
             timeout: 300_000,
           });
-          const pushOut = ((stdout ?? '') + (stderr ?? '')).slice(-4000);
+          const pushOut = ((stdout ?? '') + (stderr ?? '')).slice(-MAX_STEP_OUTPUT_CHARS);
           const check = await imageExistsInRegistry(dst);
           if (check.exists === false) {
             return {
@@ -337,7 +344,7 @@ export class AISDKDriver {
             step: 'push',
             command: `docker push ${dst}`,
             exitCode: typeof e.code === 'number' ? e.code : null,
-            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-4000),
+            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
             hint:
               'Push failed. If this is an auth error, registry login may have expired (az acr login). ' +
               'Otherwise check the target reference.',
@@ -377,7 +384,7 @@ export class AISDKDriver {
           return {
             success: true,
             command: `kubectl ${args.join(' ')}`,
-            output: ((stdout ?? '') + (stderr ?? '')).slice(-4000),
+            output: ((stdout ?? '') + (stderr ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
             note:
               'Objects applied. This does NOT confirm the pods are healthy. Call verifyDeploy now to check the ' +
               'rollout actually reaches Ready, and fix+reapply if it reports a failure.',
@@ -388,7 +395,7 @@ export class AISDKDriver {
             success: false,
             command: `kubectl ${args.join(' ')}`,
             exitCode: typeof e.code === 'number' ? e.code : null,
-            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-4000),
+            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
             hint: 'Inspect the error, fix the manifest with createFile, then call kubectlApply again.',
           };
         }
@@ -547,7 +554,7 @@ export class AISDKDriver {
           if (!log || /error from server|not found|previous terminated container/i.test(log)) {
             log = await kget(['logs', String(p.name), '--tail=40']);
           }
-          logs[String(p.name)] = (log ?? '').slice(-3000);
+          logs[String(p.name)] = (log ?? '').slice(-MAX_PATH_LOG_CHARS);
         }
         lastVerifyFailure =
           lastPods

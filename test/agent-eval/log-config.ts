@@ -12,6 +12,11 @@
  *   verbose (AGENT_EVAL_VERBOSE / --verbose) → LOG_LEVEL=info — full CA logs
  *
  * An explicit `LOG_LEVEL` in the environment always wins over both.
+ *
+ * Both `AGENT_EVAL_VERBOSE` (env) and `--verbose` (flag) exist because they act
+ * at different times: the env var is read before import-time loggers are built,
+ * so only it can make those verbose; `--verbose` (parsed later) covers the
+ * runtime loggers and failure formatting.
  */
 
 /** True when the caller asked for full CA logs via env (import-time signal). */
@@ -45,16 +50,6 @@ export function enableVerboseLogging(): void {
   process.env.LOG_LEVEL = 'info';
 }
 
-/** Last `n` non-empty, trimmed lines of `text` — the part of an error worth reading. */
-export function lastLines(text: string | undefined, n: number): string {
-  if (!text) return '';
-  const lines = text
-    .split('\n')
-    .map((l) => l.replace(/\s+$/, ''))
-    .filter((l) => l.trim().length > 0);
-  return lines.slice(-n).join('\n');
-}
-
 /** Collapse `text` to a single trimmed line capped at `max` chars for a one-line log. */
 export function oneLine(text: string | undefined, max = 200): string {
   if (!text) return '';
@@ -79,3 +74,10 @@ export function decisiveLine(text: string | undefined, max = 240): string {
   const hit = [...lines].reverse().find((l) => marker.test(l));
   return oneLine(hit ?? lines[lines.length - 1], max);
 }
+
+/** Char caps for captured command output / error tails (keep the tail — the end is decisive). */
+export const MAX_FAILURE_DETAIL_CHARS = 8000;
+export const MAX_BUILD_OUTPUT_CHARS = 6000;
+export const MAX_STEP_OUTPUT_CHARS = 4000;
+export const MAX_PATH_LOG_CHARS = 3000;
+export const MAX_INLINE_DETAIL_CHARS = 1000;
