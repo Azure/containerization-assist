@@ -27,6 +27,12 @@ extends:
       image: 1es-azlinux-3-amd64-custom-disk
       os: linux
       hostArchitecture: amd64
+    sdl:
+      sourceAnalysisPool:
+        name: staging-pool-amd64-mariner-2
+        image: azcu-agent-amd64-windows-22-img
+        os: windows
+        hostArchitecture: amd64
 
     stages:
       - stage: Probe
