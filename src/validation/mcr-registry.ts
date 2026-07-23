@@ -91,7 +91,8 @@ export async function mcrManifestExists(repo: string, tag: string): Promise<bool
  * are not on MCR or carry no tag (nothing to verify).
  */
 export async function mcrRefExists(ref: string): Promise<boolean | null> {
-  const withoutDigest = ref.split('@', 1)[0] ?? ref;
+  const at = ref.indexOf('@');
+  const withoutDigest = at >= 0 ? ref.slice(0, at) : ref;
   if (!/^mcr\.microsoft\.com\//i.test(withoutDigest)) return null;
   const lastColon = withoutDigest.lastIndexOf(':');
   const lastSlash = withoutDigest.lastIndexOf('/');

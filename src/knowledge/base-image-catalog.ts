@@ -278,13 +278,9 @@ export function suggestMcrFix(ref: string): McrFixSuggestion | null {
   const detected = detectStack(ref);
   if (!detected) return null;
   const { stack, version } = detected;
-  const cat = MCR_BASE_CATALOG[stack];
-  const entry = version ? cat.versions[version] : undefined;
-  if (!entry || !version) return null;
-  return {
-    stack,
-    version,
-    build: entry.build,
-    runtime: entry.runtime,
-  };
+  if (!version) return null;
+  const build = canonicalMcrRef(stack, version, 'build');
+  const runtime = canonicalMcrRef(stack, version, 'runtime');
+  if (!build || !runtime) return null;
+  return { stack, version, build, runtime };
 }

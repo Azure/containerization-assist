@@ -10,12 +10,7 @@
  * unlike the lossy full-reconstruction fixer.
  */
 
-import {
-  detectStack,
-  suggestMcrFix,
-  splitMcrRef,
-  type BuildStage,
-} from '@/knowledge/base-image-catalog';
+import { suggestMcrFix, type BuildStage } from '@/knowledge/base-image-catalog';
 import { mcrRefExists } from '@/validation/mcr-registry';
 
 export interface BaseImageSubstitution {
@@ -104,10 +99,6 @@ export async function fixBaseImages(dockerfile: string): Promise<BaseImageFixRes
     const replacement = stage === 'runtime' ? fix.runtime : fix.build;
     if (replacement === image) continue; // already canonical
 
-    // For a non-MCR image we only substitute when the stack+version is covered
-    // (suggestMcrFix already guarantees that). Guard against a no-op detect.
-    if (reason === 'non-mcr-with-equivalent' && detectStack(image) === null) continue;
-
     lines[from.idx] = `${from.prefix}${replacement}${from.rest}`;
     substitutions.push({
       line: from.idx + 1,
@@ -121,6 +112,3 @@ export async function fixBaseImages(dockerfile: string): Promise<BaseImageFixRes
   if (substitutions.length === 0) return { substitutions: [], fixedDockerfile: null };
   return { substitutions, fixedDockerfile: lines.join('\n') };
 }
-
-// Re-export for callers that want the low-level split.
-export { splitMcrRef };
