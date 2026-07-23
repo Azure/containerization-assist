@@ -133,6 +133,9 @@ export async function checkRefs(
   // (Layer 3 still runs on structurally-broken YAML).
   const refs = doc ? extractUsesRefsFromDoc(doc, content) : extractUsesRefs(content);
   let existenceSkipped = false;
+  // Probe api.github.com connectivity at most once per run (memoized), then reuse the result
+  // for every ref — avoids an extra /zen request per action while staying offline-safe.
+  const isOnline = opts.checkActionExistence ? makeConnectivityProbe() : undefined;
 
   for (const r of refs) {
     // Use the raw `uses:` reference so action subpaths (owner/repo/path@ref) are
@@ -176,7 +179,7 @@ export async function checkRefs(
     }
 
     if (opts.checkActionExistence) {
-      const result = await verifyRefExists(r.ownerRepo, r.ref, ctx);
+      const result = await verifyRefExists(r.ownerRepo, r.ref, ctx, isOnline);
       if (result === 'missing') {
         findings.push(
           makeIssue({
@@ -230,17 +233,31 @@ async function httpStatus(url: string, timeoutMs = 8_000): Promise<number> {
 }
 
 /**
+ * Build a memoized connectivity probe: hits `https://api.github.com/zen` once and caches the
+ * result (as a boolean) for the lifetime of the returned function, so a run with many actions
+ * doesn't repeat the probe. Returns `false` when the API is unreachable (offline).
+ */
+function makeConnectivityProbe(): () => Promise<boolean> {
+  let cached: Promise<boolean> | undefined;
+  return () => {
+    if (!cached) cached = httpStatus('https://api.github.com/zen', 5_000).then((s) => s !== 0);
+    return cached;
+  };
+}
+
+/**
  * Offline-safe existence probe: check connectivity first, then the commit endpoint.
  * Never throws; returns 'skipped' when offline/rate-limited so the tool never fails
- * a workflow just because the network is unavailable.
+ * a workflow just because the network is unavailable. Pass a shared memoized `isOnline`
+ * to reuse a single connectivity probe across many refs.
  */
 export async function verifyRefExists(
   ownerRepo: string,
   sha: string,
   ctx: ToolContext,
+  isOnline: () => Promise<boolean> = makeConnectivityProbe(),
 ): Promise<'ok' | 'missing' | 'skipped'> {
-  const online = await httpStatus('https://api.github.com/zen', 5_000);
-  if (online === 0) {
+  if (!(await isOnline())) {
     ctx.logger.debug(
       'validate-github-workflow: GitHub API unreachable, skipping SHA existence check',
     );

@@ -353,6 +353,37 @@ describe('validate-github-workflow', () => {
       }
     });
 
+    it('probes api.github.com/zen at most once per run regardless of ref count', async () => {
+      // The connectivity probe is memoized, so many pinned actions must not fan out into a
+      // /zen request each — only the per-ref commit lookups scale with the number of refs.
+      const originalFetch = global.fetch;
+      let zenCalls = 0;
+      global.fetch = jest.fn((url: unknown) => {
+        if (String(url).includes('/zen')) zenCalls += 1;
+        return Promise.resolve({ status: 200 } as Response);
+      }) as any;
+      try {
+        const content = [
+          'on: { push: { branches: [main] } }',
+          'jobs:',
+          '  buildImage:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+          `      - uses: azure/login@${CHECKOUT_SHA}`,
+          `      - uses: azure/k8s-bake@${K8S_BAKE_SHA}`,
+        ].join('\n');
+        await validate({
+          workflowContent: content,
+          layers: ['refs'],
+          checkActionExistence: true,
+        });
+        expect(zenCalls).toBe(1);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
     it('emits INFO findings with an empty warnings array (warnings reserved for WARNING severity)', async () => {
       const content = [
         'on: { push: { branches: [main] } }',
