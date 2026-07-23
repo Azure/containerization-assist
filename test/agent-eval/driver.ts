@@ -5,6 +5,14 @@ import { promisify } from 'node:util';
 import { tool, Experimental_Agent as Agent } from 'ai';
 import type { LanguageModel, ModelMessage } from 'ai';
 import { z } from 'zod';
+import {
+  decisiveLine,
+  isVerbose,
+  MAX_FAILURE_DETAIL_CHARS,
+  MAX_BUILD_OUTPUT_CHARS,
+  MAX_STEP_OUTPUT_CHARS,
+  MAX_PATH_LOG_CHARS,
+} from './log-config.js';
 
 const execFileP = promisify(execFile);
 
@@ -53,6 +61,8 @@ export interface AgentRunResult {
   text: string;
   /** True once `verifyDeploy` reported the workload reached Running/Ready. */
   deployVerified: boolean;
+  /** How many deploy-completion nudges were actually issued for this run. */
+  deployNudges: number;
 }
 
 function summarize(args: unknown): string {
@@ -245,11 +255,19 @@ export class AISDKDriver {
             success: true,
             imageTag,
             attempt: dockerBuildCalls,
-            output: ((stdout ?? '') + (stderr ?? '')).slice(-6000),
+            output: ((stdout ?? '') + (stderr ?? '')).slice(-MAX_BUILD_OUTPUT_CHARS),
           };
         } catch (err) {
           const e = err as { code?: string | number; stderr?: string; stdout?: string; message?: string };
-          const combined = ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-6000);
+          const combined = ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_FAILURE_DETAIL_CHARS);
+          if (isVerbose()) {
+            console.error(`[driver] dockerBuild FAILED (attempt ${dockerBuildCalls}):`);
+            console.error(combined.replace(/\s+$/, '') || '(no output)');
+          } else {
+            console.error(
+              `[driver] dockerBuild FAILED (attempt ${dockerBuildCalls}): ${decisiveLine(combined) || 'no output'}`,
+            );
+          }
           return {
             success: false,
             imageTag,
@@ -288,7 +306,7 @@ export class AISDKDriver {
               success: false,
               step: 'tag',
               command: `docker tag ${src} ${dst}`,
-              output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-4000),
+              output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
               hint: `Could not tag '${src}'. Use the exact imageTag that dockerBuild returned as 'source'.`,
             };
           }
@@ -298,7 +316,7 @@ export class AISDKDriver {
             maxBuffer: 16 * 1024 * 1024,
             timeout: 300_000,
           });
-          const pushOut = ((stdout ?? '') + (stderr ?? '')).slice(-4000);
+          const pushOut = ((stdout ?? '') + (stderr ?? '')).slice(-MAX_STEP_OUTPUT_CHARS);
           const check = await imageExistsInRegistry(dst);
           if (check.exists === false) {
             return {
@@ -326,7 +344,7 @@ export class AISDKDriver {
             step: 'push',
             command: `docker push ${dst}`,
             exitCode: typeof e.code === 'number' ? e.code : null,
-            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-4000),
+            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
             hint:
               'Push failed. If this is an auth error, registry login may have expired (az acr login). ' +
               'Otherwise check the target reference.',
@@ -366,7 +384,7 @@ export class AISDKDriver {
           return {
             success: true,
             command: `kubectl ${args.join(' ')}`,
-            output: ((stdout ?? '') + (stderr ?? '')).slice(-4000),
+            output: ((stdout ?? '') + (stderr ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
             note:
               'Objects applied. This does NOT confirm the pods are healthy. Call verifyDeploy now to check the ' +
               'rollout actually reaches Ready, and fix+reapply if it reports a failure.',
@@ -377,7 +395,7 @@ export class AISDKDriver {
             success: false,
             command: `kubectl ${args.join(' ')}`,
             exitCode: typeof e.code === 'number' ? e.code : null,
-            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-4000),
+            output: ((e.stdout ?? '') + (e.stderr ?? '') + (e.message ?? '')).slice(-MAX_STEP_OUTPUT_CHARS),
             hint: 'Inspect the error, fix the manifest with createFile, then call kubectlApply again.',
           };
         }
@@ -536,7 +554,7 @@ export class AISDKDriver {
           if (!log || /error from server|not found|previous terminated container/i.test(log)) {
             log = await kget(['logs', String(p.name), '--tail=40']);
           }
-          logs[String(p.name)] = (log ?? '').slice(-3000);
+          logs[String(p.name)] = (log ?? '').slice(-MAX_PATH_LOG_CHARS);
         }
         lastVerifyFailure =
           lastPods
@@ -605,12 +623,16 @@ export class AISDKDriver {
           return await agent.generate(args);
         } catch (err) {
           const info = classifyRateLimit(err);
-          if (!info.isRateLimit || attempt >= maxRetries) throw err;
-          const waitMs = info.retryAfterMs ?? Math.min(120_000, 30_000 * 2 ** attempt);
+          const timedOut = isRequestTimeout(err);
+          if ((!info.isRateLimit && !timedOut) || attempt >= maxRetries) throw err;
+          const waitMs = info.retryAfterMs ?? (timedOut ? 5_000 : Math.min(120_000, 30_000 * 2 ** attempt));
           attempt += 1;
           console.error(
-            `[driver] rate-limited (attempt ${attempt}/${maxRetries}); ` +
-              `sleeping ${Math.round(waitMs / 1000)}s before retry. ${info.detail}`,
+            timedOut
+              ? `[driver] request timed out (attempt ${attempt}/${maxRetries}); ` +
+                  `retrying in ${Math.round(waitMs / 1000)}s.`
+              : `[driver] rate-limited (attempt ${attempt}/${maxRetries}); ` +
+                  `sleeping ${Math.round(waitMs / 1000)}s before retry. ${info.detail}`,
           );
           await new Promise((r) => setTimeout(r, waitMs));
         }
@@ -625,6 +647,7 @@ export class AISDKDriver {
     // resume the SAME conversation with a pointed instruction to finish the
     // push→apply→verify loop (fixing failed builds / pod errors along the way).
     // Each nudge gives the agent a fresh step budget; bounded by maxDeployNudges.
+    let deployNudges = 0;
     if (input.requireDeploy && !deployVerified) {
       const maxNudges = input.maxDeployNudges ?? 3;
       const progressSummary = (): string => {
@@ -634,6 +657,7 @@ export class AISDKDriver {
         return parts.length ? parts.join(', ') : 'none yet';
       };
       for (let n = 0; n < maxNudges && !deployVerified; n++) {
+        deployNudges += 1;
         console.error(
           `[driver] deploy not verified — nudging agent to finish push→apply→verify ` +
             `(nudge ${n + 1}/${maxNudges}).`,
@@ -679,8 +703,27 @@ export class AISDKDriver {
       durationMs,
       text: result.text ?? '',
       deployVerified,
+      deployNudges,
     };
   }
+}
+
+/**
+ * Detect an aborted/timed-out model request so the backoff can retry it. The
+ * per-request timeout in providers.ts aborts stalled Foundry calls; surface
+ * those (and low-level socket timeouts) as transient/retryable here.
+ */
+function isRequestTimeout(err: unknown): boolean {
+  const e = err as { name?: string; message?: string; cause?: { name?: string; message?: string } };
+  const name = e?.name ?? '';
+  const causeName = e?.cause?.name ?? '';
+  const text = `${e?.message ?? ''} ${e?.cause?.message ?? ''}`;
+  return (
+    name === 'AbortError' ||
+    causeName === 'AbortError' ||
+    name === 'TimeoutError' ||
+    /aborted|timed?\s?out|timeout|ETIMEDOUT|UND_ERR_(CONNECT_TIMEOUT|HEADERS_TIMEOUT|BODY_TIMEOUT)/i.test(text)
+  );
 }
 
 /**
