@@ -31,6 +31,7 @@ import {
   actionMajor,
   type ActionPin,
 } from '../src/tools/generate-github-workflow/action-pins';
+import { updatePinInSource } from './lib/action-pins-source';
 
 const CHECK_ONLY = process.argv.includes('--check');
 const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
@@ -115,37 +116,6 @@ async function resolveLatest(ref: string, major: string): Promise<Resolved> {
   }
 
   return { kind: 'ok', sha, version };
-}
-
-// ---------------------------------------------------------------------------
-// Source rewriting
-// ---------------------------------------------------------------------------
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Replace the sha/version for a single pin (anchored by its unique `ref`). Returns the
- * rewritten source, or `null` when the pin block was not matched exactly once (so callers
- * never record an "update" that did not actually change the source, e.g. on formatting drift).
- */
-export function updatePinInSource(
-  src: string,
-  pin: ActionPin,
-  sha: string,
-  version: string,
-): string | null {
-  const re = new RegExp(
-    `(ref: '${escapeRegex(pin.ref)}',\\s*\\n\\s*sha: ')[0-9a-fA-F]+(',\\s*\\n\\s*version: ')[^']*(')`,
-    'g',
-  );
-  let count = 0;
-  const out = src.replace(re, (_m, p1: string, p2: string, p3: string) => {
-    count++;
-    return `${p1}${sha}${p2}${version}${p3}`;
-  });
-  return count === 1 ? out : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,12 +212,8 @@ async function main(): Promise<void> {
   }
 }
 
-// Skip the CLI entrypoint when imported by tests (e.g. Jest) so pure helpers like
-// updatePinInSource can be unit-tested without triggering a live network refresh.
-if (!process.env.JEST_WORKER_ID) {
-  main().catch((err) => {
-    console.error('Unexpected error while refreshing action pins:');
-    console.error(err instanceof Error ? (err.stack ?? err.message) : err);
-    process.exit(1);
-  });
-}
+main().catch((err) => {
+  console.error('Unexpected error while refreshing action pins:');
+  console.error(err instanceof Error ? (err.stack ?? err.message) : err);
+  process.exit(1);
+});

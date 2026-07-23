@@ -1,11 +1,11 @@
 /**
  * Transformation-focused tests for the action-pin refresh source rewriter.
- * These exercise updatePinInSource in isolation (no network) — the CLI entrypoint
- * is guarded by JEST_WORKER_ID so importing the script has no side effects.
+ * updatePinInSource lives in its own module (scripts/lib/action-pins-source.ts) so it can
+ * be imported without pulling in the CLI script's entrypoint side effects.
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { updatePinInSource } from '../../../scripts/refresh-action-pins';
+import { updatePinInSource } from '../../../scripts/lib/action-pins-source';
 import type { ActionPin } from '@/tools/generate-github-workflow/action-pins';
 
 const SOURCE = `export const ACTION_PINS = {
