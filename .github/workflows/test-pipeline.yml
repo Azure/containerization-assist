@@ -64,7 +64,7 @@ jobs:
 
       - name: Verify build artifacts (cross-platform)
         run: >-
-          node -e "['dist/src/index.js','dist/src/index.d.ts','dist/src/cli/cli.js','dist-cjs/src/index.js','dist-cjs/src/index.d.ts'].forEach(function(f){if(!require('fs').existsSync(f)){console.error('Missing: '+f);process.exit(1)}});console.log('Build artifacts verified')"
+          node -e "['dist/src/index.js','dist/src/index.d.ts','dist/src/cli/cli.js','dist-cjs/src/index.js','dist-cjs/src/index.d.ts','dist-cjs/package.json'].forEach(function(f){if(!require('fs').existsSync(f)){console.error('Missing: '+f);process.exit(1)}});console.log('Build artifacts verified')"
 
       - name: Verify CLI is executable (POSIX)
         if: runner.os != 'Windows'
