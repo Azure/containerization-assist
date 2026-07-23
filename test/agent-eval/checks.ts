@@ -4,6 +4,8 @@ import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { MAX_FAILURE_DETAIL_CHARS } from './log-config.js';
+import { mcrRefExists } from '../../src/validation/mcr-registry.js';
+import { KNOWN_GOOD_MCR_REFS, suggestMcrFix } from '../../src/knowledge/base-image-catalog.js';
 
 const execFileP = promisify(execFile);
 
@@ -338,8 +340,29 @@ export const requiresAzureBaseImage: Check = {
       if (!parsed) continue;
       const coverage = classifyBase(parsed);
       switch (coverage.kind) {
-        case 'mcr':
+        case 'mcr': {
+          // An `mcr.microsoft.com/...` string is not proof the tag exists —
+          // models hallucinate plausible tags that pass a naive shape check but
+          // fail the real build. Verify against the registry.
+          const mcrTag = parsed.tag ?? 'latest';
+          const fullRef = `${parsed.repo}:${mcrTag}`;
+          const exists = await mcrRefExists(fullRef);
+          if (exists === true) break; // verified real MCR tag
+          if (exists === false) {
+            const fix = suggestMcrFix(fullRef);
+            const hint = fix
+              ? `use ${fix.build} (runtime: ${fix.runtime})`
+              : 'no verified MCR replacement in catalog — pick a published tag';
+            offending.push(`${parsed.raw.trim()}  → MCR tag not found (hallucinated): ${hint}`);
+            break;
+          }
+          // exists === null → registry unreachable (offline). We cannot prove a
+          // tag is bad offline: accept catalog-known-good refs outright, and
+          // otherwise pass but flag as unverified rather than failing.
+          if (KNOWN_GOOD_MCR_REFS.has(fullRef)) break;
+          allowed.push(`${parsed.raw.trim()}  // MCR tag unverified (registry unreachable)`);
           break;
+        }
         case 'no-mcr-equivalent':
           allowed.push(`${parsed.raw.trim()}  // ${coverage.reason}`);
           break;
