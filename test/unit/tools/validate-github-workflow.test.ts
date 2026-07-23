@@ -46,6 +46,10 @@ import { extractUsesRefs, isPinnedSha, isVersionComment } from '@/tools/validate
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const CHECKOUT_SHA = 'df4cb1c069e1874edd31b4311f1884172cec0e10';
+// A distinct SHA for azure/k8s-bake so refs don't reuse CHECKOUT_SHA (which would
+// misleadingly imply the SHA relates to actions/checkout). Semantic-layer tests only
+// assert the step is present, so the exact value is irrelevant beyond being a valid SHA.
+const K8S_BAKE_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
 /** Load a workflow fixture from test/fixtures/workflows/{happy,sad}/. */
 function readFixture(kind: 'happy' | 'sad', name: string): string {
@@ -694,7 +698,7 @@ describe('validate-github-workflow', () => {
         '  deploy:',
         '    runs-on: ubuntu-latest',
         '    steps:',
-        `      - uses: azure/k8s-bake@${CHECKOUT_SHA}`,
+        `      - uses: azure/k8s-bake@${K8S_BAKE_SHA}`,
       ].join('\n');
       const plan = await validate({
         workflowContent: content,
@@ -702,6 +706,30 @@ describe('validate-github-workflow', () => {
         layers: ['semantic'],
       });
       expect(ruleIds(plan)).not.toContain('semantic/bake-step');
+    });
+
+    it('flags a missing bake step when `azure/k8s-bake` is in buildImage, not deploy', async () => {
+      // The bake step must run in the deploy job (its outputs feed Azure/k8s-deploy, and step
+      // outputs are job-scoped) — a bake in buildImage cannot satisfy the deploy contract.
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: azure/k8s-bake@${K8S_BAKE_SHA}`,
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({
+        workflowContent: content,
+        manifestFormat: 'helm',
+        layers: ['semantic'],
+      });
+      expect(ruleIds(plan)).toContain('semantic/bake-step');
     });
 
     it('flags renamed job keys as a warning-level job-keys finding', async () => {
@@ -768,6 +796,96 @@ describe('validate-github-workflow', () => {
       expect(secrets).toBeDefined();
       expect(secrets?.message).toContain('AZURE_SUBSCRIPTION_ID');
       expect(secrets?.message).not.toContain('AZURE_CLIENT_ID');
+    });
+
+    it('flags a missing required secret when no azure/login step exists at all', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - run: az acr build --image x .',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const secrets = plan.report.results.filter((r) => r.ruleId === 'semantic/required-secrets');
+      expect(secrets.length).toBe(1);
+      expect(secrets[0]?.message).toContain('No `azure/login` step');
+      expect(secrets[0]?.message).toContain('AZURE_CLIENT_ID');
+      expect(secrets[0]?.message).toContain('AZURE_TENANT_ID');
+      expect(secrets[0]?.message).toContain('AZURE_SUBSCRIPTION_ID');
+    });
+
+    it('flags a per-job incomplete login even when another job\'s login has all secrets', async () => {
+      // buildImage's login has all three secrets, but deploy's login is missing one. A
+      // global concatenation would wrongly pass; per-step validation must flag deploy.
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        '        with:',
+        '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
+        '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
+        '          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
+        '      - run: az acr build --image x .',
+        '  deploy:',
+        '    needs: [buildImage]',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { actions: read, contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        '        with:',
+        '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
+        '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
+        // deploy's login is missing subscription-id.
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const secrets = plan.report.results.filter((r) => r.ruleId === 'semantic/required-secrets');
+      expect(secrets.length).toBe(1);
+      expect(secrets[0]?.message).toContain('deploy');
+      expect(secrets[0]?.message).toContain('AZURE_SUBSCRIPTION_ID');
+      expect(secrets[0]?.message).not.toContain('AZURE_CLIENT_ID');
+    });
+
+    it('aggregates a single finding per job across multiple incomplete login steps', async () => {
+      // Two azure/login steps in one job, each missing a different secret. The output must be
+      // a single aggregated finding for the job (not one per login step).
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'concurrency: { group: g, cancel-in-progress: true }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    permissions: { actions: read, contents: read, id-token: write }',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        '        with:',
+        '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
+        '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
+        // first login missing subscription-id
+        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        '        with:',
+        '          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
+        // second login missing client-id and tenant-id
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['semantic'] });
+      const secrets = plan.report.results.filter((r) => r.ruleId === 'semantic/required-secrets');
+      expect(secrets.length).toBe(1);
+      // The single finding aggregates every secret missing from any login step in the job.
+      expect(secrets[0]?.message).toContain('AZURE_CLIENT_ID');
+      expect(secrets[0]?.message).toContain('AZURE_TENANT_ID');
+      expect(secrets[0]?.message).toContain('AZURE_SUBSCRIPTION_ID');
     });
 
     it('flags the buildImage job when `contents: read` is missing (only id-token: write set)', async () => {

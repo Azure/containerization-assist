@@ -346,29 +346,62 @@ export function checkSemantic(
   }
 
   // ── 6. Required secrets referenced ───────────────────────────────────────────
-  // Inspect the parsed `with` mapping of each azure/login step (where the OIDC secrets are
-  // actually consumed) rather than the raw text — a secret named only in a comment must not
-  // satisfy the check. Case-insensitive: GitHub contexts/secret names are case-insensitive.
-  const loginWithText = collectStepObjects(jobs)
-    .filter((s) => typeof s.uses === 'string' && /azure\/login/i.test(s.uses))
-    .flatMap((s) => (isDict(s.with) ? Object.values(s.with) : []))
-    .map((v) => String(v))
-    .join('\n');
-  const missingSecrets = REQUIRED_SECRETS.filter(
-    (s) => !new RegExp(`\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`, 'i').test(loginWithText),
+  // Each azure/login step authenticates on its own, so it must reference ALL three OIDC
+  // secrets itself — one job's complete login must not paper over another job's incomplete
+  // one. Inspect each login step's parsed `with` mapping (where the secrets are actually
+  // consumed) rather than the raw text, so a secret named only in a comment doesn't count.
+  // Aggregate the gaps per job (across all its login steps) into a single finding so a job
+  // with multiple logins isn't reported repeatedly. Case-insensitive: GitHub contexts/secret
+  // names are case-insensitive.
+  const secretsRec = rec(
+    knowledge,
+    'required-secrets-guidance',
+    'Store AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID as GitHub repository secrets.',
   );
-  if (missingSecrets.length > 0) {
+  let sawLoginStep = false;
+  for (const [jobId, job] of Object.entries(jobs)) {
+    if (!isDict(job) || !Array.isArray(job.steps)) continue;
+    const jobMissing = new Set<string>();
+    for (const step of job.steps) {
+      if (!isDict(step) || typeof step.uses !== 'string' || !/azure\/login/i.test(step.uses)) {
+        continue;
+      }
+      sawLoginStep = true;
+      const withText = (isDict(step.with) ? Object.values(step.with) : [])
+        .map((v) => String(v))
+        .join('\n');
+      for (const s of REQUIRED_SECRETS) {
+        if (!new RegExp(`\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`, 'i').test(withText)) {
+          jobMissing.add(s);
+        }
+      }
+    }
+    if (jobMissing.size > 0) {
+      // Preserve REQUIRED_SECRETS order in the message regardless of discovery order.
+      const missing = REQUIRED_SECRETS.filter((s) => jobMissing.has(s));
+      findings.push(
+        makeIssue({
+          layer: 'semantic',
+          ruleId: 'semantic/required-secrets',
+          severity: 'high',
+          message: `The \`azure/login\` step(s) in job "${jobId}" are missing reference(s) to required OIDC secret(s): ${missing.join(', ')}. Reference them via \${{ secrets.<NAME> }} in the azure/login step.`,
+          location: `job "${jobId}"`,
+          suggestion: secretsRec,
+        }),
+      );
+    }
+  }
+  // No azure/login step at all means none of the OIDC secrets are referenced. The per-job
+  // login-presence checks only fire for the literal buildImage/deploy jobs, so surface the
+  // missing secrets here too rather than letting a login-less workflow pass this rule.
+  if (!sawLoginStep) {
     findings.push(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/required-secrets',
         severity: 'high',
-        message: `Missing reference(s) to required OIDC secret(s): ${missingSecrets.join(', ')}. Reference them via \${{ secrets.<NAME> }} in the azure/login step.`,
-        suggestion: rec(
-          knowledge,
-          'required-secrets-guidance',
-          'Store AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID as GitHub repository secrets.',
-        ),
+        message: `No \`azure/login\` step found, so the required OIDC secret(s) are unreferenced: ${REQUIRED_SECRETS.join(', ')}. Add an \`azure/login\` step that passes them via \${{ secrets.<NAME> }}.`,
+        suggestion: secretsRec,
       }),
     );
   }
@@ -399,9 +432,11 @@ export function checkSemantic(
   }
 
   // ── 8. Bake step required for helm/kustomize ─────────────────────────────────
-  // Check the parsed step `uses:` refs (not the raw YAML) so `azure/k8s-bake` in a
-  // comment or echoed run-script text can't satisfy the requirement.
-  const hasBakeStep = stepUses.some((u) => /azure\/k8s-bake/i.test(u));
+  // Scope to the deploy job's parsed step `uses:` refs: azure/k8s-bake renders the
+  // manifests that Azure/k8s-deploy consumes via step outputs (which are job-scoped), so a
+  // bake step in buildImage wouldn't feed the deploy and must not satisfy this check. Using
+  // parsed `uses:` (not raw YAML) also ignores the ref in a comment or echoed run-script.
+  const hasBakeStep = deployStreams.uses.some((u) => /azure\/k8s-bake/i.test(u));
   if ((input.manifestFormat === 'helm' || input.manifestFormat === 'kustomize') && !hasBakeStep) {
     findings.push(
       makeIssue({
