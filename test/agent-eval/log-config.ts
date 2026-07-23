@@ -11,12 +11,12 @@
  *   basic   (default)  → LOG_LEVEL=warn  — CA warnings/errors only
  *   verbose (--verbose) → LOG_LEVEL=info  — full CA logs
  *
- * An explicit `LOG_LEVEL` in the environment always wins.
+ * An env `LOG_LEVEL` sets the initial mode; the `--verbose` flag forces `info`.
  */
 
-// Runtime verbosity flag, flipped on by `enableVerboseLogging()` (the `--verbose`
-// CLI flag) to turn on the verbose failure formatting and raise the CA log level.
-let verbose = false;
+// Runtime verbosity flag. Starts true when LOG_LEVEL=info, and is flipped on by
+// `enableVerboseLogging()` (the `--verbose` flag), which also raises the log level.
+let verbose = process.env.LOG_LEVEL === 'info';
 
 /** True when verbose output is active (the `--verbose` flag). */
 export function isVerbose(): boolean {
