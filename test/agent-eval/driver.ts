@@ -13,6 +13,7 @@ import {
   MAX_STEP_OUTPUT_CHARS,
   MAX_PATH_LOG_CHARS,
 } from './log-config.js';
+import { prepareMavenBuild } from './maven-ci.js';
 
 const execFileP = promisify(execFile);
 
@@ -238,12 +239,16 @@ export class AISDKDriver {
       execute: async ({ tag }) => {
         dockerBuildCalls += 1;
         const imageTag = (tag as string | undefined) ?? `agent-eval-build-${Date.now()}:check`;
+        // Neutralize the Maven-Central network block (Track B): mount a feed-mirror
+        // settings.xml as a BuildKit secret. No-op unless AGENT_EVAL_MAVEN_MIRROR is set.
+        const mavenPrep = await prepareMavenBuild(input.workingDir);
+        const secretArgs = mavenPrep?.secretArgs ?? [];
         try {
           // Build for linux/amd64 (AKS node arch): a plain build on an arm64 host
           // yields an image the amd64 nodes reject as `no match for platform`.
           const { stdout, stderr } = await execFileP(
             'docker',
-            ['buildx', 'build', '--platform', 'linux/amd64', '--load', '-t', imageTag, input.workingDir],
+            ['buildx', 'build', '--platform', 'linux/amd64', '--load', ...secretArgs, '-t', imageTag, input.workingDir],
             {
               maxBuffer: 16 * 1024 * 1024,
               // Hard wall-clock cap so a wedged buildkit can't block the loop forever.
@@ -276,6 +281,8 @@ export class AISDKDriver {
             output: combined,
             hint: 'Read the error above, fix the Dockerfile, then call dockerBuild again.',
           };
+        } finally {
+          await mavenPrep?.cleanup();
         }
       },
     });
