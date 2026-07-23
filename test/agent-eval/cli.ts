@@ -182,7 +182,7 @@ program
   .option('--port <n>', 'port for --serve (default: 7878)', '7878')
   .option(
     '--verbose',
-    'show full CA tool logs (LOG_LEVEL=info). Default is a quiet "basic" view (warnings/errors + curated per-cell progress). For fully-verbose module-level logs too, set AGENT_EVAL_VERBOSE=1.',
+    'show full CA tool logs (LOG_LEVEL=info). Default is a quiet "basic" view (warnings/errors + curated per-cell progress). To also raise the import-time module loggers, set LOG_LEVEL=info in the environment.',
     false,
   )
   .action(
@@ -260,7 +260,7 @@ program
 
       console.error(
         `[gradient] log mode: ${process.env.LOG_LEVEL === 'info' ? 'verbose' : 'basic'} ` +
-          `(LOG_LEVEL=${process.env.LOG_LEVEL}). Use --verbose or AGENT_EVAL_VERBOSE=1 for full CA logs.`,
+          `(LOG_LEVEL=${process.env.LOG_LEVEL}). Use --verbose (or LOG_LEVEL=info) for full CA logs.`,
       );
       const result = await runGradient({
         fixtures,

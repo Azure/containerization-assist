@@ -8,34 +8,25 @@
  * thousands of JSON blobs. So the eval defaults the CA log level to `warn`
  * ("basic") and only opens it back up to `info` ("verbose") on request:
  *
- *   basic   (default)         → LOG_LEVEL=warn  — CA warnings/errors only
- *   verbose (AGENT_EVAL_VERBOSE / --verbose) → LOG_LEVEL=info — full CA logs
+ *   basic   (default)  → LOG_LEVEL=warn  — CA warnings/errors only
+ *   verbose (--verbose) → LOG_LEVEL=info  — full CA logs
  *
- * An explicit `LOG_LEVEL` in the environment always wins over both.
- *
- * Both `AGENT_EVAL_VERBOSE` (env) and `--verbose` (flag) exist because they act
- * at different times: the env var is read before import-time loggers are built,
- * so only it can make those verbose; `--verbose` (parsed later) covers the
- * runtime loggers and failure formatting.
+ * An explicit `LOG_LEVEL` in the environment always wins.
  */
 
-/** True when the caller asked for full CA logs via env (import-time signal). */
-export const AGENT_EVAL_VERBOSE = /^(1|true|yes|on)$/i.test(process.env.AGENT_EVAL_VERBOSE ?? '');
+// Runtime verbosity flag, flipped on by `enableVerboseLogging()` (the `--verbose`
+// CLI flag) to turn on the verbose failure formatting and raise the CA log level.
+let verbose = false;
 
-// Runtime verbosity flag. Seeded from the env signal, but also flipped on by
-// `enableVerboseLogging()` so the `--verbose` CLI flag turns on the verbose
-// failure formatting too (not just the CA log level).
-let verbose = AGENT_EVAL_VERBOSE;
-
-/** True when verbose output is active (env `AGENT_EVAL_VERBOSE` OR the `--verbose` flag). */
+/** True when verbose output is active (the `--verbose` flag). */
 export function isVerbose(): boolean {
   return verbose;
 }
 
-// Set the default BEFORE any pino logger is constructed. Respect an explicit
-// LOG_LEVEL if the operator set one.
+// Default to quiet BEFORE any pino logger is constructed. Respect an explicit
+// LOG_LEVEL if the operator set one (e.g. LOG_LEVEL=info for full CA logs).
 if (!process.env.LOG_LEVEL) {
-  process.env.LOG_LEVEL = AGENT_EVAL_VERBOSE ? 'info' : 'warn';
+  process.env.LOG_LEVEL = 'warn';
 }
 
 /**
@@ -43,7 +34,7 @@ if (!process.env.LOG_LEVEL) {
  * (the harness and per-tool-call loggers — i.e. the bulk of the volume) and
  * turn on the eval's own verbose failure formatting. The handful of
  * module-level loggers are fixed at import time, so full verbosity across
- * those also needs `AGENT_EVAL_VERBOSE=1` in the environment.
+ * those also needs `LOG_LEVEL=info` set in the environment.
  */
 export function enableVerboseLogging(): void {
   verbose = true;
