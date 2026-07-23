@@ -146,6 +146,12 @@ extends:
                   AGENT_EVAL_CLUSTER: ca-agent-eval-aks
                   AGENT_EVAL_REGISTRY: caagentevalacr.azurecr.io
                   AGENT_EVAL_NAMESPACE: eval-ns
+                  # Track B: route Maven through the reachable Azure Artifacts feed
+                  # (Maven Central is blocked inside the isolated build). The token
+                  # reaches the build only as a BuildKit secret, never a layer.
+                  AGENT_EVAL_MAVEN_MIRROR: '1'
+                  AGENT_EVAL_MAVEN_FEED_URL: https://pkgs.dev.azure.com/AzureContainerUpstream/Kubernetes/_packaging/Kubernetes_PublicPackages/maven/v1
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   FIXTURES: ${{ parameters.fixtures }}
                   MODELS: ${{ parameters.models }}
                   REPS: ${{ parameters.reps }}

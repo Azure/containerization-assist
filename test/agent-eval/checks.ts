@@ -6,6 +6,7 @@ import { parse as parseYaml } from 'yaml';
 import { MAX_FAILURE_DETAIL_CHARS } from './log-config.js';
 import { mcrRefExists } from '../../src/validation/mcr-registry.js';
 import { KNOWN_GOOD_MCR_REFS, suggestMcrFix } from '../../src/knowledge/base-image-catalog.js';
+import { prepareMavenBuild } from './maven-ci.js';
 
 const execFileP = promisify(execFile);
 
@@ -618,40 +619,50 @@ export const dockerBuilds: Check = {
     // that has QEMU/binfmt emulation registered), build for that platform via
     // buildx so the scored result matches the target cluster architecture.
     const platform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim();
+    // Neutralize the Maven-Central network block (Track B): mount a feed-mirror
+    // settings.xml as a BuildKit secret. No-op unless AGENT_EVAL_MAVEN_MIRROR is set.
+    const mavenPrep = await prepareMavenBuild(artifactDir);
+    const secretArgs = mavenPrep?.secretArgs ?? [];
     const buildArgs = platform
-      ? ['buildx', 'build', '--platform', platform, '--load', '-t', tag, artifactDir]
-      : ['build', '-t', tag, artifactDir];
+      ? ['buildx', 'build', '--platform', platform, '--load', ...secretArgs, '-t', tag, artifactDir]
+      : ['build', ...secretArgs, '-t', tag, artifactDir];
+    // Secret mounts require BuildKit; force it on for the plain `docker build` path.
+    const buildEnv = secretArgs.length ? { ...process.env, DOCKER_BUILDKIT: '1' } : process.env;
     try {
-      await execFileP('docker', buildArgs, { maxBuffer: 16 * 1024 * 1024 });
-    } catch (err) {
-      const e = err as { code?: string; stderr?: string; message?: string };
-      if (e.code === 'ENOENT') {
-        return { name: this.name, passed: false, message: 'docker not available on PATH' };
-      }
-      const details = (e.stderr ?? e.message ?? '').slice(-MAX_FAILURE_DETAIL_CHARS);
-      const infraReason = classifyInfraFailure(details);
-      if (infraReason) {
+      try {
+        await execFileP('docker', buildArgs, { maxBuffer: 16 * 1024 * 1024, env: buildEnv });
+      } catch (err) {
+        const e = err as { code?: string; stderr?: string; message?: string };
+        if (e.code === 'ENOENT') {
+          return { name: this.name, passed: false, message: 'docker not available on PATH' };
+        }
+        const details = (e.stderr ?? e.message ?? '').slice(-MAX_FAILURE_DETAIL_CHARS);
+        const infraReason = classifyInfraFailure(details);
+        if (infraReason) {
+          return {
+            name: this.name,
+            passed: false,
+            infraBlocked: true,
+            message: `env-blocked: ${infraReason}`,
+            details,
+          };
+        }
         return {
           name: this.name,
           passed: false,
-          infraBlocked: true,
-          message: `env-blocked: ${infraReason}`,
+          message: 'docker build failed',
           details,
         };
       }
-      return {
-        name: this.name,
-        passed: false,
-        message: 'docker build failed',
-        details,
-      };
+      try {
+        await execFileP('docker', ['rmi', tag]);
+      } catch {
+        // ignore cleanup failures
+      }
+      return { name: this.name, passed: true, message: 'docker build succeeded' };
+    } finally {
+      await mavenPrep?.cleanup();
     }
-    try {
-      await execFileP('docker', ['rmi', tag]);
-    } catch {
-      // ignore cleanup failures
-    }
-    return { name: this.name, passed: true, message: 'docker build succeeded' };
   },
 };
 
