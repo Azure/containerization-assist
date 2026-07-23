@@ -418,6 +418,28 @@ export const requiresAzureBaseImage: Check = {
 const REQUIRED_DOCKERFILE_LABEL = 'com.azure.containerizationassist.createdby';
 const REQUIRED_K8S_LABELS = ['app.kubernetes.io/name', 'app.kubernetes.io/managed-by'];
 
+/**
+ * Whether a Dockerfile defines the given label key. Handles the full LABEL
+ * syntax: multiple `key=value` pairs on one instruction, backslash line
+ * continuations, and bare or double-quoted keys. The naive
+ * `^LABEL <key>=` check produced false negatives whenever the required label
+ * was not the first pair on the line or spanned a continuation.
+ */
+function dockerfileDefinesLabel(dockerfile: string, label: string): boolean {
+  // Collapse backslash continuations so each LABEL instruction is one line.
+  const logical = dockerfile.replace(/\\\r?\n/g, ' ');
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // The key may appear anywhere in the argument list, bare or quoted, followed
+  // by `=`. A leading space is prepended so a key at the very start matches.
+  const keyPattern = new RegExp(`(?:^|\\s)"?${esc}"?\\s*=`);
+  for (const rawLine of logical.split(/\r?\n/)) {
+    const m = /^\s*LABEL\s+(.*)$/i.exec(rawLine);
+    if (!m) continue;
+    if (keyPattern.test(` ${m[1]}`)) return true;
+  }
+  return false;
+}
+
 export const hasRequiredLabels: Check = {
   name: 'has-required-labels',
   async run({ artifactDir }) {
@@ -426,7 +448,7 @@ export const hasRequiredLabels: Check = {
     const dockerfile = await readDockerfile(artifactDir);
     if (dockerfile === null) {
       missing.push('Dockerfile not found');
-    } else if (!new RegExp(`^\\s*LABEL\\s+${REQUIRED_DOCKERFILE_LABEL}\\s*=`, 'm').test(dockerfile)) {
+    } else if (!dockerfileDefinesLabel(dockerfile, REQUIRED_DOCKERFILE_LABEL)) {
       missing.push(`Dockerfile is missing LABEL ${REQUIRED_DOCKERFILE_LABEL}`);
     }
 
