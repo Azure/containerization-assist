@@ -42,4 +42,17 @@ echo '--- Azure Artifacts host reachability (feed name TBD) ---'
 hit 'pkgs.dev.azure.com root [noauth]' 'https://pkgs.dev.azure.com/AzureContainerUpstream/'
 hit 'pkgs.dev.azure.com root [bearer]' 'https://pkgs.dev.azure.com/AzureContainerUpstream/' -H "Authorization: Bearer ${TOKEN}"
 
+echo '--- Azure Artifacts Maven feed: Kubernetes_PublicPackages (has Maven Central upstream) ---'
+# Real target: mirror `central` through this feed. Proven reachable + serving
+# Central artifacts locally; this confirms the BUILD IDENTITY (System.AccessToken)
+# can read it from inside `docker build`.
+FEED='https://pkgs.dev.azure.com/AzureContainerUpstream/Kubernetes/_packaging/Kubernetes_PublicPackages/maven/v1'
+for probe_artifact in \
+  "org/springframework/spring-core/maven-metadata.xml" \
+  "${ARTIFACT}"; do
+  hit "feed noauth: ${probe_artifact}" "${FEED}/${probe_artifact}"
+  hit "feed bearer: ${probe_artifact}" "${FEED}/${probe_artifact}" -H "Authorization: Bearer ${TOKEN}"
+  hit "feed basic : ${probe_artifact}" "${FEED}/${probe_artifact}" -u ".:${TOKEN}"
+done
+
 echo '=== END MAVEN PROBE ==='
