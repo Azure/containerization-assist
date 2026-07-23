@@ -224,7 +224,7 @@ export class AISDKDriver {
       description:
         'Build the Docker image from the current Dockerfile in the working directory using `docker buildx build --platform linux/amd64`. ' +
         'The image is built for linux/amd64 because the target AKS nodes are amd64 — building for the host arch (e.g. arm64) causes `no match for platform` ImagePullBackOff. ' +
-        'Returns the build exit status, the last ~8000 chars of combined stdout/stderr, and the tagged image name on success. ' +
+        'Returns the build exit status, the last ~6000 chars of combined stdout/stderr, and the tagged image name on success. ' +
         'Call this AFTER you have written the Dockerfile to disk to verify it actually builds. ' +
         'If the build fails, READ the error output, FIX the Dockerfile (use createFile to overwrite, or the fix-dockerfile MCP tool if available), then call dockerBuild again. ' +
         'You may retry up to 3 times. ' +
