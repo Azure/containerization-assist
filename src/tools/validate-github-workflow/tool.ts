@@ -133,7 +133,12 @@ const runPattern = createKnowledgeTool<
         const parsed = parseWorkflow(content);
         doc = parsed.doc;
         fatal = parsed.fatal;
-        if (selected.has('yaml') || fatal) findings.push(...parsed.findings);
+        // Surface parse findings when the caller selected the YAML layer, or when a fatal
+        // parse blocks a doc-dependent layer they DID select (schema/semantic) — so they
+        // learn why it couldn't run. A refs-only run stays silent and falls back to the
+        // line scan (layers are independently toggleable).
+        const docDependent = selected.has('schema') || selected.has('semantic');
+        if (selected.has('yaml') || (fatal && docDependent)) findings.push(...parsed.findings);
         if (selected.has('yaml')) findings.push(...checkYaml(content, doc));
       }
 
@@ -152,8 +157,7 @@ const runPattern = createKnowledgeTool<
       // Layers 2 & 4 require a parseable document.
       if (doc && !fatal) {
         if (selected.has('schema')) findings.push(...checkSchema(doc));
-        if (selected.has('semantic'))
-          findings.push(...checkSemantic(doc, content, knowledge, input));
+        if (selected.has('semantic')) findings.push(...checkSemantic(doc, knowledge, input));
       }
 
       return { findings, filePath };

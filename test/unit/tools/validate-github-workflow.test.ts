@@ -200,6 +200,19 @@ describe('validate-github-workflow', () => {
       const parseFinding = plan.report.results.find((r) => r.ruleId === 'yaml/parse');
       expect(parseFinding?.metadata?.location).toBeDefined();
     });
+
+    it('does not emit YAML-layer findings for a refs-only run on fatal YAML', async () => {
+      // Layers are independently toggleable: a refs-only run falls back to the line scan
+      // and must not surface yaml/parse findings the caller did not ask for.
+      const plan = await validate({ workflowContent: sad('malformed'), layers: ['refs'] });
+      expect(ruleIds(plan)).not.toContain('yaml/parse');
+      expect(plan.report.results.every((r) => r.layer !== 'yaml')).toBe(true);
+    });
+
+    it('surfaces the fatal parse error when a doc-dependent layer (schema) is selected', async () => {
+      const plan = await validate({ workflowContent: sad('malformed'), layers: ['schema'] });
+      expect(errorRuleIds(plan)).toContain('yaml/parse');
+    });
   });
 
   // ── Layer 3: action refs / SHA pinning ────────────────────────────────────────
@@ -526,6 +539,41 @@ describe('validate-github-workflow', () => {
       ].join('\n');
       const plan = await validate({ workflowContent: content, layers: ['semantic'] });
       expect(ruleIds(plan)).not.toContain('semantic/concurrency');
+    });
+
+    it('flags a missing bake step even when `azure/k8s-bake` appears only in a comment', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+        '      # remember to add azure/k8s-bake before deploy',
+      ].join('\n');
+      const plan = await validate({
+        workflowContent: content,
+        manifestFormat: 'helm',
+        layers: ['semantic'],
+      });
+      expect(ruleIds(plan)).toContain('semantic/bake-step');
+    });
+
+    it('accepts a real azure/k8s-bake step for helm manifests', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: azure/k8s-bake@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({
+        workflowContent: content,
+        manifestFormat: 'helm',
+        layers: ['semantic'],
+      });
+      expect(ruleIds(plan)).not.toContain('semantic/bake-step');
     });
 
     it('flags renamed job keys as a warning-level job-keys finding', async () => {

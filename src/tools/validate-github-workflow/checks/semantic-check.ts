@@ -78,7 +78,6 @@ function jobStepStreams(job: unknown): { runs: string[]; uses: string[] } {
 
 export function checkSemantic(
   doc: Document.Parsed,
-  content: string,
   knowledge: CategorizedKnowledge,
   input: ValidateGithubWorkflowParams,
 ): WorkflowValidationIssue[] {
@@ -400,10 +399,10 @@ export function checkSemantic(
   }
 
   // ── 8. Bake step required for helm/kustomize ─────────────────────────────────
-  if (
-    (input.manifestFormat === 'helm' || input.manifestFormat === 'kustomize') &&
-    !/azure\/k8s-bake/.test(content)
-  ) {
+  // Check the parsed step `uses:` refs (not the raw YAML) so `azure/k8s-bake` in a
+  // comment or echoed run-script text can't satisfy the requirement.
+  const hasBakeStep = stepUses.some((u) => /azure\/k8s-bake/i.test(u));
+  if ((input.manifestFormat === 'helm' || input.manifestFormat === 'kustomize') && !hasBakeStep) {
     findings.push(
       makeIssue({
         layer: 'semantic',
