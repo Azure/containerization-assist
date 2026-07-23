@@ -140,7 +140,22 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
       continue;
     }
 
-    const isReusable = 'uses' in jobRaw;
+    // A job is a reusable-workflow call only when `uses` is a non-empty string. A `uses`
+    // key holding any other value is malformed: flag it and fall through to the normal-job
+    // checks (runs-on/steps) rather than silently treating it as a reusable call.
+    const usesValue = jobRaw.uses;
+    const isReusable = typeof usesValue === 'string' && usesValue.trim().length > 0;
+    if ('uses' in jobRaw && !isReusable) {
+      findings.push(
+        makeIssue({
+          layer: 'schema',
+          ruleId: 'schema/invalid-uses',
+          severity: 'required',
+          message: `Job "${jobId}" has an invalid \`uses\` value; it must be a non-empty string referencing a reusable workflow, e.g. \`octo/repo/.github/workflows/deploy.yml@v1\` or \`./.github/workflows/deploy.yml\`.`,
+          location: `job "${jobId}"`,
+        }),
+      );
+    }
 
     if (!isReusable) {
       if (!('runs-on' in jobRaw)) {

@@ -41,7 +41,7 @@ import {
   type WorkflowValidationPlan,
 } from '@/tools/validate-github-workflow/schema';
 import { workflowRelativePath } from '@/tools/validate-github-workflow/checks/helpers';
-import { extractUsesRefs, isPinnedSha } from '@/tools/validate-github-workflow/checks/refs-check';
+import { extractUsesRefs, isPinnedSha, isVersionComment } from '@/tools/validate-github-workflow/checks/refs-check';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -183,9 +183,45 @@ describe('validate-github-workflow', () => {
         '    secrets: { token: abc }',
       ].join('\n');
       const plan = await validate({ workflowContent: content, layers: ['schema'] });
-      expect(ruleIds(plan)).not.toContain('schema/invalid-job-key');
-      expect(ruleIds(plan)).not.toContain('schema/unknown-job-key');
+      const ids = ruleIds(plan);
+      expect(ids).not.toContain('schema/invalid-job-key');
+      expect(ids).not.toContain('schema/unknown-job-key');
+      expect(ids).not.toContain('schema/invalid-uses');
+      expect(ids).not.toContain('schema/missing-runs-on');
     });
+
+    it.each([
+      ['numeric', '    uses: 123'],
+      ['empty string', "    uses: ''"],
+      ['whitespace-only string', "    uses: ' '"],
+      ['null', '    uses: null'],
+      ['empty mapping', '    uses: {}'],
+    ])(
+      'flags a malformed `uses` (%s) and still enforces the normal-job steps requirement',
+      async (_label, usesLine) => {
+        // `uses` present but not a non-empty string → not a valid reusable call. Provide
+        // `runs-on` so `missing-steps` is unambiguously the expected normal-job requirement,
+        // independent of whether the schema check ever gates it behind `runs-on`.
+        const content = [
+          'on: { push: { branches: [main] } }',
+          'jobs:',
+          '  build:',
+          '    runs-on: ubuntu-latest',
+          usesLine,
+        ].join('\n');
+        const plan = await validate({ workflowContent: content, layers: ['schema'] });
+        const ids = ruleIds(plan);
+        // Presence checks are decoupled from the severity mapping.
+        expect(ids).toContain('schema/invalid-uses');
+        // Treated as a normal job: with `runs-on` provided, the missing `steps` list is flagged
+        // (and `missing-runs-on` is satisfied).
+        expect(ids).toContain('schema/missing-steps');
+        expect(ids).not.toContain('schema/missing-runs-on');
+        // The malformed-`uses` finding is intentionally error-severity (`required`).
+        const invalidUses = plan.report.results.find((r) => r.ruleId === 'schema/invalid-uses');
+        expect(invalidUses?.metadata?.severity).toBe('error');
+      },
+    );
   });
 
   // ── Layer 1: YAML ───────────────────────────────────────────────────────────
@@ -328,6 +364,98 @@ describe('validate-github-workflow', () => {
       expect(vc?.metadata?.severity).toBe('info');
       expect(vc?.warnings).toEqual([]);
       expect(vc?.errors).toEqual([]);
+    });
+
+    it('isVersionComment accepts version-like comments and rejects others', () => {
+      expect(isVersionComment('v6')).toBe(true);
+      expect(isVersionComment('v6.0')).toBe(true);
+      expect(isVersionComment('v6.0.3')).toBe(true);
+      expect(isVersionComment('V6.0.3')).toBe(true); // case-insensitive
+      expect(isVersionComment('  v6.0.3  ')).toBe(true); // surrounding whitespace is trimmed
+      expect(isVersionComment('6.0.3')).toBe(false); // missing leading v
+      expect(isVersionComment('v6.0.3 (LTS)')).toBe(false); // trailing note
+      expect(isVersionComment('v6.0.3-beta')).toBe(false); // pre-release suffix
+      expect(isVersionComment('pinned')).toBe(false);
+      expect(isVersionComment('latest')).toBe(false);
+      expect(isVersionComment(undefined)).toBe(false);
+      expect(isVersionComment('')).toBe(false);
+    });
+
+    it('flags a pinned action whose trailing comment is not a version (e.g. `# pinned`)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA} # pinned`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const vc = plan.report.results.find((r) => r.ruleId === 'refs/version-comment');
+      expect(vc).toBeDefined();
+      expect(vc?.message).toContain('non-version');
+    });
+
+    it('treats a whitespace-only trailing comment as "no version comment"', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA} #${'   '}`, // trailing comment is only spaces
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const vc = plan.report.results.find((r) => r.ruleId === 'refs/version-comment');
+      expect(vc).toBeDefined();
+      expect(vc?.message).toContain('has no version comment');
+      expect(vc?.message).not.toContain('non-version');
+    });
+
+    it('accepts a version-like trailing comment (`# v6.0.3`)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA} # v6.0.3`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      expect(ruleIds(plan)).not.toContain('refs/version-comment');
+    });
+
+    it('accepts a version-like trailing comment with surrounding whitespace (`#   v6.0.3  `)', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA} #${'   '}v6.0.3${'  '}`, // padded on both sides
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      expect(ruleIds(plan)).not.toContain('refs/version-comment');
+    });
+
+    it('sanitizes an untrusted non-version comment (truncates + neutralizes backticks)', async () => {
+      const longComment = `${'x'.repeat(80)} \`inject\``;
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA} # ${longComment}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const vc = plan.report.results.find((r) => r.ruleId === 'refs/version-comment');
+      expect(vc).toBeDefined();
+      const msg = vc?.message ?? '';
+      // Backticks from the comment are neutralized and the embedded text is truncated.
+      expect(msg).not.toContain('`inject`');
+      expect(msg).toContain('\u2026');
+      expect(msg).not.toContain('x'.repeat(80));
     });
   });
 

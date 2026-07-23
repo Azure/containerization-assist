@@ -93,6 +93,30 @@ export function isPinnedSha(ref: string): boolean {
   return /^[0-9a-f]{40}$/i.test(ref) || /^[0-9a-f]{64}$/i.test(ref);
 }
 
+/**
+ * True when a trailing `uses:` comment looks like a version tag (`v6`, `v6.0`, `v6.0.3`).
+ * Normalizes (trims) internally so the exported API is robust regardless of caller behavior.
+ * Requires the leading `v` — matching the rule's own guidance (`# vX.Y.Z`) — and bounds it
+ * to semver-shaped 1–3 numeric segments, so notes like `# pinned` or `# v6 (LTS)` do not count.
+ */
+export function isVersionComment(comment?: string): boolean {
+  const c = comment?.trim();
+  return Boolean(c && /^v\d+(?:\.\d+){0,2}$/i.test(c));
+}
+
+/**
+ * Make an untrusted trailing comment safe to embed in a diagnostic message: collapse any
+ * whitespace/newlines to single spaces, neutralize backticks (which would break the inline
+ * code span), and cap the length so a crafted comment can't produce a huge/noisy finding.
+ */
+const COMMENT_MAX_LEN = 50;
+const COMMENT_ELLIPSIS = '\u2026';
+function sanitizeComment(comment: string): string {
+  const oneLine = comment.replace(/\s+/g, ' ').replace(/`/g, "'").trim();
+  if (oneLine.length <= COMMENT_MAX_LEN) return oneLine;
+  return `${oneLine.slice(0, COMMENT_MAX_LEN - COMMENT_ELLIPSIS.length)}${COMMENT_ELLIPSIS}`;
+}
+
 export interface RefsCheckOptions {
   checkActionExistence: boolean;
 }
@@ -132,13 +156,19 @@ export async function checkRefs(
       continue; // no point checking the comment or existence of an unpinned ref
     }
 
-    if (!r.comment) {
+    // Normalize once so the version check and the `detail` message agree: extraction already
+    // trims, but treat any whitespace-only comment as "no comment" for both branches below.
+    const comment = r.comment?.trim();
+    if (!isVersionComment(comment)) {
+      const detail = comment
+        ? `has a non-version trailing comment (\`# ${sanitizeComment(comment)}\`)`
+        : 'has no version comment';
       findings.push(
         makeIssue({
           layer: 'refs',
           ruleId: 'refs/version-comment',
           severity: 'low',
-          message: `Pinned action \`${r.ownerRepo}\` has no version comment. Add a trailing \`# vX.Y.Z\` so the pinned version is human-readable.`,
+          message: `Pinned action \`${r.ownerRepo}\` ${detail}. Add a trailing version comment (\`# vX\`, \`# vX.Y\`, or \`# vX.Y.Z\` — e.g. \`# v6.0.3\`) so the pinned version is human-readable.`,
           location: `line ${r.line}`,
           actionRef,
         }),
