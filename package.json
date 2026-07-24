@@ -98,6 +98,7 @@
     "build:verify": "tsx scripts/verify-build.ts",
     "dev": "npm run build:version && tsx watch src/cli/cli.ts",
     "eval": "tsx --env-file-if-exists=.env test/agent-eval/cli.ts",
+    "eval:maven-preflight": "tsx test/agent-eval/maven-ci-preflight.ts",
     "start": "node dist/src/cli/cli.js",
     "test": "npm run build:version && NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit integration e2e",
     "test:unit": "npm run build:version && NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --runInBand",
