@@ -511,14 +511,8 @@ export const dockerBuilds: Check = {
   name: 'docker-builds',
   async run({ artifactDir }) {
     const tag = `agent-eval-${Date.now()}:check`;
-    // Default behavior (and CI/pipeline path) is a native `docker build`. When
-    // AGENT_EVAL_BUILD_PLATFORM is set (e.g. to linux/amd64 on a non-amd64 host
-    // that has QEMU/binfmt emulation registered), build for that platform via
-    // buildx so the scored result matches the target cluster architecture.
-    const platform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim();
-    const buildArgs = platform
-      ? ['buildx', 'build', '--platform', platform, '--load', '-t', tag, artifactDir]
-      : ['build', '-t', tag, artifactDir];
+    const platform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim() || 'linux/amd64';
+    const buildArgs = ['buildx', 'build', '--platform', platform, '--load', '-t', tag, artifactDir];
     try {
       await execFileP('docker', buildArgs, { maxBuffer: 16 * 1024 * 1024 });
     } catch (err) {
