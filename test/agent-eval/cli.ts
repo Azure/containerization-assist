@@ -4,6 +4,9 @@
  * Compare agent success rate and token usage across modes (bare | skills | mcp).
  */
 
+// Side-effect import FIRST: sets the CA LOG_LEVEL default before any module
+// (harness, knowledge, validation) constructs its pino logger at load time.
+import { enableVerboseLogging, isVerbose } from './log-config.js';
 import { promises as fs } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -177,6 +180,11 @@ program
   .option('--reps <n>', 'repetitions per (model × fixture × path) cell (default: 1)', '1')
   .option('--serve', 'after the run, serve the HTML report over HTTP and print a clickable URL', false)
   .option('--port <n>', 'port for --serve (default: 7878)', '7878')
+  .option(
+    '--verbose',
+    'show full CA tool logs (LOG_LEVEL=info). Default is a quiet "basic" view (warnings/errors + curated per-cell progress). To also raise the import-time module loggers, set LOG_LEVEL=info in the environment.',
+    false,
+  )
   .action(
     async (opts: {
       fixtures?: string;
@@ -192,7 +200,9 @@ program
       reps: string;
       serve: boolean;
       port: string;
+      verbose: boolean;
     }) => {
+      if (opts.verbose) enableVerboseLogging();
       const split = (s: string): string[] =>
         s.split(',').map((x) => x.trim()).filter(Boolean);
       const fail = (msg: string): never => {
@@ -248,6 +258,10 @@ program
         }
       }
 
+      console.error(
+        `[gradient] log mode: ${isVerbose() ? 'verbose' : 'basic'} ` +
+          `(LOG_LEVEL=${process.env.LOG_LEVEL}). Use --verbose (or LOG_LEVEL=info) for full CA logs.`,
+      );
       const result = await runGradient({
         fixtures,
         models,
