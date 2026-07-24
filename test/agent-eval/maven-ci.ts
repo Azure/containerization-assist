@@ -124,7 +124,7 @@ export function transformDockerfileForMaven(content: string): { content: string;
           `--mount=type=secret,id=${TOKEN_SECRET_ID},target=${TOKEN_TARGET} `
         : `--mount=type=secret,id=${SETTINGS_SECRET_ID},target=${SETTINGS_TARGET} `;
       const envPrefix = isWrapper
-        ? `MVNW_USERNAME=build MVNW_PASSWORD="$(cat ${TOKEN_TARGET})" `
+        ? `export MVNW_USERNAME=build MVNW_PASSWORD="$(cat ${TOKEN_TARGET})"; `
         : '';
       const indent = m[1];
       lines[start] = lines[start].replace(
