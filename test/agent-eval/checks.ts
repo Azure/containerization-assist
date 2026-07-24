@@ -122,9 +122,34 @@ async function fetchMcrTags(repo: string): Promise<Set<string> | null> {
   return catalog?.get(repo) ?? null;
 }
 
-function tagsCoverVersion(tags: Set<string>, version: string): boolean {
-  for (const t of tags) {
-    if (t === version || t.startsWith(`${version}-`) || t.startsWith(`${version}.`)) return true;
+function canonicalizeTag(tag: string): string {
+  // Drop a trailing architecture qualifier (mirrors isNoiseTag in the refresh
+  // script, which removes these so the catalog stores only canonical tags).
+  const noArch = tag.replace(/-(amd64|arm64|arm32v7|arm32|ppc64le|s390x)$/i, '');
+  // Collapse a leading 3+ part numeric version to major.minor (`8.0.11` → `8.0`,
+  // `8.0.11-azurelinux3.0` → `8.0-azurelinux3.0`). The refresh script drops
+  // 3-part numeric tags, so the catalog only ever stores the 1-/2-part family.
+  return noArch.replace(/^(\d+\.\d+)\.\d+/, '$1');
+}
+
+/**
+ * Does the catalog contain a pullable tag matching `tag`? The catalog is
+ * intentionally lossy — the refresh script strips arch-suffixed and 3+ part
+ * numeric tags as noise — so an exact `.has()` mis-flags real-but-more-specific
+ * tags (e.g. `dotnet/sdk:8.0.11`, `nodejs:20.14.0`) as hallucinated. We instead
+ * match against the tag's canonical family, and treat a bare major (`17`) as
+ * present when any variant (`17-azurelinux`, `17.x`) is published. Genuine
+ * hallucinations (fake distro suffixes, nonexistent versions) still fail to
+ * match and are correctly rejected.
+ */
+function tagExistsInCatalog(tags: Set<string>, tag: string): boolean {
+  if (tags.has(tag)) return true;
+  const canon = canonicalizeTag(tag);
+  if (canon !== tag && tags.has(canon)) return true;
+  if (/^\d+$/.test(canon)) {
+    for (const t of tags) {
+      if (t === canon || t.startsWith(`${canon}-`) || t.startsWith(`${canon}.`)) return true;
+    }
   }
   return false;
 }
@@ -299,7 +324,7 @@ async function coverageFor<K>(
     };
   }
   const tags = await fetchMcrTags(entry.repo);
-  const covered = tags ? tagsCoverVersion(tags, String(version)) : entry.versions.has(version);
+  const covered = tags ? tagExistsInCatalog(tags, String(version)) : entry.versions.has(version);
   if (covered) {
     return {
       kind: 'mcr-equivalent-exists',
@@ -320,7 +345,7 @@ async function classifyBase(parsed: ParsedFrom): Promise<Coverage> {
     const mcrRepo = parsed.repo.replace(/^mcr\.microsoft\.com\//i, '');
     const tags = await fetchMcrTags(mcrRepo);
     if (tags === null) return { kind: 'mcr' };
-    return tags.has(tag ?? 'latest') ? { kind: 'mcr' } : { kind: 'mcr-missing' };
+    return tagExistsInCatalog(tags, tag ?? 'latest') ? { kind: 'mcr' } : { kind: 'mcr-missing' };
   }
 
   if (JAVA_JDK_REPO.test(repo))

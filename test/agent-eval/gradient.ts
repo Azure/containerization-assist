@@ -136,13 +136,13 @@ export interface GradientRunRecord {
   /**
    * True once the harness's verifyDeploy confirmed the workload reached
    * Running/Ready on the cluster. Informational only — NOT part of the scored
-   * checks. Absent for the `bare` control (no deploy is attempted there).
+   * checks. Recorded for every level (all levels now attempt a deploy).
    */
   deployVerified?: boolean;
   /**
    * How many deploy-completion nudges the harness issued for this cell. 0 means
    * the agent finished the deploy loop on its own; higher values mean it stalled
-   * and had to be re-driven. Absent for the `bare` control (no deploy attempted).
+   * and had to be re-driven. Recorded for every level (all levels deploy).
    */
   deployNudges?: number;
   checks: CheckResult[];
@@ -265,6 +265,9 @@ async function runOneLevel(opts: {
       userPrompt: resolved.userPrompt,
       workingDir,
       tools: resolved.tools,
+      // All levels now attempt a real deploy (bare included): bare is the
+      // no-CA-assist baseline for the lift comparison, not a no-deploy control,
+      // so its deploy success is measured on the same footing as mcp/skills.
       requireDeploy: true,
       maxDeployNudges: MAX_DEPLOY_NUDGES,
     });
