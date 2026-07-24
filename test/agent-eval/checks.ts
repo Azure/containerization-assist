@@ -98,7 +98,6 @@ const MCR_COVERAGE = {
   },
 } as const;
 
-const MCR_VERIFY = process.env.AGENT_EVAL_MCR_VERIFY !== '0';
 const MCR_CATALOG_PATH = fileURLToPath(
   new URL('../../knowledge/catalogs/mcr-base-images.json', import.meta.url),
 );
@@ -299,7 +298,7 @@ async function coverageFor<K>(
       suggestion: entry.suggestion.replace(/<V>/g, placeholder),
     };
   }
-  const tags = MCR_VERIFY ? await fetchMcrTags(entry.repo) : null;
+  const tags = await fetchMcrTags(entry.repo);
   const covered = tags ? tagsCoverVersion(tags, String(version)) : entry.versions.has(version);
   if (covered) {
     return {
@@ -318,7 +317,6 @@ async function classifyBase(parsed: ParsedFrom): Promise<Coverage> {
   const repo = parsed.repo.replace(/^docker\.io\//i, '').replace(/^library\//i, '');
 
   if (MCR_REGISTRY_PATTERN.test(parsed.repo)) {
-    if (!MCR_VERIFY) return { kind: 'mcr' };
     const mcrRepo = parsed.repo.replace(/^mcr\.microsoft\.com\//i, '');
     const tags = await fetchMcrTags(mcrRepo);
     if (tags === null) return { kind: 'mcr' };
