@@ -54,8 +54,17 @@ extends:
                 inputs:
                   versionSpec: $(NodeVersion)
 
-              - script: npm ci
-                displayName: Install dependencies
+              # Route this build's install through the CFS proxy (1ES agents
+              # block npmjs). Lockfile 'resolved' URLs are rewritten, then
+              # restored so staged artifacts stay pristine.
+              - script: |
+                  set -euo pipefail
+                  backup="package-lock.json.bak"
+                  cp package-lock.json "$backup"
+                  trap 'mv -f "$backup" package-lock.json' EXIT
+                  sed -i 's#https://registry\.npmjs\.org/#https://packagefeedproxy.microsoft.io/npm/#g' package-lock.json
+                  NPM_CONFIG_REGISTRY=https://packagefeedproxy.microsoft.io/npm/ NPM_CONFIG_ALWAYS_AUTH=true npm ci
+                displayName: Install dependencies via CFS proxy (1ES agents block public registry)
 
               - script: npm run build
                 displayName: Build project

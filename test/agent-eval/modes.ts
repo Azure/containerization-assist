@@ -4,6 +4,9 @@ import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+// Side-effect import BEFORE the harness (which transitively loads CA knowledge/
+// validation modules that build pino loggers at load): sets the LOG_LEVEL default.
+import { oneLine, MAX_INLINE_DETAIL_CHARS } from './log-config.js';
 import { MCPTestHarness } from '../llm-integration/infrastructure/mcp-test-harness.js';
 import { buildAksRemoteDevLoopPrompt } from '../../src/prompts/aks-loop/prompt.js';
 import type { ToolSpec } from './driver.js';
@@ -80,12 +83,12 @@ export interface AzureContext {
   imageName: string;
 }
 
-/** Load Azure context from env vars with fallbacks to the ca-eval-* defaults. */
+/** Load Azure context from env vars with fallbacks to the ca-agent-eval defaults. */
 export function loadAzureContext(): AzureContext {
   return {
-    registry: process.env.AGENT_EVAL_REGISTRY ?? 'caevalacr.azurecr.io',
-    resourceGroup: process.env.AGENT_EVAL_RESOURCE_GROUP ?? 'ca-test-suite',
-    clusterName: process.env.AGENT_EVAL_CLUSTER ?? 'ca-eval-aks',
+    registry: process.env.AGENT_EVAL_REGISTRY ?? 'caagentevalacr.azurecr.io',
+    resourceGroup: process.env.AGENT_EVAL_RESOURCE_GROUP ?? 'ca-agent-eval',
+    clusterName: process.env.AGENT_EVAL_CLUSTER ?? 'ca-agent-eval-aks',
     namespace: process.env.AGENT_EVAL_NAMESPACE ?? 'eval-ns',
     imageName: process.env.AGENT_EVAL_IMAGE ?? 'eval-image',
   };
@@ -211,7 +214,7 @@ export async function ensureEvalCluster(ctx: AzureContext = loadAzureContext()):
     }
   } catch (err) {
     const e = err as { stderr?: string; stdout?: string; message?: string };
-    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(-1000);
+    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(-MAX_INLINE_DETAIL_CHARS);
     throw new Error(
       `ensureEvalCluster failed — the eval AKS cluster could not be prepared.\n${detail}\n` +
         'Fix the cluster manually or set AGENT_EVAL_SKIP_CLUSTER_ENSURE=1, then re-run.',
@@ -348,7 +351,11 @@ export async function createMcpToolBundle(workingDir: string): Promise<{
         name: t.name,
         arguments: args,
       });
-      return resp.error ? { error: resp.error } : resp.content;
+      if (resp.error) {
+        console.error(`[tool] ${t.name} error: ${oneLine(String(resp.error))}`);
+        return { error: resp.error };
+      }
+      return resp.content;
     },
   }));
   return {
