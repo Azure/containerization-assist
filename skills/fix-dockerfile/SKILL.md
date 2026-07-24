@@ -33,10 +33,23 @@ Apply each rule below in order. For each match, record an **issue** with
 `{ ruleId, category, severity, line, message }`.
 
 `severity` ∈ `error` (must fix) | `warning` (should fix) | `info` (nice to fix).
-`category` ∈ `security` | `performance` | `bestPractices`.
+`category` ∈ `buildValidity` | `security` | `performance` | `bestPractices`.
 
 When a rule says "scan lines", split the file on `\n`, trim each line, ignore
 empty lines and lines starting with `#`.
+
+#### Build-validity rules (highest priority — the image cannot build if these fail)
+
+Checked FIRST. Unlike the hygiene rules below, a match here means `docker build`
+fails outright (wrong base image or wrong package manager for that base), so
+every rule is severity **error**. The base-image catalog referenced below is the
+`generate-dockerfile` skill's **G2.1** (MCR) and **G2.3** (documented fallback)
+tables — treat those as the single source of truth for valid tags.
+
+| ruleId | Pattern | Severity | Message |
+|---|---|---|---|
+| `invalid-mcr-base` | Any `FROM mcr.microsoft.com/…` whose repository+tag is **not** an exact entry in the generate-dockerfile **G2.1** catalog. Also flags known-invalid shapes: `openjdk/jdk:<LV>-azurelinux3.0` (Java uses `-azurelinux`; only .NET uses `azurelinux3.0`), and any `mcr.microsoft.com/java/…`, `mcr.microsoft.com/openjdk/maven…`, or `mcr.microsoft.com/maven/…` (no such repositories exist). | **error** | MCR base image/tag does not exist — build fails with `not found`. Use an exact tag from the generate-dockerfile G2.1 catalog. |
+| `base-package-manager-mismatch` | A `RUN` invokes a package manager that doesn't match its stage's base distro: Azure Linux / Mariner base (tag contains `azurelinux` or `mariner`) with `apt-get`/`apt`/`apk`/`yum`/`dnf`; Alpine base (`alpine`) with `apt-get`/`tdnf`; Debian/Ubuntu base (`-slim`, `debian`, `ubuntu`, `eclipse-temurin`, Docker Hub `maven`/`gradle`) with `tdnf`/`apk`; OR any package install on a `distroless` base (no shell). | **error** | Package manager not present on this base — the `RUN` fails with exit 255. Use the base's native manager (Azure Linux → `tdnf`, Alpine → `apk`, Debian/Ubuntu → `apt-get`); distroless installs must move to the build stage. |
 
 #### Security rules (highest priority)
 
@@ -86,7 +99,7 @@ Grade band:
 
 ### Step 4 — Compute overall priority
 
-- `high` if any security issue has severity `error`, OR ≥ 3 security issues total.
+- `high` if any build-validity or security issue has severity `error`, OR ≥ 3 security issues total.
 - `medium` if any security/performance/best-practice issue exists.
 - `low` if no issues found.
 
@@ -119,6 +132,8 @@ Walk every recorded issue and apply the corresponding fix. The fix table:
 | `require-workdir` | Add `WORKDIR /app` after `FROM`. Replace any `RUN cd /<dir>` with `WORKDIR /<dir>`. |
 | `recommend-expose` | Add `EXPOSE <port>` near the bottom. Infer port from the code reference. |
 | `missing-attribution-labels` | Add `LABEL com.azure.containerizationassist.createdby="containerization-assist"`. If you can read the current `containerization-assist` package version from the environment, also add `LABEL com.azure.containerizationassist.version="<version>"`; otherwise omit the version label — never hard-code a stale version string. Do NOT use `org.opencontainers.image.*` keys. |
+| `invalid-mcr-base` | Replace the `FROM` with the exact tag for the detected language/version from the generate-dockerfile **G2.1** catalog (e.g. Java 17 build = `mcr.microsoft.com/openjdk/jdk:17-azurelinux`, runtime = `mcr.microsoft.com/openjdk/jdk:17-distroless`). If a Maven/Gradle builder is required, use the **G2.3** Docker Hub `maven:3.9-eclipse-temurin-<LV>` (or `gradle:<ver>-jdk<LV>`) as a build-only stage with a `# WHY-NOT-MCR:` note and a matching MCR `*-distroless` runtime stage. Never invent an MCR tag. |
+| `base-package-manager-mismatch` | Swap to the base's native package manager: Azure Linux / Mariner → `RUN tdnf install -y <pkgs> && tdnf clean all`; Alpine → `RUN apk add --no-cache <pkgs>`; Debian/Ubuntu → `RUN apt-get update && apt-get install -y --no-install-recommends <pkgs> && rm -rf /var/lib/apt/lists/*`. For a `distroless` runtime stage, remove the install entirely and `COPY --from=build` the needed artifacts. |
 
 After applying all fixes, run **Step 2 again** as a self-check on the new
 content. If any rule still triggers, fix it before writing. Never write a
@@ -152,6 +167,10 @@ Use these exact sections in order:
 - **Strategy:** <rewrite|refactor|tweak>
 
 ### Issues (<N>)
+
+#### Build validity (<count>)
+- *<severity>* `<ruleId>` (line <line>) — <message>
+- ...
 
 #### Security (<count>)
 - *<severity>* `<ruleId>` (line <line>) — <message>

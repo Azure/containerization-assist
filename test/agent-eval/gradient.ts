@@ -18,9 +18,10 @@ import { getModel } from './providers.js';
 import { AISDKDriver, type ToolSpec } from './driver.js';
 import {
   BASELINE_PROMPT,
-  USER_PROMPT,
+  buildBareDeployUserPrompt,
   loadDeployToAksSkill,
   buildSkillsAksLoopUserPrompt,
+  dropSkillShadowedTools,
   buildMcpAksLoopSystemPrompt,
   buildMcpAksLoopUserPrompt,
   createMcpToolBundle,
@@ -90,7 +91,7 @@ async function resolveLevel(
     case 'bare':
       return {
         systemPrompt: BASELINE_PROMPT,
-        userPrompt: USER_PROMPT(workingDir),
+        userPrompt: buildBareDeployUserPrompt(workingDir, ctx),
         tools: [],
         cleanup: async () => {},
       };
@@ -109,7 +110,7 @@ async function resolveLevel(
       return {
         systemPrompt,
         userPrompt: buildSkillsAksLoopUserPrompt(workingDir, ctx),
-        tools,
+        tools: dropSkillShadowedTools(tools),
         cleanup,
       };
     }
@@ -135,13 +136,13 @@ export interface GradientRunRecord {
   /**
    * True once the harness's verifyDeploy confirmed the workload reached
    * Running/Ready on the cluster. Informational only — NOT part of the scored
-   * checks. Absent for the `bare` control (no deploy is attempted there).
+   * checks. Recorded for every level (all levels now attempt a deploy).
    */
   deployVerified?: boolean;
   /**
    * How many deploy-completion nudges the harness issued for this cell. 0 means
    * the agent finished the deploy loop on its own; higher values mean it stalled
-   * and had to be re-driven. Absent for the `bare` control (no deploy attempted).
+   * and had to be re-driven. Recorded for every level (all levels deploy).
    */
   deployNudges?: number;
   checks: CheckResult[];
@@ -225,6 +226,8 @@ const MAX_DEPLOY_NUDGES = (() => {
   return Number.isFinite(raw) && raw >= 0 ? raw : 1;
 })();
 
+const RUN_ID = Date.now().toString(36).slice(-6);
+
 async function runOneLevel(opts: {
   fixture: string;
   level: LevelConfig;
@@ -241,15 +244,19 @@ async function runOneLevel(opts: {
     rep: opts.rep,
     checks: [],
   };
+  const cellCtx: AzureContext = {
+    ...opts.ctx,
+    imageName: `${opts.ctx.imageName}-${opts.level.id}-r${opts.rep}-${RUN_ID}`,
+  };
   // Wipe any leftover deployment so verify-deploy doesn't read stale state.
-  await cleanupAzureResources(opts.ctx);
+  await cleanupAzureResources(cellCtx);
   // Refresh ACR credentials per cell — tokens expire (~3h) mid-sweep otherwise.
-  await ensureRegistryLogin(opts.ctx);
+  await ensureRegistryLogin(cellCtx);
   const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-grad-'));
   let resolved: ResolvedLevel | undefined;
   try {
     await fs.cp(opts.fixture, workingDir, { recursive: true });
-    resolved = await resolveLevel(opts.level.id, workingDir, opts.ctx);
+    resolved = await resolveLevel(opts.level.id, workingDir, cellCtx);
     const { model, providerOptions } = getModel(opts.model);
     const result = await new AISDKDriver().run({
       model,
@@ -258,9 +265,10 @@ async function runOneLevel(opts: {
       userPrompt: resolved.userPrompt,
       workingDir,
       tools: resolved.tools,
-      // bare is the no-deploy control; mcp/skills are expected to deploy, so let
-      // the harness nudge them through push→apply→verify if they stall early.
-      requireDeploy: opts.level.id !== 'bare',
+      // All levels now attempt a real deploy (bare included): bare is the
+      // no-CA-assist baseline for the lift comparison, not a no-deploy control,
+      // so its deploy success is measured on the same footing as mcp/skills.
+      requireDeploy: true,
       maxDeployNudges: MAX_DEPLOY_NUDGES,
     });
     record.tokensIn = result.tokensIn;
@@ -272,8 +280,8 @@ async function runOneLevel(opts: {
     }, {});
     record.durationMs = result.durationMs;
     record.finalText = result.text;
-    if (opts.level.id !== 'bare') record.deployVerified = result.deployVerified;
-    if (opts.level.id !== 'bare') record.deployNudges = result.deployNudges;
+    record.deployVerified = result.deployVerified;
+    record.deployNudges = result.deployNudges;
     record.checks = await runChecks(opts.checkSpecs, { artifactDir: workingDir });
   } catch (err) {
     record.error = err instanceof Error ? err.message : String(err);
@@ -286,7 +294,7 @@ async function runOneLevel(opts: {
       }
     }
     // Tear down the deployment we just created so the next run starts clean.
-    await cleanupAzureResources(opts.ctx);
+    await cleanupAzureResources(cellCtx);
   }
   return record;
 }
@@ -457,10 +465,7 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
             continue;
           }
           const r = await runOneLevel({ fixture, level, model, ctx, checkSpecs, rep });
-          const deployTag =
-            r.level === 'bare'
-              ? ''
-              : ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
+          const deployTag = ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
           const checksPassed = r.checks.filter((c) => c.passed).length;
           console.error(
             `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +

@@ -220,10 +220,14 @@ export class AISDKDriver {
     };
 
     let dockerBuildCalls = 0;
+    const builtTags = new Set<string>();
+    // Target platform for the driver's build, overridable for cross-arch hosts.
+    // Default is linux/amd64 to match the amd64 AKS nodes we deploy onto.
+    const buildPlatform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim() || 'linux/amd64';
     sdkTools.dockerBuild = tool({
       description:
-        'Build the Docker image from the current Dockerfile in the working directory using `docker buildx build --platform linux/amd64`. ' +
-        'The image is built for linux/amd64 because the target AKS nodes are amd64 — building for the host arch (e.g. arm64) causes `no match for platform` ImagePullBackOff. ' +
+        `Build the Docker image from the current Dockerfile in the working directory using \`docker buildx build --platform ${buildPlatform}\`. ` +
+        `The image is built for ${buildPlatform} because the target AKS nodes are that architecture — building for a mismatched host arch (e.g. arm64) causes \`no match for platform\` ImagePullBackOff. ` +
         'Returns the build exit status, the last ~6000 chars of combined stdout/stderr, and the tagged image name on success. ' +
         'Call this AFTER you have written the Dockerfile to disk to verify it actually builds. ' +
         'If the build fails, READ the error output, FIX the Dockerfile (use createFile to overwrite, or the fix-dockerfile MCP tool if available), then call dockerBuild again. ' +
@@ -238,12 +242,12 @@ export class AISDKDriver {
       execute: async ({ tag }) => {
         dockerBuildCalls += 1;
         const imageTag = (tag as string | undefined) ?? `agent-eval-build-${Date.now()}:check`;
+        await execFileP('docker', ['image', 'rm', '-f', imageTag], { timeout: 60_000 }).catch(() => {});
+        builtTags.delete(imageTag);
         try {
-          // Build for linux/amd64 (AKS node arch): a plain build on an arm64 host
-          // yields an image the amd64 nodes reject as `no match for platform`.
           const { stdout, stderr } = await execFileP(
             'docker',
-            ['buildx', 'build', '--platform', 'linux/amd64', '--load', '-t', imageTag, input.workingDir],
+            ['buildx', 'build', '--platform', buildPlatform, '--load', '-t', imageTag, input.workingDir],
             {
               maxBuffer: 16 * 1024 * 1024,
               // Hard wall-clock cap so a wedged buildkit can't block the loop forever.
@@ -251,11 +255,21 @@ export class AISDKDriver {
               killSignal: 'SIGTERM',
             },
           );
+          const combined = ((stdout ?? '') + (stderr ?? '')).slice(-MAX_BUILD_OUTPUT_CHARS);
+          if (isVerbose()) {
+            console.error(`[driver] dockerBuild ok (attempt ${dockerBuildCalls}) → ${imageTag}:`);
+            console.error(combined.replace(/\s+$/, '') || '(no output)');
+          } else {
+            console.error(
+              `[driver] dockerBuild ok (attempt ${dockerBuildCalls}) → ${imageTag}: ${decisiveLine(combined) || 'built'}`,
+            );
+          }
+          builtTags.add(imageTag);
           return {
             success: true,
             imageTag,
             attempt: dockerBuildCalls,
-            output: ((stdout ?? '') + (stderr ?? '')).slice(-MAX_BUILD_OUTPUT_CHARS),
+            output: combined,
           };
         } catch (err) {
           const e = err as { code?: string | number; stderr?: string; stdout?: string; message?: string };
@@ -297,6 +311,16 @@ export class AISDKDriver {
       execute: async ({ source, target }) => {
         const src = String(source);
         const dst = String(target);
+        if (!builtTags.has(src)) {
+          return {
+            success: false,
+            step: 'precheck',
+            hint:
+              `Refusing to push '${src}': no successful dockerBuild produced this image in the current run. ` +
+              'Build the image first with dockerBuild and push the exact imageTag it returns. ' +
+              'This guard prevents deploying a stale image left over from a previous run.',
+          };
+        }
         if (src !== dst) {
           try {
             await execFileP('docker', ['tag', src, dst], { timeout: 60_000 });
@@ -597,7 +621,9 @@ export class AISDKDriver {
           tokensOut += usage.outputTokens ?? 0;
         }
         for (const tc of stepCalls ?? []) {
-          toolCalls.push({ name: tc.toolName, argsSummary: summarize((tc as { input?: unknown }).input) });
+          const argsSummary = summarize((tc as { input?: unknown }).input);
+          toolCalls.push({ name: tc.toolName, argsSummary });
+          console.error(`[step] ${tc.toolName}${argsSummary ? ` ${argsSummary}` : ''}`);
           if (tc.toolName === 'createFile') createFileCalled = true;
         }
       },
