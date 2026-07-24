@@ -221,10 +221,13 @@ export class AISDKDriver {
 
     let dockerBuildCalls = 0;
     const builtTags = new Set<string>();
+    // Target platform for the driver's build, overridable for cross-arch hosts.
+    // Default is linux/amd64 to match the amd64 AKS nodes we deploy onto.
+    const buildPlatform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim() || 'linux/amd64';
     sdkTools.dockerBuild = tool({
       description:
-        'Build the Docker image from the current Dockerfile in the working directory using `docker buildx build --platform linux/amd64`. ' +
-        'The image is built for linux/amd64 because the target AKS nodes are amd64 — building for the host arch (e.g. arm64) causes `no match for platform` ImagePullBackOff. ' +
+        `Build the Docker image from the current Dockerfile in the working directory using \`docker buildx build --platform ${buildPlatform}\`. ` +
+        `The image is built for ${buildPlatform} because the target AKS nodes are that architecture — building for a mismatched host arch (e.g. arm64) causes \`no match for platform\` ImagePullBackOff. ` +
         'Returns the build exit status, the last ~6000 chars of combined stdout/stderr, and the tagged image name on success. ' +
         'Call this AFTER you have written the Dockerfile to disk to verify it actually builds. ' +
         'If the build fails, READ the error output, FIX the Dockerfile (use createFile to overwrite, or the fix-dockerfile MCP tool if available), then call dockerBuild again. ' +
@@ -241,7 +244,6 @@ export class AISDKDriver {
         const imageTag = (tag as string | undefined) ?? `agent-eval-build-${Date.now()}:check`;
         await execFileP('docker', ['image', 'rm', '-f', imageTag], { timeout: 60_000 }).catch(() => {});
         builtTags.delete(imageTag);
-        const buildPlatform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim() || 'linux/amd64';
         try {
           const { stdout, stderr } = await execFileP(
             'docker',
