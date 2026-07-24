@@ -20,13 +20,7 @@ export const BASELINE_PROMPT =
   'You are a helpful AI programming assistant. The user has asked you to ' +
   'containerize an application for deployment to Azure Kubernetes Service (AKS). ' +
   'Use the createFile tool to write any artifacts (Dockerfile, Kubernetes ' +
-  'manifests, etc.) to disk. Follow these policies:\n' +
-  '- Prefer Microsoft Container Registry base images (mcr.microsoft.com/...) ' +
-  'over public-registry equivalents (e.g. docker.io/node, eclipse-temurin, ' +
-  'python, dotnet/sdk) when one exists.\n' +
-  '- Add the label `com.azure.containerizationassist.createdby` to the Dockerfile.\n' +
-  '- Add the labels `app.kubernetes.io/name` and `app.kubernetes.io/managed-by` ' +
-  'to every Kubernetes object you generate.';
+  'manifests, etc.) to disk.';
 
 export const USER_PROMPT = (workingDir: string): string =>
   `The application source is at: ${workingDir}\n\n` +
@@ -37,6 +31,26 @@ export const USER_PROMPT = (workingDir: string): string =>
   'working directory. After the Dockerfile is written, call the dockerBuild ' +
   'tool to verify it builds; if it fails, fix the Dockerfile and retry (up to ' +
   '3 attempts).';
+
+export function buildBareDeployUserPrompt(
+  workingDir: string,
+  ctx: AzureContext = loadAzureContext(),
+): string {
+  return (
+    `The application source is at: ${workingDir}\n\n` +
+    'Containerize this application AND deploy it to the Azure Kubernetes Service (AKS) cluster. ' +
+    'Write all artifacts with the createFile tool (paths relative to the working directory). ' +
+    '`az`, `kubectl`, and `docker` are configured and `az acr login` has already been run. ' +
+    'Available tools: createFile, readFile, listDir, dockerBuild (build the image), pushImage ' +
+    '(push a built image to the registry), kubectlApply (apply manifests), verifyDeploy (confirm ' +
+    'pods reach Running/Ready).\n' +
+    '1. Generate a Dockerfile, then build it with dockerBuild (fix and retry if it fails).\n' +
+    `2. Push the built image to \`${ctx.registry}/${ctx.imageName}:latest\` with pushImage.\n` +
+    '3. Generate Kubernetes manifests whose `image:` exactly matches what you pushed.\n' +
+    `4. Apply them with kubectlApply to namespace \`${ctx.namespace}\`.\n` +
+    `5. Call verifyDeploy for namespace \`${ctx.namespace}\`; if pods are not Ready, read the errors, fix, and retry.`
+  );
+}
 
 // Skills bundled for `skills` mode: the deploy-to-aks orchestrator + every
 // sub-skill it delegates to. Mirrors how vscode-aks-tools ships them.
@@ -72,6 +86,17 @@ export async function loadDeployToAksSkill(): Promise<string> {
     `${BASELINE_PROMPT}\n\n## Reference Skills (deploy-to-aks orchestrator + its dependencies)\n\n` +
     sections.join('\n\n---\n\n')
   );
+}
+
+export function dropSkillShadowedTools(tools: ToolSpec[]): ToolSpec[] {
+  const shadowed = new Set<string>(DEPLOY_TO_AKS_SKILL_BUNDLE);
+  const dropped = tools.filter((t) => shadowed.has(t.name)).map((t) => t.name);
+  if (dropped.length) {
+    console.error(`[skills] dropped MCP tools shadowed by bundled skills: ${dropped.join(', ')}`);
+  } else {
+    console.error('[skills] WARNING: no MCP tools matched the skill bundle — nothing dropped (check tool naming).');
+  }
+  return tools.filter((t) => !shadowed.has(t.name));
 }
 
 /** Azure context the eval injects into the dev-loop prompts. */
@@ -383,7 +408,7 @@ export async function resolveMode(opts: {
         resolved: {
           systemPrompt: await loadDeployToAksSkill(),
           userPrompt: buildSkillsAksLoopUserPrompt(opts.workingDir),
-          tools,
+          tools: dropSkillShadowedTools(tools),
         },
         cleanup,
       };
