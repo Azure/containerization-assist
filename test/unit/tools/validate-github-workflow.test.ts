@@ -36,20 +36,35 @@ function createMockToolContext(): ToolContext {
 
 // Import after mocks
 import validateGithubWorkflowTool from '@/tools/validate-github-workflow/tool';
+import generateGithubWorkflowTool from '@/tools/generate-github-workflow/tool';
+import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
+import { ACTION_PINS, pinnedUses } from '@/tools/shared/action-pins';
+import { JOB_KEYS } from '@/tools/shared/workflow-contract';
 import {
   validateGithubWorkflowSchema,
   type WorkflowValidationPlan,
 } from '@/tools/validate-github-workflow/schema';
 import { workflowRelativePath } from '@/tools/validate-github-workflow/checks/helpers';
-import { extractUsesRefs, isPinnedSha, isVersionComment } from '@/tools/validate-github-workflow/checks/refs-check';
+import {
+  extractUsesRefs,
+  isPinnedSha,
+  isVersionComment,
+} from '@/tools/validate-github-workflow/checks/refs-check';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const CHECKOUT_SHA = 'df4cb1c069e1874edd31b4311f1884172cec0e10';
-// A distinct SHA for azure/k8s-bake so refs don't reuse CHECKOUT_SHA (which would
-// misleadingly imply the SHA relates to actions/checkout). Semantic-layer tests only
-// assert the step is present, so the exact value is irrelevant beyond being a valid SHA.
-const K8S_BAKE_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+// Per-action pins, taken from the registry. Reusing one action's SHA for another would make
+// a ref look correctly pinned while pointing at the wrong action — misleading fixture data
+// that a future rule (or a real bug) could hide behind. Sourcing them here also means a pin
+// refresh flows through every fixture automatically.
+const CHECKOUT_SHA = ACTION_PINS.checkout.sha;
+const AZURE_LOGIN_SHA = ACTION_PINS.azureLogin.sha;
+const AKS_SET_CONTEXT_SHA = ACTION_PINS.aksSetContext.sha;
+const K8S_BAKE_SHA = ACTION_PINS.k8sBake.sha;
+const K8S_DEPLOY_SHA = ACTION_PINS.k8sDeploy.sha;
+
+/** Valid SHA shape for an action deliberately absent from the pin registry. */
+const UNKNOWN_ACTION_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
 /** Load a workflow fixture from test/fixtures/workflows/{happy,sad}/. */
 function readFixture(kind: 'happy' | 'sad', name: string): string {
@@ -66,7 +81,6 @@ async function validate(
   const result = await validateGithubWorkflowTool.handler(
     {
       repositoryPath: '/tmp/repo',
-      checkActionExistence: false,
       manifestFormat: 'k8s',
       ...input,
     } as any,
@@ -104,7 +118,6 @@ describe('validate-github-workflow', () => {
       if (result.success) {
         expect(result.data.workflowFileName).toBe('deploy.yml');
         expect(result.data.manifestFormat).toBe('k8s');
-        expect(result.data.checkActionExistence).toBe(false);
       }
     });
 
@@ -226,6 +239,28 @@ describe('validate-github-workflow', () => {
         expect(invalidUses?.metadata?.severity).toBe('error');
       },
     );
+    // Runner labels are deliberately not validated: an allow-list goes stale every time
+    // GitHub ships a runner, and ours already rejected larger and ARM runners as "unknown".
+    it.each([
+      'ubuntu-latest-8-cores',
+      'ubuntu-24.04-arm',
+      'windows-11-arm',
+      'macos-latest-xlarge',
+      'macos-26',
+      'some-self-hosted-pool',
+    ])('does not flag runner label %s', async (runner) => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  build:',
+        `    runs-on: ${runner}`,
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['schema'] });
+      expect(ruleIds(plan)).not.toContain('schema/unknown-runner');
+      expect(ruleIds(plan)).toEqual([]);
+    });
   });
 
   // ── Layer 1: YAML ───────────────────────────────────────────────────────────
@@ -253,11 +288,70 @@ describe('validate-github-workflow', () => {
       const plan = await validate({ workflowContent: sad('malformed'), layers: ['schema'] });
       expect(errorRuleIds(plan)).toContain('yaml/parse');
     });
+
+    // Pins the position convention we depend on: `yaml`'s linePos reports 1-based line AND
+    // 1-based column (its own message for this input reads "at line 3, column 1"). If a yaml
+    // upgrade ever switched either to 0-based, every reported location would silently shift.
+    it('reports parse-error positions as 1-based line and column', async () => {
+      const plan = await validate({
+        workflowContent: 'jobs:\n  a: [1, 2\n',
+        layers: ['yaml'],
+      });
+      const parse = plan.report.results.find((r) => r.ruleId === 'yaml/parse');
+      expect(parse).toBeDefined();
+      expect(parse?.line).toBe(3);
+      expect(parse?.metadata?.location).toBe('column 1');
+    });
   });
 
   // ── Layer 3: action refs / SHA pinning ────────────────────────────────────────
 
   describe('Layer 3 — action refs', () => {
+    // Regression: a *non-fatal* parse error (a stray tab) used to force Layer 3 onto the
+    // line scan, which cannot see inline-map steps — so an unpinned action vanished from
+    // the report entirely and a mutable ref shipped unflagged. The partial AST is now
+    // harvested regardless of parse errors, unioned with the scan.
+    it('still finds inline-map refs when the parse is degraded but not fatal', async () => {
+      const content = [
+        'name: deploy',
+        'on:',
+        '  push:',
+        'jobs:',
+        '  buildImage:',
+        '    runs-on: ubuntu-latest',
+        '\t\tenv:', // tab indent → parse error, tree still walkable
+        '      FOO: bar',
+        '    steps:',
+        '      - uses: actions/checkout@v4', // block style: both extractors see it
+        '      - { uses: azure/login@v2 }', // inline map: ONLY the AST sees it
+        '',
+      ].join('\n');
+
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const flagged = plan.report.results
+        .filter((r) => r.ruleId === 'refs/sha-pin')
+        .map((r) => r.actionRef);
+
+      expect(flagged).toContain('azure/login@v2');
+      expect(flagged).toContain('actions/checkout@v4');
+    });
+
+    it('does not double-report a ref both extractors find on a degraded parse', async () => {
+      const content = [
+        'jobs:',
+        '  a:',
+        '\t\tenv: x',
+        '    steps:',
+        '      - uses: actions/checkout@v4',
+        '',
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const checkoutFindings = plan.report.results.filter(
+        (r) => r.ruleId === 'refs/sha-pin' && r.actionRef === 'actions/checkout@v4',
+      );
+      expect(checkoutFindings).toHaveLength(1);
+    });
+
     it('isPinnedSha accepts 40/64-char SHAs and rejects tags/short shas', () => {
       expect(isPinnedSha(CHECKOUT_SHA)).toBe(true);
       expect(isPinnedSha('a'.repeat(64))).toBe(true);
@@ -272,11 +366,11 @@ describe('validate-github-workflow', () => {
         'uses: actions/checkout@v4',
         'uses: ./.github/actions/local',
         'uses: docker://ghcr.io/owner/img:tag',
-        'uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0',
+        `uses: ${pinnedUses(ACTION_PINS.azureLogin)}`,
       ].join('\n');
       const refs = extractUsesRefs(content);
       expect(refs.map((r) => r.ownerRepo)).toEqual(['actions/checkout', 'azure/login']);
-      expect(refs[1]?.comment).toBe('v3.0.0');
+      expect(refs[1]?.comment).toBe(ACTION_PINS.azureLogin.version);
     });
 
     it('ignores commented-out `uses:` and `uses:` text inside run scripts', () => {
@@ -287,6 +381,39 @@ describe('validate-github-workflow', () => {
       ].join('\n');
       const refs = extractUsesRefs(content);
       expect(refs.map((r) => r.raw)).toEqual(['actions/setup-node@v5']);
+    });
+
+    // The fallback scan (used when YAML is unparseable) builds its own line index rather
+    // than rescanning the source per match, so its offset->line mapping needs its own cover.
+    it('reports 1-based line numbers from the fallback line scan', () => {
+      const content = [
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`, // 1
+        '      - run: echo hi', //                          2
+        '', //                                              3
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`, //   4
+      ].join('\n');
+      const refs = extractUsesRefs(content);
+      expect(refs.map((r) => r.line)).toEqual([1, 4]);
+    });
+
+    // The line-anchored fallback regex cannot see these; the parsed path must, or an
+    // unpinned action in inline-map style would silently pass the SHA-pin gate.
+    it.each([
+      ['inline map step', '      - { uses: actions/checkout@v4 }'],
+      ['flow sequence', '    steps: [{ uses: actions/checkout@v4 }]'],
+    ])('catches an unpinned action written as an %s', async (_label, stepLine) => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        stepLine.startsWith('    steps:') ? stepLine : '    steps:',
+        ...(stepLine.startsWith('    steps:') ? [] : [stepLine]),
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      const shaPin = plan.report.results.find((r) => r.ruleId === 'refs/sha-pin');
+      expect(shaPin).toBeDefined();
+      expect(shaPin?.actionRef).toBe('actions/checkout@v4');
     });
 
     it('does not treat `uses:` inside a multiline run script as a real action (parsed nodes)', async () => {
@@ -338,29 +465,12 @@ describe('validate-github-workflow', () => {
       expect(ruleIds(plan)).not.toContain('refs/sha-pin');
     });
 
-    it('offline existence probe is downgraded to info and never fails the tool', async () => {
+    it('validates refs without any network access', async () => {
+      // Layer 3 is deliberately offline: upstream SHA existence is verified out-of-band by
+      // scripts/refresh-action-pins.ts and scripts/validate-action-refs.ts, not per tool run.
       const originalFetch = global.fetch;
-      global.fetch = jest.fn().mockRejectedValue(new Error('offline')) as any;
-      try {
-        const plan = await validate({
-          workflowContent: happy('deploy'),
-          checkActionExistence: true,
-        });
-        expect(plan.report.errors).toBe(0);
-        expect(ruleIds(plan)).toContain('refs/sha-exists-skipped');
-      } finally {
-        global.fetch = originalFetch;
-      }
-    });
-
-    it('probes api.github.com/zen at most once per run regardless of ref count', async () => {
-      // The connectivity probe is memoized, so many pinned actions must not fan out into a
-      // /zen request each — only the per-ref commit lookups scale with the number of refs.
-      const originalFetch = global.fetch;
-      let zenCalls = 0;
-      global.fetch = jest.fn((url: unknown) => {
-        if (String(url).includes('/zen')) zenCalls += 1;
-        return Promise.resolve({ status: 200 } as Response);
+      global.fetch = jest.fn(() => {
+        throw new Error('network access is not allowed from the refs layer');
       }) as any;
       try {
         const content = [
@@ -370,15 +480,12 @@ describe('validate-github-workflow', () => {
           '    runs-on: ubuntu-latest',
           '    steps:',
           `      - uses: actions/checkout@${CHECKOUT_SHA}`,
-          `      - uses: azure/login@${CHECKOUT_SHA}`,
+          `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
           `      - uses: azure/k8s-bake@${K8S_BAKE_SHA}`,
         ].join('\n');
-        await validate({
-          workflowContent: content,
-          layers: ['refs'],
-          checkActionExistence: true,
-        });
-        expect(zenCalls).toBe(1);
+        const plan = await validate({ workflowContent: content, layers: ['refs'] });
+        expect(plan.report.errors).toBe(0);
+        expect(global.fetch).not.toHaveBeenCalled();
       } finally {
         global.fetch = originalFetch;
       }
@@ -560,9 +667,9 @@ describe('validate-github-workflow', () => {
         '    runs-on: ubuntu-latest',
         '    steps:',
         `      - uses: actions/checkout@${CHECKOUT_SHA}`,
-        `      - uses: some/other-action@${CHECKOUT_SHA}`,
+        `      - uses: some/other-action@${UNKNOWN_ACTION_SHA}`,
         "        with: { admin: 'false', use-kubelogin: 'true' }",
-        `      - uses: azure/aks-set-context@${CHECKOUT_SHA}`,
+        `      - uses: azure/aks-set-context@${AKS_SET_CONTEXT_SHA}`,
         '        with: { resource-group: rg, cluster-name: c }',
       ].join('\n');
       const plan = await validate({ workflowContent: content, layers: ['semantic'] });
@@ -576,7 +683,7 @@ describe('validate-github-workflow', () => {
         '  deploy:',
         '    runs-on: ubuntu-latest',
         '    steps:',
-        `      - uses: azure/aks-set-context@${CHECKOUT_SHA}`,
+        `      - uses: azure/aks-set-context@${AKS_SET_CONTEXT_SHA}`,
         "        with: { admin: 'false', use-kubelogin: 'true' }",
       ].join('\n');
       const plan = await validate({ workflowContent: content, layers: ['semantic'] });
@@ -595,7 +702,7 @@ describe('validate-github-workflow', () => {
         `      - uses: actions/checkout@${CHECKOUT_SHA}`,
         '      # reminder: never run az aks get-credentials',
         '      # reminder: never use azure/setup-kubectl',
-        `      - uses: azure/login@${CHECKOUT_SHA}`,
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
         '      - run: az acr build --image x .',
       ].join('\n');
       const plan = await validate({ workflowContent: content, layers: ['semantic'] });
@@ -632,7 +739,7 @@ describe('validate-github-workflow', () => {
         '  deploy:',
         '    runs-on: ubuntu-latest',
         '    steps:',
-        `      - uses: Azure/Login@${CHECKOUT_SHA}`,
+        `      - uses: Azure/Login@${AZURE_LOGIN_SHA}`,
       ].join('\n');
       const plan = await validate({ workflowContent: content, layers: ['semantic'] });
       const msgs = plan.report.results
@@ -763,11 +870,106 @@ describe('validate-github-workflow', () => {
       expect(ruleIds(plan)).toContain('semantic/bake-step');
     });
 
-    it('flags renamed job keys as a warning-level job-keys finding', async () => {
+    // The generator states these as "⛔ CRITICAL RULES — MUST be followed exactly", so a
+    // violation has to gate: fail the report and reach the fix loop, not sit in `warnings`
+    // where the client can ignore it.
+    it('gates on renamed job keys and routes them to the fix loop', async () => {
       const plan = await validate({ workflowContent: sad('semantic') });
       const jobKeys = plan.report.results.filter((r) => r.ruleId === 'semantic/job-keys');
       expect(jobKeys.length).toBeGreaterThan(0);
-      expect(jobKeys.every((r) => r.metadata?.severity === 'warning')).toBe(true);
+      expect(jobKeys.every((r) => r.metadata?.severity === 'error')).toBe(true);
+
+      // ...and that failure actually reaches the agent as an actionable instruction.
+      expect(plan.report.errors).toBeGreaterThan(0);
+      expect(plan.nextAction?.action).toBe('fix-files');
+      expect(plan.nextAction?.instruction).toContain('semantic/job-keys');
+    });
+
+    // Every CA-contract rule gates. A workflow missing the deployment contract must not be
+    // reported as "passed all required checks" — that was the exact failure mode this
+    // severity alignment fixes.
+    it('gates on a missing deployment contract rather than passing with warnings', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  build-and-push:', //  renamed job keys
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content });
+
+      const errored = errorRuleIds(plan);
+      expect(errored).toContain('semantic/job-keys');
+      expect(errored).toContain('semantic/required-secrets');
+      expect(errored).toContain('semantic/concurrency');
+      expect(plan.summary).toContain('ACTION REQUIRED');
+      expect(plan.nextAction?.action).toBe('fix-files');
+    });
+
+    // The one deliberate exception: bake-step keys off the caller-supplied manifestFormat,
+    // which can be wrong. Gating on it would push the agent to add a step the workflow does
+    // not need, so it stays advisory.
+    it('keeps the conditional bake-step advisory rather than gating', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  deploy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${CHECKOUT_SHA}`,
+      ].join('\n');
+      const plan = await validate({
+        workflowContent: content,
+        manifestFormat: 'helm',
+        layers: ['semantic'],
+      });
+      const bake = plan.report.results.find((r) => r.ruleId === 'semantic/bake-step');
+      expect(bake).toBeDefined();
+      expect(bake?.metadata?.severity).toBe('info');
+    });
+
+    // The validator must stay fully functional with no knowledge base (offline, empty pack,
+    // or a policy that filters every snippet). Layer 4 reads recommendation text by snippet
+    // id from `knowledge.all` and falls back to hardcoded guidance when the id is absent.
+    it('produces a complete report from hardcoded fallbacks when knowledge is empty', async () => {
+      mockGetKnowledgeSnippets.mockResolvedValue([]);
+
+      const plan = await validate({ workflowContent: sad('semantic') });
+
+      // Findings are still produced and still carry actionable guidance.
+      expect(ruleIds(plan)).toContain('semantic/job-keys');
+      const jobKeys = plan.report.results.find((r) => r.ruleId === 'semantic/job-keys');
+      expect(jobKeys?.suggestions?.[0]).toContain('Split the workflow into two jobs');
+
+      const acr = plan.report.results.find((r) => r.ruleId === 'semantic/az-acr-build');
+      expect(acr?.suggestions?.[0]).toContain('az acr build');
+    });
+
+    it('prefers knowledge-pack recommendation text over the hardcoded fallback', async () => {
+      mockGetKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'workflow-two-job-structure',
+          text: 'PACK TEXT: use buildImage and deploy job keys',
+          category: 'cicd',
+          tags: ['generate-github-workflow'],
+          weight: 1.0,
+        },
+      ]);
+
+      const plan = await validate({ workflowContent: sad('semantic') });
+
+      const jobKeys = plan.report.results.find((r) => r.ruleId === 'semantic/job-keys');
+      expect(jobKeys?.suggestions?.[0]).toBe('PACK TEXT: use buildImage and deploy job keys');
+    });
+
+    // Deterministic checks must not advertise a knowledge-derived confidence: the verdict is
+    // the same whether or not the knowledge base returned anything.
+    it('does not stamp per-finding confidence on semantic findings', async () => {
+      const plan = await validate({ workflowContent: sad('semantic') });
+      const semantic = plan.report.results.filter((r) => r.ruleId?.startsWith('semantic/'));
+      expect(semantic.length).toBeGreaterThan(0);
+      expect(semantic.every((r) => r.confidence === undefined)).toBe(true);
     });
 
     it('flags a missing required secret', async () => {
@@ -787,10 +989,10 @@ describe('validate-github-workflow', () => {
         '    permissions: { actions: read, contents: read, id-token: write }',
         '    steps:',
         `      - uses: actions/checkout@${CHECKOUT_SHA}`,
-        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
-        '      - uses: azure/aks-set-context@60623acbdcbbdcf799ad50a1adf8703874339f8b',
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
+        `      - uses: azure/aks-set-context@${AKS_SET_CONTEXT_SHA}`,
         "        with: { admin: 'false', use-kubelogin: 'true' }",
-        '      - uses: Azure/k8s-deploy@c7ebd0d5f39477a23f1b5dea0f52e6db04adf28e',
+        `      - uses: Azure/k8s-deploy@${K8S_DEPLOY_SHA}`,
       ].join('\n');
       const plan = await validate({ workflowContent: noSecrets });
       const secrets = plan.report.results.find((r) => r.ruleId === 'semantic/required-secrets');
@@ -816,7 +1018,7 @@ describe('validate-github-workflow', () => {
         '    steps:',
         `      - uses: actions/checkout@${CHECKOUT_SHA}`,
         // Real refs for two secrets; the third appears only in a comment.
-        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
         '        with:',
         '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
         '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
@@ -850,7 +1052,7 @@ describe('validate-github-workflow', () => {
       expect(secrets[0]?.message).toContain('AZURE_SUBSCRIPTION_ID');
     });
 
-    it('flags a per-job incomplete login even when another job\'s login has all secrets', async () => {
+    it("flags a per-job incomplete login even when another job's login has all secrets", async () => {
       // buildImage's login has all three secrets, but deploy's login is missing one. A
       // global concatenation would wrongly pass; per-step validation must flag deploy.
       const content = [
@@ -862,7 +1064,7 @@ describe('validate-github-workflow', () => {
         '    permissions: { contents: read, id-token: write }',
         '    steps:',
         `      - uses: actions/checkout@${CHECKOUT_SHA}`,
-        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
         '        with:',
         '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
         '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
@@ -874,7 +1076,7 @@ describe('validate-github-workflow', () => {
         '    permissions: { actions: read, contents: read, id-token: write }',
         '    steps:',
         `      - uses: actions/checkout@${CHECKOUT_SHA}`,
-        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
         '        with:',
         '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
         '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
@@ -900,12 +1102,12 @@ describe('validate-github-workflow', () => {
         '    permissions: { actions: read, contents: read, id-token: write }',
         '    steps:',
         `      - uses: actions/checkout@${CHECKOUT_SHA}`,
-        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
         '        with:',
         '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
         '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
         // first login missing subscription-id
-        '      - uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43',
+        `      - uses: azure/login@${AZURE_LOGIN_SHA}`,
         '        with:',
         '          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
         // second login missing client-id and tenant-id
@@ -963,6 +1165,321 @@ describe('validate-github-workflow', () => {
       const plan = await validate({ workflowContent: content, layers: ['semantic'] });
       const perms = plan.report.results.filter((r) => r.ruleId === 'semantic/permissions');
       expect(perms.some((r) => r.metadata?.location === 'job "deploy"')).toBe(true);
+    });
+  });
+
+  // ── Generator ↔ validator lockstep ───────────────────────────────────────────
+  // generate-github-workflow never emits a workflow file — like generate-k8s-manifests it
+  // returns a nextAction instruction (prose + pinned YAML snippets) that the client LLM turns
+  // into YAML. So lockstep is asserted in three parts rather than by diffing one artifact.
+
+  describe('generator <-> validator lockstep', () => {
+    /** Every pinned action, indexed by lower-cased `owner/repo`. */
+    const PINS_BY_REF = new Map(Object.values(ACTION_PINS).map((p) => [p.ref.toLowerCase(), p]));
+
+    // (1) The known-good fixture must stay derived from the pin registry. Without this,
+    // scripts/refresh-action-pins.ts bumps a SHA on its weekly run and the fixture silently
+    // keeps asserting a workflow CA no longer emits — the suite stays green either way.
+    it('happy fixture pins are exactly the ACTION_PINS entries', () => {
+      const refs = extractUsesRefs(happy('deploy'));
+      expect(refs.length).toBeGreaterThan(0);
+
+      for (const ref of refs) {
+        const pin = PINS_BY_REF.get(ref.ownerRepo.toLowerCase());
+        expect(pin).toBeDefined();
+        // Compare the rendered `owner/repo@sha # vX.Y.Z` so a stale SHA *or* a stale version
+        // comment both fail.
+        expect(`${ref.raw} # ${ref.comment}`).toBe(pinnedUses(pin!));
+      }
+    });
+
+    // (2) Assemble a workflow from the generator's own output and run it through the
+    // validator. The four fenced snippets are the drift-prone parts the generator itself
+    // marks "copy verbatim"; the scaffold below stands in for the client LLM.
+    //
+    // Extraction is structural, not byte-exact: line endings are normalized and trailing
+    // whitespace after the ```yaml info string is tolerated. Otherwise a formatting-only
+    // change to the generator (CRLF, a stray space) would fail a test that is meant to be
+    // about the *contract*, and the failure would look like a real contract break.
+    const normalizeEol = (s: string): string => s.replace(/\r\n?/g, '\n');
+
+    const yamlBlocks = (instruction: string): string[] =>
+      [...normalizeEol(instruction).matchAll(/```[ \t]*yaml[ \t]*\n([\s\S]*?)```/g)].map((m) =>
+        m[1]!.replace(/\s+$/, ''),
+      );
+
+    /** Lines of an instruction section, up to the first blank line. */
+    const section = (instruction: string, heading: string): string[] => {
+      const lines = normalizeEol(instruction).split('\n');
+      const start = lines.findIndex((l) => l.trim() === heading);
+      if (start === -1) return [];
+      const out: string[] = [];
+      for (let i = start + 1; i < lines.length && lines[i]!.trim() !== ''; i++) out.push(lines[i]!);
+      return out;
+    };
+
+    function assembleWorkflow(plan: GithubWorkflowPlan): string {
+      const { instruction } = plan.nextAction;
+      const blocks = yamlBlocks(instruction);
+      expect(blocks).toHaveLength(4);
+      const [acrBuild, aksContext, deployStep, annotate] = blocks as [
+        string,
+        string,
+        string,
+        string,
+      ];
+
+      // The checkout + login steps are described in prose, not YAML, so they are rebuilt here
+      // from the same pin registry the generator renders them from.
+      const login = [
+        '      - name: Azure login',
+        `        uses: ${pinnedUses(ACTION_PINS.azureLogin)}`,
+        '        with:',
+        '          client-id: ${{ secrets.AZURE_CLIENT_ID }}',
+        '          tenant-id: ${{ secrets.AZURE_TENANT_ID }}',
+        '          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}',
+      ];
+
+      return [
+        'name: deploy',
+        'on:',
+        '  push:',
+        '    branches: [main]',
+        '  workflow_dispatch:',
+        'concurrency:',
+        '  group: ${{ github.workflow }}-${{ github.ref }}',
+        '  cancel-in-progress: true',
+        'env:',
+        ...section(instruction, '## Workflow-level env variables'),
+        'jobs:',
+        `  ${JOB_KEYS.BUILD}:`,
+        '    runs-on: ubuntu-latest',
+        '    permissions:',
+        '      contents: read',
+        '      id-token: write',
+        '    steps:',
+        `      - uses: ${pinnedUses(ACTION_PINS.checkout)}`,
+        ...login,
+        acrBuild,
+        `  ${JOB_KEYS.DEPLOY}:`,
+        `    needs: [${JOB_KEYS.BUILD}]`,
+        '    runs-on: ubuntu-latest',
+        '    permissions:',
+        '      actions: read',
+        '      contents: read',
+        '      id-token: write',
+        '    steps:',
+        `      - uses: ${pinnedUses(ACTION_PINS.checkout)}`,
+        ...login,
+        aksContext,
+        deployStep,
+        annotate,
+      ].join('\n');
+    }
+
+    it.each(['k8s', 'helm'] as const)(
+      'a workflow built from the generator output passes validation (%s)',
+      async (manifestFormat) => {
+        const generated = await generateGithubWorkflowTool.handler(
+          {
+            repositoryPath: '/home/user/myapp',
+            registry: 'myregistry.azurecr.io',
+            clusterName: 'my-aks',
+            resourceGroup: 'my-rg',
+            branches: ['main'],
+            manifestFormat,
+          } as any,
+          createMockToolContext(),
+        );
+        expect(generated.ok).toBe(true);
+        if (!generated.ok) return;
+
+        const plan = await validate({
+          workflowContent: assembleWorkflow(generated.value),
+          manifestFormat,
+        });
+
+        // The generator must not produce anything its own validator objects to.
+        // Asserting only `errors === 0` would be far too weak: most CA-contract rules are
+        // `high` severity, which maps to WARNING, so a badly assembled workflow could still
+        // report zero errors. Require the contract layers to be completely silent.
+        expect(errorRuleIds(plan)).toEqual([]);
+        expect(plan.report.errors).toBe(0);
+        expect(plan.nextAction).toBeUndefined();
+
+        const contractFindings = plan.report.results.filter(
+          (r) => r.ruleId?.startsWith('semantic/') || r.ruleId?.startsWith('refs/'),
+        );
+        expect(contractFindings.map((r) => `${r.ruleId}: ${r.message}`)).toEqual([]);
+        expect(plan.report.grade).toBe('A');
+      },
+    );
+
+    // Guards the snippet extractor itself: a CRLF instruction must still yield the same four
+    // blocks. Without this, the tolerance above is an untested claim, and a future generator
+    // change to line endings would surface as a confusing "contract broken" failure.
+    it('extracts the generator snippets regardless of line endings', async () => {
+      const generated = await generateGithubWorkflowTool.handler(
+        {
+          repositoryPath: '/home/user/myapp',
+          registry: 'myregistry.azurecr.io',
+          clusterName: 'my-aks',
+          resourceGroup: 'my-rg',
+          branches: ['main'],
+        } as any,
+        createMockToolContext(),
+      );
+      expect(generated.ok).toBe(true);
+      if (!generated.ok) return;
+
+      const crlf: GithubWorkflowPlan = {
+        ...generated.value,
+        nextAction: {
+          ...generated.value.nextAction,
+          instruction: generated.value.nextAction.instruction.replace(/\n/g, '\r\n'),
+        },
+      };
+
+      const plan = await validate({ workflowContent: assembleWorkflow(crlf) });
+      expect(plan.report.errors).toBe(0);
+      expect(plan.report.grade).toBe('A');
+    });
+  });
+
+  // ── Finding positions ─────────────────────────────────────────────
+  // Layers 2 and 4 reason over `doc.toJS()`, which discards node positions; they recover a
+  // line by re-reading the parsed Document at the same path. These tests pin the mapping,
+  // since an off-by-one would otherwise go unnoticed.
+
+  describe('Finding positions', () => {
+    /** Build a workflow where the 1-based array index equals the YAML line number. */
+    const numbered = (lines: string[]): string => lines.join('\n');
+
+    const lineOf = (plan: WorkflowValidationPlan, ruleId: string): number | undefined =>
+      plan.report.results.find((r) => r.ruleId === ruleId)?.line;
+
+    it('points semantic/no-job-environment at the `environment:` key', async () => {
+      const plan = await validate({
+        workflowContent: numbered([
+          'on: { push: { branches: [main] } }', // 1
+          'jobs:', //                              2
+          '  buildImage:', //                      3
+          '    runs-on: ubuntu-latest', //         4
+          '    environment: production', //        5
+          '    steps:', //                         6
+          '      - run: az acr build .', //        7
+        ]),
+      });
+      expect(lineOf(plan, 'semantic/no-job-environment')).toBe(5);
+    });
+
+    it('points a forbidden build method at the offending step', async () => {
+      const plan = await validate({
+        workflowContent: numbered([
+          'on: { push: { branches: [main] } }', // 1
+          'jobs:', //                              2
+          '  buildImage:', //                      3
+          '    runs-on: ubuntu-latest', //         4
+          '    steps:', //                         5
+          '      - run: az acr build .', //        6
+          '      - name: Bad', //                  7
+          '        run: docker build -t x .', //   8
+        ]),
+      });
+      const acr = plan.report.results.find(
+        (r) => r.ruleId === 'semantic/az-acr-build' && r.message?.includes('docker build'),
+      );
+      // The step node begins at its first key (`name:` on line 7), not at the `run:` line.
+      expect(acr?.line).toBe(7);
+      expect(acr?.metadata?.location).toBe('job "buildImage"');
+    });
+
+    it('points schema/unknown-job-key at the offending key', async () => {
+      const plan = await validate({
+        workflowContent: numbered([
+          'on: { push: { branches: [main] } }', // 1
+          'jobs:', //                              2
+          '  buildImage:', //                      3
+          '    runs-on: ubuntu-latest', //         4
+          '    bogusKey: nope', //                 5
+          '    steps:', //                         6
+          '      - run: az acr build .', //        7
+        ]),
+      });
+      expect(lineOf(plan, 'schema/unknown-job-key')).toBe(5);
+    });
+
+    // Boundary: the first line. An offset->line index that isn't seeded with the start of
+    // line 1 reports 0 here rather than 1.
+    it('reports line 1 for a finding on the first line', async () => {
+      const plan = await validate({
+        workflowContent: numbered([
+          'bogusTopLevel: nope', //                1
+          'on: { push: { branches: [main] } }', // 2
+          'jobs:', //                              3
+          '  buildImage:', //                      4
+          '    runs-on: ubuntu-latest', //         5
+          '    steps:', //                         6
+          '      - run: az acr build .', //        7
+        ]),
+      });
+      expect(lineOf(plan, 'schema/unknown-workflow-key')).toBe(1);
+    });
+
+    it('omits the line for findings about absent structure', async () => {
+      const plan = await validate({
+        workflowContent: numbered(['jobs:', '  buildImage:', '    runs-on: ubuntu-latest']),
+      });
+      // There is no `on:` block to point at, so the finding carries no position.
+      const missingOn = plan.report.results.find((r) => r.ruleId === 'schema/missing-on');
+      expect(missingOn).toBeDefined();
+      expect(missingOn?.line).toBeUndefined();
+    });
+
+    it('surfaces the line in the fix-files instruction', async () => {
+      const plan = await validate({
+        workflowContent: numbered([
+          'on: { push: { branches: [main] } }', // 1
+          'jobs:', //                              2
+          '  buildImage:', //                      3
+          '    runs-on: ubuntu-latest', //         4
+          '    environment: production', //        5
+          '    steps:', //                         6
+          '      - run: az acr build .', //        7
+        ]),
+      });
+      expect(plan.nextAction?.instruction).toContain('line 5');
+    });
+
+    // `line` is the where, `metadata.location` the what. If a layer also encodes the line
+    // into `location`, consumers that join the two render "(line 12, line 12)".
+    it('never encodes a line number in metadata.location', async () => {
+      const plan = await validate({
+        workflowContent: [
+          'on: { push: { branches: [main] } }',
+          'jobs:',
+          '  buildImage:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          '      - uses: actions/checkout@v4', // unpinned -> refs/sha-pin (Layer 3)
+          '      - run: docker build -t x .', // -> semantic/az-acr-build (Layer 4)
+        ].join('\n'),
+      });
+
+      const located = plan.report.results.filter((r) => r.metadata?.location);
+      expect(located.length).toBeGreaterThan(0);
+      for (const r of located) {
+        expect(r.metadata?.location).not.toMatch(/\bline\s+\d+/i);
+      }
+
+      // Layer 3 describes the subject instead, and the line survives on its own field.
+      const shaPin = plan.report.results.find((r) => r.ruleId === 'refs/sha-pin');
+      expect(shaPin?.metadata?.location).toBe('uses: actions/checkout');
+      expect(shaPin?.line).toBe(6);
+
+      // ...and the rendered instruction mentions that line exactly once.
+      const rendered = plan.nextAction?.instruction ?? '';
+      expect(rendered.match(/line 6\b/g)).toHaveLength(1);
     });
   });
 

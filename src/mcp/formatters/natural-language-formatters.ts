@@ -1030,7 +1030,11 @@ export function formatWorkflowValidationNarrative(
     report.results.filter((r) => r.metadata?.severity === severity);
 
   const renderFinding = (r: (typeof report.results)[number]): string => {
-    const loc = r.metadata?.location ? ` (${r.metadata.location})` : '';
+    // `line` is the where, `metadata.location` the what — e.g. `line 27, job "deploy"`.
+    const where = [r.line !== undefined ? `line ${r.line}` : undefined, r.metadata?.location]
+      .filter(Boolean)
+      .join(', ');
+    const loc = where ? ` (${where})` : '';
     const fix = r.suggestions?.[0] ? `\n      ↳ ${r.suggestions[0]}` : '';
     return `  • [${r.ruleId ?? 'unknown'}]${loc} ${r.message ?? ''}${fix}`;
   };

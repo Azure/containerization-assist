@@ -17,14 +17,10 @@ import { type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/core/context';
 import { tool } from '@/types/tool';
 import { CATEGORY } from '@/knowledge/types';
-import {
-  ValidationSeverity,
-  type ValidationGrade,
-  type ValidationReport,
-} from '@/validation/core-types';
+import { ValidationSeverity, type ValidationGrade } from '@/validation/core-types';
 import { PACKAGE_VERSION } from '@/lib/package-version';
 import { pluralize } from '@/lib/summary-helpers';
-import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
+import { createKnowledgeTool } from '../shared/knowledge-tool-pattern';
 import { TOOL_NAME } from '../shared/toolDefinition';
 import {
   validateGithubWorkflowSchema,
@@ -32,6 +28,7 @@ import {
   type WorkflowLayer,
   type WorkflowValidationIssue,
   type WorkflowValidationPlan,
+  type WorkflowValidationReport,
 } from './schema';
 import { validateGithubWorkflowToolDefinition } from './types';
 import { makeIssue, resolveWorkflowSource, workflowRelativePath } from './checks/helpers';
@@ -45,19 +42,20 @@ const { name } = validateGithubWorkflowToolDefinition;
 // Score penalties per finding severity (100 = clean).
 const PENALTY = { ERROR: 25, WARNING: 8, INFO: 2 } as const;
 
-type WorkflowCategory = 'auth' | 'build' | 'deploy' | 'bestPractices';
-
 interface WorkflowRules {
   findings: WorkflowValidationIssue[];
   filePath: string;
 }
 
 // ─── Knowledge-tool pattern ───────────────────────────────────────────────────
+// No `categorization` is configured: Layer 4 looks recommendation text up by snippet id from
+// `knowledge.all`, so category buckets would be dead weight. Every lookup has a hardcoded
+// fallback, which is what keeps the validator fully functional with an empty knowledge base.
 
 const runPattern = createKnowledgeTool<
   ValidateGithubWorkflowParams,
   WorkflowValidationPlan,
-  WorkflowCategory,
+  string,
   WorkflowRules
 >({
   name,
@@ -70,27 +68,6 @@ const runPattern = createKnowledgeTool<
     extractFilters: (input) => ({
       language: input.language,
       framework: input.framework,
-    }),
-  },
-
-  categorization: {
-    categoryNames: ['auth', 'build', 'deploy', 'bestPractices'] as const,
-    categorize: createSimpleCategorizer<WorkflowCategory>({
-      auth: (s) => Boolean(s.tags?.includes('azure-oidc') || s.tags?.includes('azure-login')),
-      build: (s) =>
-        Boolean(
-          s.tags?.includes('docker-build') ||
-            s.tags?.includes('acr') ||
-            s.tags?.includes('registry'),
-        ),
-      deploy: (s) =>
-        Boolean(
-          s.tags?.includes('aks') ||
-            s.tags?.includes('kubectl') ||
-            s.tags?.includes('k8s-deploy') ||
-            s.tags?.includes('k8s-bake'),
-        ),
-      bestPractices: () => true,
     }),
   },
 
@@ -128,36 +105,34 @@ const runPattern = createKnowledgeTool<
         selected.has('semantic') ||
         selected.has('refs');
       let doc = null as ReturnType<typeof parseWorkflow>['doc'];
+      let lineCounter = null as ReturnType<typeof parseWorkflow>['lineCounter'] | null;
       let fatal = false;
       if (needsDoc) {
         const parsed = parseWorkflow(content);
         doc = parsed.doc;
         fatal = parsed.fatal;
+        lineCounter = parsed.lineCounter;
         // Surface parse findings when the caller selected the YAML layer, or when a fatal
         // parse blocks a doc-dependent layer they DID select (schema/semantic) — so they
         // learn why it couldn't run. A refs-only run stays silent and falls back to the
         // line scan (layers are independently toggleable).
         const docDependent = selected.has('schema') || selected.has('semantic');
         if (selected.has('yaml') || (fatal && docDependent)) findings.push(...parsed.findings);
-        if (selected.has('yaml')) findings.push(...checkYaml(content, doc));
+        if (selected.has('yaml')) findings.push(...checkYaml(content, doc, lineCounter));
       }
 
       // Layer 3 (refs) is line-oriented and works even on structurally-broken YAML.
-      if (selected.has('refs')) {
-        findings.push(
-          ...(await checkRefs(
-            content,
-            { checkActionExistence: input.checkActionExistence },
-            ctx,
-            fatal ? null : doc,
-          )),
-        );
+      if (selected.has('refs') && lineCounter) {
+        findings.push(...checkRefs(content, doc, lineCounter, fatal));
       }
 
-      // Layers 2 & 4 require a parseable document.
-      if (doc && !fatal) {
-        if (selected.has('schema')) findings.push(...checkSchema(doc));
-        if (selected.has('semantic')) findings.push(...checkSemantic(doc, knowledge, input));
+      // Layers 2 & 4 require a parseable document. Both receive the parser's LineCounter so
+      // findings can carry a line: they reason over `doc.toJS()`, which discards positions.
+      if (doc && !fatal && lineCounter) {
+        if (selected.has('schema')) findings.push(...checkSchema(doc, lineCounter));
+        if (selected.has('semantic')) {
+          findings.push(...checkSemantic(doc, lineCounter, knowledge, input));
+        }
       }
 
       return { findings, filePath };
@@ -194,9 +169,6 @@ function buildReport(
   let penalty = 0;
 
   for (const f of findings) {
-    // Carry the pattern confidence on Layer-4 (semantic) findings.
-    if (f.layer === 'semantic') f.confidence = confidence;
-
     switch (f.metadata?.severity) {
       case ValidationSeverity.ERROR:
         errors++;
@@ -214,7 +186,7 @@ function buildReport(
   }
 
   const score = Math.max(0, Math.min(100, 100 - penalty));
-  const report: ValidationReport = {
+  const report: WorkflowValidationReport = {
     results: findings,
     score,
     grade: gradeFor(score),
@@ -266,7 +238,11 @@ function buildFixAction(
     `The GitHub Actions workflow at ${targetPath} has ${pluralize(errorFindings.length, 'required issue')} that must be fixed:`,
     '',
     ...errorFindings.map((f, i) => {
-      const loc = f.metadata?.location ? ` (${f.metadata.location})` : '';
+      // `line` is the where, `metadata.location` the what — e.g. "line 27, job "deploy"".
+      const where = [f.line !== undefined ? `line ${f.line}` : undefined, f.metadata?.location]
+        .filter(Boolean)
+        .join(', ');
+      const loc = where ? ` (${where})` : '';
       const fix = f.suggestions?.[0] ? `\n     Fix: ${f.suggestions[0]}` : '';
       return `  ${i + 1}. [${f.ruleId ?? 'unknown'}]${loc} ${f.message ?? ''}${fix}`;
     }),

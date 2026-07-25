@@ -6,12 +6,51 @@
  * generator and validator stay in lockstep.
  */
 
-import type { Document } from 'yaml';
+import type { Document, LineCounter } from 'yaml';
 import type { CategorizedKnowledge } from '../../shared/knowledge-tool-pattern';
-import { makeIssue } from './helpers';
+import {
+  JOB_KEYS,
+  REQUIRED_SECRETS,
+  BUILD_COMMAND,
+  BUILD_COMMAND_RE,
+  FORBIDDEN_BUILD_ACTIONS,
+  FORBIDDEN_BUILD_COMMANDS,
+  FORBIDDEN_BUILD_LABELS,
+  FORBIDDEN_DEPLOY_ACTIONS,
+  FORBIDDEN_DEPLOY_COMMANDS,
+  FORBIDDEN_DEPLOY_LABELS,
+  REQUIRED_DEPLOY_ACTIONS,
+  LOGIN_ACTION,
+  USE_KUBELOGIN_ACTION,
+  AKS_SET_CONTEXT_ACTION,
+  BAKE_ACTION,
+  AKS_CONTEXT_FLAGS,
+  actionRefPattern,
+  joinWithConjunction,
+} from '../../shared/workflow-contract';
+import {
+  makeIssue,
+  lineOfKey,
+  lineOfKeyOrParent,
+  lineOfNode,
+  type FindingSeverity,
+} from './helpers';
 import type { ValidateGithubWorkflowParams, WorkflowValidationIssue } from '../schema';
 
-const REQUIRED_SECRETS = ['AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID'] as const;
+/**
+ * Severity for the CA deployment contract.
+ *
+ * The generator states these rules as "⛔ CRITICAL RULES — these MUST be followed exactly",
+ * so a violation has to *fail* validation and reach the `fix-files` loop, not be reported as
+ * a warning the client can ignore. Reporting a workflow with renamed jobs, missing OIDC
+ * secrets or no `azure/login` as "✅ passed all required checks" was the opposite of the
+ * tool's purpose.
+ *
+ * Deliberately excluded: `semantic/bake-step`, which is conditional on the caller-supplied
+ * `manifestFormat` hint. If that hint is wrong, gating on it would push the agent to add a
+ * bake step the workflow does not need — a false positive is worse than an advisory there.
+ */
+const CONTRACT: FindingSeverity = 'required';
 
 type Dict = Record<string, unknown>;
 
@@ -33,51 +72,79 @@ function needsOf(job: unknown): string[] {
 }
 
 /**
- * Every step (as a mapping) across all jobs, in document order.
+ * A step together with where it lives, so a finding about it can be given a line.
+ * `doc.toJS()` discards positions, so the job id + index are kept to look the node back
+ * up via the path `['jobs', jobId, 'steps', index]`.
  */
-function collectStepObjects(jobs: Dict): Dict[] {
-  const steps: Dict[] = [];
-  for (const job of Object.values(jobs)) {
-    if (!isDict(job) || !Array.isArray(job.steps)) continue;
-    for (const step of job.steps) {
-      if (isDict(step)) steps.push(step);
-    }
-  }
-  return steps;
+interface StepRef {
+  jobId: string;
+  index: number;
+  step: Dict;
 }
 
 /**
- * Collect every step's `run` script and `uses` ref across all jobs. Evaluating these
- * parsed values (rather than the raw YAML text) keeps semantic checks from matching
- * comments, docs, or echoed strings, while still covering multiline `run:` blocks
+ * Every step across all jobs, tagged with its job and index.
+ *
+ * Exposed both as a flat list (document order, for whole-workflow scans) and grouped by job
+ * id, because most rules are job-scoped. Grouping once here keeps those rules O(steps)
+ * overall — re-filtering the flat list inside a per-job loop would make the section
+ * O(jobs × steps).
+ *
+ * Evaluating parsed step values (rather than the raw YAML text) keeps semantic checks from
+ * matching comments, docs, or echoed strings, while still covering multiline `run:` blocks
  * (which parse to a single string).
  */
-function collectSteps(jobs: Dict): { runs: string[]; uses: string[] } {
-  const runs: string[] = [];
-  const uses: string[] = [];
-  for (const step of collectStepObjects(jobs)) {
-    if (typeof step.run === 'string') runs.push(step.run);
-    if (typeof step.uses === 'string') uses.push(step.uses);
-  }
-  return { runs, uses };
+interface StepIndex {
+  all: StepRef[];
+  byJob: Map<string, StepRef[]>;
 }
 
-/** A single job's `run` scripts and `uses` refs (parsed step values only). */
-function jobStepStreams(job: unknown): { runs: string[]; uses: string[] } {
-  const runs: string[] = [];
-  const uses: string[] = [];
-  if (isDict(job) && Array.isArray(job.steps)) {
-    for (const step of job.steps) {
-      if (!isDict(step)) continue;
-      if (typeof step.run === 'string') runs.push(step.run);
-      if (typeof step.uses === 'string') uses.push(step.uses);
-    }
+function collectStepRefs(jobs: Dict): StepIndex {
+  const all: StepRef[] = [];
+  const byJob = new Map<string, StepRef[]>();
+  for (const [jobId, job] of Object.entries(jobs)) {
+    if (!isDict(job) || !Array.isArray(job.steps)) continue;
+    const jobSteps: StepRef[] = [];
+    job.steps.forEach((step, index) => {
+      if (!isDict(step)) return;
+      const ref: StepRef = { jobId, index, step };
+      jobSteps.push(ref);
+      all.push(ref);
+    });
+    byJob.set(jobId, jobSteps);
   }
-  return { runs, uses };
+  return { all, byJob };
+}
+
+/** The `run` script of a step, when it has one. */
+function runOf(s: StepRef): string | undefined {
+  return typeof s.step.run === 'string' ? s.step.run : undefined;
+}
+
+/** The `uses` ref of a step, when it has one. */
+function usesOf(s: StepRef): string | undefined {
+  return typeof s.step.uses === 'string' ? s.step.uses : undefined;
+}
+
+/** First step whose `run` matches, or undefined. */
+function findByRun(steps: readonly StepRef[], re: RegExp): StepRef | undefined {
+  return steps.find((s) => {
+    const run = runOf(s);
+    return run !== undefined && re.test(run);
+  });
+}
+
+/** First step whose `uses` matches, or undefined. */
+function findByUses(steps: readonly StepRef[], re: RegExp): StepRef | undefined {
+  return steps.find((s) => {
+    const uses = usesOf(s);
+    return uses !== undefined && re.test(uses);
+  });
 }
 
 export function checkSemantic(
   doc: Document.Parsed,
+  lineCounter: LineCounter,
   knowledge: CategorizedKnowledge,
   input: ValidateGithubWorkflowParams,
 ): WorkflowValidationIssue[] {
@@ -86,23 +153,30 @@ export function checkSemantic(
   if (!isDict(root)) return findings;
 
   const jobs = isDict(root.jobs) ? root.jobs : {};
-  const buildImage = jobs.buildImage;
-  const deploy = jobs.deploy;
+  const buildImage = jobs[JOB_KEYS.BUILD];
+  const deploy = jobs[JOB_KEYS.DEPLOY];
+
+  // Positions are recovered from the parsed Document by path, since `toJS()` drops them.
+  const jobLine = (jobId: string): number | undefined =>
+    lineOfKey(doc, lineCounter, ['jobs', jobId]);
+  const jobKeyLine = (jobId: string, key: string): number | undefined =>
+    lineOfKeyOrParent(doc, lineCounter, ['jobs', jobId, key]);
+  const stepLine = (s: StepRef): number | undefined =>
+    lineOfNode(doc, lineCounter, ['jobs', s.jobId, 'steps', s.index]);
 
   // ── 1. Job keys buildImage + deploy; deploy needs [buildImage] ───────────────
   const jobKeysRec = rec(
     knowledge,
     'workflow-two-job-structure',
-    "Split the workflow into two jobs — 'buildImage' and 'deploy' — with deploy depending on buildImage via needs: [buildImage].",
+    `Split the workflow into two jobs — '${JOB_KEYS.BUILD}' and '${JOB_KEYS.DEPLOY}' — with ${JOB_KEYS.DEPLOY} depending on ${JOB_KEYS.BUILD} via needs: [${JOB_KEYS.BUILD}].`,
   );
   if (!buildImage) {
     findings.push(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/job-keys',
-        severity: 'high',
-        message:
-          'Missing the literal `buildImage` job. Job keys must be exactly `buildImage` and `deploy`.',
+        severity: CONTRACT,
+        message: `Missing the literal \`${JOB_KEYS.BUILD}\` job. Job keys must be exactly \`${JOB_KEYS.BUILD}\` and \`${JOB_KEYS.DEPLOY}\`.`,
         suggestion: jobKeysRec,
       }),
     );
@@ -112,21 +186,20 @@ export function checkSemantic(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/job-keys',
-        severity: 'high',
-        message:
-          'Missing the literal `deploy` job. Job keys must be exactly `buildImage` and `deploy`.',
+        severity: CONTRACT,
+        message: `Missing the literal \`${JOB_KEYS.DEPLOY}\` job. Job keys must be exactly \`${JOB_KEYS.BUILD}\` and \`${JOB_KEYS.DEPLOY}\`.`,
         suggestion: jobKeysRec,
       }),
     );
-  } else if (!needsOf(deploy).includes('buildImage')) {
+  } else if (!needsOf(deploy).includes(JOB_KEYS.BUILD)) {
     findings.push(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/deploy-needs',
-        severity: 'high',
-        message:
-          'The `deploy` job must declare `needs: [buildImage]` so it runs after the image is in ACR.',
-        location: 'job "deploy"',
+        severity: CONTRACT,
+        message: `The \`${JOB_KEYS.DEPLOY}\` job must declare \`needs: [${JOB_KEYS.BUILD}]\` so it runs after the image is in ACR.`,
+        location: `job "${JOB_KEYS.DEPLOY}"`,
+        line: jobKeyLine(JOB_KEYS.DEPLOY, 'needs'),
         suggestion: jobKeysRec,
       }),
     );
@@ -136,49 +209,47 @@ export function checkSemantic(
   // Evaluate parsed step `run`/`uses` values directly (not the raw YAML text) so
   // matches in comments/docs/echoed strings don't raise false failures, and multiline
   // `run:` blocks are still covered (they parse to a single string).
-  const { runs: stepRuns, uses: stepUses } = collectSteps(jobs);
-  const buildImageStreams = jobStepStreams(buildImage);
-  const deployStreams = jobStepStreams(deploy);
+  const { all: allSteps, byJob: stepsByJob } = collectStepRefs(jobs);
+  const buildImageSteps = stepsByJob.get(JOB_KEYS.BUILD) ?? [];
+  const deploySteps = stepsByJob.get(JOB_KEYS.DEPLOY) ?? [];
   const acrRec = rec(
     knowledge,
     'docker-build-push-acr',
-    "Build and push the image with 'az acr build' ONLY — never docker/build-push-action, docker build, docker buildx, docker/setup-buildx-action, or docker/login-action.",
+    `Build and push the image with '${BUILD_COMMAND}' ONLY — never ${joinWithConjunction(FORBIDDEN_BUILD_LABELS)}.`,
   );
-  const forbiddenUses: Array<{ label: string; re: RegExp }> = [
-    { label: 'docker/build-push-action', re: /docker\/build-push-action/ },
-    { label: 'docker/setup-buildx-action', re: /docker\/setup-buildx-action/ },
-    { label: 'docker/login-action', re: /docker\/login-action/ },
-  ];
-  const forbiddenRun: Array<{ label: string; re: RegExp }> = [
-    { label: 'docker buildx', re: /\bdocker\s+buildx\b/ },
-    { label: 'docker build', re: /\bdocker\s+build(?!x)/ },
-  ];
-  const forbiddenBuild = [
-    ...forbiddenUses.filter(({ re }) => stepUses.some((u) => re.test(u))),
-    ...forbiddenRun.filter(({ re }) => stepRuns.some((r) => re.test(r))),
-  ];
-  for (const { label } of forbiddenBuild) {
+  const forbiddenBuild: Array<{ label: string; hit: StepRef }> = [];
+  for (const label of FORBIDDEN_BUILD_ACTIONS) {
+    const hit = findByUses(allSteps, actionRefPattern(label));
+    if (hit) forbiddenBuild.push({ label, hit });
+  }
+  for (const { label, pattern } of FORBIDDEN_BUILD_COMMANDS) {
+    const hit = findByRun(allSteps, pattern);
+    if (hit) forbiddenBuild.push({ label, hit });
+  }
+  for (const { label, hit } of forbiddenBuild) {
     findings.push(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/az-acr-build',
         severity: 'required',
-        message: `Forbidden build method \`${label}\` detected. The image must be built with \`az acr build\` (runs the build in Azure, not on the runner).`,
+        message: `Forbidden build method \`${label}\` detected. The image must be built with \`${BUILD_COMMAND}\` (runs the build in Azure, not on the runner).`,
+        location: `job "${hit.jobId}"`,
+        line: stepLine(hit),
         suggestion: acrRec,
       }),
     );
   }
   // The image build must live in the buildImage job (scoped to that job, not a global
   // text search that a differently-named job could satisfy).
-  if (buildImage && !buildImageStreams.runs.some((r) => /\baz\s+acr\s+build\b/.test(r))) {
+  if (buildImage && !findByRun(buildImageSteps, BUILD_COMMAND_RE)) {
     findings.push(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/az-acr-build',
-        severity: 'high',
-        message:
-          'The `buildImage` job must build and push the image with `az acr build` (no `az acr build` run step found in it).',
-        location: 'job "buildImage"',
+        severity: CONTRACT,
+        message: `The \`${JOB_KEYS.BUILD}\` job must build and push the image with \`${BUILD_COMMAND}\` (no \`${BUILD_COMMAND}\` run step found in it).`,
+        location: `job "${JOB_KEYS.BUILD}"`,
+        line: jobLine(JOB_KEYS.BUILD),
         suggestion: acrRec,
       }),
     );
@@ -199,6 +270,7 @@ export function checkSemantic(
           severity: 'required',
           message: `Job "${jobId}" has an \`environment:\` key. A job-level environment breaks Azure OIDC authentication (changes the token subject claim).`,
           location: `job "${jobId}"`,
+          line: jobKeyLine(jobId, 'environment'),
           suggestion: envRec,
         }),
       );
@@ -209,51 +281,63 @@ export function checkSemantic(
   const azureRec = rec(
     knowledge,
     'aks-get-credentials',
-    'Use azure/aks-set-context@<sha> with admin: false and use-kubelogin: true (with azure/use-kubelogin) instead of az aks get-credentials or azure/setup-kubectl.',
+    `Use ${AKS_SET_CONTEXT_ACTION}@<sha> with admin: ${AKS_CONTEXT_FLAGS.admin} and use-kubelogin: ${AKS_CONTEXT_FLAGS['use-kubelogin']} (with ${USE_KUBELOGIN_ACTION}) instead of ${joinWithConjunction(FORBIDDEN_DEPLOY_LABELS)}.`,
   );
-  if (stepRuns.some((r) => /az\s+aks\s+get-credentials/.test(r))) {
-    findings.push(
-      makeIssue({
-        layer: 'semantic',
-        ruleId: 'semantic/azure-actions',
-        severity: 'high',
-        message:
-          'Forbidden `az aks get-credentials` detected. Use `azure/aks-set-context` (admin: false, use-kubelogin: true) instead.',
-        suggestion: azureRec,
-      }),
-    );
+  for (const { label, pattern } of FORBIDDEN_DEPLOY_COMMANDS) {
+    const hit = findByRun(allSteps, pattern);
+    if (hit) {
+      findings.push(
+        makeIssue({
+          layer: 'semantic',
+          ruleId: 'semantic/azure-actions',
+          severity: CONTRACT,
+          message: `Forbidden \`${label}\` detected. Use \`${AKS_SET_CONTEXT_ACTION}\` (admin: ${AKS_CONTEXT_FLAGS.admin}, use-kubelogin: ${AKS_CONTEXT_FLAGS['use-kubelogin']}) instead.`,
+          location: `job "${hit.jobId}"`,
+          line: stepLine(hit),
+          suggestion: azureRec,
+        }),
+      );
+    }
   }
-  if (stepUses.some((u) => /azure\/setup-kubectl/.test(u))) {
-    findings.push(
-      makeIssue({
-        layer: 'semantic',
-        ruleId: 'semantic/azure-actions',
-        severity: 'high',
-        message:
-          'Forbidden `azure/setup-kubectl` detected. kubectl is configured via `azure/aks-set-context` with kubelogin.',
-        suggestion: azureRec,
-      }),
-    );
+  for (const label of FORBIDDEN_DEPLOY_ACTIONS) {
+    const hit = findByUses(allSteps, actionRefPattern(label));
+    if (hit) {
+      findings.push(
+        makeIssue({
+          layer: 'semantic',
+          ruleId: 'semantic/azure-actions',
+          severity: CONTRACT,
+          message: `Forbidden \`${label}\` detected. kubectl is configured via \`${AKS_SET_CONTEXT_ACTION}\` with kubelogin.`,
+          location: `job "${hit.jobId}"`,
+          line: stepLine(hit),
+          suggestion: azureRec,
+        }),
+      );
+    }
   }
   // Inspect the actual azure/aks-set-context step's `with` mapping (not the whole YAML)
   // so admin/use-kubelogin keys from other steps, jobs, or comments can't mask a
   // misconfigured step. `String(...)` normalizes YAML string ('false') and boolean (false)
   // scalars alike. Report once per misconfigured step.
-  const aksSetContextSteps = collectStepObjects(jobs).filter(
-    (s) => typeof s.uses === 'string' && /azure\/aks-set-context/i.test(s.uses),
-  );
-  for (const step of aksSetContextSteps) {
-    const w = isDict(step.with) ? step.with : {};
-    const adminFalse = String(w['admin']) === 'false';
-    const useKubelogin = String(w['use-kubelogin']) === 'true';
-    if (!adminFalse || !useKubelogin) {
+  const aksSetContextRe = actionRefPattern(AKS_SET_CONTEXT_ACTION);
+  const aksSetContextSteps = allSteps.filter((s) => {
+    const uses = usesOf(s);
+    return uses !== undefined && aksSetContextRe.test(uses);
+  });
+  for (const s of aksSetContextSteps) {
+    const w = isDict(s.step.with) ? s.step.with : {};
+    const misconfigured = Object.entries(AKS_CONTEXT_FLAGS).some(
+      ([flag, expected]) => String(w[flag]) !== expected,
+    );
+    if (misconfigured) {
       findings.push(
         makeIssue({
           layer: 'semantic',
           ruleId: 'semantic/aks-context-flags',
-          severity: 'high',
-          message:
-            'azure/aks-set-context must set `admin: "false"` and `use-kubelogin: "true"` for least-privilege OIDC access.',
+          severity: CONTRACT,
+          message: `${AKS_SET_CONTEXT_ACTION} must set \`admin: "${AKS_CONTEXT_FLAGS.admin}"\` and \`use-kubelogin: "${AKS_CONTEXT_FLAGS['use-kubelogin']}"\` for least-privilege OIDC access.`,
+          location: `job "${s.jobId}"`,
+          line: stepLine(s),
           suggestion: azureRec,
         }),
       );
@@ -264,7 +348,7 @@ export function checkSemantic(
   const permRec = rec(
     knowledge,
     'github-oidc-permissions',
-    'buildImage needs contents: read + id-token: write; deploy additionally needs actions: read.',
+    `${JOB_KEYS.BUILD} needs contents: read + id-token: write; ${JOB_KEYS.DEPLOY} additionally needs actions: read.`,
   );
   const perm = (job: unknown): Dict | undefined =>
     isDict(job) && isDict(job.permissions) ? job.permissions : undefined;
@@ -275,10 +359,10 @@ export function checkSemantic(
         makeIssue({
           layer: 'semantic',
           ruleId: 'semantic/permissions',
-          severity: 'high',
-          message:
-            'The `buildImage` job must set `permissions: id-token: write` (and contents: read) for the OIDC token request.',
-          location: 'job "buildImage"',
+          severity: CONTRACT,
+          message: `The \`${JOB_KEYS.BUILD}\` job must set \`permissions: id-token: write\` (and contents: read) for the OIDC token request.`,
+          location: `job "${JOB_KEYS.BUILD}"`,
+          line: jobKeyLine(JOB_KEYS.BUILD, 'permissions'),
           suggestion: permRec,
         }),
       );
@@ -291,10 +375,10 @@ export function checkSemantic(
         makeIssue({
           layer: 'semantic',
           ruleId: 'semantic/permissions',
-          severity: 'high',
-          message:
-            'The `deploy` job must set `permissions: actions: read, contents: read, id-token: write`.',
-          location: 'job "deploy"',
+          severity: CONTRACT,
+          message: `The \`${JOB_KEYS.DEPLOY}\` job must set \`permissions: actions: read, contents: read, id-token: write\`.`,
+          location: `job "${JOB_KEYS.DEPLOY}"`,
+          line: jobKeyLine(JOB_KEYS.DEPLOY, 'permissions'),
           suggestion: permRec,
         }),
       );
@@ -307,37 +391,33 @@ export function checkSemantic(
   const loginRec = rec(
     knowledge,
     'azure-login-oidc',
-    'Use azure/login with OIDC federated credentials (client-id/tenant-id/subscription-id from secrets).',
+    `Use ${LOGIN_ACTION} with OIDC federated credentials (client-id/tenant-id/subscription-id from secrets).`,
   );
-  if (buildImage && !buildImageStreams.uses.some((u) => /azure\/login/i.test(u))) {
+  const loginRe = actionRefPattern(LOGIN_ACTION);
+  if (buildImage && !findByUses(buildImageSteps, loginRe)) {
     findings.push(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/azure-actions',
-        severity: 'high',
-        message:
-          'The `buildImage` job must include an `azure/login` step (OIDC authentication to Azure).',
-        location: 'job "buildImage"',
+        severity: CONTRACT,
+        message: `The \`${JOB_KEYS.BUILD}\` job must include an \`${LOGIN_ACTION}\` step (OIDC authentication to Azure).`,
+        location: `job "${JOB_KEYS.BUILD}"`,
+        line: jobLine(JOB_KEYS.BUILD),
         suggestion: loginRec,
       }),
     );
   }
   if (deploy) {
-    const deployRequired: Array<{ re: RegExp; label: string }> = [
-      { re: /azure\/login/i, label: 'azure/login' },
-      { re: /azure\/use-kubelogin/i, label: 'azure/use-kubelogin' },
-      { re: /azure\/aks-set-context/i, label: 'azure/aks-set-context' },
-      { re: /azure\/k8s-deploy/i, label: 'Azure/k8s-deploy' },
-    ];
-    for (const { re, label } of deployRequired) {
-      if (!deployStreams.uses.some((u) => re.test(u))) {
+    for (const label of REQUIRED_DEPLOY_ACTIONS) {
+      if (!findByUses(deploySteps, actionRefPattern(label))) {
         findings.push(
           makeIssue({
             layer: 'semantic',
             ruleId: 'semantic/azure-actions',
-            severity: 'high',
-            message: `The \`deploy\` job must include a \`${label}\` step to authenticate and deploy to AKS.`,
-            location: 'job "deploy"',
+            severity: CONTRACT,
+            message: `The \`${JOB_KEYS.DEPLOY}\` job must include a \`${label}\` step to authenticate and deploy to AKS.`,
+            location: `job "${JOB_KEYS.DEPLOY}"`,
+            line: jobLine(JOB_KEYS.DEPLOY),
             suggestion: azureRec,
           }),
         );
@@ -356,23 +436,25 @@ export function checkSemantic(
   const secretsRec = rec(
     knowledge,
     'required-secrets-guidance',
-    'Store AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID as GitHub repository secrets.',
+    `Store ${REQUIRED_SECRETS.join(', ')} as GitHub repository secrets.`,
   );
   let sawLoginStep = false;
-  for (const [jobId, job] of Object.entries(jobs)) {
-    if (!isDict(job) || !Array.isArray(job.steps)) continue;
+  // Jobs without a `steps` list are absent from the group map; they can hold no login step,
+  // so they contribute nothing to this rule. Iteration order still follows document order.
+  for (const [jobId, jobSteps] of stepsByJob) {
     const jobMissing = new Set<string>();
-    for (const step of job.steps) {
-      if (!isDict(step) || typeof step.uses !== 'string' || !/azure\/login/i.test(step.uses)) {
-        continue;
-      }
+    let firstLogin: StepRef | undefined;
+    for (const s of jobSteps) {
+      const uses = usesOf(s);
+      if (uses === undefined || !loginRe.test(uses)) continue;
       sawLoginStep = true;
-      const withText = (isDict(step.with) ? Object.values(step.with) : [])
+      firstLogin ??= s;
+      const withText = (isDict(s.step.with) ? Object.values(s.step.with) : [])
         .map((v) => String(v))
         .join('\n');
-      for (const s of REQUIRED_SECRETS) {
-        if (!new RegExp(`\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`, 'i').test(withText)) {
-          jobMissing.add(s);
+      for (const secret of REQUIRED_SECRETS) {
+        if (!new RegExp(`\\$\\{\\{\\s*secrets\\.${secret}\\s*\\}\\}`, 'i').test(withText)) {
+          jobMissing.add(secret);
         }
       }
     }
@@ -383,9 +465,10 @@ export function checkSemantic(
         makeIssue({
           layer: 'semantic',
           ruleId: 'semantic/required-secrets',
-          severity: 'high',
-          message: `The \`azure/login\` step(s) in job "${jobId}" are missing reference(s) to required OIDC secret(s): ${missing.join(', ')}. Reference them via \${{ secrets.<NAME> }} in the azure/login step.`,
+          severity: CONTRACT,
+          message: `The \`${LOGIN_ACTION}\` step(s) in job "${jobId}" are missing reference(s) to required OIDC secret(s): ${missing.join(', ')}. Reference them via \${{ secrets.<NAME> }} in the ${LOGIN_ACTION} step.`,
           location: `job "${jobId}"`,
+          ...(firstLogin && { line: stepLine(firstLogin) }),
           suggestion: secretsRec,
         }),
       );
@@ -399,8 +482,8 @@ export function checkSemantic(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/required-secrets',
-        severity: 'high',
-        message: `No \`azure/login\` step found, so the required OIDC secret(s) are unreferenced: ${REQUIRED_SECRETS.join(', ')}. Add an \`azure/login\` step that passes them via \${{ secrets.<NAME> }}.`,
+        severity: CONTRACT,
+        message: `No \`${LOGIN_ACTION}\` step found, so the required OIDC secret(s) are unreferenced: ${REQUIRED_SECRETS.join(', ')}. Add an \`${LOGIN_ACTION}\` step that passes them via \${{ secrets.<NAME> }}.`,
         suggestion: secretsRec,
       }),
     );
@@ -419,9 +502,11 @@ export function checkSemantic(
       makeIssue({
         layer: 'semantic',
         ruleId: 'semantic/concurrency',
-        severity: 'medium',
+        severity: CONTRACT,
         message:
           'Missing a `concurrency` block with `cancel-in-progress: true` to prevent stale deploys from racing.',
+        // Points at an existing-but-misconfigured `concurrency:`; absent entirely, no line.
+        line: lineOfKey(doc, lineCounter, ['concurrency']),
         suggestion: rec(
           knowledge,
           'workflow-concurrency',
@@ -436,7 +521,7 @@ export function checkSemantic(
   // manifests that Azure/k8s-deploy consumes via step outputs (which are job-scoped), so a
   // bake step in buildImage wouldn't feed the deploy and must not satisfy this check. Using
   // parsed `uses:` (not raw YAML) also ignores the ref in a comment or echoed run-script.
-  const hasBakeStep = deployStreams.uses.some((u) => /azure\/k8s-bake/i.test(u));
+  const hasBakeStep = findByUses(deploySteps, actionRefPattern(BAKE_ACTION)) !== undefined;
   if ((input.manifestFormat === 'helm' || input.manifestFormat === 'kustomize') && !hasBakeStep) {
     findings.push(
       makeIssue({

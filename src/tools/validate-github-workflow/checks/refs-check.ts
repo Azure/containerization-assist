@@ -1,31 +1,28 @@
 /**
  * Layer 3 — action reference (`uses:`) SHA-pinning.
  *
- * The extraction regex derives from scripts/validate-action-refs.ts, extended to capture
- * the optional trailing `# vX.Y.Z` comment and anchored to the start of a YAML line (so
- * commented-out lines and `uses:` text inside `run:` scripts are ignored). The SHA
- * *format* check is always offline; the optional *existence* probe is offline-safe.
+ * The `uses:` grammar itself lives in `shared/workflow-contract.ts`, shared with
+ * `scripts/validate-action-refs.ts` so the two cannot disagree about what counts as an
+ * action reference.
+ *
+ * This layer is entirely offline and deterministic. Whether a pinned SHA still resolves
+ * upstream is verified out-of-band instead: `scripts/refresh-action-pins.ts` refreshes the
+ * `ACTION_PINS` registry via reviewed PRs, and `scripts/validate-action-refs.ts` re-checks
+ * this repo's own workflows in CI. Repeating that lookup per tool run would add network
+ * latency and rate-limit flakiness to a check that can only ever degrade to "unknown".
  */
 
-import { visit, isScalar, type Document } from 'yaml';
-import type { ToolContext } from '@/core/context';
-import { makeIssue, lineOfOffset } from './helpers';
+import { type Document, type LineCounter } from 'yaml';
+import {
+  USES_RE,
+  parseActionRef,
+  extractActionRefsFromDoc,
+  type ParsedActionRef,
+} from '../../shared/workflow-contract';
+import { makeIssue, lineOfOffset, createLineIndex } from './helpers';
 import type { WorkflowValidationIssue } from '../schema';
 
-// Anchored to the start of a YAML line (optional indentation + optional list `-`) so only
-// real `uses:` keys match — not commented-out lines (`# uses: ...`) or `uses:` inside a
-// `run:` script. Group 1 = the `owner/repo[/sub]@ref`; group 2 = the trailing `# comment`.
-const USES_RE = /^[ \t]*-?[ \t]*uses:\s*([^#\s]+@[^#\s]+)\s*(?:#\s*(.+))?/gm;
-
-export interface ActionRef {
-  /** The raw `owner/repo[/sub]@ref` string. */
-  raw: string;
-  /** `owner/repo` (first two path segments). */
-  ownerRepo: string;
-  /** The ref portion (after the last `@`). */
-  ref: string;
-  /** Trailing `# ...` comment, if any. */
-  comment?: string;
+export interface ActionRef extends ParsedActionRef {
   /** 1-based line number of the `uses:` line. */
   line: number;
 }
@@ -33,54 +30,37 @@ export interface ActionRef {
 /** Build an ActionRef from a raw `owner/repo[/sub]@ref` string; returns null to skip
  * (local `./`, `docker://`, or non-pinnable shapes). */
 function toActionRef(raw: string, line: number, comment?: string): ActionRef | null {
-  const trimmed = raw.trim();
-  if (!trimmed || trimmed.startsWith('./') || trimmed.startsWith('docker://')) return null;
-
-  const at = trimmed.lastIndexOf('@');
-  if (at <= 0) return null;
-  const actionPath = trimmed.slice(0, at);
-  const ref = trimmed.slice(at + 1);
-
-  const parts = actionPath.split('/');
-  if (parts.length < 2) return null;
-  const ownerRepo = `${parts[0]}/${parts[1]}`;
-
-  return { raw: trimmed, ownerRepo, ref, ...(comment ? { comment } : {}), line };
+  const parsed = parseActionRef(raw, comment);
+  return parsed ? { ...parsed, line } : null;
 }
 
 /**
- * Extract every pinnable `uses:` reference from the parsed document. Because it walks real
- * mapping pairs, `uses:` text inside `run:` scripts or comments is never matched (unlike a
- * raw line scan). Scalar node ranges give accurate 1-based line numbers, and the trailing
- * `# vX.Y.Z` comment is read from the node's own comment.
+ * Extract every pinnable `uses:` reference from the parsed document. Style-agnostic (block
+ * steps, inline maps, flow sequences) and never matches `uses:` inside comments or `run:`
+ * scripts. Node offsets give accurate 1-based line numbers.
  */
-export function extractUsesRefsFromDoc(doc: Document.Parsed, content: string): ActionRef[] {
-  const refs: ActionRef[] = [];
-  visit(doc, {
-    Pair(_, pair) {
-      const key = pair.key;
-      const value = pair.value;
-      if (!isScalar(key) || key.value !== 'uses') return;
-      if (!isScalar(value) || typeof value.value !== 'string') return;
-      const offset = Array.isArray(value.range) ? value.range[0] : 0;
-      const comment = typeof value.comment === 'string' ? value.comment.trim() : undefined;
-      const actionRef = toActionRef(value.value, lineOfOffset(content, offset), comment);
-      if (actionRef) refs.push(actionRef);
-    },
-  });
-  return refs;
+export function extractUsesRefsFromDoc(
+  doc: Document.Parsed,
+  lineCounter: LineCounter,
+): ActionRef[] {
+  return extractActionRefsFromDoc(doc).map(({ offset, ...parsed }) => ({
+    ...parsed,
+    line: lineOfOffset(lineCounter, offset),
+  }));
 }
 
 /** Extract every pinnable `uses:` reference via a line scan; skips local (`./`) and
  * `docker://` refs. Used only as a fallback when the document could not be parsed. */
 export function extractUsesRefs(content: string): ActionRef[] {
   const refs: ActionRef[] = [];
+  // Built once for the whole scan rather than rescanning the source per match.
+  const lineIndex = createLineIndex(content);
   const re = new RegExp(USES_RE);
   let match: RegExpExecArray | null;
   while ((match = re.exec(content)) !== null) {
     const actionRef = toActionRef(
       match[1] ?? '',
-      lineOfOffset(content, match.index),
+      lineOfOffset(lineIndex, match.index),
       match[2]?.trim(),
     );
     if (actionRef) refs.push(actionRef);
@@ -117,25 +97,50 @@ function sanitizeComment(comment: string): string {
   return `${oneLine.slice(0, COMMENT_MAX_LEN - COMMENT_ELLIPSIS.length)}${COMMENT_ELLIPSIS}`;
 }
 
-export interface RefsCheckOptions {
-  checkActionExistence: boolean;
+/**
+ * Every pinnable `uses:` reference in the workflow.
+ *
+ * Node extraction is authoritative: it sees inline maps and flow sequences, and never treats
+ * `uses:` inside a comment or a `run:` script as an action. So it is always used when a
+ * document is available — including a document that parsed *with errors*, since `yaml` returns
+ * a usable partial tree alongside `doc.errors`.
+ *
+ * When the parse is degraded the two extractors are unioned, because neither dominates: a
+ * parse error truncates the subtree it occurs in, so the AST can miss refs *below* the fault
+ * that the line scan still matches, while the line scan can never see an inline map. Gating
+ * node extraction on a clean parse meant one stray tab downgraded the whole file to the
+ * blind-spotted scan — and an unreported ref is an unpinned action that ships unnoticed,
+ * which is precisely what this layer exists to prevent.
+ */
+export function collectRefs(
+  content: string,
+  doc: Document.Parsed | null | undefined,
+  lineCounter: LineCounter,
+  parseDegraded: boolean,
+): ActionRef[] {
+  if (!doc) return extractUsesRefs(content);
+
+  const fromDoc = extractUsesRefsFromDoc(doc, lineCounter);
+  if (!parseDegraded) return fromDoc;
+
+  // Same occurrence found by both extractors resolves to the same 1-based line, so
+  // `line:raw` dedupes without collapsing two steps that legitimately use the same action.
+  const byKey = new Map<string, ActionRef>();
+  for (const r of [...fromDoc, ...extractUsesRefs(content)]) {
+    const key = `${r.line}:${r.raw}`;
+    if (!byKey.has(key)) byKey.set(key, r);
+  }
+  return [...byKey.values()].sort((a, b) => a.line - b.line);
 }
 
-export async function checkRefs(
+export function checkRefs(
   content: string,
-  opts: RefsCheckOptions,
-  ctx: ToolContext,
-  doc?: Document.Parsed | null,
-): Promise<WorkflowValidationIssue[]> {
+  doc: Document.Parsed | null | undefined,
+  lineCounter: LineCounter,
+  parseDegraded = false,
+): WorkflowValidationIssue[] {
   const findings: WorkflowValidationIssue[] = [];
-  // Prefer parsed-node extraction so `uses:` in comments or `run:` scripts is never treated
-  // as a real action; fall back to the line scan only when the YAML could not be parsed
-  // (Layer 3 still runs on structurally-broken YAML).
-  const refs = doc ? extractUsesRefsFromDoc(doc, content) : extractUsesRefs(content);
-  let existenceSkipped = false;
-  // Probe api.github.com connectivity at most once per run (memoized), then reuse the result
-  // for every ref — avoids an extra /zen request per action while staying offline-safe.
-  const isOnline = opts.checkActionExistence ? makeConnectivityProbe() : undefined;
+  const refs = collectRefs(content, doc, lineCounter, parseDegraded);
 
   for (const r of refs) {
     // Use the raw `uses:` reference so action subpaths (owner/repo/path@ref) are
@@ -151,12 +156,13 @@ export async function checkRefs(
           ruleId: 'refs/sha-pin',
           severity: 'required',
           message: `Action \`${actionRef}\` is pinned to a mutable ref. Pin to a full 40-character commit SHA to prevent supply-chain tampering.`,
-          location: `line ${r.line}`,
+          location: `uses: ${actionPath}`,
+          line: r.line,
           actionRef,
           suggestion: `Replace @${r.ref} with the commit SHA that tag resolves to, e.g. ${actionPath}@<40-char-sha> # ${r.ref}. Resolve it via: curl -s https://api.github.com/repos/${r.ownerRepo}/commits/${r.ref} | grep -m1 '"sha"'.`,
         }),
       );
-      continue; // no point checking the comment or existence of an unpinned ref
+      continue; // no point checking the version comment of an unpinned ref
     }
 
     // Normalize once so the version check and the `detail` message agree: extraction already
@@ -172,100 +178,13 @@ export async function checkRefs(
           ruleId: 'refs/version-comment',
           severity: 'low',
           message: `Pinned action \`${r.ownerRepo}\` ${detail}. Add a trailing version comment (\`# vX\`, \`# vX.Y\`, or \`# vX.Y.Z\` — e.g. \`# v6.0.3\`) so the pinned version is human-readable.`,
-          location: `line ${r.line}`,
+          location: `uses: ${actionPath}`,
+          line: r.line,
           actionRef,
         }),
       );
     }
-
-    if (opts.checkActionExistence) {
-      const result = await verifyRefExists(r.ownerRepo, r.ref, ctx, isOnline);
-      if (result === 'missing') {
-        findings.push(
-          makeIssue({
-            layer: 'refs',
-            ruleId: 'refs/sha-exists',
-            severity: 'high',
-            message: `The pinned SHA for \`${r.ownerRepo}\` was not found upstream. It may be invalid, from a fork, or force-removed.`,
-            location: `line ${r.line}`,
-            actionRef,
-          }),
-        );
-      } else if (result === 'skipped') {
-        existenceSkipped = true;
-      }
-    }
-  }
-
-  if (existenceSkipped) {
-    findings.push(
-      makeIssue({
-        layer: 'refs',
-        ruleId: 'refs/sha-exists-skipped',
-        severity: 'info',
-        message:
-          'SHA existence check was skipped — api.github.com is unreachable (offline) or rate-limited. Format (SHA-pinning) checks still applied.',
-      }),
-    );
   }
 
   return findings;
-}
-
-/** Fetch with timeout; returns HTTP status, or 0 on network error. */
-async function httpStatus(url: string, timeoutMs = 8_000): Promise<number> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const headers: Record<string, string> = {
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'validate-github-workflow',
-    };
-    const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
-    if (token) headers.Authorization = `token ${token}`;
-    const res = await fetch(url, { signal: controller.signal, headers });
-    return res.status;
-  } catch {
-    return 0;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
- * Build a memoized connectivity probe: hits `https://api.github.com/zen` once and caches the
- * result (as a boolean) for the lifetime of the returned function, so a run with many actions
- * doesn't repeat the probe. Returns `false` when the API is unreachable (offline).
- */
-function makeConnectivityProbe(): () => Promise<boolean> {
-  let cached: Promise<boolean> | undefined;
-  return () => {
-    if (!cached) cached = httpStatus('https://api.github.com/zen', 5_000).then((s) => s !== 0);
-    return cached;
-  };
-}
-
-/**
- * Offline-safe existence probe: check connectivity first, then the commit endpoint.
- * Never throws; returns 'skipped' when offline/rate-limited so the tool never fails
- * a workflow just because the network is unavailable. Pass a shared memoized `isOnline`
- * to reuse a single connectivity probe across many refs.
- */
-export async function verifyRefExists(
-  ownerRepo: string,
-  sha: string,
-  ctx: ToolContext,
-  isOnline: () => Promise<boolean> = makeConnectivityProbe(),
-): Promise<'ok' | 'missing' | 'skipped'> {
-  if (!(await isOnline())) {
-    ctx.logger.debug(
-      'validate-github-workflow: GitHub API unreachable, skipping SHA existence check',
-    );
-    return 'skipped';
-  }
-
-  const status = await httpStatus(`https://api.github.com/repos/${ownerRepo}/commits/${sha}`);
-  if (status === 200) return 'ok';
-  if (status === 404 || status === 422) return 'missing';
-  return 'skipped'; // 403 (rate limit) or anything else — do not fail on it
 }

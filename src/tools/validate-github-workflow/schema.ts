@@ -41,14 +41,6 @@ export const validateGithubWorkflowSchema = z.object({
       'Manifest format the workflow deploys. Tailors Layer-4 deploy-step expectations (helm/kustomize expect an azure/k8s-bake step).',
     ),
 
-  checkActionExistence: z
-    .boolean()
-    .optional()
-    .default(false)
-    .describe(
-      'Enable the online GitHub API probe that verifies each pinned SHA actually exists upstream. Offline-safe: skipped (never fails) when api.github.com is unreachable.',
-    ),
-
   layers: z
     .array(z.enum(WORKFLOW_LAYERS))
     .optional()
@@ -78,6 +70,29 @@ export interface WorkflowValidationIssue extends ValidationResult {
   layer?: WorkflowLayer;
   /** The offending `owner/repo@ref` when this finding concerns a `uses:` reference. */
   actionRef?: string;
+  /**
+   * 1-based line the finding points at, when it can be located in the source.
+   *
+   * Splits *where* from *what*: this is the position, while `metadata.location` describes the
+   * subject (`job "deploy"`, `uses: actions/checkout`). Consumers join them as
+   * `line 27, job "deploy"`, so `location` must never contain a line number itself. Absent for
+   * findings about *missing* structure, which has no position — e.g. a workflow with no `on:`
+   * block at all.
+   */
+  line?: number;
+}
+
+/**
+ * The reused {@link ValidationReport}, narrowed so `results` carries the workflow-specific
+ * finding type.
+ *
+ * `ValidationReport.results` is `ValidationResult[]`, which would force every consumer to cast
+ * in order to read `line` or `layer` — and a cast would keep compiling if those fields were
+ * ever dropped from the contract. Narrowing here keeps the shared report shape (score, grade,
+ * tallies) while making the extra fields visible to the type system.
+ */
+export interface WorkflowValidationReport extends Omit<ValidationReport, 'results'> {
+  results: WorkflowValidationIssue[];
 }
 
 /**
@@ -88,7 +103,7 @@ export interface WorkflowValidationIssue extends ValidationResult {
  */
 export interface WorkflowValidationPlan {
   /** The findings + tallies (reused ValidationReport shape). */
-  report: ValidationReport;
+  report: WorkflowValidationReport;
 
   /** Validated path, or '<inline>' when workflowContent was supplied. */
   filePath: string;

@@ -6,8 +6,8 @@
  * `needs:` graph (no missing targets, no cycles), and unknown-key nudges.
  */
 
-import type { Document } from 'yaml';
-import { makeIssue } from './helpers';
+import type { Document, LineCounter } from 'yaml';
+import { makeIssue, lineOfKey, lineOfKeyOrParent } from './helpers';
 import type { WorkflowValidationIssue } from '../schema';
 
 const WORKFLOW_KEYS = new Set([
@@ -44,21 +44,11 @@ const JOB_KEYS = new Set([
 // Keys that are only valid on reusable-workflow-call jobs (those with `uses:`).
 const REUSABLE_ONLY_JOB_KEYS = new Set(['with', 'secrets']);
 
-const KNOWN_RUNNERS = new Set([
-  'ubuntu-latest',
-  'ubuntu-24.04',
-  'ubuntu-22.04',
-  'ubuntu-20.04',
-  'windows-latest',
-  'windows-2025',
-  'windows-2022',
-  'windows-2019',
-  'macos-latest',
-  'macos-15',
-  'macos-14',
-  'macos-13',
-  'macos-12',
-]);
+// No runner-label check: it needs an allow-list that changes every time GitHub ships a
+// runner, and a stale list reports valid labels as unknown. Ours had already drifted — it
+// rejected every larger runner (`ubuntu-latest-8-cores`), every ARM variant
+// (`ubuntu-24.04-arm`, `windows-11-arm`) and `macos-26*`, while still listing retired
+// images. actionlint maintains that list properly; CA emits `ubuntu-latest` and delegates.
 
 type Dict = Record<string, unknown>;
 
@@ -66,9 +56,19 @@ function isDict(v: unknown): v is Dict {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
+export function checkSchema(
+  doc: Document.Parsed,
+  lineCounter: LineCounter,
+): WorkflowValidationIssue[] {
   const findings: WorkflowValidationIssue[] = [];
   const root = doc.toJS() as unknown;
+
+  // Positions are recovered from the parsed Document by the same path used to read the
+  // value, since `toJS()` above has already thrown them away.
+  const keyLine = (path: readonly unknown[]): number | undefined =>
+    lineOfKey(doc, lineCounter, path);
+  const jobKeyLine = (path: readonly unknown[]): number | undefined =>
+    lineOfKeyOrParent(doc, lineCounter, path);
 
   if (!isDict(root)) {
     findings.push(
@@ -105,6 +105,7 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
           severity: 'medium',
           message: `Unknown top-level workflow key "${key}".`,
           location: `key "${key}"`,
+          line: keyLine([key]),
         }),
       );
     }
@@ -135,6 +136,7 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
           severity: 'required',
           message: `Job "${jobId}" must be a mapping.`,
           location: `job "${jobId}"`,
+          line: keyLine(['jobs', jobId]),
         }),
       );
       continue;
@@ -153,6 +155,7 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
           severity: 'required',
           message: `Job "${jobId}" has an invalid \`uses\` value; it must be a non-empty string referencing a reusable workflow, e.g. \`octo/repo/.github/workflows/deploy.yml@v1\` or \`./.github/workflows/deploy.yml\`.`,
           location: `job "${jobId}"`,
+          line: jobKeyLine(['jobs', jobId, 'uses']),
         }),
       );
     }
@@ -166,6 +169,7 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
             severity: 'required',
             message: `Job "${jobId}" is missing a \`runs-on\` runner.`,
             location: `job "${jobId}"`,
+            line: keyLine(['jobs', jobId]),
           }),
         );
       }
@@ -177,6 +181,7 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
             severity: 'required',
             message: `Job "${jobId}" is missing a \`steps\` list.`,
             location: `job "${jobId}"`,
+            line: keyLine(['jobs', jobId]),
           }),
         );
       } else if (!Array.isArray(jobRaw.steps)) {
@@ -187,25 +192,7 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
             severity: 'required',
             message: `Job "${jobId}" \`steps\` must be a list.`,
             location: `job "${jobId}"`,
-          }),
-        );
-      }
-
-      // Runner label nudge (info only — CA emits ubuntu-latest).
-      const runsOn = jobRaw['runs-on'];
-      if (
-        typeof runsOn === 'string' &&
-        !runsOn.includes('${{') &&
-        runsOn !== 'self-hosted' &&
-        !KNOWN_RUNNERS.has(runsOn)
-      ) {
-        findings.push(
-          makeIssue({
-            layer: 'schema',
-            ruleId: 'schema/unknown-runner',
-            severity: 'low',
-            message: `Job "${jobId}" uses runner "${runsOn}", which is not a known GitHub-hosted runner label.`,
-            location: `job "${jobId}"`,
+            line: jobKeyLine(['jobs', jobId, 'steps']),
           }),
         );
       }
@@ -224,6 +211,7 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
               severity: 'medium',
               message: `Key "${key}" in job "${jobId}" is only valid on reusable-workflow-call jobs (those with \`uses:\`).`,
               location: `job "${jobId}"`,
+              line: jobKeyLine(['jobs', jobId, key]),
             }),
           );
         }
@@ -236,12 +224,13 @@ export function checkSchema(doc: Document.Parsed): WorkflowValidationIssue[] {
           severity: 'medium',
           message: `Unknown key "${key}" in job "${jobId}".`,
           location: `job "${jobId}"`,
+          line: jobKeyLine(['jobs', jobId, key]),
         }),
       );
     }
   }
 
-  findings.push(...checkNeedsGraph(jobs, jobIds));
+  findings.push(...checkNeedsGraph(jobs, jobIds, doc, lineCounter));
 
   return findings;
 }
@@ -255,7 +244,12 @@ function needsOf(job: unknown): string[] {
   return [];
 }
 
-function checkNeedsGraph(jobs: Dict, jobIds: Set<string>): WorkflowValidationIssue[] {
+function checkNeedsGraph(
+  jobs: Dict,
+  jobIds: Set<string>,
+  doc: Document.Parsed,
+  lineCounter: LineCounter,
+): WorkflowValidationIssue[] {
   const findings: WorkflowValidationIssue[] = [];
   const graph = new Map<string, string[]>();
 
@@ -271,6 +265,7 @@ function checkNeedsGraph(jobs: Dict, jobIds: Set<string>): WorkflowValidationIss
             severity: 'high',
             message: `Job "${jobId}" declares needs: [${dep}], but no job "${dep}" exists.`,
             location: `job "${jobId}"`,
+            line: lineOfKeyOrParent(doc, lineCounter, ['jobs', jobId, 'needs']),
           }),
         );
       }
@@ -299,6 +294,7 @@ function checkNeedsGraph(jobs: Dict, jobIds: Set<string>): WorkflowValidationIss
             severity: 'high',
             message: `Cyclic \`needs:\` dependency detected involving job "${dep}". Jobs cannot depend on each other in a cycle.`,
             location: `job "${dep}"`,
+            line: lineOfKey(doc, lineCounter, ['jobs', dep]),
           }),
         );
         cycleReported = true;
