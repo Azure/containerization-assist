@@ -68,7 +68,15 @@ export function extractUsesRefs(content: string): ActionRef[] {
   return refs;
 }
 
-/** True when `ref` is a full commit SHA (SHA-1 40 hex, or SHA-256 64 hex). */
+/**
+ * True when `ref` is a full commit SHA (SHA-1 40 hex, or SHA-256 64 hex).
+ *
+ * Acceptance is deliberately wider than the advice the `refs/sha-pin` finding gives. GitHub
+ * issues 40-char SHA-1 commit ids today — that is what `/commits/{ref}` returns and what the
+ * remediation text tells users to paste — so the guidance names only that. But a 64-char
+ * SHA-256 id is equally immutable, and this rule asks "is this ref immutable", so rejecting
+ * one would fail a correctly pinned action. Recommend the narrow form, accept the wider one.
+ */
 export function isPinnedSha(ref: string): boolean {
   return /^[0-9a-f]{40}$/i.test(ref) || /^[0-9a-f]{64}$/i.test(ref);
 }
@@ -155,6 +163,9 @@ export function checkRefs(
           layer: 'refs',
           ruleId: 'refs/sha-pin',
           severity: 'required',
+          // Names the 40-char SHA-1 form only: that is what the `curl` below returns and what
+          // GitHub issues. `isPinnedSha` also accepts 64-char SHA-256 — see its note on why
+          // acceptance is wider than the advice.
           message: `Action \`${actionRef}\` is pinned to a mutable ref. Pin to a full 40-character commit SHA to prevent supply-chain tampering.`,
           location: `uses: ${actionPath}`,
           line: r.line,

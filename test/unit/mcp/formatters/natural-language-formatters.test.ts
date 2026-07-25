@@ -939,7 +939,14 @@ describe('natural-language-formatters', () => {
             errors: ['Action `actions/checkout@v4` is pinned to a mutable ref.'],
             warnings: [],
             suggestions: ['Replace @v4 with the commit SHA it resolves to.'],
-            metadata: { severity: ValidationSeverity.ERROR, location: 'line 6' },
+            // Contract: the top-level `line` carries the position and `metadata.location`
+            // describes the subject. Encoding "line 6" into `location` would both violate
+            // that split and hide the regression the test below guards against.
+            line: 6,
+            metadata: {
+              severity: ValidationSeverity.ERROR,
+              location: 'uses: actions/checkout',
+            },
           },
         ],
         score: 75,
@@ -973,6 +980,28 @@ describe('natural-language-formatters', () => {
       expect(narrative).toContain('**Fix instruction:**');
       expect(narrative).toContain('.github/workflows/ci.yml has 1 required issue');
       expect(narrative).toContain('[refs/sha-pin]');
+    });
+
+    // Regression: `line` and `metadata.location` are rendered from two different fields, so a
+    // finding carrying both must read "line 6, uses: actions/checkout" — never "line 6, line 6".
+    it('renders the line and the subject as one location, without duplication', () => {
+      const narrative = formatWorkflowValidationNarrative(makeFailingPlan());
+      expect(narrative).toContain('(line 6, uses: actions/checkout)');
+      expect(narrative).not.toMatch(/line 6,\s*line 6/);
+    });
+
+    it('omits the position entirely when a finding has neither line nor location', () => {
+      const plan = makeFailingPlan();
+      const first = plan.report.results[0];
+      // Assert `metadata` up front rather than `delete first.metadata?.location`: optional
+      // chaining would silently no-op if the fixture ever lost `metadata`, leaving the test
+      // green for the wrong reason.
+      if (!first?.metadata) throw new Error('fixture must have a finding with metadata');
+      delete first.line;
+      delete first.metadata.location;
+      const narrative = formatWorkflowValidationNarrative(plan);
+      expect(narrative).toContain('[refs/sha-pin]');
+      expect(narrative).not.toContain('()');
     });
 
     it('does not emit a fix instruction when the workflow passes', () => {

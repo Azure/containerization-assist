@@ -361,6 +361,23 @@ describe('validate-github-workflow', () => {
       expect(isPinnedSha('abc1234')).toBe(false);
     });
 
+    // The sha-pin guidance names only the 40-char SHA-1 form, because that is what GitHub
+    // issues. Acceptance is deliberately wider — a 64-char SHA-256 id is equally immutable,
+    // so it must not be flagged. Locks that asymmetry end-to-end: narrowing isPinnedSha to
+    // match the wording would fail a correctly pinned action, and fail here first.
+    it('accepts a 64-char SHA-256 pin end-to-end even though guidance names 40-char', async () => {
+      const content = [
+        'on: { push: { branches: [main] } }',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        `      - uses: actions/checkout@${'a'.repeat(64)} # v6.0.3`,
+      ].join('\n');
+      const plan = await validate({ workflowContent: content, layers: ['refs'] });
+      expect(plan.report.results.filter((r) => r.ruleId === 'refs/sha-pin')).toHaveLength(0);
+    });
+
     it('extractUsesRefs skips local (./) and docker:// references', () => {
       const content = [
         'uses: actions/checkout@v4',
