@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from '@jest/globals';
 import { updatePinInSource } from '../../../scripts/lib/action-pins-source';
-import type { ActionPin } from '@/tools/generate-github-workflow/action-pins';
+import type { ActionPin } from '@/tools/shared/action-pins';
 
 const SOURCE = `export const ACTION_PINS = {
   checkout: {

@@ -48,7 +48,14 @@ function createMockToolContext(): ToolContext {
 // Import after mocks
 import generateGithubWorkflowTool from '@/tools/generate-github-workflow/tool';
 import { generateGithubWorkflowSchema } from '@/tools/generate-github-workflow/schema';
-import { ACTION_PINS, pinnedUses } from '@/tools/generate-github-workflow/action-pins';
+import { ACTION_PINS, pinnedUses } from '@/tools/shared/action-pins';
+import { extractUsesRefs, isPinnedSha } from '@/tools/validate-github-workflow/checks/refs-check';
+
+/** Every pinned action, indexed by lower-cased `owner/repo`. */
+const PINS_BY_REF = new Map(Object.values(ACTION_PINS).map((p) => [p.ref.toLowerCase(), p]));
+
+/** Matches an `owner/repo[/sub]@ref` anywhere in a string (prose, not just `uses:` lines). */
+const ANY_ACTION_REF = /\b([\w.-]+\/[\w.-]+(?:\/[\w.-]+)*)@([\w.-]+)/g;
 
 // ─── Knowledge mock helpers ───────────────────────────────────────────────────
 
@@ -447,6 +454,50 @@ describe('generate-github-workflow', () => {
         expect(build?.steps.some((s) => s.includes(ACTION_PINS.checkout.sha))).toBe(true);
       }
     });
+
+    // Lockstep guard: an allowlist ("checkout and azure/login are pinned") would not notice a
+    // NEW action added with a floating tag, which validate-github-workflow rejects as a
+    // `required` refs/sha-pin failure — i.e. the generator would emit output its own validator
+    // fails. Sweep every ref instead, and require each to come from the pin registry.
+    it.each(['k8s', 'helm', 'kustomize'] as const)(
+      'emits only SHA-pinned, registry-backed action refs (%s)',
+      async (manifestFormat) => {
+        const result = await generateGithubWorkflowTool.handler(
+          {
+            repositoryPath: '/home/user/myapp',
+            registry: 'myregistry.azurecr.io',
+            clusterName: 'my-aks',
+            resourceGroup: 'my-rg',
+            branches: ['main'],
+            manifestFormat,
+          },
+          mockContext,
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        // (a) every `uses:` in the instruction (prose lines + pinned YAML snippets)
+        const usesRefs = extractUsesRefs(result.value.nextAction.instruction);
+        expect(usesRefs.length).toBeGreaterThan(0);
+        for (const ref of usesRefs) {
+          expect(isPinnedSha(ref.ref)).toBe(true);
+          expect(PINS_BY_REF.has(ref.ownerRepo.toLowerCase())).toBe(true);
+        }
+
+        // (b) the structured job steps, which are prose and carry no `uses:` prefix
+        for (const job of result.value.workflowJobs) {
+          for (const step of job.steps) {
+            for (const [, ownerRepo, gitRef] of step.matchAll(ANY_ACTION_REF)) {
+              const pin = PINS_BY_REF.get(String(ownerRepo).toLowerCase());
+              if (!pin) continue; // not an action ref (e.g. an image tag)
+              expect(isPinnedSha(String(gitRef))).toBe(true);
+              expect(gitRef).toBe(pin.sha);
+            }
+          }
+        }
+      },
+    );
   });
 
   describe('Tool metadata', () => {

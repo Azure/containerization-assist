@@ -3,7 +3,7 @@
  * Refresh Action Pins Script
  *
  * Resolves the LATEST commit SHA within each action's current major from GitHub and
- * rewrites src/tools/generate-github-workflow/action-pins.ts. Intended to run
+ * rewrites src/tools/shared/action-pins.ts. Intended to run
  * periodically (scheduled CI) and land via a reviewed PR — mirroring how the codebase
  * keeps other pinned versions (e.g. prepare-cluster's KIND_VERSION) current, but
  * automated + human-reviewed.
@@ -26,16 +26,12 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  ACTION_PINS,
-  actionMajor,
-  type ActionPin,
-} from '../src/tools/generate-github-workflow/action-pins';
+import { ACTION_PINS, actionMajor, type ActionPin } from '../src/tools/shared/action-pins';
 import { updatePinInSource } from './lib/action-pins-source';
 
 const CHECK_ONLY = process.argv.includes('--check');
 const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
-const PINS_FILE = resolve(process.cwd(), 'src/tools/generate-github-workflow/action-pins.ts');
+const PINS_FILE = resolve(process.cwd(), 'src/tools/shared/action-pins.ts');
 
 // ---------------------------------------------------------------------------
 // HTTP

@@ -45,7 +45,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PIN_FILE="src/tools/generate-github-workflow/action-pins.ts"
+          PIN_FILE="src/tools/shared/action-pins.ts"
           if git diff --quiet -- "$PIN_FILE"; then
             echo "No pin changes — nothing to do."
             exit 0

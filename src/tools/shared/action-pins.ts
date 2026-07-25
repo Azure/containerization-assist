@@ -1,6 +1,13 @@
 /**
  * SHA-pinned GitHub Action references — single source of truth.
  *
+ * Lives in `shared/` because three consumers depend on it and none owns it:
+ * `generate-github-workflow` renders `uses:` values from it, `workflow-contract.ts` derives
+ * the required/forbidden action identities from it, and `scripts/refresh-action-pins.ts`
+ * rewrites it. It previously sat under `generate-github-workflow/`, which forced
+ * `shared/workflow-contract.ts` to import *upward* into a specific tool — an inverted
+ * dependency that also risked a cycle.
+ *
  * Every `uses:` the generate-github-workflow tool emits points at an immutable commit
  * SHA (validate-github-workflow enforces SHA-pinning as a `required` check) with a
  * trailing `# vX.Y.Z` comment for readability (an advisory `low`-severity check —
@@ -13,8 +20,9 @@
  * file (run periodically / in CI, landed via a reviewed PR). Do not hand-edit the SHAs
  * unless you have verified them (e.g. `gh api repos/<ref>/commits/<major> --jq .sha`).
  *
- * This module is intentionally dependency-free (no `@/` imports) so scripts can import
- * and rewrite it.
+ * ⚠️ This module must stay dependency-free (no `@/` imports, no imports at all) so the
+ * scripts that consume and rewrite it keep working under `tsx`, which does not resolve the
+ * `@/` path alias. Adding an import here would also reopen the cycle risk above.
  */
 
 export interface ActionPin {

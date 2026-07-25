@@ -6,7 +6,7 @@
  * keeps the script a plain entrypoint with no test-runner-specific guards.
  */
 
-import type { ActionPin } from '../../src/tools/generate-github-workflow/action-pins';
+import type { ActionPin } from '../../src/tools/shared/action-pins';
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
