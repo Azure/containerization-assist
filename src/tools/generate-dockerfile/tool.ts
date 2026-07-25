@@ -364,26 +364,23 @@ const DOCKER_IMAGE_NAME_REGEX =
 function substituteImageVersion(image: string, targetVersion: string | undefined): string {
   if (!targetVersion) return image;
 
-  // For maven/gradle images with format "tool:version-runtime-jdkversion"
-  // Match patterns like maven:3.9-openjdk-17 or gradle:8.5-jdk21
+  const legacyJavaMatch = /^1\.(\d+)$/.exec(targetVersion);
+  const version = legacyJavaMatch ? legacyJavaMatch[1] : targetVersion;
+
   const toolWithRuntimePattern = /^(maven|gradle):(\d+\.\d+)-(openjdk|eclipse-temurin|jdk)-(\d+)/;
   const toolMatch = image.match(toolWithRuntimePattern);
 
   if (toolMatch) {
     const [, tool, toolVersion, runtime] = toolMatch;
-    // Replace only the JDK version at the end
-    return `${tool}:${toolVersion}-${runtime}-${targetVersion}`;
+    return `${tool}:${toolVersion}-${runtime}-${version}`;
   }
 
-  // For runtime images with format "runtime:version-variant"
-  // Match patterns like :17-jdk-alpine, :21-azurelinux, :3.11-slim
   const runtimePattern = /:(\d+(?:\.\d+)?)([-.]|$)/;
   const match = image.match(runtimePattern);
 
   if (match) {
     const currentVersion = match[1];
-    // Replace the version while preserving everything else
-    return image.replace(`:${currentVersion}`, `:${targetVersion}`);
+    return image.replace(`:${currentVersion}`, `:${version}`);
   }
 
   return image;

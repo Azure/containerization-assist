@@ -186,6 +186,30 @@ CMD ["node", "index.js"]`;
         expect(result.value.summary).toContain('Multi-stage');
       }
     });
+
+    it('normalizes legacy Java "1.8" version to "8" in the base image tag', async () => {
+      config.language = 'java';
+      config.framework = 'spring-boot';
+      config.languageVersion = '1.8';
+      mockGetKnowledgeForCategory.mockReturnValue([
+        {
+          id: 'base-image-java',
+          text: 'FROM mcr.microsoft.com/openjdk/jdk:8-azurelinux\nUse Azure Linux for Java',
+          category: 'base-image',
+          tags: ['base-image', 'java', 'azurelinux'],
+          weight: 0.95,
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const images = result.value.recommendations.baseImages.map((b) => b.image);
+        expect(images).toContain('mcr.microsoft.com/openjdk/jdk:8-azurelinux');
+        expect(images.some((img) => img.includes('1.8-azurelinux'))).toBe(false);
+      }
+    });
   });
 
   describe('Error Handling', () => {

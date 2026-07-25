@@ -641,6 +641,8 @@ describe('prepareCluster (advisory)', () => {
           (m) => m.kind === 'ServiceAccount' && m.namespace === 'app-ns',
         );
         expect(sa).toBeDefined();
+        expect(sa?.yaml).toContain('app.kubernetes.io/managed-by: containerization-assist');
+        expect(sa?.yaml).toContain('app.kubernetes.io/name: app-service-account');
 
         // No kind probes should have run.
         const calls = (

@@ -29,6 +29,7 @@ import type { ToolContext } from '@/core/context';
 import { DOCKER, KUBERNETES } from '@/config/constants';
 import { prepareClusterToolDefinition } from './types';
 import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
+import { K8S_LABEL_MANAGED_BY, K8S_LABEL_NAME, TOOL_NAME } from '@/lib/package-version';
 import {
   getSystemInfo,
   getDownloadOS,
@@ -628,6 +629,10 @@ function buildServiceAccountManifest(namespace: string): ClusterManifestPlan {
     metadata: {
       name: 'app-service-account',
       namespace,
+      labels: {
+        [K8S_LABEL_NAME]: 'app-service-account',
+        [K8S_LABEL_MANAGED_BY]: TOOL_NAME,
+      },
     },
   };
   return {

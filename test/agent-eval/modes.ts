@@ -44,6 +44,10 @@ export function buildBareDeployUserPrompt(
     'Available tools: createFile, readFile, listDir, dockerBuild (build the image), pushImage ' +
     '(push a built image to the registry), kubectlApply (apply manifests), verifyDeploy (confirm ' +
     'pods reach Running/Ready).\n' +
+    'Required labels (downstream tooling depends on them): the Dockerfile must set ' +
+    '`LABEL com.azure.containerizationassist.createdby=<your identifier>`, and every Kubernetes ' +
+    'resource must include `app.kubernetes.io/name` and `app.kubernetes.io/managed-by` under ' +
+    'metadata.labels.\n' +
     '1. Generate a Dockerfile, then build it with dockerBuild (fix and retry if it fails).\n' +
     `2. Push the built image to \`${ctx.registry}/${ctx.imageName}:latest\` with pushImage.\n` +
     '3. Generate Kubernetes manifests whose `image:` exactly matches what you pushed.\n' +
