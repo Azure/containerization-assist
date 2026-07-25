@@ -83,17 +83,17 @@ const MCR_COVERAGE = {
   },
   node: {
     repo: 'azurelinux/base/nodejs',
-    versions: new Set([18, 20, 22]),
+    versions: new Set([20, 24]),
     suggestion: 'mcr.microsoft.com/azurelinux/base/nodejs:<V> or .../distroless/nodejs:<V>',
   },
   python: {
     repo: 'azurelinux/base/python',
-    versions: new Set(['3.11', '3.12']),
+    versions: new Set(['3.12']),
     suggestion: 'mcr.microsoft.com/azurelinux/base/python:<V> or .../distroless/python:<V>',
   },
   dotnet: {
     repo: 'dotnet/sdk',
-    versions: new Set(['8.0', '9.0']),
+    versions: new Set(['8.0', '9.0', '10.0']),
     suggestion: 'mcr.microsoft.com/dotnet/<sdk|aspnet|runtime>:<V>-azurelinux3.0',
   },
 } as const;
@@ -117,7 +117,7 @@ async function loadMcrCatalog(): Promise<Map<string, Set<string>> | null> {
   return mcrCatalog;
 }
 
-async function fetchMcrTags(repo: string): Promise<Set<string> | null> {
+async function getMcrTags(repo: string): Promise<Set<string> | null> {
   const catalog = await loadMcrCatalog();
   return catalog?.get(repo) ?? null;
 }
@@ -125,7 +125,8 @@ async function fetchMcrTags(repo: string): Promise<Set<string> | null> {
 function canonicalizeTag(tag: string): string {
   // Drop a trailing architecture qualifier (mirrors isNoiseTag in the refresh
   // script, which removes these so the catalog stores only canonical tags).
-  const noArch = tag.replace(/-(amd64|arm64|arm32v7|arm32|ppc64le|s390x)$/i, '');
+  // Covers versioned arch suffixes too (`arm64v8`, `arm32v7`), which MCR uses.
+  const noArch = tag.replace(/-(amd64|arm64(v8)?|arm32(v[0-9]+)?|ppc64le|s390x)$/i, '');
   // Collapse a leading 3+ part numeric version to major.minor (`8.0.11` → `8.0`,
   // `8.0.11-azurelinux3.0` → `8.0-azurelinux3.0`). The refresh script drops
   // 3-part numeric tags, so the catalog only ever stores the 1-/2-part family.
@@ -323,7 +324,7 @@ async function coverageFor<K>(
       suggestion: entry.suggestion.replace(/<V>/g, placeholder),
     };
   }
-  const tags = await fetchMcrTags(entry.repo);
+  const tags = await getMcrTags(entry.repo);
   const covered = tags ? tagExistsInCatalog(tags, String(version)) : entry.versions.has(version);
   if (covered) {
     return {
@@ -343,7 +344,7 @@ async function classifyBase(parsed: ParsedFrom): Promise<Coverage> {
 
   if (MCR_REGISTRY_PATTERN.test(parsed.repo)) {
     const mcrRepo = parsed.repo.replace(/^mcr\.microsoft\.com\//i, '');
-    const tags = await fetchMcrTags(mcrRepo);
+    const tags = await getMcrTags(mcrRepo);
     if (tags === null) return { kind: 'mcr' };
     return tagExistsInCatalog(tags, tag ?? 'latest') ? { kind: 'mcr' } : { kind: 'mcr-missing' };
   }

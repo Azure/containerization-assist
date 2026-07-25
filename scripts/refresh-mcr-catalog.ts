@@ -16,7 +16,7 @@ const CATALOG_DIR = new URL('../knowledge/catalogs/', import.meta.url);
 const OUT = fileURLToPath(new URL('mcr-base-images.json', CATALOG_DIR));
 
 function isNoiseTag(tag: string): boolean {
-  if (/-(amd64|arm64|arm32v7|arm32|ppc64le|s390x)$/i.test(tag)) return true;
+  if (/-(amd64|arm64(v8)?|arm32(v[0-9]+)?|ppc64le|s390x)$/i.test(tag)) return true;
   if (/(nightly|preview|-rc\.?\d|alpha|beta|-cbld|-cm[0-9])/i.test(tag)) return true;
   if (/^\d+\.\d+\.\d+/.test(tag)) return true;
   return false;

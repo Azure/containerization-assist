@@ -364,7 +364,11 @@ const DOCKER_IMAGE_NAME_REGEX =
 function substituteImageVersion(image: string, targetVersion: string | undefined): string {
   if (!targetVersion) return image;
 
-  const legacyJavaMatch = /^1\.(\d+)$/.exec(targetVersion);
+  // Normalize legacy Java versions (`1.8` → `8`) so they map onto MCR tags.
+  // Scoped to majors 1–8: only Java ever used the `1.x` prefix (dropped at
+  // Java 9). Languages whose real versions are `1.x` (Go's `1.21`, `1.22`, …)
+  // use two-digit minors and must NOT be rewritten.
+  const legacyJavaMatch = /^1\.([0-8])$/.exec(targetVersion);
   const version = legacyJavaMatch ? legacyJavaMatch[1] : targetVersion;
 
   const toolWithRuntimePattern = /^(maven|gradle):(\d+\.\d+)-(openjdk|eclipse-temurin|jdk)-(\d+)/;
