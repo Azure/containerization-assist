@@ -257,11 +257,11 @@ export class AISDKDriver {
           );
           const combined = ((stdout ?? '') + (stderr ?? '')).slice(-MAX_BUILD_OUTPUT_CHARS);
           if (isVerbose()) {
-            console.error(`[driver] dockerBuild ok (attempt ${dockerBuildCalls}) → ${imageTag}:`);
+            console.error(`[driver] dockerBuild PASSED (attempt ${dockerBuildCalls}) → ${imageTag}:`);
             console.error(combined.replace(/\s+$/, '') || '(no output)');
           } else {
             console.error(
-              `[driver] dockerBuild ok (attempt ${dockerBuildCalls}) → ${imageTag}: ${decisiveLine(combined) || 'built'}`,
+              `[driver] dockerBuild PASSED (attempt ${dockerBuildCalls}) → ${imageTag}: ${decisiveLine(combined) || 'built'}`,
             );
           }
           builtTags.add(imageTag);

@@ -6,9 +6,13 @@ Azure infra (ACR + AKS):
 
 | Path     | What the agent gets |
 | -------- | ------------------- |
-| `bare`   | Generic "containerize this application" prompt (generate Dockerfile + manifests, then `dockerBuild`). No deploy loop. The control. |
+| `bare`   | Generic "containerize **and deploy to AKS**" prompt + the harness's built-in build/push/apply/verify tools. No CA skill, no CA MCP. The control (no-CA baseline). |
 | `mcp`    | Same task + the CA `aks-loop` MCP prompt + CA MCP tools. |
 | `skills` | Same task + the CA `deploy-to-aks` SKILL bundle + CA MCP tools. |
+
+All three paths run the identical deploy loop (`requireDeploy`, same nudges, same
+step budget) and are scored by the identical level-blind checks — the *only*
+difference between them is the CA layer above.
 
 After each run, deterministic checks score the produced artifacts and the report
 shows each path's lift over the `bare` control, swept across every model in one

@@ -74,7 +74,7 @@ export const LEVELS: readonly LevelConfig[] = [
 ];
 
 /** Resolved prompts + tools for one path. */
-interface ResolvedLevel {
+export interface ResolvedLevel {
   systemPrompt: string;
   userPrompt: string;
   tools: ToolSpec[];
@@ -82,7 +82,7 @@ interface ResolvedLevel {
 }
 
 /** Build runtime config. `mcp` spins up MCP harness — caller must await cleanup. */
-async function resolveLevel(
+export async function resolveLevel(
   level: LevelId,
   workingDir: string,
   ctx: AzureContext,
@@ -221,7 +221,7 @@ async function runWithConcurrency<T, R>(
 // model stalls before verifyDeploy, extra nudges rarely convert (each also
 // grants a fresh step budget, so they dominate wall-time on slow models like
 // gpt-4o). Default 1; override with AGENT_EVAL_MAX_DEPLOY_NUDGES.
-const MAX_DEPLOY_NUDGES = (() => {
+export const MAX_DEPLOY_NUDGES = (() => {
   const raw = Math.floor(Number(process.env.AGENT_EVAL_MAX_DEPLOY_NUDGES));
   return Number.isFinite(raw) && raw >= 0 ? raw : 1;
 })();

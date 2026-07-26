@@ -15,12 +15,14 @@ import { program } from 'commander';
 import { generateText } from 'ai';
 import { getModel, validateProviderEnv } from './providers.js';
 import { AISDKDriver } from './driver.js';
-import { resolveMode, USER_PROMPT, type Mode } from './modes.js';
+import { loadAzureContext, ensureRegistryLogin, cleanupAzureResources } from './modes.js';
 import { runChecks, selectChecks } from './checks.js';
 import {
   runGradient,
   formatGradientHtml,
   discoverFixtures,
+  resolveLevel,
+  MAX_DEPLOY_NUDGES,
   LEVELS,
   type LevelId,
 } from './gradient.js';
@@ -32,33 +34,44 @@ program
 
 program
   .command('run')
-  .description('Run a single agent evaluation against a fixture')
+  .description(
+    'Run a single agent evaluation against a fixture. Uses the SAME prompt/tool ' +
+      'resolver and deploy loop as one `gradient` cell, so a single `run` faithfully ' +
+      'mirrors the swept behavior for that path.',
+  )
   .requiredOption('--fixture <path>', 'path to fixture directory')
   .requiredOption('--mode <mode>', 'bare | skills | mcp (baseline accepted as alias for bare)')
   .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o or foundry:llama-3-3-70b')
   .action(async (opts: { fixture: string; mode: string; model: string }) => {
     validateProviderEnv();
+    const level: LevelId = opts.mode === 'baseline' ? 'bare' : (opts.mode as LevelId);
+    if (!LEVELS.some((l) => l.id === level)) {
+      console.error(`Error: unknown mode '${opts.mode}'. Valid: bare (alias: baseline), mcp, skills`);
+      process.exit(2);
+    }
+    const ctx = loadAzureContext();
     const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-'));
     await fs.cp(opts.fixture, workingDir, { recursive: true });
-
-    const { resolved, cleanup } = await resolveMode({
-      mode: opts.mode as Mode,
-      workingDir,
-    });
+    await ensureRegistryLogin(ctx);
+    const { systemPrompt, userPrompt, tools, cleanup } = await resolveLevel(level, workingDir, ctx);
     try {
       const { model, providerOptions } = getModel(opts.model);
       const result = await new AISDKDriver().run({
         model,
         providerOptions,
-        systemPrompt: resolved.systemPrompt,
-        userPrompt: resolved.userPrompt ?? USER_PROMPT(workingDir),
+        systemPrompt,
+        userPrompt,
         workingDir,
-        tools: resolved.tools,
+        tools,
+        // Mirror a gradient cell: every path attempts a real deploy on the same footing.
+        requireDeploy: true,
+        maxDeployNudges: MAX_DEPLOY_NUDGES,
       });
       console.log(JSON.stringify(result, null, 2));
       console.log('artifacts at:', workingDir);
     } finally {
       await cleanup();
+      await cleanupAzureResources(ctx);
     }
   });
 

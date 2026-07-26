@@ -22,37 +22,21 @@ export const BASELINE_PROMPT =
   'Use the createFile tool to write any artifacts (Dockerfile, Kubernetes ' +
   'manifests, etc.) to disk.';
 
-export const USER_PROMPT = (workingDir: string): string =>
-  `The application source is at: ${workingDir}\n\n` +
-  'Containerize this application. Generate a Dockerfile and any Kubernetes ' +
-  'manifests appropriate for the application. When tools require a repository ' +
-  `or working directory path, pass the absolute path above (${workingDir}). ` +
-  'Write all artifacts using the createFile tool with paths relative to the ' +
-  'working directory. After the Dockerfile is written, call the dockerBuild ' +
-  'tool to verify it builds; if it fails, fix the Dockerfile and retry (up to ' +
-  '3 attempts).';
-
+/**
+ * User prompt for `bare` mode. Uses the SAME shared operational envelope as
+ * `mcp`/`skills` (buildEvalEnvelope) so the only thing that differs between the
+ * three paths is the CA layer (system prompt + CA tools) — the bare kickoff
+ * deliberately references no CA skill or workflow.
+ */
 export function buildBareDeployUserPrompt(
   workingDir: string,
   ctx: AzureContext = loadAzureContext(),
 ): string {
   return (
-    `The application source is at: ${workingDir}\n\n` +
-    'Containerize this application AND deploy it to the Azure Kubernetes Service (AKS) cluster. ' +
-    'Write all artifacts with the createFile tool (paths relative to the working directory). ' +
-    '`az`, `kubectl`, and `docker` are configured and `az acr login` has already been run. ' +
-    'Available tools: createFile, readFile, listDir, dockerBuild (build the image), pushImage ' +
-    '(push a built image to the registry), kubectlApply (apply manifests), verifyDeploy (confirm ' +
-    'pods reach Running/Ready).\n' +
-    'Required labels (downstream tooling depends on them): the Dockerfile must set ' +
-    '`LABEL com.azure.containerizationassist.createdby=<your identifier>`, and every Kubernetes ' +
-    'resource must include `app.kubernetes.io/name` and `app.kubernetes.io/managed-by` under ' +
-    'metadata.labels.\n' +
-    '1. Generate a Dockerfile, then build it with dockerBuild (fix and retry if it fails).\n' +
-    `2. Push the built image to \`${ctx.registry}/${ctx.imageName}:latest\` with pushImage.\n` +
-    '3. Generate Kubernetes manifests whose `image:` exactly matches what you pushed.\n' +
-    `4. Apply them with kubectlApply to namespace \`${ctx.namespace}\`.\n` +
-    `5. Call verifyDeploy for namespace \`${ctx.namespace}\`; if pods are not Ready, read the errors, fix, and retry.`
+    buildEvalEnvelope(workingDir, ctx) +
+    `Containerize the repository above and deploy it to the Azure Kubernetes Service (AKS) cluster ` +
+    `using the Azure values listed in the envelope. Produce a Dockerfile and Kubernetes manifests, ` +
+    `then complete the build → push → apply → verify loop until the workload is Running/Ready.`
   );
 }
 
@@ -65,20 +49,6 @@ const DEPLOY_TO_AKS_SKILL_BUNDLE: readonly string[] = [
   'generate-k8s-manifests',
   'fix-dockerfile',
 ];
-
-export type Mode = 'bare' | 'baseline' | 'skills' | 'mcp';
-
-export interface ResolvedMode {
-  systemPrompt: string;
-  /** Optional override for the default USER_PROMPT (set by modes that ship their own). */
-  userPrompt?: string;
-  tools: ToolSpec[];
-}
-
-export interface ResolvedModeBundle {
-  resolved: ResolvedMode;
-  cleanup: () => Promise<void>;
-}
 
 export async function loadDeployToAksSkill(): Promise<string> {
   const sections: string[] = [];
@@ -306,7 +276,8 @@ export function buildEvalEnvelope(
     `- You MUST then call \`verifyDeploy\` with \`{ "namespace": "${ctx.namespace}" }\` to confirm the pods reach Running/Ready. The deploy is only done when verifyDeploy returns success:true.\n` +
     `- If \`verifyDeploy\` returns success:false, treat it like a real operator would: READ the returned pod waitingReasons/waitingMessages, lastTerminated and logs, FIX the root cause (edit the manifest with createFile — e.g. add a numeric \`securityContext.runAsUser\` if the kubelet complains about a non-numeric user; or rebuild+repush if the image is missing/mismatched; or deploy a missing backing service), then call \`kubectlApply\` and \`verifyDeploy\` again. Iterate up to 3 rounds before giving up.\n` +
     `- Backing services are NOT pre-provisioned. If the app crash-loops because it needs a dependency (e.g. a database), deploy a small dev instance of that dependency (a Deployment + Service in namespace \`${ctx.namespace}\`) and wire the app's env/ConfigMap to it, then reapply.\n` +
-    `- Walk every stage end-to-end: analyze → generate-dockerfile → dockerBuild → scan → generate-k8s-manifests → pushImage → kubectlApply → verifyDeploy (with the fix/reapply loop until Ready).\n\n`
+    `- Required labels (downstream tooling depends on them): the Dockerfile MUST set \`LABEL com.azure.containerizationassist.createdby=<your identifier>\`, and every Kubernetes resource MUST carry \`app.kubernetes.io/name\` and \`app.kubernetes.io/managed-by\` under metadata.labels.\n` +
+    `- Walk every stage end-to-end: inspect the repo → write the Dockerfile → dockerBuild → write Kubernetes manifests → pushImage → kubectlApply → verifyDeploy (with the fix/reapply loop until Ready).\n\n`
   );
 }
 
@@ -393,42 +364,4 @@ export async function createMcpToolBundle(workingDir: string): Promise<{
       await harness.stopServer(serverName);
     },
   };
-}
-
-export async function resolveMode(opts: {
-  mode: Mode;
-  workingDir: string;
-}): Promise<ResolvedModeBundle> {
-  switch (opts.mode) {
-    case 'bare':
-    case 'baseline':
-      return {
-        resolved: { systemPrompt: BASELINE_PROMPT, tools: [] },
-        cleanup: async () => {},
-      };
-    case 'skills': {
-      const { tools, cleanup } = await createMcpToolBundle(opts.workingDir);
-      return {
-        resolved: {
-          systemPrompt: await loadDeployToAksSkill(),
-          userPrompt: buildSkillsAksLoopUserPrompt(opts.workingDir),
-          tools: dropSkillShadowedTools(tools),
-        },
-        cleanup,
-      };
-    }
-    case 'mcp': {
-      const { tools, cleanup } = await createMcpToolBundle(opts.workingDir);
-      return {
-        resolved: {
-          systemPrompt: buildMcpAksLoopSystemPrompt(),
-          userPrompt: buildMcpAksLoopUserPrompt(opts.workingDir),
-          tools,
-        },
-        cleanup,
-      };
-    }
-    default:
-      throw new Error(`Unknown mode '${opts.mode as string}'. Supported: bare (alias: baseline), skills, mcp`);
-  }
 }
