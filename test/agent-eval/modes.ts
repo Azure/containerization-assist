@@ -24,9 +24,14 @@ export const BASELINE_PROMPT =
 
 /**
  * User prompt for `bare` mode. Uses the SAME shared operational envelope as
- * `mcp`/`skills` (buildEvalEnvelope) so the only thing that differs between the
- * three paths is the CA layer (system prompt + CA tools) — the bare kickoff
- * deliberately references no CA skill or workflow.
+ * `mcp`/`skills` (buildEvalEnvelope), plus the required attribution/k8s label
+ * strings — which `bare` ALONE is given, because it has no CA layer and cannot
+ * infer the arbitrary `com.azure.containerizationassist.createdby` convention.
+ * `mcp`/`skills` are deliberately NOT told the labels here: their CA layer (the
+ * generate-dockerfile MCP tool's `attributionLabels` / the deploy-to-aks skill)
+ * supplies them, so spoon-feeding them in the prompt would mask how effectively
+ * the CA layer delivers them. MCR base-image policy is withheld from every path
+ * (bare included) for the same reason — it is a quality decision the CA drives.
  */
 export function buildBareDeployUserPrompt(
   workingDir: string,
@@ -34,6 +39,9 @@ export function buildBareDeployUserPrompt(
 ): string {
   return (
     buildEvalEnvelope(workingDir, ctx) +
+    `Required labels (downstream tooling depends on them): the Dockerfile MUST set ` +
+    `\`LABEL com.azure.containerizationassist.createdby=<your identifier>\`, and every Kubernetes ` +
+    `resource MUST carry \`app.kubernetes.io/name\` and \`app.kubernetes.io/managed-by\` under metadata.labels.\n` +
     `Containerize the repository above and deploy it to the Azure Kubernetes Service (AKS) cluster ` +
     `using the Azure values listed in the envelope. Produce a Dockerfile and Kubernetes manifests, ` +
     `then complete the build → push → apply → verify loop until the workload is Running/Ready.`
@@ -276,7 +284,6 @@ export function buildEvalEnvelope(
     `- You MUST then call \`verifyDeploy\` with \`{ "namespace": "${ctx.namespace}" }\` to confirm the pods reach Running/Ready. The deploy is only done when verifyDeploy returns success:true.\n` +
     `- If \`verifyDeploy\` returns success:false, treat it like a real operator would: READ the returned pod waitingReasons/waitingMessages, lastTerminated and logs, FIX the root cause (edit the manifest with createFile — e.g. add a numeric \`securityContext.runAsUser\` if the kubelet complains about a non-numeric user; or rebuild+repush if the image is missing/mismatched; or deploy a missing backing service), then call \`kubectlApply\` and \`verifyDeploy\` again. Iterate up to 3 rounds before giving up.\n` +
     `- Backing services are NOT pre-provisioned. If the app crash-loops because it needs a dependency (e.g. a database), deploy a small dev instance of that dependency (a Deployment + Service in namespace \`${ctx.namespace}\`) and wire the app's env/ConfigMap to it, then reapply.\n` +
-    `- Required labels (downstream tooling depends on them): the Dockerfile MUST set \`LABEL com.azure.containerizationassist.createdby=<your identifier>\`, and every Kubernetes resource MUST carry \`app.kubernetes.io/name\` and \`app.kubernetes.io/managed-by\` under metadata.labels.\n` +
     `- Walk every stage end-to-end: inspect the repo → write the Dockerfile → dockerBuild → write Kubernetes manifests → pushImage → kubectlApply → verifyDeploy (with the fix/reapply loop until Ready).\n\n`
   );
 }
