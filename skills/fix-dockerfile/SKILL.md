@@ -1,7 +1,7 @@
 ---
 name: fix-dockerfile
 description: Validate and remediate an existing Dockerfile against security, performance, and best-practice rules. Use AFTER a Dockerfile exists (either user-authored or produced by generate-dockerfile) and BEFORE building or pushing the image. Triggers include "fix my Dockerfile", "is this Dockerfile secure", "validate Dockerfile", "check Dockerfile for issues", "audit Dockerfile", or any container build flow that needs a sanity check.
-argument-hint: <path to Dockerfile | inline Dockerfile content> [environment=production|development]
+argument-hint: <path to Dockerfile | inline Dockerfile content> [environment=production|development] [buildError=<docker build stderr>]
 ---
 
 # Fix Dockerfile
@@ -17,8 +17,10 @@ structural check, not a judgment call.
 | `dockerfile` *or* `path` | yes | Either the file contents OR an absolute path. If `path` is given, read it. |
 | `environment` | optional | `production` (default) or `development`. Some rules downgrade to suggestions in dev. |
 | `targetPlatform` | optional | `linux/amd64` (default) or `linux/arm64`. Used only in the **Next steps** section. |
+| `buildError` | optional | The captured `stderr`/`stdout` from a **failed `docker build`**. When present, run the **build-failure triage** (Step 2, first pass) against it — this is how the skill remediates the *actual* build error, not just static hygiene. |
+| `buildContext` | optional | A listing of the build-context directory (e.g. `ls -R` or the top two levels). Lets the skill verify that every `COPY <src>` source actually exists on disk vs. being a pre-built artifact the build never produced. |
 
-If neither is provided → ask the user for the Dockerfile path. STOP.
+If neither `dockerfile` nor `path` is provided → ask the user for the Dockerfile path. STOP.
 
 ## Procedure
 
@@ -29,14 +31,37 @@ least one `FROM ` line (case-insensitive) — that's not a Dockerfile.
 
 ### Step 2 — Run every rule
 
-Apply each rule below in order. For each match, record an **issue** with
-`{ ruleId, category, severity, line, message }`.
+**First pass — build-failure triage (only when `buildError` is provided).** Before
+the static rules, read the `buildError` text (and `buildContext` listing if given)
+and match it against the **Build-failure rules** below. These describe what the
+*actual* `docker build` did wrong, so they are the highest-priority signal of all —
+a match here almost always forces a `rewrite`. Record each as an issue with
+`category: buildFailure`, severity **error**. If no `buildError` was supplied, skip
+this pass.
+
+**Second pass — static rules.** Apply each remaining rule below in order. For each
+match, record an **issue** with `{ ruleId, category, severity, line, message }`.
 
 `severity` ∈ `error` (must fix) | `warning` (should fix) | `info` (nice to fix).
-`category` ∈ `buildValidity` | `security` | `performance` | `bestPractices`.
+`category` ∈ `buildFailure` | `buildValidity` | `security` | `performance` | `bestPractices`.
 
 When a rule says "scan lines", split the file on `\n`, trim each line, ignore
 empty lines and lines starting with `#`.
+
+#### Build-failure rules (only when `buildError` is provided — highest priority of all)
+
+Matched against the **`buildError`** text (and `buildContext` listing), not the
+Dockerfile source. Each is the signature of a real `docker build` failure observed
+in the agent-eval sweeps; every one is severity **error** because the build already
+failed. Match on the substring/regex in the *Signature* column.
+
+| ruleId | Signature (in `buildError`) | Severity | Message |
+|---|---|---|---|
+| `copy-missing-artifact` | `lstat …: no such file or directory` on a buildkit mount, OR `"/…": not found` / `failed to compute cache key: … not found` where the missing path is a `COPY`/`ADD` **source** (classically `target/`, `build/libs/`, `dist/`, `*.jar`, `*.war`) | **error** | The `COPY` source does not exist in the build context — the artifact was expected to be built *outside* Docker (e.g. a `build.sh`/`mvnw` run the build never executed). Convert to a **multi-stage build** that compiles the artifact inside a builder stage, then `COPY --from=build …`. Never `COPY` a pre-built `target/`/`dist/` that isn't in the repo. |
+| `build-tool-not-found` | `did not complete successfully: exit code: 127`, OR `not found` / `command not found` / `executable file not found in $PATH` for a build command (`mvn`, `mvnw`, `gradle`, `ant`, `npm`, `go`, `dotnet`) | **error** | The build tool is not on the base image. Either switch the build stage to a base that ships the tool (e.g. a Maven/Gradle builder), or install it with the base's native package manager — do not assume `mvn`/`gradle` exist on a JRE/JDK runtime image. |
+| `base-image-not-found` | `manifest unknown`, `not found: manifest`, `pull access denied`, `manifest for … not found`, `failed to resolve source metadata for …` | **error** | The `FROM` tag does not exist (commonly a hallucinated `mcr.microsoft.com/…` tag). Replace with an exact tag from the generate-dockerfile **G2.1** catalog — see `invalid-mcr-base`. |
+| `external-registry-unreachable` | `i/o timeout`, `dial tcp …: connect`, `context deadline exceeded`, `TLS handshake timeout`, or `192.0.2.` while pulling from `docker.io`/`registry-1.docker.io`/`quay.io`/`gcr.io`/`ghcr.io` | **error** | The pipeline sandbox only reaches `mcr.microsoft.com`; external registries are blocked and time out. Switch the `FROM` to the MCR equivalent from the generate-dockerfile **G2.1** catalog (documented Docker Hub fallback **G2.3** is allowed **only** as a build-only stage when no MCR builder exists, with a `# WHY-NOT-MCR:` note). |
+| `dependency-fetch-blocked` | `Could not transfer artifact`, `Connection timed out` / `Could not resolve dependencies` (Maven), `Could not resolve host`, `Temporary failure resolving`, or `apt-get`/`dnf`/`microdnf`/`tdnf` network timeouts during a `RUN` | **error** | In-build dependency resolution is network-blocked in the sandbox (Maven Central, OS package repos). Keep dependency downloads inside a build stage that can reach the proxied mirrors where available, prefer offline/vendored dependencies, and do not add new external `RUN … install` fetches to the runtime stage. Flag as an environment restriction if no mirror exists. |
 
 #### Build-validity rules (highest priority — the image cannot build if these fail)
 
@@ -107,7 +132,7 @@ Grade band:
 
 | Conditions | Strategy |
 |---|---|
-| Grade = F OR ≥ 1 `error` severity issue | `rewrite` — emit a fully restructured Dockerfile. |
+| Any `buildFailure` issue present, OR Grade = F OR ≥ 1 `error` severity issue | `rewrite` — emit a fully restructured Dockerfile. |
 | Grade ∈ {C, D} | `refactor` — emit the file with targeted edits per issue. |
 | Grade ∈ {A, B} | `tweak` — emit the file with minimal edits; if no issues, return unchanged. |
 
@@ -117,6 +142,10 @@ Walk every recorded issue and apply the corresponding fix. The fix table:
 
 | ruleId | Fix |
 |---|---|
+| `copy-missing-artifact` | Restructure into a multi-stage build that produces the artifact **inside** Docker. Add a builder stage `FROM <build-image> AS build` (a base that has the build tool — e.g. `maven:3.9-eclipse-temurin-<LV>` per generate-dockerfile **G2.3** with a `# WHY-NOT-MCR:` note, or a JDK base plus the wrapper), `COPY` the sources + manifests, run the build (`mvn -q -DskipTests package`, `gradle build`, `npm run build`, etc.) to generate the artifact, then in the runtime stage `COPY --from=build /workspace/target/<artifact> …`. Delete any `COPY target/…` / `COPY build/…` that points at a host-built artifact not present in the repo. Never rely on a `build.sh` run outside `docker build`. |
+| `build-tool-not-found` | Move the compile step into a builder stage whose base ships the tool, or install the tool with the base's native package manager before invoking it. Do not call `mvn`/`gradle`/`ant`/`npm`/`go`/`dotnet` on a base that lacks them. |
+| `base-image-not-found` / `external-registry-unreachable` | Replace the `FROM` with an exact, reachable tag from the generate-dockerfile **G2.1** MCR catalog for the detected language/version. Only fall back to a **G2.3** Docker Hub builder as a build-only stage (with a `# WHY-NOT-MCR:` note) paired with an MCR `*-distroless` runtime stage. Never invent an MCR tag; never leave a `docker.io`/`quay.io`/`gcr.io` base in a stage that must pull at build time. |
+| `dependency-fetch-blocked` | Confine dependency resolution to a build stage, prefer vendored/offline dependencies (e.g. `mvn -o` with a pre-populated repo, `go mod vendor`, committed lockfiles), and remove ad-hoc external `RUN … install` network fetches from the runtime stage. If no proxy/mirror exists in the environment, record it as an environment restriction in the summary rather than looping on the same failing `RUN`. |
 | `block-root-user` / `no-root-user` | Append (or replace existing) before final `CMD`/`ENTRYPOINT`: `RUN adduser -D -u 10001 appuser` (Alpine) or `RUN useradd -m -u 10001 appuser` (Debian/Azure Linux), then `USER appuser`. Choose flavor from base image. |
 | `block-secrets-in-env` / `no-secrets` | Delete the offending `ENV`/`ARG`/`RUN` line. Add a comment `# SECRET: <NAME> — inject via Kubernetes Secret at runtime`. |
 | `avoid-sudo` | Drop `sudo ` prefix. If the action requires root, move it before the final `USER` directive. |
@@ -138,6 +167,16 @@ Walk every recorded issue and apply the corresponding fix. The fix table:
 After applying all fixes, run **Step 2 again** as a self-check on the new
 content. If any rule still triggers, fix it before writing. Never write a
 Dockerfile that still violates a security `error` rule.
+
+**COPY-source self-check (always, but critical when a `copy-missing-artifact`
+issue was recorded).** For every `COPY <src>` / `ADD <src>` in the rewritten
+Dockerfile, the `<src>` MUST be one of: (a) a path present in `buildContext`
+(or, if no `buildContext` was given, a path you can see exists in the repo), or
+(b) produced by an earlier build stage referenced via `COPY --from=<stage>`. If a
+`COPY` source is neither, the build will fail again with the same
+`no such file or directory` — go back and generate that artifact in a builder
+stage instead of copying it. Do not emit a Dockerfile that copies an artifact
+nothing in the build produces.
 
 ### Step 7 — Apply the change
 
@@ -167,6 +206,14 @@ Use these exact sections in order:
 - **Strategy:** <rewrite|refactor|tweak>
 
 ### Issues (<N>)
+
+#### Build failures (<count>)
+
+> Only when `buildError` was provided. These are the actual `docker build`
+> errors this run remediated.
+
+- *<severity>* `<ruleId>` — <what the build error was> → <what the rewrite does>
+- ...
 
 #### Build validity (<count>)
 - *<severity>* `<ruleId>` (line <line>) — <message>
