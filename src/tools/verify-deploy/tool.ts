@@ -301,7 +301,8 @@ async function handleVerifyDeployment(
     return Failure(extractErrorMessage(error), {
       message: extractErrorMessage(error),
       hint: 'An unexpected error occurred during deployment verification',
-      resolution: 'Check the error message for details. Verify the deployment exists, cluster is accessible, and you have proper permissions',
+      resolution:
+        'Check the error message for details. Verify the deployment exists, cluster is accessible, and you have proper permissions',
     });
   }
 }

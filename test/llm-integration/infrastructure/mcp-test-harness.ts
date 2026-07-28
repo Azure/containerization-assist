@@ -196,12 +196,18 @@ export class MCPTestHarness {
         `✅ TOOL CALL OUTPUT: ${toolCall.name} (${endTime - startTime}ms)`
       );
 
+      const failureMessage = result.ok
+        ? undefined
+        : [result.error, result.guidance?.hint, result.guidance?.resolution]
+            .filter((part): part is string => Boolean(part))
+            .join(' — ') || 'Unknown error';
+
       if (result.ok) {
         console.log(`📤 Result: ${toolCall.name} SUCCESS`);
         console.log(`📄 Content:`, typeof result.value === 'string' ? result.value : JSON.stringify(result.value, null, 2));
       } else {
         console.log(`❌ Result: ${toolCall.name} FAILED`);
-        console.log(`🚫 Error:`, result.error?.message || 'Unknown error');
+        console.log(`🚫 Error:`, failureMessage);
       }
       console.log('─'.repeat(80));
 
@@ -209,7 +215,7 @@ export class MCPTestHarness {
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         content: result.ok ? result.value : null,
-        error: result.ok ? undefined : result.error?.message,
+        error: failureMessage,
       };
     } catch (error) {
       const endTime = Date.now();

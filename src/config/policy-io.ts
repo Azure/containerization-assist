@@ -56,9 +56,7 @@ export async function loadPolicy(file: string): Promise<Result<RegoEvaluator>> {
  * @param policyPaths - Array of .rego policy file paths
  * @returns Promise<Result<RegoEvaluator>>
  */
-export async function loadAndMergePolicies(
-  policyPaths: string[],
-): Promise<Result<RegoEvaluator>> {
+export async function loadAndMergePolicies(policyPaths: string[]): Promise<Result<RegoEvaluator>> {
   // Validate all paths are .rego files
   const nonRegoPaths = policyPaths.filter((p) => !p.endsWith('.rego'));
   if (nonRegoPaths.length > 0) {

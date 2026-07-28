@@ -1,6 +1,6 @@
 {
   "name": "containerization-assist-mcp",
-  "version": "1.4.1",
+  "version": "1.5.1-dev.1",
   "mcpName": "io.github.Azure/containerization-assist",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "license": "MIT",
@@ -98,6 +98,7 @@
     "build:watch": "tsc --project tsconfig.json --watch",
     "build:verify": "tsx scripts/verify-build.ts",
     "dev": "npm run build:version && tsx watch src/cli/cli.ts",
+    "eval": "tsx --env-file-if-exists=.env test/agent-eval/cli.ts",
     "start": "node dist/src/cli/cli.js",
     "test": "npm run build:version && NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit integration e2e",
     "test:unit": "npm run build:version && NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --runInBand",
@@ -156,6 +157,7 @@
   },
   "devDependencies": {
     "@ai-sdk/azure": "^2.0.54",
+    "@ai-sdk/openai": "^2.0.53",
     "@eslint/js": "^9.38.0",
     "@jest/globals": "^30.2.0",
     "@types/dockerode": "^3.3.44",
