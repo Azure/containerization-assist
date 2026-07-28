@@ -1,0 +1,13 @@
+name: Check Signed Commits
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-signed-commits:
+    uses: Azure/action-release-workflows/.github/workflows/check_signed_commits.yaml@c5e43fbe94d02562038cf6a32f438015c02d6ca9
