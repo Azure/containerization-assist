@@ -68,7 +68,10 @@ async function hasNetwork(): Promise<boolean> {
       signal: controller.signal,
       headers: headers(),
     });
-    return res.status === 200;
+    // Any HTTP response means GitHub is reachable. A non-200 (e.g. 403 rate
+    // limit / abuse detection) still indicates connectivity — per-pin logic
+    // downstream handles rate-limited responses by skipping individual pins.
+    return res.status > 0;
   } catch {
     return false;
   } finally {

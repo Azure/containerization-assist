@@ -262,7 +262,7 @@ function checkNeedsGraph(
           makeIssue({
             layer: 'schema',
             ruleId: 'schema/unknown-needs',
-            severity: 'high',
+            severity: 'required',
             message: `Job "${jobId}" declares needs: [${dep}], but no job "${dep}" exists.`,
             location: `job "${jobId}"`,
             line: lineOfKeyOrParent(doc, lineCounter, ['jobs', jobId, 'needs']),
@@ -291,7 +291,7 @@ function checkNeedsGraph(
           makeIssue({
             layer: 'schema',
             ruleId: 'schema/needs-cycle',
-            severity: 'high',
+            severity: 'required',
             message: `Cyclic \`needs:\` dependency detected involving job "${dep}". Jobs cannot depend on each other in a cycle.`,
             location: `job "${dep}"`,
             line: lineOfKey(doc, lineCounter, ['jobs', dep]),
