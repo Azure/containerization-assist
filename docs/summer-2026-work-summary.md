@@ -14,7 +14,7 @@ The work falls into four connected streams:
 3. **Agent-eval ADO pipeline** — an Azure DevOps pipeline that runs the eval
    end-to-end against real Azure infrastructure, on demand.
 4. **AKS Tools integration** — shipping the CA skills inside the
-   `vscode-aks-tools` extension, gated behind a preview flag.
+   `vscode-aks-tools` extension as a preview, enabled by default (no feature flag).
 
 All four share one theme: **we're migrating CA's capabilities from MCP tools to
 skills, and we need to prove that skills change agent behavior at least as well as
@@ -290,8 +290,11 @@ HTML heatmap and JSON report as a build artifact.
 ## 4. Shipping the CA skills in the AKS Tools extension
 
 Branch `feat/ca-skills-preview` in `vscode-aks-tools` contributes the CA skills
-into the extension, **gated behind `aks.skillsEnabledPreview`** so it ships dark
-until we choose to turn it on.
+into the extension. They're a **Preview feature but ship enabled by default — no
+`aks.skillsEnabledPreview` flag**: the five CA skills are contributed
+unconditionally once the extension is installed. (The separate command-based
+Container Assist flows still sit behind `aks.containerAssistEnabledPreview`, and
+the Kickstart agent behind `aks.kickstartEnabledPreview` — those are unaffected.)
 
 **Status:** the work is functionally complete. It isn't merged yet because of a
 **pre-existing integration-test failure that blocks every PR in that repo, not
