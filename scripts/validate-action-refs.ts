@@ -21,6 +21,14 @@
 
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseDocument } from 'yaml';
+// Relative import (no `@/` alias) so this stays runnable under tsx, matching how
+// refresh-action-pins.ts consumes action-pins.ts.
+import {
+  USES_RE,
+  parseActionRef,
+  extractActionRefsFromDoc,
+} from '../src/tools/shared/workflow-contract';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -85,24 +93,45 @@ function extractRefs(): ActionRef[] {
 
   for (const file of files) {
     const content = readFileSync(join(workflowDir, file), 'utf-8');
-    // Match:  uses: owner/repo@ref  or  uses: owner/repo/sub@ref
-    const regex = /uses:\s*([^#\s]+@[^#\s]+)/g;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(content)) !== null) {
-      const raw = match[1].trim();
-      // Skip docker:// and local ./ references
-      if (raw.startsWith('docker://') || raw.startsWith('./')) continue;
+    const doc = parseDocument(content);
 
-      const [actionPath, ref] = raw.split('@');
-      if (!actionPath || !ref) continue;
+    // Deduplicate per file so a ref found by both extractors is only listed once.
+    const perFile = new Map<string, ActionRef>();
+    const add = (ownerRepo: string, ref: string): void => {
+      const key = `${ownerRepo}@${ref}`;
+      if (!perFile.has(key)) perFile.set(key, { ownerRepo, ref, key, file });
+    };
 
-      // owner/repo (strip sub-paths like /init, /analyze)
-      const parts = actionPath.split('/');
-      if (parts.length < 2) continue;
-      const ownerRepo = `${parts[0]}/${parts[1]}`;
-
-      refs.push({ ownerRepo, ref, key: `${ownerRepo}@${ref}`, file });
+    // Always harvest the AST, errors or not: `yaml` returns a usable partial tree alongside
+    // `doc.errors`, and it is the only extractor that sees inline-map and flow-sequence steps
+    // (`- { uses: x@sha }`). Gating this on a clean parse meant one non-fatal error — a
+    // duplicate key, a stray tab — silently downgraded the whole file to the blind-spotted
+    // line scan.
+    for (const { ownerRepo, ref } of extractActionRefsFromDoc(doc)) {
+      add(ownerRepo, ref);
     }
+
+    if (doc.errors.length > 0) {
+      // Damaged file: neither extractor is trustworthy alone. A parse error truncates the
+      // subtree it occurs in, so the AST can miss refs *below* the fault that the line scan
+      // still matches; the line scan in turn cannot see inline maps. Union both and report
+      // loudly — a missed ref here is a silently unverified action, the exact hole this
+      // script exists to close.
+      console.error(
+        `\u26a0 ${file}: YAML parse error (${doc.errors[0]?.message ?? 'unknown'}) — ` +
+          `refs recovered from a partial parse plus a line scan; fix the file to restore ` +
+          `full coverage.`,
+      );
+      const regex = new RegExp(USES_RE);
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(content)) !== null) {
+        const parsed = parseActionRef(match[1] ?? '');
+        if (!parsed) continue;
+        add(parsed.ownerRepo, parsed.ref);
+      }
+    }
+
+    refs.push(...perFile.values());
   }
 
   return refs;
@@ -251,6 +280,6 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   console.error('Unexpected error while validating action references:');
-  console.error(err instanceof Error ? err.stack ?? err.message : err);
+  console.error(err instanceof Error ? (err.stack ?? err.message) : err);
   process.exit(1);
 });
