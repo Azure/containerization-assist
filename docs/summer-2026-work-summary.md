@@ -414,10 +414,15 @@ artifacts (or add explicit label steps to the `aks-loop` mcp prompt).
 
 ### Smaller notes for whoever picks this up
 
-- **`fix-dockerfile` is static-analysis only.** It is text-only (lint + policy →
-  recommendations): it never sees the `docker build` error output or the build
-  context, and it does not rewrite the Dockerfile, so it cannot recover a failing
-  build. This is something being addressed on the skills path.
+- **`fix-dockerfile` recovery is now on the skills path; the MCP tool is still
+  static-analysis only.** The MCP `fix-dockerfile` tool remains text-only (lint +
+  policy → recommendations): it never sees the `docker build` output or the build
+  context and doesn't rewrite the Dockerfile, so it can't recover a failing build.
+  The **skill** now closes that gap — it accepts optional `buildError`/`buildContext`
+  inputs, triages the real failure (missing COPY artifact, build-tool-not-found,
+  hallucinated/unreachable base, blocked dependency fetch) ahead of the static
+  rules, and forces a `rewrite`; `deploy-to-aks` feeds the captured build output
+  back in. Bringing the same round-trip to the MCP tool is still open.
 - **The `dockerBuild` retry cap is advisory only.** The prompt says "retry up to 3
   times" but nothing enforces it — cells were observed burning 8–24 build attempts.
   A hard cap would bound cost and turn budget.
