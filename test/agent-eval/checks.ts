@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import { MAX_FAILURE_DETAIL_CHARS } from './log-config.js';
+import { catalogCoversVersion, lookupMcrTag, type McrCatalog } from './mcr-catalog.js';
 
 const execFileP = promisify(execFile);
 
@@ -101,9 +102,9 @@ const MCR_COVERAGE = {
 const MCR_CATALOG_PATH = fileURLToPath(
   new URL('../../knowledge/catalogs/mcr-base-images.json', import.meta.url),
 );
-let mcrCatalog: Map<string, Set<string>> | null | undefined;
+let mcrCatalog: McrCatalog | null | undefined;
 
-async function loadMcrCatalog(): Promise<Map<string, Set<string>> | null> {
+async function loadMcrCatalog(): Promise<McrCatalog | null> {
   if (mcrCatalog !== undefined) return mcrCatalog;
   try {
     const raw = await fs.readFile(MCR_CATALOG_PATH, 'utf8');
@@ -115,44 +116,6 @@ async function loadMcrCatalog(): Promise<Map<string, Set<string>> | null> {
     mcrCatalog = null;
   }
   return mcrCatalog;
-}
-
-async function getMcrTags(repo: string): Promise<Set<string> | null> {
-  const catalog = await loadMcrCatalog();
-  return catalog?.get(repo) ?? null;
-}
-
-function canonicalizeTag(tag: string): string {
-  // Drop a trailing architecture qualifier (mirrors isNoiseTag in the refresh
-  // script, which removes these so the catalog stores only canonical tags).
-  // Covers versioned arch suffixes too (`arm64v8`, `arm32v7`), which MCR uses.
-  const noArch = tag.replace(/-(amd64|arm64(v8)?|arm32(v[0-9]+)?|ppc64le|s390x)$/i, '');
-  // Collapse a leading 3+ part numeric version to major.minor (`8.0.11` → `8.0`,
-  // `8.0.11-azurelinux3.0` → `8.0-azurelinux3.0`). The refresh script drops
-  // 3-part numeric tags, so the catalog only ever stores the 1-/2-part family.
-  return noArch.replace(/^(\d+\.\d+)\.\d+/, '$1');
-}
-
-/**
- * Does the catalog contain a pullable tag matching `tag`? The catalog is
- * intentionally lossy — the refresh script strips arch-suffixed and 3+ part
- * numeric tags as noise — so an exact `.has()` mis-flags real-but-more-specific
- * tags (e.g. `dotnet/sdk:8.0.11`, `nodejs:20.14.0`) as hallucinated. We instead
- * match against the tag's canonical family, and treat a bare major (`17`) as
- * present when any variant (`17-azurelinux`, `17.x`) is published. Genuine
- * hallucinations (fake distro suffixes, nonexistent versions) still fail to
- * match and are correctly rejected.
- */
-function tagExistsInCatalog(tags: Set<string>, tag: string): boolean {
-  if (tags.has(tag)) return true;
-  const canon = canonicalizeTag(tag);
-  if (canon !== tag && tags.has(canon)) return true;
-  if (/^\d+$/.test(canon)) {
-    for (const t of tags) {
-      if (t === canon || t.startsWith(`${canon}-`) || t.startsWith(`${canon}.`)) return true;
-    }
-  }
-  return false;
 }
 
 // Public-registry repos that map onto an MCR-covered stack (plain JDK/JRE, Node,
@@ -308,6 +271,7 @@ function extractMajorMinor(tag: string | null): string | null {
 type Coverage =
   | { kind: 'mcr' }
   | { kind: 'mcr-missing' }
+  | { kind: 'catalog-unavailable' }
   | { kind: 'mcr-equivalent-exists'; suggestion: string }
   | { kind: 'no-mcr-equivalent'; reason: string }
   | { kind: 'unknown' };
@@ -324,8 +288,10 @@ async function coverageFor<K>(
       suggestion: entry.suggestion.replace(/<V>/g, placeholder),
     };
   }
-  const tags = await getMcrTags(entry.repo);
-  const covered = tags ? tagExistsInCatalog(tags, String(version)) : entry.versions.has(version);
+  const catalog = await loadMcrCatalog();
+  const covered = catalog
+    ? catalogCoversVersion(catalog, entry.repo, String(version))
+    : entry.versions.has(version);
   if (covered) {
     return {
       kind: 'mcr-equivalent-exists',
@@ -344,9 +310,11 @@ async function classifyBase(parsed: ParsedFrom): Promise<Coverage> {
 
   if (MCR_REGISTRY_PATTERN.test(parsed.repo)) {
     const mcrRepo = parsed.repo.replace(/^mcr\.microsoft\.com\//i, '');
-    const tags = await getMcrTags(mcrRepo);
-    if (tags === null) return { kind: 'mcr' };
-    return tagExistsInCatalog(tags, tag ?? 'latest') ? { kind: 'mcr' } : { kind: 'mcr-missing' };
+    const catalog = await loadMcrCatalog();
+    if (catalog === null) return { kind: 'catalog-unavailable' };
+    return lookupMcrTag(catalog, mcrRepo, tag ?? 'latest') === 'present'
+      ? { kind: 'mcr' }
+      : { kind: 'mcr-missing' };
   }
 
   if (JAVA_JDK_REPO.test(repo))
@@ -398,6 +366,11 @@ export const requiresAzureBaseImage: Check = {
         case 'mcr-missing':
           offending.push(
             `${parsed.raw.trim()}  → MCR image/tag not found in the registry (hallucinated?); use a real mcr.microsoft.com tag`,
+          );
+          break;
+        case 'catalog-unavailable':
+          offending.push(
+            `${parsed.raw.trim()}  → MCR catalog unavailable; image existence could not be validated`,
           );
           break;
         case 'no-mcr-equivalent':
@@ -463,7 +436,9 @@ export const hasRequiredLabels: Check = {
     const dockerfile = await readDockerfile(artifactDir);
     if (dockerfile === null) {
       missing.push('Dockerfile not found');
-    } else if (!new RegExp(`^\\s*LABEL\\s+${REQUIRED_DOCKERFILE_LABEL}\\s*=`, 'm').test(dockerfile)) {
+    } else if (
+      !new RegExp(`^\\s*LABEL\\s+${REQUIRED_DOCKERFILE_LABEL}\\s*=`, 'm').test(dockerfile)
+    ) {
       missing.push(`Dockerfile is missing LABEL ${REQUIRED_DOCKERFILE_LABEL}`);
     }
 

@@ -210,6 +210,29 @@ CMD ["node", "index.js"]`;
         expect(images.some((img) => img.includes('1.8-azurelinux'))).toBe(false);
       }
     });
+
+    it('preserves legacy Go "1.8" as a real Go version', async () => {
+      config.language = 'go';
+      config.languageVersion = '1.8';
+      mockGetKnowledgeForCategory.mockReturnValue([
+        {
+          id: 'base-image-go',
+          text: 'FROM golang:1.22\nUse the official Go builder',
+          category: 'base-image',
+          tags: ['base-image', 'go'],
+          weight: 0.95,
+        },
+      ]);
+
+      const result = await generateDockerfileTool.handler(config, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const images = result.value.recommendations.baseImages.map((b) => b.image);
+        expect(images.some((image) => image.startsWith('golang:1.8'))).toBe(true);
+        expect(images.some((image) => image.startsWith('golang:8'))).toBe(false);
+      }
+    });
   });
 
   describe('Error Handling', () => {

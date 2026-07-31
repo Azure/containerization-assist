@@ -82,6 +82,7 @@
     "policies.user.examples/**/*.md",
     "!policies.user/**",
     "knowledge/packs/**/*.json",
+    "knowledge/catalogs/**/*.json",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"

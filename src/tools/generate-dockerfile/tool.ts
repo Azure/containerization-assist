@@ -361,14 +361,14 @@ const DOCKER_IMAGE_NAME_REGEX =
  *   mcr.microsoft.com/openjdk/jdk:21-azurelinux + version 25 -> mcr.microsoft.com/openjdk/jdk:25-azurelinux
  *   maven:3.9-openjdk-17 + version 25 -> maven:3.9-openjdk-25
  */
-function substituteImageVersion(image: string, targetVersion: string | undefined): string {
+function substituteImageVersion(
+  image: string,
+  targetVersion: string | undefined,
+  language: string | undefined,
+): string {
   if (!targetVersion) return image;
 
-  // Normalize legacy Java versions (`1.8` → `8`) so they map onto MCR tags.
-  // Scoped to majors 1–8: only Java ever used the `1.x` prefix (dropped at
-  // Java 9). Languages whose real versions are `1.x` (Go's `1.21`, `1.22`, …)
-  // use two-digit minors and must NOT be rewritten.
-  const legacyJavaMatch = /^1\.([0-8])$/.exec(targetVersion);
+  const legacyJavaMatch = language === 'java' ? /^1\.([0-8])$/.exec(targetVersion) : null;
   const version = legacyJavaMatch ? legacyJavaMatch[1] : targetVersion;
 
   const toolWithRuntimePattern = /^(maven|gradle):(\d+\.\d+)-(openjdk|eclipse-temurin|jdk)-(\d+)/;
@@ -402,6 +402,7 @@ function createBaseImageRecommendation(
     weight: number;
   },
   languageVersion?: string,
+  language?: string,
 ): BaseImageRecommendation {
   // Extract image name from the recommendation text
   const imageMatch = snippet.text.match(DOCKER_IMAGE_NAME_REGEX);
@@ -409,7 +410,7 @@ function createBaseImageRecommendation(
 
   // Substitute version if languageVersion is provided
   if (languageVersion && image !== 'unknown') {
-    image = substituteImageVersion(image, languageVersion);
+    image = substituteImageVersion(image, languageVersion, language);
   }
 
   // Determine category based on tags and content
@@ -544,7 +545,7 @@ const runPattern = createKnowledgeTool<
       // Pass languageVersion for dynamic version substitution
       // Limit to top 2 recommendations to provide clear, opinionated guidance
       let baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || []).map(
-        (snippet) => createBaseImageRecommendation(snippet, input.languageVersion),
+        (snippet) => createBaseImageRecommendation(snippet, input.languageVersion, input.language),
       );
 
       // Apply policy config base image category preference

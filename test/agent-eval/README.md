@@ -85,13 +85,18 @@ npm run eval -- gradient \
 
 - All three paths run unless scoped with `--paths bare,skills`.
 - Models run **in parallel** when more than one is passed (each lane gets its
-  own namespace + ACR repo + Deployment). Pass `--sequential` to force serial
-  execution, or `--max-concurrent-models <n>` to cap concurrency for provider
-  rate limits.
+  own disposable child namespace + ACR repo + Deployment). Pass `--sequential`
+  to force serial execution, or `--max-concurrent-models <n>` to cap concurrency
+  for provider rate limits.
 - `--reps <n>` repeats each cell; `--fixtures-dir <dir>` auto-discovers fixtures
   from a parent directory instead of listing them with `--fixtures`.
 - kubectl cleanup runs before **and** after each cell, so a stuck Deployment
-  can't poison the next path.
+  can't poison the next path. The harness deletes the owned child namespace
+  when the run/model lane finishes and refuses namespace-wide cleanup of the
+  configured base namespace or unrelated namespaces.
+- Step logs and serialized results record tool names only. Tool arguments and
+  generated file contents are intentionally omitted to prevent secrets from
+  leaking into CI logs or report artifacts.
 
 `--out results.json` also writes a companion self-contained `results.html`
 (the heatmap report) alongside it. The report shows per-path scores, the

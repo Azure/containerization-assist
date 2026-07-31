@@ -56,18 +56,13 @@ export interface AgentRunResult {
   artifactDir: string;
   tokensIn: number;
   tokensOut: number;
-  toolCalls: Array<{ name: string; argsSummary: string }>;
+  toolCalls: Array<{ name: string }>;
   durationMs: number;
   text: string;
   /** True once `verifyDeploy` reported the workload reached Running/Ready. */
   deployVerified: boolean;
   /** How many deploy-completion nudges were actually issued for this run. */
   deployNudges: number;
-}
-
-function summarize(args: unknown): string {
-  const s = JSON.stringify(args ?? {});
-  return s.length > 80 ? s.slice(0, 77) + '...' : s;
 }
 
 /**
@@ -155,7 +150,7 @@ export class AISDKDriver {
   async run(input: AgentRunInput): Promise<AgentRunResult> {
     // 64 covers ~18-step aks-loop + tool calls + retries.
     const maxSteps = input.maxSteps ?? 64;
-    const toolCalls: Array<{ name: string; argsSummary: string }> = [];
+    const toolCalls: Array<{ name: string }> = [];
     let tokensIn = 0;
     let tokensOut = 0;
     let createFileCalled = false;
@@ -621,9 +616,8 @@ export class AISDKDriver {
           tokensOut += usage.outputTokens ?? 0;
         }
         for (const tc of stepCalls ?? []) {
-          const argsSummary = summarize((tc as { input?: unknown }).input);
-          toolCalls.push({ name: tc.toolName, argsSummary });
-          console.error(`[step] ${tc.toolName}${argsSummary ? ` ${argsSummary}` : ''}`);
+          toolCalls.push({ name: tc.toolName });
+          console.error(`[step] ${tc.toolName}`);
           if (tc.toolName === 'createFile') createFileCalled = true;
         }
       },

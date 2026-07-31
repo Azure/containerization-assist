@@ -9,6 +9,7 @@
  */
 
 import { promises as fs } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // Side-effect import FIRST: sets the CA LOG_LEVEL default before any module
@@ -26,6 +27,7 @@ import {
   buildMcpAksLoopUserPrompt,
   createMcpToolBundle,
   cleanupAzureResources,
+  deleteEvalNamespace,
   ensureRegistryLogin,
   ensureEvalCluster,
   ensureNamespace,
@@ -34,6 +36,7 @@ import {
   type AzureContext,
 } from './modes.js';
 import { runChecks, selectChecks, type CheckResult } from './checks.js';
+import { createDisposableNamespace } from './namespaces.js';
 
 /** Discover fixtures: each immediate subdirectory of `dir` is one fixture. */
 export async function discoverFixtures(dir: string): Promise<string[]> {
@@ -227,6 +230,7 @@ export const MAX_DEPLOY_NUDGES = (() => {
 })();
 
 const RUN_ID = Date.now().toString(36).slice(-6);
+const OWNERSHIP_TOKEN = randomBytes(6).toString('hex');
 
 async function runOneLevel(opts: {
   fixture: string;
@@ -249,7 +253,7 @@ async function runOneLevel(opts: {
     imageName: `${opts.ctx.imageName}-${opts.level.id}-r${opts.rep}-${RUN_ID}`,
   };
   // Wipe any leftover deployment so verify-deploy doesn't read stale state.
-  await cleanupAzureResources(cellCtx);
+  await cleanupAzureResources(cellCtx, OWNERSHIP_TOKEN);
   // Refresh ACR credentials per cell — tokens expire (~3h) mid-sweep otherwise.
   await ensureRegistryLogin(cellCtx);
   const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-grad-'));
@@ -294,7 +298,7 @@ async function runOneLevel(opts: {
       }
     }
     // Tear down the deployment we just created so the next run starts clean.
-    await cleanupAzureResources(cellCtx);
+    await cleanupAzureResources(cellCtx, OWNERSHIP_TOKEN);
   }
   return record;
 }
@@ -431,56 +435,57 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
 
   // One model's worth of work — sequential over reps × fixtures × paths.
   // Rep is the outer loop so partial runs still give >=1 complete rep per cell.
-  const runModel = async (model: string): Promise<GradientRunRecord[]> => {
+  const runModel = async (lane: { model: string; index: number }): Promise<GradientRunRecord[]> => {
+    const { model } = lane;
     const slug = slugifyModel(model);
-    const nsBudget = 63 - baseCtx.namespace.length - 1;
-    if (opts.models.length > 1 && nsBudget < 1) {
-      throw new Error(
-        `baseCtx.namespace '${baseCtx.namespace}' is too long (${baseCtx.namespace.length} chars) — needs room for '-<model-slug>' within 63 chars (RFC1123).`,
-      );
-    }
-    const nsSlug = slug.slice(0, nsBudget).replace(/-+$/, '');
-    const ctx: AzureContext =
-      opts.models.length > 1
-        ? {
-            ...baseCtx,
-            imageName: `${baseCtx.imageName}-${slug}`,
-            namespace: `${baseCtx.namespace}-${nsSlug}`,
-          }
-        : baseCtx;
+    const modelHash = createHash('sha256').update(model).digest('hex').slice(0, 8);
+    const laneSuffix = `${lane.index}-${modelHash}-${RUN_ID}`;
+    const namespaceSuffix = `${slug.slice(0, 24)}-${laneSuffix}`;
+    const ctx: AzureContext = {
+      ...baseCtx,
+      imageName:
+        opts.models.length > 1
+          ? `${baseCtx.imageName}-${slug.slice(0, 32)}-${laneSuffix}`
+          : baseCtx.imageName,
+      namespace: createDisposableNamespace(baseCtx.namespace, namespaceSuffix, OWNERSHIP_TOKEN),
+    };
     await ensureNamespace(baseCtx, ctx.namespace);
     console.error(
       `[gradient] start model=${model} imageName=${ctx.imageName} namespace=${ctx.namespace} reps=${reps}`,
     );
     const out: GradientRunRecord[] = [];
-    for (let rep = 0; rep < reps; rep++) {
-      for (const fixture of opts.fixtures) {
-        for (const level of levels) {
-          const key = cellKey({ fixture, model, level: level.id, rep });
-          if (completed.has(key)) {
+    try {
+      for (let rep = 0; rep < reps; rep++) {
+        for (const fixture of opts.fixtures) {
+          for (const level of levels) {
+            const key = cellKey({ fixture, model, level: level.id, rep });
+            if (completed.has(key)) {
+              console.error(
+                `[gradient] skip  model=${model} rep=${rep + 1}/${reps} ` +
+                  `fixture=${fixture.split('/').pop()} path=${level.id} (resumed)`,
+              );
+              continue;
+            }
+            const r = await runOneLevel({ fixture, level, model, ctx, checkSpecs, rep });
+            const deployTag = ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
+            const checksPassed = r.checks.filter((c) => c.passed).length;
             console.error(
-              `[gradient] skip  model=${model} rep=${rep + 1}/${reps} ` +
-                `fixture=${fixture.split('/').pop()} path=${level.id} (resumed)`,
+              `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +
+                `fixture=${r.fixture.split('/').pop()} ` +
+                `path=${r.level} ${r.error ? 'ERROR' : 'ok'}${deployTag} ` +
+                `checks=${checksPassed}/${r.checks.length} ` +
+                `(${r.durationMs ? Math.round(r.durationMs / 1000) + 's' : '?'})`,
             );
-            continue;
+            reportCellFailures(r);
+            out.push(r);
+            collected.push(r);
+            if (!r.error) completed.add(key);
+            void writeCheckpoint();
           }
-          const r = await runOneLevel({ fixture, level, model, ctx, checkSpecs, rep });
-          const deployTag = ` deploy=${r.deployVerified ? 'ok' : 'no'} nudges=${r.deployNudges ?? 0}`;
-          const checksPassed = r.checks.filter((c) => c.passed).length;
-          console.error(
-            `[gradient] done  model=${model} rep=${rep + 1}/${reps} ` +
-              `fixture=${r.fixture.split('/').pop()} ` +
-              `path=${r.level} ${r.error ? 'ERROR' : 'ok'}${deployTag} ` +
-              `checks=${checksPassed}/${r.checks.length} ` +
-              `(${r.durationMs ? Math.round(r.durationMs / 1000) + 's' : '?'})`,
-          );
-          reportCellFailures(r);
-          out.push(r);
-          collected.push(r);
-          if (!r.error) completed.add(key);
-          void writeCheckpoint();
         }
       }
+    } finally {
+      await deleteEvalNamespace(ctx, OWNERSHIP_TOKEN);
     }
     console.error(
       `[gradient] finish model=${model} (${Math.round((Date.now() - t0) / 1000)}s wall so far)`,
@@ -491,13 +496,14 @@ export async function runGradient(opts: GradientOptions): Promise<GradientResult
   const concurrency = parallel
     ? Math.max(1, Math.min(opts.maxConcurrentModels ?? opts.models.length, opts.models.length))
     : 1;
+  const modelLanes = opts.models.map((model, index) => ({ model, index }));
   const all =
     concurrency === 1
-      ? await opts.models.reduce<Promise<GradientRunRecord[]>>(
-          async (accP, m) => (await accP).concat(await runModel(m)),
+      ? await modelLanes.reduce<Promise<GradientRunRecord[]>>(
+          async (accP, lane) => (await accP).concat(await runModel(lane)),
           Promise.resolve([]),
         )
-      : (await runWithConcurrency(opts.models, concurrency, runModel)).flat();
+      : (await runWithConcurrency(modelLanes, concurrency, runModel)).flat();
 
   // Flush the final checkpoint before returning.
   await writeCheckpoint();

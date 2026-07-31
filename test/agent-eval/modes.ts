@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 // Side-effect import BEFORE the harness (which transitively loads CA knowledge/
 // validation modules that build pino loggers at load): sets the LOG_LEVEL default.
 import { oneLine, MAX_INLINE_DETAIL_CHARS } from './log-config.js';
+import { assertDisposableNamespace } from './namespaces.js';
 import { MCPTestHarness } from '../llm-integration/infrastructure/mcp-test-harness.js';
 import { buildAksRemoteDevLoopPrompt } from '../../src/prompts/aks-loop/prompt.js';
 import type { ToolSpec } from './driver.js';
@@ -76,7 +77,9 @@ export function dropSkillShadowedTools(tools: ToolSpec[]): ToolSpec[] {
   if (dropped.length) {
     console.error(`[skills] dropped MCP tools shadowed by bundled skills: ${dropped.join(', ')}`);
   } else {
-    console.error('[skills] WARNING: no MCP tools matched the skill bundle — nothing dropped (check tool naming).');
+    console.error(
+      '[skills] WARNING: no MCP tools matched the skill bundle — nothing dropped (check tool naming).',
+    );
   }
   return tools.filter((t) => !shadowed.has(t.name));
 }
@@ -124,7 +127,9 @@ const K8S_NAME_RE = /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/;
 
 function assertK8sName(kind: string, value: string): void {
   if (!K8S_NAME_RE.test(value)) {
-    throw new Error(`Invalid ${kind} '${value}': must match RFC1123 label (^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$).`);
+    throw new Error(
+      `Invalid ${kind} '${value}': must match RFC1123 label (^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$).`,
+    );
   }
 }
 
@@ -162,11 +167,19 @@ export async function ensureNamespace(ctx: AzureContext, namespace: string): Pro
     } finally {
       await fs.unlink(tmpPath).catch(() => {});
     }
-    await execFileP('kubectl', [
-      '-n', namespace,
-      'patch', 'serviceaccount', 'default',
-      '-p', JSON.stringify({ imagePullSecrets: [{ name: pullSecret }] }),
-    ], { timeout: 30_000 });
+    await execFileP(
+      'kubectl',
+      [
+        '-n',
+        namespace,
+        'patch',
+        'serviceaccount',
+        'default',
+        '-p',
+        JSON.stringify({ imagePullSecrets: [{ name: pullSecret }] }),
+      ],
+      { timeout: 30_000 },
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (!/NotFound|not found/i.test(msg)) {
@@ -221,7 +234,9 @@ export async function ensureEvalCluster(ctx: AzureContext = loadAzureContext()):
     }
   } catch (err) {
     const e = err as { stderr?: string; stdout?: string; message?: string };
-    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(-MAX_INLINE_DETAIL_CHARS);
+    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(
+      -MAX_INLINE_DETAIL_CHARS,
+    );
     throw new Error(
       `ensureEvalCluster failed — the eval AKS cluster could not be prepared.\n${detail}\n` +
         'Fix the cluster manually or set AGENT_EVAL_SKIP_CLUSTER_ENSURE=1, then re-run.',
@@ -229,21 +244,12 @@ export async function ensureEvalCluster(ctx: AzureContext = loadAzureContext()):
   }
 }
 
-/**
- * Best-effort cleanup so a run doesn't inherit a stuck pod from a previous one.
- * The agent names its Deployment after the working dir, not `ctx.imageName`, so
- * we match Deployments by this run's pushed image (`<registry>/<imageName>:`)
- * and delete those plus their Service. The trailing `:` keeps the match exact
- * per repo (so `eval-image` doesn't also match `eval-image-mini`).
- */
-export async function cleanupAzureResources(ctx: AzureContext = loadAzureContext()): Promise<void> {
-  // Wipe ALL agent-created workloads in the eval namespace, not just the
-  // canonical eval-image Deployment. Agents self-provision backing services
-  // (mysql/postgres), init Jobs, ConfigMaps and PVCs; leaving those behind let
-  // cross-run cruft accumulate and could skew a later verifyDeploy that checks
-  // every Deployment in the namespace. We intentionally do NOT delete the
-  // namespace itself, ServiceAccounts, or Secrets (the ACR pull secret wired to
-  // the default SA must survive between cells).
+/** Best-effort cleanup of a disposable namespace owned by the evaluation run. */
+export async function cleanupAzureResources(
+  ctx: AzureContext,
+  ownershipToken: string,
+): Promise<void> {
+  assertDisposableNamespace(loadAzureContext().namespace, ctx.namespace, ownershipToken);
   try {
     await execFileP(
       'kubectl',
@@ -260,6 +266,26 @@ export async function cleanupAzureResources(ctx: AzureContext = loadAzureContext
     );
   } catch {
     // best-effort; ignore (no kubectl, no cluster, namespace absent, etc.)
+  }
+}
+
+export async function deleteEvalNamespace(
+  ctx: AzureContext,
+  ownershipToken: string,
+): Promise<void> {
+  assertDisposableNamespace(loadAzureContext().namespace, ctx.namespace, ownershipToken);
+  try {
+    await execFileP(
+      'kubectl',
+      ['delete', 'namespace', ctx.namespace, '--ignore-not-found', '--wait=false'],
+      { timeout: 60_000 },
+    );
+  } catch (err) {
+    console.error(
+      `[gradient] WARNING: failed to delete disposable namespace ${ctx.namespace}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
   }
 }
 
