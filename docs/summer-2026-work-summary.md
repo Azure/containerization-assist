@@ -73,9 +73,11 @@ concrete examples:
 Writing them this firmly is what turns them into a *measurable* signal. The
 base-image rule (G2) is the piece of guidance the `bare` control never receives
 (it only arrives via the CA layer), so the base-image check is the cleanest read
-on what CA adds. The label requirement, by contrast, is handed to *every* level as
-a functional deploy requirement (see the eval section), so it isn't a CA
-differentiator on its own.
+on what CA adds. The label requirement, by contrast, reaches every level — but
+only through its own channel: `bare` is told the exact strings in its prompt
+(it can't guess the arbitrary `createdby` convention), while `mcp`/`skills`
+receive them via their CA layer rather than the prompt (see the eval section) —
+so it isn't a CA differentiator on its own.
 
 **Guardrail:** [test/unit/skills-integrity.test.ts](https://github.com/Azure/containerization-assist/blob/main/test/unit/skills-integrity.test.ts)
 keeps the skill set from silently drifting.
@@ -134,11 +136,16 @@ The whole experiment only means something if the **only** thing that differs
 between bare, mcp, and skills is the CA layer itself. So the prompts are designed
 to isolate that one variable:
 
-- **Labels are given to every level, because they're too specific to guess.** The
+- **Labels reach every level, but only `bare` is told them in its prompt.** The
   `createdby` Dockerfile label and the `app.kubernetes.io/{name,managed-by}`
   manifest labels are exact strings downstream tooling depends on — `bare` would
-  essentially never produce them unprompted, so withholding them wouldn't measure
-  anything. They're a functional requirement, not a CA differentiator.
+  essentially never produce them unprompted and cannot infer the arbitrary
+  `createdby` convention, so it's handed them directly. `mcp` and `skills` are
+  deliberately *not* told the labels in the prompt: their CA layer (the
+  `generate-dockerfile` tool's `attributionLabels` / the `deploy-to-aks` skill)
+  supplies them, so the `has-required-labels` check measures whether the CA layer
+  actually delivers them instead of the prompt spoon-feeding the answer. Either
+  way they're a functional requirement, not a CA differentiator.
 - **Base-image (MCR) guidance is withheld from the plain prompt.** Unlike the
   labels, a model *could* plausibly reach for `mcr.microsoft.com` on its own from a
   "deploy to AKS" prompt — so it's a fair thing to test. No level's task prompt
