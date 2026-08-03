@@ -89,6 +89,7 @@
   ],
   "scripts": {
     "clean": "node scripts/clean-build.cjs",
+    "prepare": "husky",
     "build": "npm run clean && npm run build:version && npm run build:knowledge && npm run build:policies && npm run build:esm && npm run build:cjs",
     "build:version": "tsx scripts/generate-version.ts",
     "build:knowledge": "tsx scripts/generate-embedded-packs.ts",
@@ -113,6 +114,7 @@
     "validate-api": "tsx scripts/validate-public-api.ts",
     "validate:policies": "tsx scripts/validate-policies.ts",
     "validate:action-refs": "tsx scripts/validate-action-refs.ts",
+    "refresh:action-pins": "tsx scripts/refresh-action-pins.ts",
     "policy:simulate": "tsx src/cli/policy-simulate.ts",
     "validate": "npm run lint && npm run typecheck && npm run test:unit && npm run validate:policies && node scripts/validate-examples.js",
     "fix": "npm run lint:fix && npm run format",

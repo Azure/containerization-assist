@@ -9,6 +9,7 @@ import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
 import scanImageTool from './scan-image/tool';
 import tagImageTool from './tag-image/tool';
+import validateGithubWorkflowTool from './validate-github-workflow/tool';
 import verifyDeployTool from './verify-deploy/tool';
 import { TOOL_NAME, WORKFLOW_TOOL_NAME, ToolName } from './shared/toolDefinition';
 
@@ -26,6 +27,7 @@ prepareClusterTool.name = TOOL_NAME.PREPARE_CLUSTER;
 pushImageTool.name = TOOL_NAME.PUSH_IMAGE;
 scanImageTool.name = TOOL_NAME.SCAN_IMAGE;
 tagImageTool.name = TOOL_NAME.TAG_IMAGE;
+validateGithubWorkflowTool.name = TOOL_NAME.VALIDATE_GITHUB_WORKFLOW;
 verifyDeployTool.name = TOOL_NAME.VERIFY_DEPLOY;
 
 // Create a union type of all tool types for better type safety
@@ -41,6 +43,7 @@ export type Tool = (
   | typeof pushImageTool
   | typeof scanImageTool
   | typeof tagImageTool
+  | typeof validateGithubWorkflowTool
   | typeof verifyDeployTool
 ) & { name: ToolName };
 
@@ -53,6 +56,7 @@ export const ALL_TOOLS: readonly Tool[] = [
   generateDockerfileTool,
   generateGithubWorkflowTool,
   generateK8sManifestsTool,
+  validateGithubWorkflowTool,
 
   // Operational/deterministic tools
   buildImageContextTool,
@@ -78,5 +82,6 @@ export {
   pushImageTool,
   scanImageTool,
   tagImageTool,
+  validateGithubWorkflowTool,
   verifyDeployTool,
 };

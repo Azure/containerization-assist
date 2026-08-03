@@ -20,7 +20,7 @@
     "category": "cicd",
     "pattern": "azure/login",
     "recommendation": "Use azure/login@v3 with OIDC federated credentials instead of client secrets or certificates — eliminates long-lived secrets entirely",
-    "example": "- name: Azure Login (OIDC)\n  uses: azure/login@v3\n  with:\n    client-id: ${{ secrets.AZURE_CLIENT_ID }}\n    tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+    "example": "- name: Azure Login (OIDC)\n  uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0\n  with:\n    client-id: ${{ secrets.AZURE_CLIENT_ID }}\n    tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}",
     "severity": "required",
     "tags": [
       "generate-github-workflow",
@@ -68,7 +68,7 @@
     "category": "cicd",
     "pattern": "azure/use-kubelogin",
     "recommendation": "Use azure/use-kubelogin@v1 to configure kubelogin for non-interactive AAD/OIDC authentication before connecting to AKS — required when admin: false is set on aks-set-context",
-    "example": "- name: Set up kubelogin for non-interactive login\n  uses: azure/use-kubelogin@v1\n  with:\n    kubelogin-version: 'v0.0.25'",
+    "example": "- name: Set up kubelogin for non-interactive login\n  uses: azure/use-kubelogin@76597ae0fcbaace21b05e13a2cbf8daee2c6e820 # v1.2\n  with:\n    kubelogin-version: 'v0.0.25'",
     "severity": "high",
     "tags": [
       "aks",
@@ -83,7 +83,7 @@
     "category": "cicd",
     "pattern": "azure/aks-set-context",
     "recommendation": "Use azure/aks-set-context@v5 with use-kubelogin: true and admin: false to configure kubectl context for AKS using OIDC non-interactive authentication",
-    "example": "- name: Get K8s context\n  uses: azure/aks-set-context@v5\n  with:\n    resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}\n    cluster-name: ${{ env.CLUSTER_NAME }}\n    admin: 'false'\n    use-kubelogin: 'true'",
+    "example": "- name: Get K8s context\n  uses: azure/aks-set-context@60623acbdcbbdcf799ad50a1adf8703874339f8b # v5.0.0\n  with:\n    resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}\n    cluster-name: ${{ env.CLUSTER_NAME }}\n    admin: 'false'\n    use-kubelogin: 'true'",
     "severity": "high",
     "tags": [
       "aks",
@@ -98,7 +98,7 @@
     "category": "cicd",
     "pattern": "azure/k8s-bake",
     "recommendation": "Use azure/k8s-bake@v4 (renderEngine) to render Helm charts or Kustomize overlays before deployment. Plain Kubernetes manifests do NOT need bake — pass them directly to Azure/k8s-deploy",
-    "example": "# Helm:\n- name: Bake Helm chart\n  uses: azure/k8s-bake@v4\n  with:\n    renderEngine: helm\n    helmChart: charts/myapp\n    overrideFiles: charts/myapp/values.production.yaml\n  id: bake\n\n# Kustomize:\n# - name: Bake Kustomize overlay\n#   uses: azure/k8s-bake@v4\n#   with:\n#     renderEngine: kustomize\n#     kustomizationPath: k8s/overlays/production\n#   id: bake\n\n# Plain manifests: skip bake — pass manifests directly to Azure/k8s-deploy",
+    "example": "# Helm:\n- name: Bake Helm chart\n  uses: azure/k8s-bake@0191a5ae5126cfe61885d9bd46511caa8e9a9550 # v4.1.0\n  with:\n    renderEngine: helm\n    helmChart: charts/myapp\n    overrideFiles: charts/myapp/values.production.yaml\n  id: bake\n\n# Kustomize:\n# - name: Bake Kustomize overlay\n#   uses: azure/k8s-bake@0191a5ae5126cfe61885d9bd46511caa8e9a9550 # v4.1.0\n#   with:\n#     renderEngine: kustomize\n#     kustomizationPath: k8s/overlays/production\n#   id: bake\n\n# Plain manifests: skip bake — pass manifests directly to Azure/k8s-deploy",
     "severity": "medium",
     "tags": [
       "aks",
@@ -115,7 +115,7 @@
     "category": "cicd",
     "pattern": "azure/k8s-deploy",
     "recommendation": "Use Azure/k8s-deploy@v6 to apply manifests to AKS, then follow with a kubectl annotate step to tag deployed resources with pipeline metadata for traceability",
-    "example": "- name: Deploys application\n  uses: Azure/k8s-deploy@v6\n  with:\n    action: deploy\n    manifests: ${{ env.DEPLOYMENT_MANIFEST_PATH }}\n    images: |\n      ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }}\n    namespace: ${{ env.NAMESPACE }}\n\n- name: Annotate deployment\n  run: |\n    if kubectl get deployment -n ${{ env.NAMESPACE }} --no-headers 2>/dev/null | grep -q .; then\n      kubectl annotate deployment --all -n ${{ env.NAMESPACE }} \\\n        aks-project/pipeline-repo=\"${{ github.repository }}\" \\\n        aks-project/pipeline-workflow=\"${{ github.workflow }}\" \\\n        aks-project/deployed-by=\"vscode\" \\\n        aks-project/pipeline-run-url=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\" \\\n        --overwrite\n    fi",
+    "example": "- name: Deploys application\n  uses: Azure/k8s-deploy@c7ebd0d5f39477a23f1b5dea0f52e6db04adf28e # v6.0.0\n  with:\n    action: deploy\n    manifests: ${{ env.DEPLOYMENT_MANIFEST_PATH }}\n    images: |\n      ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }}\n    namespace: ${{ env.NAMESPACE }}\n\n- name: Annotate deployment\n  run: |\n    if kubectl get deployment -n ${{ env.NAMESPACE }} --no-headers 2>/dev/null | grep -q .; then\n      kubectl annotate deployment --all -n ${{ env.NAMESPACE }} \\\n        aks-project/pipeline-repo=\"${{ github.repository }}\" \\\n        aks-project/pipeline-workflow=\"${{ github.workflow }}\" \\\n        aks-project/deployed-by=\"vscode\" \\\n        aks-project/pipeline-run-url=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\" \\\n        --overwrite\n    fi",
     "severity": "required",
     "tags": [
       "aks",
@@ -131,7 +131,7 @@
     "category": "cicd",
     "pattern": "needs: [buildImage]",
     "recommendation": "Split the workflow into two jobs — 'buildImage' (build and push to ACR) and 'deploy' (set context and deploy to AKS) — with deploy depending on buildImage via needs:",
-    "example": "jobs:\n  buildImage:\n    permissions:\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n      - name: Azure login\n        uses: azure/login@v3\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... log into ACR and az acr build steps\n\n  deploy:\n    permissions:\n      actions: read\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    needs: [buildImage]\n    steps:\n      - uses: actions/checkout@v6\n      - name: Azure login\n        uses: azure/login@v3\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... kubelogin, aks-set-context, k8s-deploy steps",
+    "example": "jobs:\n  buildImage:\n    permissions:\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3\n      - name: Azure login\n        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... log into ACR and az acr build steps\n\n  deploy:\n    permissions:\n      actions: read\n      contents: read\n      id-token: write\n    runs-on: ubuntu-latest\n    needs: [buildImage]\n    steps:\n      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3\n      - name: Azure login\n        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0\n        with:\n          client-id: ${{ secrets.AZURE_CLIENT_ID }}\n          tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n      # ... kubelogin, aks-set-context, k8s-deploy steps",
     "severity": "high",
     "tags": [
       "generate-github-workflow",
@@ -190,15 +190,17 @@
     "id": "action-version-pinning",
     "category": "cicd",
     "pattern": "uses:",
-    "recommendation": "Pin every action to its floating major tag (@vN) so it auto-tracks the latest compatible release. When an action publishes a new major, bump N. Do NOT use @main or commit-floating refs, and do NOT use @latest (not a valid GitHub Actions version selector)",
-    "example": "# Good — floating major tag, always the latest compatible release:\nuses: actions/checkout@v6\nuses: azure/login@v3\nuses: azure/use-kubelogin@v1\nuses: azure/aks-set-context@v5\nuses: azure/k8s-bake@v4\nuses: Azure/k8s-deploy@v6\n\n# Avoid:\n# uses: actions/checkout@main     # unverifiable, supply-chain risk\n# uses: actions/checkout@latest   # not a real selector — fails unless a 'latest' tag exists",
-    "severity": "high",
+    "recommendation": "Pin every action to a full 40-character commit SHA with a trailing '# vX.Y.Z' comment. A mutable tag (@v3) or branch (@main) can be repointed by a compromised maintainer to malicious code — a full commit SHA is immutable. Do NOT use floating tags, @main, or @latest.",
+    "example": "# Good — immutable commit SHA pinned, with a version comment for readability:\nuses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3\nuses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0\nuses: azure/use-kubelogin@76597ae0fcbaace21b05e13a2cbf8daee2c6e820 # v1.2\nuses: azure/aks-set-context@60623acbdcbbdcf799ad50a1adf8703874339f8b # v5.0.0\nuses: azure/k8s-bake@0191a5ae5126cfe61885d9bd46511caa8e9a9550 # v4.1.0\nuses: Azure/k8s-deploy@c7ebd0d5f39477a23f1b5dea0f52e6db04adf28e # v6.0.0\n\n# Avoid:\n# uses: actions/checkout@v6       # mutable tag — can be repointed (supply-chain risk)\n# uses: actions/checkout@main     # unverifiable, supply-chain risk\n# uses: actions/checkout@latest   # not a real selector — fails unless a 'latest' tag exists",
+    "severity": "required",
     "tags": [
       "generate-github-workflow",
+      "validate-github-workflow",
       "github-actions",
       "versioning",
+      "security",
       "maintenance"
     ],
-    "description": "GitHub Actions has no '@latest' selector like npm; the idiomatic way to always get the latest compatible release is the floating major tag '@vN', which the action maintainers move forward across minor/patch releases. Pinning to the major keeps workflows getting fixes automatically while staying on a stable API. Bump the major only when the action ships a new one (and verify any renamed inputs). Current latest majors at time of writing: actions/checkout@v6, azure/login@v3, azure/use-kubelogin@v1, azure/aks-set-context@v5, azure/k8s-bake@v4, Azure/k8s-deploy@v6."
+    "description": "Pinning a GitHub Action to a full commit SHA is the recommended supply-chain control: unlike a floating major tag (@vN) or branch (@main), a 40-char commit SHA is immutable and cannot be silently repointed to malicious code. Keep a trailing '# vX.Y.Z' comment so humans can read the version, and refresh the SHA when bumping to a new release (resolve the tag via the GitHub API: /repos/<owner>/<repo>/commits/<tag>). The generate-github-workflow tool emits these pinned SHAs and validate-github-workflow enforces them (Layer 3). Pinned versions at time of writing: actions/checkout=v6.0.3, azure/login=v3.0.0, azure/use-kubelogin=v1.2, azure/aks-set-context=v5.0.0, azure/k8s-bake=v4.1.0, Azure/k8s-deploy=v6.0.0."
   }
 ]

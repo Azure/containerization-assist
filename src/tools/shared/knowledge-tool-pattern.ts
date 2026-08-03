@@ -55,8 +55,16 @@ export interface CategorizedKnowledge<TCategories extends string = string> {
   /** All knowledge snippets */
   all: KnowledgeSnippet[];
 
-  /** Categorized by type */
-  categories: Record<TCategories, KnowledgeSnippet[]>;
+  /**
+   * Snippets grouped by category.
+   *
+   * `Partial` because the grouping only exists when the tool configures
+   * {@link KnowledgeToolConfig.categorization} — a tool that reads only `all` gets an empty
+   * record. When categorization *is* configured every declared `categoryNames` entry is
+   * present (initialized to `[]` before grouping), so a missing key means the category was
+   * never declared. Read with `?? []` rather than assuming presence.
+   */
+  categories: Partial<Record<TCategories, KnowledgeSnippet[]>>;
 }
 
 /**
@@ -138,8 +146,13 @@ export interface KnowledgeToolConfig<
   /** Knowledge query configuration */
   query: KnowledgeQueryConfig<TInput>;
 
-  /** Categorization configuration */
-  categorization: CategorizationConfig<TInput, TCategories>;
+  /**
+   * Categorization configuration. Optional — omit it for tools that only read
+   * `knowledge.all` (e.g. deterministic validators that look snippets up by id).
+   * When omitted, `knowledge.categories` is an empty record; see
+   * {@link CategorizedKnowledge.categories}.
+   */
+  categorization?: CategorizationConfig<TInput, TCategories>;
 
   /** Rule-based logic configuration */
   rules: RulesConfig<TInput, TRuleResults>;
@@ -294,33 +307,36 @@ export function createKnowledgeTool<
       knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
     }
 
-    // 2. Categorize knowledge snippets
-    // Initialize empty arrays for each category
-    const categoriesRecord: Record<string, KnowledgeSnippet[]> = {};
-    for (const categoryName of config.categorization.categoryNames) {
-      categoriesRecord[categoryName] = [];
-    }
+    // 2. Categorize knowledge snippets (skipped entirely when no categorization is configured)
+    // Every declared category is initialized to [] first, so a configured tool always sees
+    // all of its own keys; only an unconfigured tool gets an empty record.
+    const categoriesRecord: Partial<Record<TCategories, KnowledgeSnippet[]>> = {};
+    if (config.categorization) {
+      for (const categoryName of config.categorization.categoryNames) {
+        categoriesRecord[categoryName] = [];
+      }
 
-    // Categorize each snippet (snippets can belong to multiple categories)
-    for (const snippet of knowledgeSnippets) {
-      const categories = config.categorization.categorize(snippet, input);
-      for (const category of categories) {
-        const categoryArray = categoriesRecord[category];
-        if (categoryArray) {
-          categoryArray.push(snippet);
-        } else {
-          throw new Error(
-            `categorize() returned undeclared category "${category}" for tool "${config.name}". ` +
-              `Snippet ID: ${snippet.id}, Source: ${snippet.source}. ` +
-              `This likely indicates a configuration error.`,
-          );
+      // Categorize each snippet (snippets can belong to multiple categories)
+      for (const snippet of knowledgeSnippets) {
+        const categories = config.categorization.categorize(snippet, input);
+        for (const category of categories) {
+          const categoryArray = categoriesRecord[category];
+          if (categoryArray) {
+            categoryArray.push(snippet);
+          } else {
+            throw new Error(
+              `categorize() returned undeclared category "${category}" for tool "${config.name}". ` +
+                `Snippet ID: ${snippet.id}, Source: ${snippet.source}. ` +
+                `This likely indicates a configuration error.`,
+            );
+          }
         }
       }
     }
 
     const categorized: CategorizedKnowledge<TCategories> = {
       all: knowledgeSnippets,
-      categories: categoriesRecord as Record<TCategories, KnowledgeSnippet[]>,
+      categories: categoriesRecord,
     };
 
     // 3. Apply rule-based logic
@@ -336,7 +352,8 @@ export function createKnowledgeTool<
 
     // Log completion
     const categoryCounts = Object.entries(categorized.categories).map(
-      ([name, snippets]) => `${name}: ${(snippets as KnowledgeSnippet[]).length}`,
+      ([name, snippets]) =>
+        `${name}: ${((snippets as KnowledgeSnippet[] | undefined) ?? []).length}`,
     );
 
     ctx.logger.info(

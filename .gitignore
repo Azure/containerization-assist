@@ -68,6 +68,9 @@ temp/
 # Tool planning scratch files (local only)
 planning/
 
+# Local-only dev/test helpers (not committed)
+local/
+
 # TypeScript
 *.tsbuildinfo
 

@@ -95,7 +95,7 @@ export interface ToolNextActionFile {
  */
 export interface ToolNextAction {
   /** Type of action to perform */
-  action: 'create-files' | 'update-files' | 'review-and-decide';
+  action: 'create-files' | 'update-files' | 'review-and-decide' | 'fix-files';
   /** Clear instruction for the AI on what to do with the recommendations */
   instruction: string;
   /** Files to create or update */
