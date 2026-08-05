@@ -41,6 +41,7 @@ import type { VerifyDeploymentResult } from '@/tools/verify-deploy/tool';
 import type { DockerfileFixPlan } from '@/tools/fix-dockerfile/schema';
 import type { ManifestPlan } from '@/tools/generate-k8s-manifests/schema';
 import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
+import type { WorkflowValidationPlan } from '@/tools/validate-github-workflow/schema';
 import type { PushImageResult } from '@/tools/push-image/tool';
 import type { TagImageResult } from '@/tools/tag-image/tool';
 import type { ClusterPlan } from '@/tools/prepare-cluster/schema';
@@ -54,6 +55,7 @@ import {
   formatFixDockerfileNarrative,
   formatGenerateK8sManifestsNarrative,
   formatGithubWorkflowNarrative,
+  formatWorkflowValidationNarrative,
   formatPushImageNarrative,
   formatTagImageNarrative,
   formatPrepareClusterNarrative,
@@ -231,6 +233,7 @@ export function createMCPServer<TTool extends Tool>(
   // collapsed tool output rather than flooding the chat window.
 
   // create-containerization-policy
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP SDK tool() generics cause TS2589; runtime safety via Zod schema
   (server as McpServer & { tool: any }).tool(
     WORKFLOW_TOOL_NAME.CREATE_POLICY,
     'Create a custom OPA Rego policy for containerization-assist. Returns a step-by-step plan and guidance for authoring a policy. Call this tool, then walk the user through the returned plan — each step has a recommended default the user can accept or override.',
@@ -241,6 +244,7 @@ export function createMCPServer<TTool extends Tool>(
   );
 
   // kind-loop
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP SDK tool() generics cause TS2589; runtime safety via Zod schema
   (server as McpServer & { tool: any }).tool(
     WORKFLOW_TOOL_NAME.KIND_LOOP,
     'Drive a full local Kind cluster development iteration loop: analyze, build, scan, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
@@ -251,6 +255,7 @@ export function createMCPServer<TTool extends Tool>(
   );
 
   // aks-loop
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP SDK tool() generics cause TS2589; runtime safety via Zod schema
   (server as McpServer & { tool: any }).tool(
     WORKFLOW_TOOL_NAME.AKS_LOOP,
     'Drive a full AKS remote cluster deployment iteration loop: analyze, build, scan, push to ACR, deploy, and verify using containerization-assist tools. Returns a step-by-step workflow plan.',
@@ -605,6 +610,9 @@ function formatAsNaturalLanguage(
   if (isGithubWorkflowPlan(output)) {
     return formatGithubWorkflowNarrative(output, chainHintsMode);
   }
+  if (isWorkflowValidationPlan(output)) {
+    return formatWorkflowValidationNarrative(output, chainHintsMode);
+  }
   if (isPushImageResult(output)) {
     return formatPushImageNarrative(output, chainHintsMode);
   }
@@ -684,6 +692,18 @@ function isGithubWorkflowPlan(output: object): output is GithubWorkflowPlan {
     'secretsRequired' in output &&
     'nextAction' in output &&
     Array.isArray((output as GithubWorkflowPlan).workflowJobs)
+  );
+}
+
+function isWorkflowValidationPlan(output: object): output is WorkflowValidationPlan {
+  const report = (output as WorkflowValidationPlan).report as unknown;
+  return (
+    'report' in output &&
+    'filePath' in output &&
+    'attributionLabels' in output &&
+    report !== null &&
+    typeof report === 'object' &&
+    'grade' in report
   );
 }
 

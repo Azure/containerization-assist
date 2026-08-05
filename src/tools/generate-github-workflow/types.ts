@@ -13,7 +13,7 @@ export const generateGithubWorkflowToolDefinition = {
   },
   chainHints: {
     success:
-      'GitHub Actions workflow plan generated. Next: commit the workflow file under .github/workflows/ to your repository, then configure AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID as GitHub repository secrets. Set up a branch-scoped OIDC federated credential in Azure Entra ID pointing to your GitHub repository and branch.',
+      'GitHub Actions workflow plan generated with SHA-pinned actions. IMMEDIATE NEXT STEP: after writing the workflow file, call validate-github-workflow (pass repositoryPath + workflowFileName, or the raw workflowContent) to verify YAML validity, SHA-pinning, and the CA critical rules BEFORE committing. Only once validation reports no required issues, commit the workflow file under .github/workflows/, configure AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID as GitHub repository secrets, and set up a branch-scoped OIDC federated credential in Azure Entra ID pointing to your GitHub repository and branch.',
     failure:
       'Failed to generate GitHub Actions workflow plan. Ensure registry, clusterName, and resourceGroup are provided.',
   },

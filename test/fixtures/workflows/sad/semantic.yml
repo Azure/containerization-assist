@@ -1,0 +1,14 @@
+name: deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Build
+        run: docker build -t myapp .
+      - name: Push
+        uses: docker/build-push-action@0788c444d8b4d67e21d4c6b3f7b2f9dc1e2b9d8a # v6
