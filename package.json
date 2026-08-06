@@ -139,7 +139,7 @@
     "@modelcontextprotocol/sdk": "~1.30.0",
     "@open-policy-agent/opa-wasm": "^1.10.0",
     "@types/xml2js": "^0.4.14",
-    "commander": "^14.0.1",
+    "commander": "^15.0.0",
     "docker-file-parser": "^1.0.7",
     "dockerfilelint": "^1.8.0",
     "dockerode": "^5.0.0",
