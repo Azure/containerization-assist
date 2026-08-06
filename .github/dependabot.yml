@@ -35,6 +35,9 @@ updates:
     schedule:
       interval: "cron"
       cronjob: "0 9 1,15 * *"
+    # Wait 7 days after a release before proposing it
+    cooldown:
+      default-days: 7
     groups:
       github-actions-minor-patch:
         patterns:
