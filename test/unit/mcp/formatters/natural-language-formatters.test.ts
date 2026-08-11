@@ -9,12 +9,15 @@ import {
   formatBuildImageNarrative,
   formatAnalyzeRepoNarrative,
   formatGithubWorkflowNarrative,
+  formatWorkflowValidationNarrative,
 } from '@/mcp/formatters/natural-language-formatters';
 import type { ScanImageResult } from '@/tools/scan-image/tool';
 import type { DockerfilePlan } from '@/tools/generate-dockerfile/schema';
 import type { BuildImageResult } from '@/tools/build-image-context/schema';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import type { GithubWorkflowPlan } from '@/tools/generate-github-workflow/schema';
+import type { WorkflowValidationPlan } from '@/tools/validate-github-workflow/schema';
+import { ValidationSeverity } from '@/validation/core-types';
 
 describe('natural-language-formatters', () => {
   describe('formatScanImageNarrative', () => {
@@ -920,6 +923,97 @@ describe('natural-language-formatters', () => {
     it('includes next steps when chain hints are enabled', () => {
       const narrative = formatGithubWorkflowNarrative(makePlan());
       expect(narrative).toContain('**Next Steps:**');
+    });
+  });
+
+  describe('formatWorkflowValidationNarrative', () => {
+    const makeFailingPlan = (): WorkflowValidationPlan => ({
+      report: {
+        results: [
+          {
+            isValid: false,
+            passed: false,
+            ruleId: 'refs/sha-pin',
+            layer: 'refs',
+            message: 'Action `actions/checkout@v4` is pinned to a mutable ref.',
+            errors: ['Action `actions/checkout@v4` is pinned to a mutable ref.'],
+            warnings: [],
+            suggestions: ['Replace @v4 with the commit SHA it resolves to.'],
+            // Contract: the top-level `line` carries the position and `metadata.location`
+            // describes the subject. Encoding "line 6" into `location` would both violate
+            // that split and hide the regression the test below guards against.
+            line: 6,
+            metadata: {
+              severity: ValidationSeverity.ERROR,
+              location: 'uses: actions/checkout',
+            },
+          },
+        ],
+        score: 75,
+        grade: 'C',
+        passed: 0,
+        failed: 1,
+        errors: 1,
+        warnings: 0,
+        info: 0,
+        timestamp: new Date().toISOString(),
+      },
+      filePath: '.github/workflows/ci.yml',
+      summary: 'action required',
+      attributionLabels: { annotations: {} },
+      confidence: 0.9,
+      nextAction: {
+        action: 'fix-files',
+        instruction:
+          'The GitHub Actions workflow at .github/workflows/ci.yml has 1 required issue that must be fixed:\n  1. [refs/sha-pin] (line 6) Action `actions/checkout@v4` is pinned to a mutable ref.',
+        files: [
+          {
+            path: '.github/workflows/ci.yml',
+            purpose: 'GitHub Actions CI/CD workflow to fix so it passes validation',
+          },
+        ],
+      },
+    });
+
+    it('surfaces the fix-files instruction (target path + enumerated issues) on failure', () => {
+      const narrative = formatWorkflowValidationNarrative(makeFailingPlan());
+      expect(narrative).toContain('**Fix instruction:**');
+      expect(narrative).toContain('.github/workflows/ci.yml has 1 required issue');
+      expect(narrative).toContain('[refs/sha-pin]');
+    });
+
+    // Regression: `line` and `metadata.location` are rendered from two different fields, so a
+    // finding carrying both must read "line 6, uses: actions/checkout" — never "line 6, line 6".
+    it('renders the line and the subject as one location, without duplication', () => {
+      const narrative = formatWorkflowValidationNarrative(makeFailingPlan());
+      expect(narrative).toContain('(line 6, uses: actions/checkout)');
+      expect(narrative).not.toMatch(/line 6,\s*line 6/);
+    });
+
+    it('omits the position entirely when a finding has neither line nor location', () => {
+      const plan = makeFailingPlan();
+      const first = plan.report.results[0];
+      // Assert `metadata` up front rather than `delete first.metadata?.location`: optional
+      // chaining would silently no-op if the fixture ever lost `metadata`, leaving the test
+      // green for the wrong reason.
+      if (!first?.metadata) throw new Error('fixture must have a finding with metadata');
+      delete first.line;
+      delete first.metadata.location;
+      const narrative = formatWorkflowValidationNarrative(plan);
+      expect(narrative).toContain('[refs/sha-pin]');
+      expect(narrative).not.toContain('()');
+    });
+
+    it('does not emit a fix instruction when the workflow passes', () => {
+      const plan = makeFailingPlan();
+      const passingPlan: WorkflowValidationPlan = {
+        ...plan,
+        report: { ...plan.report, results: [], errors: 0, failed: 0, score: 100, grade: 'A' },
+      };
+      delete passingPlan.nextAction;
+      const narrative = formatWorkflowValidationNarrative(passingPlan);
+      expect(narrative).toContain('WORKFLOW VALIDATION PASSED');
+      expect(narrative).not.toContain('**Fix instruction:**');
     });
   });
 });

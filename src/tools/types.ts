@@ -9,6 +9,7 @@ import { prepareClusterToolDefinition } from './prepare-cluster/types';
 import { pushImageToolDefinition } from './push-image/types';
 import { scanImageToolDefinition } from './scan-image/types';
 import { tagImageToolDefinition } from './tag-image/types';
+import { validateGithubWorkflowToolDefinition } from './validate-github-workflow/types';
 import { verifyDeployToolDefinition } from './verify-deploy/types';
 
 export {
@@ -23,6 +24,7 @@ export {
   pushImageToolDefinition,
   scanImageToolDefinition,
   tagImageToolDefinition,
+  validateGithubWorkflowToolDefinition,
   verifyDeployToolDefinition,
 };
 
@@ -41,5 +43,6 @@ export const ALL_TOOL_DEFINITIONS = [
   pushImageToolDefinition,
   scanImageToolDefinition,
   tagImageToolDefinition,
+  validateGithubWorkflowToolDefinition,
   verifyDeployToolDefinition,
 ] as const;
