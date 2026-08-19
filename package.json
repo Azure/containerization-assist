@@ -145,7 +145,7 @@
     "dockerode": "^5.0.0",
     "glob": "^11.0.3",
     "js-yaml": "^4.1.0",
-    "kubernetes-models": "^4.5.1",
+    "kubernetes-models": "^5.1.0",
     "pino": "^9.14.0",
     "protobufjs": "^8.0.0",
     "tar": "^7.5.2",
