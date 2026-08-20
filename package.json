@@ -157,8 +157,8 @@
     "zod-to-json-schema": "^3.25.0"
   },
   "devDependencies": {
-    "@ai-sdk/azure": "^2.0.54",
-    "@ai-sdk/openai": "^2.0.53",
+    "@ai-sdk/azure": "^4.0.34",
+    "@ai-sdk/openai": "^4.0.33",
     "@eslint/js": "^9.38.0",
     "@jest/globals": "^30.2.0",
     "@types/dockerode": "^3.3.44",
@@ -171,7 +171,7 @@
     "@types/tmp": "^0.2.6",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
-    "ai": "^5.0.76",
+    "ai": "^7.0.55",
     "eslint": "^9.38.0",
     "husky": "^9.1.7",
     "jest": "^30.2.0",
