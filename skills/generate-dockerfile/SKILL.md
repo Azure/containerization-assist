@@ -96,20 +96,19 @@ same major (`8-distroless`, `17-distroless`, …) which ships only the JRE.
 |---|---|---|---|
 | 8.0 | `sdk:8.0-azurelinux3.0` | `aspnet:8.0-azurelinux3.0` | `runtime:8.0-azurelinux3.0` |
 | 9.0 | `sdk:9.0-azurelinux3.0` | `aspnet:9.0-azurelinux3.0` | `runtime:9.0-azurelinux3.0` |
+| 10.0 | `sdk:10.0-azurelinux3.0` | `aspnet:10.0-azurelinux3.0` | `runtime:10.0-azurelinux3.0` |
 
 **Node.js — `mcr.microsoft.com/azurelinux/{base,distroless}/nodejs`**
 
 | `<LV>` | Build tag | Runtime tag |
 |---|---|---|
-| 18 | `base/nodejs:18` | `distroless/nodejs:18` |
 | 20 | `base/nodejs:20` | `distroless/nodejs:20` |
-| 22 | `base/nodejs:22` | `distroless/nodejs:22` |
+| 24 | `base/nodejs:24` | `distroless/nodejs:24` |
 
 **Python — `mcr.microsoft.com/azurelinux/{base,distroless}/python`**
 
 | `<LV>` | Build tag | Runtime tag |
 |---|---|---|
-| 3.11 | `base/python:3.11` | `distroless/python:3.11` |
 | 3.12 | `base/python:3.12` | `distroless/python:3.12` |
 
 Defaults if `languageVersion` is missing: `java=21`, `dotnet=8.0`,
@@ -120,8 +119,8 @@ Defaults if `languageVersion` is missing: `java=21`, `dotnet=8.0`,
 If the project targets a version not in G2.1 (typically Python 3.9/3.10,
 Node 16, Java 7):
 
-1. **Preferred:** bump the build target to the nearest LTS in G2.1
-   (Python → 3.11, Node → 18). Update package metadata, keep MCR images.
+1. **Preferred:** bump the build target to the nearest supported version in G2.1
+   (Python → 3.12, Node → 20). Update package metadata, keep MCR images.
 2. Only if modernization is genuinely impossible, drop to G2.3 and
    document the reason in a `# WHY-NOT-MCR:` comment above the
    offending `FROM` line.
@@ -363,7 +362,7 @@ row in this table.
 Before emitting, confirm:
 
 - [ ] **Required label present.** The runtime stage contains `LABEL com.azure.containerizationassist.createdby="containerization-assist"` immediately after its `FROM` line. (If missing, add it now — do not skip.)
-- [ ] **Azure base.** Every `FROM` line either starts with `mcr.microsoft.com/` (using a tag from the G2.1 catalog) **or** matches a row in the G2.3 fallback list with a `# WHY-NOT-MCR:` comment above it. No invented MCR tags.
+- [ ] **Azure base.** Every `FROM` line either starts with `mcr.microsoft.com/` (using an exact repository+tag from `knowledge/catalogs/mcr-base-images.json`, preferably a G2.1 recommendation) **or** matches a row in the G2.3 fallback list with a `# WHY-NOT-MCR:` comment above it. No invented MCR tags.
 - [ ] **No builder as runtime.** If any `FROM` uses a G2.3 *Build stage* image (`maven`/`gradle`/`golang`/`rust`/`composer`), the Dockerfile is multi-stage and its **final** `FROM` is the matching G2.3 *Runtime stage* image (or an MCR G2.1 image) — never the builder itself.
 - [ ] **Source copied before build.** Every `RUN` that invokes a build tool (`mvn`/`mvnw`, `gradle`/`gradlew`, `npm run build`, `tsc`, `dotnet publish`, `go build`, `cargo build`) is preceded by a `COPY` of the source tree.
 - [ ] Single non-root `USER` in the final stage

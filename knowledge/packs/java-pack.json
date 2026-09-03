@@ -3,7 +3,7 @@
     "id": "java-25-microsoft-azurelinux",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk|FROM.*java",
-    "recommendation": "Use Microsoft Azure Linux 3.0 with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance. Note this image does not have tar pre-installed, so install it for Maven builds. Images include a non-root 'app' user.",
+    "recommendation": "Use Microsoft Azure Linux 3.0 with Java 25 for enterprise deployments. Provides enterprise support, security updates, and compliance. This image is Azure Linux, whose only package manager is tdnf (there is no apt-get, dnf, microdnf, or yum). tar is not pre-installed, so install it with tdnf for Maven builds: RUN tdnf install -y tar. Images include a non-root 'app' user.",
     "example": "# Multi-stage build with Java 25 on Microsoft Azure Linux 3.0\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS builder\nRUN tdnf install -y tar\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nUSER app\nCMD [\"app.jar\"]",
     "severity": "high",
     "tags": [
@@ -26,7 +26,7 @@
     "id": "java-25-microsoft-maven",
     "category": "dockerfile",
     "pattern": "mvn|maven",
-    "recommendation": "Use Maven on Microsoft Azure Linux 3.0 with Java 25 for reproducible enterprise builds. Note this image does not have tar pre-installed, so install it for Maven builds.",
+    "recommendation": "Use Maven on Microsoft Azure Linux 3.0 with Java 25 for reproducible enterprise builds. This image is Azure Linux, whose only package manager is tdnf (no apt-get, dnf, microdnf, or yum). tar is not pre-installed, so install it with tdnf: RUN tdnf install -y tar maven.",
     "example": "# Maven build with Java 25 on Microsoft Azure Linux 3.0\nFROM mcr.microsoft.com/openjdk/jdk:25-azurelinux AS build\nRUN tdnf install -y tar maven\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B\n\nFROM mcr.microsoft.com/openjdk/jdk:25-distroless\nWORKDIR /app\nCOPY --from=build /app/target/*.jar app.jar\nUSER app\nCMD [\"app.jar\"]",
     "severity": "high",
     "tags": [
@@ -86,7 +86,7 @@
     "id": "java-microsoft-azure-linux",
     "category": "security",
     "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
-    "recommendation": "For production Java deployments, prefer Microsoft Azure distroless images for runtime (minimal attack surface) and Azure Linux 3.0 for build stages. Azure Linux images do not have tar pre-installed, so install it for Maven builds. Images include a non-root 'app' user; use USER app directive for security.",
+    "recommendation": "For production Java deployments, prefer Microsoft Azure distroless images for runtime (minimal attack surface) and Azure Linux 3.0 for build stages. Azure Linux's only package manager is tdnf (no apt-get, dnf, microdnf, or yum); tar is not pre-installed, so install it with tdnf: RUN tdnf install -y tar. Distroless runtime images have no shell or package manager, so never add RUN steps there. Images include a non-root 'app' user; use USER app directive for security.",
     "example": "RUN tdnf install -y tar\nUSER app",
     "severity": "high",
     "tags": [

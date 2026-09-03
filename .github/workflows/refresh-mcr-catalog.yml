@@ -1,0 +1,64 @@
+name: Refresh MCR base-image catalog
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore catalog from an existing refresh PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="chore/refresh-mcr-catalog"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')" ]; then
+            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+            git show "refs/remotes/origin/$branch:knowledge/catalogs/mcr-base-images.json" \
+              > knowledge/catalogs/mcr-base-images.json
+          fi
+
+      - name: Refresh catalog from live MCR
+        run: npx tsx scripts/refresh-mcr-catalog.ts
+
+      - name: Open PR if the catalog changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- knowledge/catalogs/mcr-base-images.json; then
+            echo "No MCR catalog changes."
+            exit 0
+          fi
+          branch="chore/refresh-mcr-catalog"
+          git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add knowledge/catalogs/mcr-base-images.json
+          git commit -m "chore: refresh MCR base-image catalog"
+          git push --force-with-lease -u origin "$branch"
+          if [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')" ]; then
+            gh pr create --fill \
+              --title "chore: refresh MCR base-image catalog" \
+              --body "Automated refresh of \`knowledge/catalogs/mcr-base-images.json\` from the live MCR registry (\`/v2/<repo>/tags/list\`). Review the tag diff before merging."
+          fi

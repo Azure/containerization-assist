@@ -120,9 +120,10 @@ Retry up to 2 times if generation/remediation fails.
    - `platform` = `linux/amd64`
 2. Execute the returned build command to produce the local Docker image.
 3. On failure:
-   - If the failure looks like a Dockerfile issue (syntax, missing files, base image not found, dependency error): follow the `fix-dockerfile` skill against the current Dockerfile, then retry.
+   - **Capture the full build output** (`stderr` + `stdout`, especially the final `ERROR: failed to solve …` lines).
+   - If the failure looks like a Dockerfile issue (syntax, missing files, base image not found, dependency error): follow the `fix-dockerfile` skill against the current Dockerfile, **passing the captured build output as `buildError` and a listing of the build context (e.g. `ls -R` of the module) as `buildContext`** so it remediates the actual failure (multi-stage build for a missing `COPY target/…` artifact, an MCR base for an unreachable/hallucinated image, the right build tool for an `exit code: 127`). Then retry.
    - Otherwise retry the build directly.
-   - Maximum **2 retries** per failure mode.
+   - Maximum **2 retries** per failure mode. Do not loop re-running the same failing build without feeding the new `buildError` into `fix-dockerfile` — if two remediation passes don't change the failure, stop and report it (it may be an environment restriction such as a blocked external registry).
 
 ### Step 10 — Scan the image
 
