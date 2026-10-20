@@ -262,7 +262,7 @@ const dockerErrorPatterns: ErrorPattern[] = [
         hint: `Registry returned HTTP ${dockerError.statusCode} - server-side issue`,
         resolution:
           'The registry is experiencing problems. Retry after a moment or check registry status page.',
-        details: buildDetails(dockerError as Error),
+        details: buildDetails(dockerError),
       };
     },
   ),

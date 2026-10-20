@@ -302,7 +302,7 @@ export const createKubernetesClient = (
         };
 
         const response = await authApi.createSelfSubjectAccessReview({
-          body: accessReview as k8s.V1SelfSubjectAccessReview,
+          body: accessReview,
         });
         return response.status?.allowed === true;
       } catch (error) {
@@ -379,7 +379,7 @@ export const createKubernetesClient = (
         };
 
         await coreApi.createNamespace({
-          body: namespaceManifest as unknown as k8s.V1Namespace,
+          body: namespaceManifest,
         });
 
         logger.info({ namespace }, 'Namespace created successfully');

@@ -201,7 +201,7 @@ function createEvaluatePolicyWrapper(
     _packageName?: string,
   ): Promise<Result<CategorizedViolations>> => {
     if (!result.ok) {
-      return result as Result<never>;
+      return result;
     }
 
     try {

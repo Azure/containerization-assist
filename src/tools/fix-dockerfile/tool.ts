@@ -128,16 +128,16 @@ const runPattern = createKnowledgeTool<
       security: (s) =>
         Boolean(
           s.category === 'security' ||
-            s.tags?.includes('security') ||
-            s.tags?.includes('security-fix'),
+          s.tags?.includes('security') ||
+          s.tags?.includes('security-fix'),
         ),
       performance: (s) =>
         Boolean(
           s.tags?.includes('performance') ||
-            s.tags?.includes('optimization') ||
-            s.tags?.includes('caching') ||
-            s.tags?.includes('size') ||
-            s.tags?.includes('performance-fix'),
+          s.tags?.includes('optimization') ||
+          s.tags?.includes('caching') ||
+          s.tags?.includes('size') ||
+          s.tags?.includes('performance-fix'),
         ),
       bestPractices: () => true, // Catch remaining snippets as best practices
     }),
@@ -190,10 +190,7 @@ const runPattern = createKnowledgeTool<
           title: snippet.text.split('\n')[0] || snippet.text.substring(0, 80),
           description: snippet.text,
           ...(snippet.tags && { tags: snippet.tags }),
-          priority: (snippet.tags?.includes('critical') ? 'high' : 'medium') as
-            | 'high'
-            | 'medium'
-            | 'low',
+          priority: snippet.tags?.includes('critical') ? 'high' : 'medium',
           matchScore: snippet.weight,
         };
       });

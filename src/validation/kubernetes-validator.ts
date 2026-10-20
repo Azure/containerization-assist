@@ -96,7 +96,7 @@ const isWorkload = (manifest: KubernetesManifest): boolean => {
  */
 const getPodSpec = (manifest: KubernetesManifest): PodSpec | undefined => {
   if (manifest.kind === 'Pod') {
-    return manifest.spec as PodSpec;
+    return manifest.spec;
   }
   if (manifest.kind === 'Job' || manifest.kind === 'CronJob') {
     const spec = manifest.spec as WorkloadSpec;

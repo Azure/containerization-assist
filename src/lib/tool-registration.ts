@@ -192,11 +192,7 @@ export function createToolHandler<TName extends ToolName>(
       // Call success handler if provided
       if (onSuccess) {
         // Type assertion is safe for the same reasons as above
-        onSuccess(
-          result.value as ToolResultMap[TName],
-          toolName,
-          sanitizedParams as ToolInputMap[TName],
-        );
+        onSuccess(result.value, toolName, sanitizedParams as ToolInputMap[TName]);
       }
 
       // Return formatted result
