@@ -84,15 +84,15 @@ const runPattern = createKnowledgeTool<
       build: (s) =>
         Boolean(
           s.tags?.includes('docker-build') ||
-            s.tags?.includes('acr') ||
-            s.tags?.includes('registry'),
+          s.tags?.includes('acr') ||
+          s.tags?.includes('registry'),
         ),
       deploy: (s) =>
         Boolean(
           s.tags?.includes('aks') ||
-            s.tags?.includes('kubectl') ||
-            s.tags?.includes('k8s-deploy') ||
-            s.tags?.includes('k8s-bake'),
+          s.tags?.includes('kubectl') ||
+          s.tags?.includes('k8s-deploy') ||
+          s.tags?.includes('k8s-bake'),
         ),
       bestPractices: () => true, // catch-all for caching, concurrency, governance
     }),
