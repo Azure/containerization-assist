@@ -47,8 +47,7 @@ export interface ErrorGuidance {
  * ```
  */
 export type Result<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: string; guidance?: ErrorGuidance };
+  { ok: true; value: T } | { ok: false; error: string; guidance?: ErrorGuidance };
 
 /** Create a success result */
 export const Success = <T>(value: T): Result<T> => ({ ok: true, value });

@@ -83,7 +83,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const { aliasedTools, aliasToOriginalMap } = applyToolAliases(tools, config.toolAliases);
 
   // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema
-  const registryTools: Tool[] = aliasedTools.map((tool) => tool as unknown as Tool);
+  const registryTools: Tool[] = aliasedTools;
 
   const toolsMap = new Map<string, Tool>();
   for (const tool of registryTools) {
@@ -147,7 +147,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       metadata?: ExecutionMetadata,
     ): Promise<Result<ToolResultMap[T]>> =>
       orchestratedExecute({
-        toolName: toolName as string,
+        toolName,
         params,
         metadata: {
           ...(metadata?.signal && { signal: metadata.signal }),

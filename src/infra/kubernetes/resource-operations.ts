@@ -177,10 +177,10 @@ export async function applyResource(
       const objectApi = k8s.KubernetesObjectApi.makeApiClient(kc);
 
       try {
-        const result = await objectApi.create(resource as k8s.KubernetesObject);
+        const result = await objectApi.create(resource);
         logger.info({ kind, name, namespace }, 'Resource created successfully (generic API)');
         // KubernetesObjectApi returns the resource directly
-        return Success(result as K8sResource);
+        return Success(result);
       } catch (createError) {
         // If resource already exists, try to patch it
         if (isConflictError(createError)) {
@@ -188,10 +188,10 @@ export async function applyResource(
             { kind, name, namespace },
             'Resource exists, updating with patch (generic API)',
           );
-          const patchResult = await objectApi.patch(resource as k8s.KubernetesObject);
+          const patchResult = await objectApi.patch(resource);
           logger.info({ kind, name, namespace }, 'Resource updated successfully (generic API)');
           // KubernetesObjectApi returns the resource directly
-          return Success(patchResult as K8sResource);
+          return Success(patchResult);
         }
 
         // Other errors - propagate

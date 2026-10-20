@@ -55,14 +55,14 @@ const FIXES: FixOperation[] = [
             args: 'adduser -D -u 1001 appuser',
             lineno: 0,
             raw: 'RUN adduser -D -u 1001 appuser',
-          } as CommandEntry;
+          };
         } else if (baseImage.includes('debian') || baseImage.includes('ubuntu')) {
           userCreationCmd = {
             name: 'RUN',
             args: 'useradd -m -u 1001 -s /bin/sh appuser',
             lineno: 0,
             raw: 'RUN useradd -m -u 1001 -s /bin/sh appuser',
-          } as CommandEntry;
+          };
         } else {
           // Generic fallback
           userCreationCmd = {
@@ -70,7 +70,7 @@ const FIXES: FixOperation[] = [
             args: 'useradd -m -u 1001 appuser || adduser -D -u 1001 appuser',
             lineno: 0,
             raw: 'RUN useradd -m -u 1001 appuser || adduser -D -u 1001 appuser',
-          } as CommandEntry;
+          };
         }
 
         newCommands.splice(insertIndex, 0, userCreationCmd, {

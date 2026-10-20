@@ -311,17 +311,17 @@ const runPattern = createKnowledgeTool<
       fieldMappings: (s) =>
         Boolean(
           s.tags?.includes('mapping') ||
-            s.tags?.includes('conversion') ||
-            s.text.toLowerCase().includes('map') ||
-            s.text.toLowerCase().includes('convert'),
+          s.tags?.includes('conversion') ||
+          s.text.toLowerCase().includes('map') ||
+          s.text.toLowerCase().includes('convert'),
         ),
       security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
       resourceManagement: (s) =>
         Boolean(
           s.tags?.includes('resources') ||
-            s.tags?.includes('limits') ||
-            s.tags?.includes('requests') ||
-            s.tags?.includes('optimization'),
+          s.tags?.includes('limits') ||
+          s.tags?.includes('requests') ||
+          s.tags?.includes('optimization'),
         ),
       bestPractices: () => true, // Catch remaining snippets as best practices
     }),
@@ -631,7 +631,7 @@ async function handleGenerateK8sManifests(
       mustExist: true,
       mustBeDirectory: true,
     });
-    if (!pathResult.ok) return pathResult as Result<ManifestPlan>;
+    if (!pathResult.ok) return pathResult;
 
     // Default name from directory basename if not provided
     if (!input.name) {
@@ -648,7 +648,7 @@ async function handleGenerateK8sManifests(
       mustExist: true,
       mustBeDirectory: true,
     });
-    if (!modulePathResult.ok) return modulePathResult as Result<ManifestPlan>;
+    if (!modulePathResult.ok) return modulePathResult;
     input.modulePath = modulePathResult.value;
   }
 

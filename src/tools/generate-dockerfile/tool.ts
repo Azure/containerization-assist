@@ -472,18 +472,18 @@ const runPattern = createKnowledgeTool<
       baseImages: (s) =>
         Boolean(
           s.tags?.includes('base-image') ||
-            s.tags?.includes('registry') ||
-            s.tags?.includes('official') ||
-            s.tags?.includes('distroless') ||
-            (s.tags?.includes('build-stage') && s.tags?.includes('build-tool')) ||
-            s.text.toLowerCase().includes('base image'),
+          s.tags?.includes('registry') ||
+          s.tags?.includes('official') ||
+          s.tags?.includes('distroless') ||
+          (s.tags?.includes('build-stage') && s.tags?.includes('build-tool')) ||
+          s.text.toLowerCase().includes('base image'),
         ),
       security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
       optimization: (s) =>
         Boolean(
           s.tags?.includes('optimization') ||
-            s.tags?.includes('caching') ||
-            s.tags?.includes('size'),
+          s.tags?.includes('caching') ||
+          s.tags?.includes('size'),
         ),
       bestPractices: () => true, // Catch remaining snippets as best practices
     }),
@@ -966,8 +966,7 @@ async function handleGenerateDockerfile(
 
   // Query policy for generation configuration (if policy is available)
   let dockerfileConfig:
-    | import('@/config/policy-generation-config').DockerfileGenerationConfig
-    | null = null;
+    import('@/config/policy-generation-config').DockerfileGenerationConfig | null = null;
   if (ctx.policy) {
     const configQuery = await ctx.queryConfig<{
       dockerfile?: import('@/config/policy-generation-config').DockerfileGenerationConfig;
@@ -1205,7 +1204,7 @@ async function handleGenerateDockerfile(
           return keep ? item : null;
         }),
       );
-      return results.filter((item) => item !== null) as T[];
+      return results.filter((item) => item !== null);
     };
 
     // Filter all three categories in parallel

@@ -127,7 +127,7 @@ export function checkYaml(
   });
 
   if (doc?.contents) {
-    collectDuplicateKeys(doc.contents as unknown, lineCounter, findings);
+    collectDuplicateKeys(doc.contents, lineCounter, findings);
   }
 
   return findings;
