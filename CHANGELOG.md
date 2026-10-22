@@ -1,5 +1,16 @@
 # Change Log
 
+## [1.6.0]
+
+- Add `validate-github-workflow` tool and SHA-pin generated GitHub Actions (#740)
+- Add agent evaluation framework and pipeline improvements (#714, #718, #728, #729, #730, #731, #732, #733, #739, #742)
+- Upgrade AI SDK to v7 and refresh runtime, development, and security dependencies (#793, #802)
+- Pin repository GitHub Actions to full commit SHAs and group Dependabot updates with a 7-day cooldown (#769, #780, #796)
+- Add Windows coverage to the test pipeline (#709)
+- Write package lifecycle logs to stderr to preserve machine-readable npm output (#722)
+- Stabilize scan-image integration tests against vulnerability database changes (#723)
+- Additional dependency updates (#704, #707, #726, #735, #748, #764, #767, #779)
+
 ## [1.5.1-dev.1]
 
 - test partner release pipeline
