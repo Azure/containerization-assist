@@ -48,7 +48,7 @@ export const DEFAULT_CHAIN_HINTS: ChainHintsRegistry = {
 
   [TOOL_NAME.GENERATE_K8S_MANIFESTS]: {
     success:
-      'Kubernetes manifests generated successfully. Next: Call prepare-cluster to create a kind cluster to deploy to.',
+      'Kubernetes manifests generated successfully. Next: Call prepare-cluster to prepare the target cluster, then deploy and call verify-deploy.',
     failure: 'Manifest generation failed. Ensure you have a valid image and try again.',
   },
 

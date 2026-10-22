@@ -13,7 +13,7 @@ export const generateK8sManifestsToolDefinition = {
   },
   chainHints: {
     success:
-      'Manifest plan generated successfully and passed policy validation. Next: Call prepare-cluster to create a kind cluster to deploy to.',
+      'Manifest plan generated successfully and passed policy validation. Next: Call prepare-cluster to prepare the target cluster, then deploy and call verify-deploy.',
     failure:
       'Manifest generation failed or plan violates policies. Review manifest requirements and policy violations.',
   },

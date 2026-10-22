@@ -361,29 +361,30 @@ const DOCKER_IMAGE_NAME_REGEX =
  *   mcr.microsoft.com/openjdk/jdk:21-azurelinux + version 25 -> mcr.microsoft.com/openjdk/jdk:25-azurelinux
  *   maven:3.9-openjdk-17 + version 25 -> maven:3.9-openjdk-25
  */
-function substituteImageVersion(image: string, targetVersion: string | undefined): string {
+function substituteImageVersion(
+  image: string,
+  targetVersion: string | undefined,
+  language: string | undefined,
+): string {
   if (!targetVersion) return image;
 
-  // For maven/gradle images with format "tool:version-runtime-jdkversion"
-  // Match patterns like maven:3.9-openjdk-17 or gradle:8.5-jdk21
+  const legacyJavaMatch = language === 'java' ? /^1\.([0-8])$/.exec(targetVersion) : null;
+  const version = legacyJavaMatch ? legacyJavaMatch[1] : targetVersion;
+
   const toolWithRuntimePattern = /^(maven|gradle):(\d+\.\d+)-(openjdk|eclipse-temurin|jdk)-(\d+)/;
   const toolMatch = image.match(toolWithRuntimePattern);
 
   if (toolMatch) {
     const [, tool, toolVersion, runtime] = toolMatch;
-    // Replace only the JDK version at the end
-    return `${tool}:${toolVersion}-${runtime}-${targetVersion}`;
+    return `${tool}:${toolVersion}-${runtime}-${version}`;
   }
 
-  // For runtime images with format "runtime:version-variant"
-  // Match patterns like :17-jdk-alpine, :21-azurelinux, :3.11-slim
   const runtimePattern = /:(\d+(?:\.\d+)?)([-.]|$)/;
   const match = image.match(runtimePattern);
 
   if (match) {
     const currentVersion = match[1];
-    // Replace the version while preserving everything else
-    return image.replace(`:${currentVersion}`, `:${targetVersion}`);
+    return image.replace(`:${currentVersion}`, `:${version}`);
   }
 
   return image;
@@ -401,6 +402,7 @@ function createBaseImageRecommendation(
     weight: number;
   },
   languageVersion?: string,
+  language?: string,
 ): BaseImageRecommendation {
   // Extract image name from the recommendation text
   const imageMatch = snippet.text.match(DOCKER_IMAGE_NAME_REGEX);
@@ -408,7 +410,7 @@ function createBaseImageRecommendation(
 
   // Substitute version if languageVersion is provided
   if (languageVersion && image !== 'unknown') {
-    image = substituteImageVersion(image, languageVersion);
+    image = substituteImageVersion(image, languageVersion, language);
   }
 
   // Determine category based on tags and content
@@ -543,7 +545,7 @@ const runPattern = createKnowledgeTool<
       // Pass languageVersion for dynamic version substitution
       // Limit to top 2 recommendations to provide clear, opinionated guidance
       let baseImageMatches: BaseImageRecommendation[] = (knowledge.categories.baseImages || []).map(
-        (snippet) => createBaseImageRecommendation(snippet, input.languageVersion),
+        (snippet) => createBaseImageRecommendation(snippet, input.languageVersion, input.language),
       );
 
       // Apply policy config base image category preference

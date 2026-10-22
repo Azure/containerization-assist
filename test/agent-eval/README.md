@@ -6,9 +6,18 @@ Azure infra (ACR + AKS):
 
 | Path     | What the agent gets |
 | -------- | ------------------- |
-| `bare`   | Generic "containerize this application" prompt (generate Dockerfile + manifests, then `dockerBuild`). No deploy loop. The control. |
+| `bare`   | Generic "containerize **and deploy to AKS**" prompt + the harness's built-in build/push/apply/verify tools. No CA skill, no CA MCP. The control (no-CA baseline). |
 | `mcp`    | Same task + the CA `aks-loop` MCP prompt + CA MCP tools. |
 | `skills` | Same task + the CA `deploy-to-aks` SKILL bundle + CA MCP tools. |
+
+All three paths run the identical deploy loop (`requireDeploy`, same nudges, same
+step budget) and are scored by the identical level-blind checks. The only prompt
+difference is the CA layer above — plus one deliberate concession: `bare` is
+handed the arbitrary attribution-label strings it cannot possibly infer, whereas
+`mcp`/`skills` are **not** told the labels or the MCR base-image policy in the
+prompt. Their CA layer supplies both, so `requires-azure-base` and
+`has-required-labels` measure what the CA layer actually delivers rather than the
+harness spoon-feeding the answer.
 
 After each run, deterministic checks score the produced artifacts and the report
 shows each path's lift over the `bare` control, swept across every model in one
@@ -76,13 +85,18 @@ npm run eval -- gradient \
 
 - All three paths run unless scoped with `--paths bare,skills`.
 - Models run **in parallel** when more than one is passed (each lane gets its
-  own namespace + ACR repo + Deployment). Pass `--sequential` to force serial
-  execution, or `--max-concurrent-models <n>` to cap concurrency for provider
-  rate limits.
+  own disposable child namespace + ACR repo + Deployment). Pass `--sequential`
+  to force serial execution, or `--max-concurrent-models <n>` to cap concurrency
+  for provider rate limits.
 - `--reps <n>` repeats each cell; `--fixtures-dir <dir>` auto-discovers fixtures
   from a parent directory instead of listing them with `--fixtures`.
 - kubectl cleanup runs before **and** after each cell, so a stuck Deployment
-  can't poison the next path.
+  can't poison the next path. The harness deletes the owned child namespace
+  when the run/model lane finishes and refuses namespace-wide cleanup of the
+  configured base namespace or unrelated namespaces.
+- Step logs and serialized results record tool names only. Tool arguments and
+  generated file contents are intentionally omitted to prevent secrets from
+  leaking into CI logs or report artifacts.
 
 `--out results.json` also writes a companion self-contained `results.html`
 (the heatmap report) alongside it. The report shows per-path scores, the

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 // Side-effect import BEFORE the harness (which transitively loads CA knowledge/
 // validation modules that build pino loggers at load): sets the LOG_LEVEL default.
 import { oneLine, MAX_INLINE_DETAIL_CHARS } from './log-config.js';
+import { assertDisposableNamespace } from './namespaces.js';
 import { MCPTestHarness } from '../llm-integration/infrastructure/mcp-test-harness.js';
 import { buildAksRemoteDevLoopPrompt } from '../../src/prompts/aks-loop/prompt.js';
 import type { ToolSpec } from './driver.js';
@@ -20,23 +21,33 @@ export const BASELINE_PROMPT =
   'You are a helpful AI programming assistant. The user has asked you to ' +
   'containerize an application for deployment to Azure Kubernetes Service (AKS). ' +
   'Use the createFile tool to write any artifacts (Dockerfile, Kubernetes ' +
-  'manifests, etc.) to disk. Follow these policies:\n' +
-  '- Prefer Microsoft Container Registry base images (mcr.microsoft.com/...) ' +
-  'over public-registry equivalents (e.g. docker.io/node, eclipse-temurin, ' +
-  'python, dotnet/sdk) when one exists.\n' +
-  '- Add the label `com.azure.containerizationassist.createdby` to the Dockerfile.\n' +
-  '- Add the labels `app.kubernetes.io/name` and `app.kubernetes.io/managed-by` ' +
-  'to every Kubernetes object you generate.';
+  'manifests, etc.) to disk.';
 
-export const USER_PROMPT = (workingDir: string): string =>
-  `The application source is at: ${workingDir}\n\n` +
-  'Containerize this application. Generate a Dockerfile and any Kubernetes ' +
-  'manifests appropriate for the application. When tools require a repository ' +
-  `or working directory path, pass the absolute path above (${workingDir}). ` +
-  'Write all artifacts using the createFile tool with paths relative to the ' +
-  'working directory. After the Dockerfile is written, call the dockerBuild ' +
-  'tool to verify it builds; if it fails, fix the Dockerfile and retry (up to ' +
-  '3 attempts).';
+/**
+ * User prompt for `bare` mode. Uses the SAME shared operational envelope as
+ * `mcp`/`skills` (buildEvalEnvelope), plus the required attribution/k8s label
+ * strings — which `bare` ALONE is given, because it has no CA layer and cannot
+ * infer the arbitrary `com.azure.containerizationassist.createdby` convention.
+ * `mcp`/`skills` are deliberately NOT told the labels here: their CA layer (the
+ * generate-dockerfile MCP tool's `attributionLabels` / the deploy-to-aks skill)
+ * supplies them, so spoon-feeding them in the prompt would mask how effectively
+ * the CA layer delivers them. MCR base-image policy is withheld from every path
+ * (bare included) for the same reason — it is a quality decision the CA drives.
+ */
+export function buildBareDeployUserPrompt(
+  workingDir: string,
+  ctx: AzureContext = loadAzureContext(),
+): string {
+  return (
+    buildEvalEnvelope(workingDir, ctx) +
+    `Required labels (downstream tooling depends on them): the Dockerfile MUST set ` +
+    `\`LABEL com.azure.containerizationassist.createdby=<your identifier>\`, and every Kubernetes ` +
+    `resource MUST carry \`app.kubernetes.io/name\` and \`app.kubernetes.io/managed-by\` under metadata.labels.\n` +
+    `Containerize the repository above and deploy it to the Azure Kubernetes Service (AKS) cluster ` +
+    `using the Azure values listed in the envelope. Produce a Dockerfile and Kubernetes manifests, ` +
+    `then complete the build → push → apply → verify loop until the workload is Running/Ready.`
+  );
+}
 
 // Skills bundled for `skills` mode: the deploy-to-aks orchestrator + every
 // sub-skill it delegates to. Mirrors how vscode-aks-tools ships them.
@@ -48,20 +59,6 @@ const DEPLOY_TO_AKS_SKILL_BUNDLE: readonly string[] = [
   'fix-dockerfile',
 ];
 
-export type Mode = 'bare' | 'baseline' | 'skills' | 'mcp';
-
-export interface ResolvedMode {
-  systemPrompt: string;
-  /** Optional override for the default USER_PROMPT (set by modes that ship their own). */
-  userPrompt?: string;
-  tools: ToolSpec[];
-}
-
-export interface ResolvedModeBundle {
-  resolved: ResolvedMode;
-  cleanup: () => Promise<void>;
-}
-
 export async function loadDeployToAksSkill(): Promise<string> {
   const sections: string[] = [];
   for (const name of DEPLOY_TO_AKS_SKILL_BUNDLE) {
@@ -72,6 +69,19 @@ export async function loadDeployToAksSkill(): Promise<string> {
     `${BASELINE_PROMPT}\n\n## Reference Skills (deploy-to-aks orchestrator + its dependencies)\n\n` +
     sections.join('\n\n---\n\n')
   );
+}
+
+export function dropSkillShadowedTools(tools: ToolSpec[]): ToolSpec[] {
+  const shadowed = new Set<string>(DEPLOY_TO_AKS_SKILL_BUNDLE);
+  const dropped = tools.filter((t) => shadowed.has(t.name)).map((t) => t.name);
+  if (dropped.length) {
+    console.error(`[skills] dropped MCP tools shadowed by bundled skills: ${dropped.join(', ')}`);
+  } else {
+    console.error(
+      '[skills] WARNING: no MCP tools matched the skill bundle — nothing dropped (check tool naming).',
+    );
+  }
+  return tools.filter((t) => !shadowed.has(t.name));
 }
 
 /** Azure context the eval injects into the dev-loop prompts. */
@@ -117,7 +127,9 @@ const K8S_NAME_RE = /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/;
 
 function assertK8sName(kind: string, value: string): void {
   if (!K8S_NAME_RE.test(value)) {
-    throw new Error(`Invalid ${kind} '${value}': must match RFC1123 label (^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$).`);
+    throw new Error(
+      `Invalid ${kind} '${value}': must match RFC1123 label (^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$).`,
+    );
   }
 }
 
@@ -155,11 +167,19 @@ export async function ensureNamespace(ctx: AzureContext, namespace: string): Pro
     } finally {
       await fs.unlink(tmpPath).catch(() => {});
     }
-    await execFileP('kubectl', [
-      '-n', namespace,
-      'patch', 'serviceaccount', 'default',
-      '-p', JSON.stringify({ imagePullSecrets: [{ name: pullSecret }] }),
-    ], { timeout: 30_000 });
+    await execFileP(
+      'kubectl',
+      [
+        '-n',
+        namespace,
+        'patch',
+        'serviceaccount',
+        'default',
+        '-p',
+        JSON.stringify({ imagePullSecrets: [{ name: pullSecret }] }),
+      ],
+      { timeout: 30_000 },
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (!/NotFound|not found/i.test(msg)) {
@@ -214,7 +234,9 @@ export async function ensureEvalCluster(ctx: AzureContext = loadAzureContext()):
     }
   } catch (err) {
     const e = err as { stderr?: string; stdout?: string; message?: string };
-    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(-MAX_INLINE_DETAIL_CHARS);
+    const detail = ((e.stderr ?? '') + (e.stdout ?? '') + (e.message ?? '')).slice(
+      -MAX_INLINE_DETAIL_CHARS,
+    );
     throw new Error(
       `ensureEvalCluster failed — the eval AKS cluster could not be prepared.\n${detail}\n` +
         'Fix the cluster manually or set AGENT_EVAL_SKIP_CLUSTER_ENSURE=1, then re-run.',
@@ -222,21 +244,12 @@ export async function ensureEvalCluster(ctx: AzureContext = loadAzureContext()):
   }
 }
 
-/**
- * Best-effort cleanup so a run doesn't inherit a stuck pod from a previous one.
- * The agent names its Deployment after the working dir, not `ctx.imageName`, so
- * we match Deployments by this run's pushed image (`<registry>/<imageName>:`)
- * and delete those plus their Service. The trailing `:` keeps the match exact
- * per repo (so `eval-image` doesn't also match `eval-image-mini`).
- */
-export async function cleanupAzureResources(ctx: AzureContext = loadAzureContext()): Promise<void> {
-  // Wipe ALL agent-created workloads in the eval namespace, not just the
-  // canonical eval-image Deployment. Agents self-provision backing services
-  // (mysql/postgres), init Jobs, ConfigMaps and PVCs; leaving those behind let
-  // cross-run cruft accumulate and could skew a later verifyDeploy that checks
-  // every Deployment in the namespace. We intentionally do NOT delete the
-  // namespace itself, ServiceAccounts, or Secrets (the ACR pull secret wired to
-  // the default SA must survive between cells).
+/** Best-effort cleanup of a disposable namespace owned by the evaluation run. */
+export async function cleanupAzureResources(
+  ctx: AzureContext,
+  ownershipToken: string,
+): Promise<void> {
+  assertDisposableNamespace(loadAzureContext().namespace, ctx.namespace, ownershipToken);
   try {
     await execFileP(
       'kubectl',
@@ -253,6 +266,26 @@ export async function cleanupAzureResources(ctx: AzureContext = loadAzureContext
     );
   } catch {
     // best-effort; ignore (no kubectl, no cluster, namespace absent, etc.)
+  }
+}
+
+export async function deleteEvalNamespace(
+  ctx: AzureContext,
+  ownershipToken: string,
+): Promise<void> {
+  assertDisposableNamespace(loadAzureContext().namespace, ctx.namespace, ownershipToken);
+  try {
+    await execFileP(
+      'kubectl',
+      ['delete', 'namespace', ctx.namespace, '--ignore-not-found', '--wait=false'],
+      { timeout: 60_000 },
+    );
+  } catch (err) {
+    console.error(
+      `[gradient] WARNING: failed to delete disposable namespace ${ctx.namespace}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
   }
 }
 
@@ -277,7 +310,7 @@ export function buildEvalEnvelope(
     `- You MUST then call \`verifyDeploy\` with \`{ "namespace": "${ctx.namespace}" }\` to confirm the pods reach Running/Ready. The deploy is only done when verifyDeploy returns success:true.\n` +
     `- If \`verifyDeploy\` returns success:false, treat it like a real operator would: READ the returned pod waitingReasons/waitingMessages, lastTerminated and logs, FIX the root cause (edit the manifest with createFile — e.g. add a numeric \`securityContext.runAsUser\` if the kubelet complains about a non-numeric user; or rebuild+repush if the image is missing/mismatched; or deploy a missing backing service), then call \`kubectlApply\` and \`verifyDeploy\` again. Iterate up to 3 rounds before giving up.\n` +
     `- Backing services are NOT pre-provisioned. If the app crash-loops because it needs a dependency (e.g. a database), deploy a small dev instance of that dependency (a Deployment + Service in namespace \`${ctx.namespace}\`) and wire the app's env/ConfigMap to it, then reapply.\n` +
-    `- Walk every stage end-to-end: analyze → generate-dockerfile → dockerBuild → scan → generate-k8s-manifests → pushImage → kubectlApply → verifyDeploy (with the fix/reapply loop until Ready).\n\n`
+    `- Walk every stage end-to-end: inspect the repo → write the Dockerfile → dockerBuild → write Kubernetes manifests → pushImage → kubectlApply → verifyDeploy (with the fix/reapply loop until Ready).\n\n`
   );
 }
 
@@ -364,42 +397,4 @@ export async function createMcpToolBundle(workingDir: string): Promise<{
       await harness.stopServer(serverName);
     },
   };
-}
-
-export async function resolveMode(opts: {
-  mode: Mode;
-  workingDir: string;
-}): Promise<ResolvedModeBundle> {
-  switch (opts.mode) {
-    case 'bare':
-    case 'baseline':
-      return {
-        resolved: { systemPrompt: BASELINE_PROMPT, tools: [] },
-        cleanup: async () => {},
-      };
-    case 'skills': {
-      const { tools, cleanup } = await createMcpToolBundle(opts.workingDir);
-      return {
-        resolved: {
-          systemPrompt: await loadDeployToAksSkill(),
-          userPrompt: buildSkillsAksLoopUserPrompt(opts.workingDir),
-          tools,
-        },
-        cleanup,
-      };
-    }
-    case 'mcp': {
-      const { tools, cleanup } = await createMcpToolBundle(opts.workingDir);
-      return {
-        resolved: {
-          systemPrompt: buildMcpAksLoopSystemPrompt(),
-          userPrompt: buildMcpAksLoopUserPrompt(opts.workingDir),
-          tools,
-        },
-        cleanup,
-      };
-    }
-    default:
-      throw new Error(`Unknown mode '${opts.mode as string}'. Supported: bare (alias: baseline), skills, mcp`);
-  }
 }

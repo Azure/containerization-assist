@@ -8,6 +8,7 @@
 // (harness, knowledge, validation) constructs its pino logger at load time.
 import { enableVerboseLogging, isVerbose } from './log-config.js';
 import { promises as fs } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,12 +16,21 @@ import { program } from 'commander';
 import { generateText } from 'ai';
 import { getModel, validateProviderEnv } from './providers.js';
 import { AISDKDriver } from './driver.js';
-import { resolveMode, USER_PROMPT, type Mode } from './modes.js';
+import {
+  loadAzureContext,
+  ensureRegistryLogin,
+  ensureNamespace,
+  cleanupAzureResources,
+  deleteEvalNamespace,
+} from './modes.js';
+import { createDisposableNamespace } from './namespaces.js';
 import { runChecks, selectChecks } from './checks.js';
 import {
   runGradient,
   formatGradientHtml,
   discoverFixtures,
+  resolveLevel,
+  MAX_DEPLOY_NUDGES,
   LEVELS,
   type LevelId,
 } from './gradient.js';
@@ -32,33 +42,62 @@ program
 
 program
   .command('run')
-  .description('Run a single agent evaluation against a fixture')
+  .description(
+    'Run a single agent evaluation against a fixture. Uses the SAME prompt/tool ' +
+      'resolver and deploy loop as one `gradient` cell, so a single `run` faithfully ' +
+      'mirrors the swept behavior for that path.',
+  )
   .requiredOption('--fixture <path>', 'path to fixture directory')
   .requiredOption('--mode <mode>', 'bare | skills | mcp (baseline accepted as alias for bare)')
   .requiredOption('--model <spec>', 'provider:model, e.g. azure:gpt-4o or foundry:llama-3-3-70b')
   .action(async (opts: { fixture: string; mode: string; model: string }) => {
     validateProviderEnv();
+    const level: LevelId = opts.mode === 'baseline' ? 'bare' : (opts.mode as LevelId);
+    if (!LEVELS.some((l) => l.id === level)) {
+      console.error(
+        `Error: unknown mode '${opts.mode}'. Valid: bare (alias: baseline), mcp, skills`,
+      );
+      process.exit(2);
+    }
+    const baseCtx = loadAzureContext();
+    const ownershipToken = randomBytes(6).toString('hex');
+    const ctx = {
+      ...baseCtx,
+      namespace: createDisposableNamespace(
+        baseCtx.namespace,
+        `run-${process.pid.toString(36)}`,
+        ownershipToken,
+      ),
+    };
     const workingDir = await fs.mkdtemp(join(tmpdir(), 'agent-eval-'));
     await fs.cp(opts.fixture, workingDir, { recursive: true });
-
-    const { resolved, cleanup } = await resolveMode({
-      mode: opts.mode as Mode,
-      workingDir,
-    });
+    await ensureNamespace(baseCtx, ctx.namespace);
+    let cleanup = async (): Promise<void> => {};
     try {
+      await ensureRegistryLogin(ctx);
+      const resolved = await resolveLevel(level, workingDir, ctx);
+      cleanup = resolved.cleanup;
       const { model, providerOptions } = getModel(opts.model);
       const result = await new AISDKDriver().run({
         model,
         providerOptions,
         systemPrompt: resolved.systemPrompt,
-        userPrompt: resolved.userPrompt ?? USER_PROMPT(workingDir),
+        userPrompt: resolved.userPrompt,
         workingDir,
         tools: resolved.tools,
+        // Mirror a gradient cell: every path attempts a real deploy on the same footing.
+        requireDeploy: true,
+        maxDeployNudges: MAX_DEPLOY_NUDGES,
       });
       console.log(JSON.stringify(result, null, 2));
       console.log('artifacts at:', workingDir);
     } finally {
-      await cleanup();
+      try {
+        await cleanup();
+      } finally {
+        await cleanupAzureResources(ctx, ownershipToken);
+        await deleteEvalNamespace(ctx, ownershipToken);
+      }
     }
   });
 
@@ -119,9 +158,13 @@ program
     const execFileP = promisify(execFile);
     let stdout: string;
     try {
-      const res = await execFileP('kubectl', ['get', 'namespace', '-o', 'jsonpath={.items[*].metadata.name}'], {
-        timeout: 30_000,
-      });
+      const res = await execFileP(
+        'kubectl',
+        ['get', 'namespace', '-o', 'jsonpath={.items[*].metadata.name}'],
+        {
+          timeout: 30_000,
+        },
+      );
       stdout = res.stdout ?? '';
     } catch (err) {
       console.error(`kubectl failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -138,9 +181,13 @@ program
     if (opts.dryRun) return;
     for (const n of targets) {
       try {
-        await execFileP('kubectl', ['delete', 'namespace', n, '--wait=false', '--ignore-not-found'], {
-          timeout: 60_000,
-        });
+        await execFileP(
+          'kubectl',
+          ['delete', 'namespace', n, '--wait=false', '--ignore-not-found'],
+          {
+            timeout: 60_000,
+          },
+        );
         console.log(`  deleted ${n}`);
       } catch (err) {
         console.error(`  FAILED ${n}: ${err instanceof Error ? err.message : String(err)}`);
@@ -155,9 +202,15 @@ program
       '(`bare`, `mcp`, `skills`) and report per-path scores plus \u0394 vs the ' +
       '`bare` control. Use for the "value-per-token" brief.',
   )
-  .option('--fixtures <paths>', 'comma-separated fixture directories (one run per fixture × model × path)')
+  .option(
+    '--fixtures <paths>',
+    'comma-separated fixture directories (one run per fixture × model × path)',
+  )
   .option('--fixtures-dir <path>', 'directory whose subdirectories are each treated as one fixture')
-  .requiredOption('--models <specs>', 'comma-separated provider:model list, e.g. azure:gpt-4o,azure:gpt-4.1,azure:gpt-5.4')
+  .requiredOption(
+    '--models <specs>',
+    'comma-separated provider:model list, e.g. azure:gpt-4o,azure:gpt-4.1,azure:gpt-5.4',
+  )
   .option('--checks <names>', "'all', 'none', or comma-separated check names", 'all')
   .option(
     '--paths <ids>',
@@ -166,7 +219,11 @@ program
   )
   .option('--out <path>', 'write JSON results to this file (default: do not write)', '')
   .option('--parallel', 'force models to run in parallel (default: parallel when >1 model)', false)
-  .option('--sequential', 'force models to run sequentially (overrides the default parallel-when-multi behavior)', false)
+  .option(
+    '--sequential',
+    'force models to run sequentially (overrides the default parallel-when-multi behavior)',
+    false,
+  )
   .option(
     '--max-concurrent-models <n>',
     'cap on how many model lanes run concurrently. Use to stay under provider rate limits.',
@@ -178,7 +235,11 @@ program
     '',
   )
   .option('--reps <n>', 'repetitions per (model × fixture × path) cell (default: 1)', '1')
-  .option('--serve', 'after the run, serve the HTML report over HTTP and print a clickable URL', false)
+  .option(
+    '--serve',
+    'after the run, serve the HTML report over HTTP and print a clickable URL',
+    false,
+  )
   .option('--port <n>', 'port for --serve (default: 7878)', '7878')
   .option(
     '--verbose',
@@ -204,7 +265,10 @@ program
     }) => {
       if (opts.verbose) enableVerboseLogging();
       const split = (s: string): string[] =>
-        s.split(',').map((x) => x.trim()).filter(Boolean);
+        s
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
       const fail = (msg: string): never => {
         console.error(`Error: ${msg}`);
         process.exit(2);
@@ -222,9 +286,7 @@ program
       if (models.length === 0) fail('--models must list at least one model');
 
       const validIds = new Set<LevelId>(LEVELS.map((l) => l.id));
-      const levels = opts.paths
-        ? (split(opts.paths) as LevelId[])
-        : undefined;
+      const levels = opts.paths ? (split(opts.paths) as LevelId[]) : undefined;
       if (levels) {
         for (const id of levels) {
           if (!validIds.has(id)) {
@@ -233,8 +295,13 @@ program
         }
       }
 
-      if (opts.parallel && opts.sequential) fail('--parallel and --sequential are mutually exclusive');
-      const parallelModels: boolean | undefined = opts.sequential ? false : opts.parallel ? true : undefined;
+      if (opts.parallel && opts.sequential)
+        fail('--parallel and --sequential are mutually exclusive');
+      const parallelModels: boolean | undefined = opts.sequential
+        ? false
+        : opts.parallel
+          ? true
+          : undefined;
 
       const reps = Number.parseInt(opts.reps, 10);
       if (!Number.isFinite(reps) || reps < 1) fail('--reps must be a positive integer');
@@ -242,7 +309,8 @@ program
       let maxConcurrentModels: number | undefined;
       if (opts.maxConcurrentModels) {
         const n = Number.parseInt(opts.maxConcurrentModels, 10);
-        if (!Number.isFinite(n) || n < 1) fail('--max-concurrent-models must be a positive integer');
+        if (!Number.isFinite(n) || n < 1)
+          fail('--max-concurrent-models must be a positive integer');
         maxConcurrentModels = n;
       }
 
@@ -252,9 +320,13 @@ program
           const raw = await fs.readFile(opts.resume, 'utf8');
           const parsed = JSON.parse(raw) as { runs?: import('./gradient.js').GradientRunRecord[] };
           resumeRuns = Array.isArray(parsed.runs) ? parsed.runs : [];
-          console.error(`[gradient] loaded ${resumeRuns.length} prior run record(s) from ${opts.resume}`);
+          console.error(
+            `[gradient] loaded ${resumeRuns.length} prior run record(s) from ${opts.resume}`,
+          );
         } catch (err) {
-          fail(`could not read --resume file ${opts.resume}: ${err instanceof Error ? err.message : String(err)}`);
+          fail(
+            `could not read --resume file ${opts.resume}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
 

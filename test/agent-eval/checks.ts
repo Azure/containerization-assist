@@ -2,8 +2,10 @@ import { promises as fs } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import { MAX_FAILURE_DETAIL_CHARS } from './log-config.js';
+import { catalogCoversVersion, lookupMcrTag, type McrCatalog } from './mcr-catalog.js';
 
 const execFileP = promisify(execFile);
 
@@ -76,22 +78,45 @@ const WHY_NOT_MCR_PATTERN = /^\s*#\s*WHY-NOT-MCR\s*:/i;
 // rather than silently passing on missing information.
 const MCR_COVERAGE = {
   java: {
+    repo: 'openjdk/jdk',
     versions: new Set([8, 11, 17, 21, 25]),
     suggestion: 'mcr.microsoft.com/openjdk/jdk:<V>-azurelinux or :<V>-distroless',
   },
   node: {
-    versions: new Set([18, 20, 22]),
+    repo: 'azurelinux/base/nodejs',
+    versions: new Set([20, 24]),
     suggestion: 'mcr.microsoft.com/azurelinux/base/nodejs:<V> or .../distroless/nodejs:<V>',
   },
   python: {
-    versions: new Set(['3.11', '3.12']),
+    repo: 'azurelinux/base/python',
+    versions: new Set(['3.12']),
     suggestion: 'mcr.microsoft.com/azurelinux/base/python:<V> or .../distroless/python:<V>',
   },
   dotnet: {
-    versions: new Set(['8.0', '9.0']),
+    repo: 'dotnet/sdk',
+    versions: new Set(['8.0', '9.0', '10.0']),
     suggestion: 'mcr.microsoft.com/dotnet/<sdk|aspnet|runtime>:<V>-azurelinux3.0',
   },
 } as const;
+
+const MCR_CATALOG_PATH = fileURLToPath(
+  new URL('../../knowledge/catalogs/mcr-base-images.json', import.meta.url),
+);
+let mcrCatalog: McrCatalog | null | undefined;
+
+async function loadMcrCatalog(): Promise<McrCatalog | null> {
+  if (mcrCatalog !== undefined) return mcrCatalog;
+  try {
+    const raw = await fs.readFile(MCR_CATALOG_PATH, 'utf8');
+    const data = JSON.parse(raw) as { repos?: Record<string, string[]> };
+    const map = new Map<string, Set<string>>();
+    for (const [repo, tags] of Object.entries(data.repos ?? {})) map.set(repo, new Set(tags));
+    mcrCatalog = map;
+  } catch {
+    mcrCatalog = null;
+  }
+  return mcrCatalog;
+}
 
 // Public-registry repos that map onto an MCR-covered stack (plain JDK/JRE, Node,
 // Python, .NET runtimes). Excludes builders/app servers (maven, gradle, tomcat,
@@ -245,29 +270,29 @@ function extractMajorMinor(tag: string | null): string | null {
 
 type Coverage =
   | { kind: 'mcr' }
+  | { kind: 'mcr-missing' }
+  | { kind: 'catalog-unavailable' }
   | { kind: 'mcr-equivalent-exists'; suggestion: string }
   | { kind: 'no-mcr-equivalent'; reason: string }
   | { kind: 'unknown' };
 
-/**
- * Decide coverage for a recognized MCR-covered stack. A covered version → an
- * MCR equivalent exists; an unparseable version (e.g. `8u212-jre`, `lts`,
- * `latest`) is treated strictly as covered so it still needs justification;
- * anything else is a genuine coverage gap.
- */
-function coverageFor<K>(
+async function coverageFor<K>(
   version: K | null,
-  entry: { versions: ReadonlySet<K>; suggestion: string },
+  entry: { repo: string; versions: ReadonlySet<K>; suggestion: string },
   placeholder: string,
   label: string,
-): Coverage {
+): Promise<Coverage> {
   if (version === null) {
     return {
       kind: 'mcr-equivalent-exists',
       suggestion: entry.suggestion.replace(/<V>/g, placeholder),
     };
   }
-  if (entry.versions.has(version)) {
+  const catalog = await loadMcrCatalog();
+  const covered = catalog
+    ? catalogCoversVersion(catalog, entry.repo, String(version))
+    : entry.versions.has(version);
+  if (covered) {
     return {
       kind: 'mcr-equivalent-exists',
       suggestion: entry.suggestion.replace(/<V>/g, String(version)),
@@ -275,21 +300,23 @@ function coverageFor<K>(
   }
   return {
     kind: 'no-mcr-equivalent',
-    reason: `${label} ${version} not in MCR (publishes ${[...entry.versions].join('/')})`,
+    reason: `${label} ${version} not published on MCR (${entry.repo})`,
   };
 }
 
-function classifyBase(parsed: ParsedFrom): Coverage {
+async function classifyBase(parsed: ParsedFrom): Promise<Coverage> {
   const { tag } = parsed;
-  // Normalize common Docker Hub prefixes so `docker.io/library/node` and `node`
-  // classify identically; otherwise the registry-qualified form would fall
-  // through to `unknown`.
   const repo = parsed.repo.replace(/^docker\.io\//i, '').replace(/^library\//i, '');
 
-  // 1. Already on MCR → pass.
-  if (MCR_REGISTRY_PATTERN.test(parsed.repo)) return { kind: 'mcr' };
+  if (MCR_REGISTRY_PATTERN.test(parsed.repo)) {
+    const mcrRepo = parsed.repo.replace(/^mcr\.microsoft\.com\//i, '');
+    const catalog = await loadMcrCatalog();
+    if (catalog === null) return { kind: 'catalog-unavailable' };
+    return lookupMcrTag(catalog, mcrRepo, tag ?? 'latest') === 'present'
+      ? { kind: 'mcr' }
+      : { kind: 'mcr-missing' };
+  }
 
-  // 2-5. Recognized MCR-covered stacks.
   if (JAVA_JDK_REPO.test(repo))
     return coverageFor(extractJavaMajor(tag), MCR_COVERAGE.java, '<major>', 'Java');
   if (NODE_REPO.test(repo))
@@ -299,14 +326,10 @@ function classifyBase(parsed: ParsedFrom): Coverage {
   if (DOTNET_REPO.test(repo))
     return coverageFor(extractMajorMinor(tag), MCR_COVERAGE.dotnet, '<major.minor>', '.NET');
 
-  // 6. Stacks with no MCR equivalent at all (Maven, Tomcat, Wildfly, Go, …)
   for (const { pattern, reason } of NO_MCR_EQUIVALENT_REPOS) {
     if (pattern.test(repo)) return { kind: 'no-mcr-equivalent', reason };
   }
 
-  // 7. Anything else — unrecognized stack. Strict default: we cannot confirm an
-  // MCR equivalent is absent, so do NOT pass silently. The caller fails it
-  // unless a WHY-NOT-MCR annotation justifies it.
   return { kind: 'unknown' };
 }
 
@@ -336,9 +359,19 @@ export const requiresAzureBaseImage: Check = {
       fromCount++;
       const parsed = parseFromLine(lines[i]);
       if (!parsed) continue;
-      const coverage = classifyBase(parsed);
+      const coverage = await classifyBase(parsed);
       switch (coverage.kind) {
         case 'mcr':
+          break;
+        case 'mcr-missing':
+          offending.push(
+            `${parsed.raw.trim()}  → MCR image/tag not found in the registry (hallucinated?); use a real mcr.microsoft.com tag`,
+          );
+          break;
+        case 'catalog-unavailable':
+          offending.push(
+            `${parsed.raw.trim()}  → MCR catalog unavailable; image existence could not be validated`,
+          );
           break;
         case 'no-mcr-equivalent':
           allowed.push(`${parsed.raw.trim()}  // ${coverage.reason}`);
@@ -403,7 +436,9 @@ export const hasRequiredLabels: Check = {
     const dockerfile = await readDockerfile(artifactDir);
     if (dockerfile === null) {
       missing.push('Dockerfile not found');
-    } else if (!new RegExp(`^\\s*LABEL\\s+${REQUIRED_DOCKERFILE_LABEL}\\s*=`, 'm').test(dockerfile)) {
+    } else if (
+      !new RegExp(`^\\s*LABEL\\s+${REQUIRED_DOCKERFILE_LABEL}\\s*=`, 'm').test(dockerfile)
+    ) {
       missing.push(`Dockerfile is missing LABEL ${REQUIRED_DOCKERFILE_LABEL}`);
     }
 
@@ -452,14 +487,8 @@ export const dockerBuilds: Check = {
   name: 'docker-builds',
   async run({ artifactDir }) {
     const tag = `agent-eval-${Date.now()}:check`;
-    // Default behavior (and CI/pipeline path) is a native `docker build`. When
-    // AGENT_EVAL_BUILD_PLATFORM is set (e.g. to linux/amd64 on a non-amd64 host
-    // that has QEMU/binfmt emulation registered), build for that platform via
-    // buildx so the scored result matches the target cluster architecture.
-    const platform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim();
-    const buildArgs = platform
-      ? ['buildx', 'build', '--platform', platform, '--load', '-t', tag, artifactDir]
-      : ['build', '-t', tag, artifactDir];
+    const platform = process.env.AGENT_EVAL_BUILD_PLATFORM?.trim() || 'linux/amd64';
+    const buildArgs = ['buildx', 'build', '--platform', platform, '--load', '-t', tag, artifactDir];
     try {
       await execFileP('docker', buildArgs, { maxBuffer: 16 * 1024 * 1024 });
     } catch (err) {
