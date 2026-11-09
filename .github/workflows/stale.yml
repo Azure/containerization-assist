@@ -1,0 +1,49 @@
+name: Close Stale Issues and Pull Requests
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stale-cleanup
+  cancel-in-progress: false
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Close stale issues and pull requests
+        uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
+        with:
+          days-before-stale: 60
+          days-before-close: 14
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: 'release,do not merge,help wanted,good first issue'
+          exempt-pr-labels: 'release,do not merge,help wanted,good first issue'
+          exempt-draft-pr: true
+          remove-stale-when-updated: true
+          delete-branch: false
+          operations-per-run: 100
+          stale-issue-message: >-
+            This issue has had no activity for 60 days and has been marked stale.
+            It will be closed in 14 days unless there is further activity.
+            Please comment if this issue is still relevant.
+          stale-pr-message: >-
+            This pull request has had no activity for 60 days and has been marked stale.
+            It will be closed in 14 days unless there is further activity.
+            Please comment or update the pull request if you are still working on it.
+          close-issue-message: >-
+            This issue was closed after 14 days without activity following the stale notice.
+            Please reopen it or create a new issue if it still needs attention.
+          close-pr-message: >-
+            This pull request was closed after 14 days without activity following the stale notice.
+            Please reopen it when you are ready to continue.
