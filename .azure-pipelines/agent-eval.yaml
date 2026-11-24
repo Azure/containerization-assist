@@ -98,7 +98,7 @@ extends:
                   AZURE_FOUNDRY_API_KEY: $(AZURE_FOUNDRY_API_KEY)
                   AZURE_FOUNDRY_ENDPOINT: $(AZURE_FOUNDRY_ENDPOINT)
 
-              - template: templates/npm-ci.yml
+              - template: /.azure-pipelines/templates/npm-ci.yml@self
 
               - script: npm run build
                 displayName: Build project
