@@ -2,6 +2,16 @@
 trigger: none
 pr: none
 
+parameters:
+  - name: npmRegistry
+    displayName: Approved CFS-backed Azure Artifacts npm registry URL
+    type: string
+    default: https://pkgs.dev.azure.com/AzureContainerUpstream/Kubernetes/_packaging/Kubernetes_PublicPackages/npm/registry/
+  - name: publish
+    displayName: Publish partner drop and create GitHub release
+    type: boolean
+    default: false
+
 resources:
   repositories:
     - repository: 1esPipelines
@@ -16,7 +26,7 @@ variables:
   # Folder name under `drops/` in partner drop storage (not the npm package name).
   PartnerDropFolder: containerization-assist
   Language: js
-  NodeVersion: "22.x"
+  NodeVersion: '22.x'
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
@@ -39,6 +49,11 @@ extends:
         jobs:
           - job: Build
             displayName: Build Partner Drop
+            variables:
+              NPM_CONFIG_REGISTRY: ${{ parameters.npmRegistry }}
+              NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)/ca-official.npmrc
+              NPM_CONFIG_REPLACE_REGISTRY_HOST: npmjs
+              NPM_CONFIG_CACHE: $(Agent.TempDirectory)/ca-npm-cache-$(System.JobId)-$(System.JobAttempt)
             templateContext:
               outputs:
                 - output: pipelineArtifact
@@ -54,17 +69,7 @@ extends:
                 inputs:
                   versionSpec: $(NodeVersion)
 
-              # Route this build's install through the CFS proxy (1ES agents
-              # block npmjs). Lockfile 'resolved' URLs are rewritten, then
-              # restored so staged artifacts stay pristine.
-              - script: |
-                  set -euo pipefail
-                  backup="package-lock.json.bak"
-                  cp package-lock.json "$backup"
-                  trap 'mv -f "$backup" package-lock.json' EXIT
-                  sed -i 's#https://registry\.npmjs\.org/#https://packagefeedproxy.microsoft.io/npm/#g' package-lock.json
-                  NPM_CONFIG_REGISTRY=https://packagefeedproxy.microsoft.io/npm/ NPM_CONFIG_ALWAYS_AUTH=true npm ci
-                displayName: Install dependencies via CFS proxy (1ES agents block public registry)
+              - template: templates/npm-ci.yml
 
               - script: npm run build
                 displayName: Build project
@@ -130,14 +135,14 @@ extends:
               - task: CopyFiles@2
                 displayName: Stage tarball for 1ES artifact output
                 inputs:
-                  sourceFolder: "$(Build.SourcesDirectory)"
-                  contents: "$(package_tarball.TarballName)"
-                  targetFolder: "$(Build.ArtifactStagingDirectory)/partner-drop"
+                  sourceFolder: '$(Build.SourcesDirectory)'
+                  contents: '$(package_tarball.TarballName)'
+                  targetFolder: '$(Build.ArtifactStagingDirectory)/partner-drop'
 
       - stage: Publish
         displayName: Publish Partner Drop
         dependsOn: Build
-        condition: succeeded()
+        condition: and(succeeded(), ${{ eq(parameters.publish, true) }})
         variables:
           PackageVersion: $[ stageDependencies.Build.Build.outputs['package_version.PackageVersion'] ]
           IsPrerelease: $[ stageDependencies.Build.Build.outputs['package_version.IsPrerelease'] ]
@@ -158,7 +163,7 @@ extends:
               - task: AzureCLI@2
                 displayName: Upload tarball to partner drop storage
                 inputs:
-                  azureSubscription: "$(AzureServiceConnection)"
+                  azureSubscription: '$(AzureServiceConnection)'
                   scriptType: bash
                   scriptLocation: inlineScript
                   inlineScript: |
