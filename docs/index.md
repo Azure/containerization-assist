@@ -40,7 +40,7 @@ Or add the following to `.vscode/mcp.json` in your project:
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.13+ (22.x) or 24+
 - Docker or Docker Desktop
 - Optional: [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) for security scanning
 - Optional: Kubernetes cluster for deployment features

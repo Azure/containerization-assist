@@ -101,7 +101,7 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
     if (pkg.engines?.node) result.languageVersion = pkg.engines.node;
     return result;
   } catch (error) {
-    throw new Error(`Failed to parse package.json: ${error}`);
+    throw new Error(`Failed to parse package.json: ${error}`, { cause: error });
   }
 }
 
@@ -174,7 +174,7 @@ export async function parsePomXml(filePath: string): Promise<ParsedConfig> {
     }
     return result;
   } catch (error) {
-    throw new Error(`Failed to parse pom.xml: ${error}`);
+    throw new Error(`Failed to parse pom.xml: ${error}`, { cause: error });
   }
 }
 
@@ -229,7 +229,7 @@ export async function parseGradle(filePath: string): Promise<ParsedConfig> {
     if (javaVersion) result.languageVersion = javaVersion;
     return result;
   } catch (error) {
-    throw new Error(`Failed to parse build.gradle: ${error}`);
+    throw new Error(`Failed to parse build.gradle: ${error}`, { cause: error });
   }
 }
 
@@ -292,7 +292,7 @@ export async function parsePythonConfig(filePath: string): Promise<ParsedConfig>
     if (pythonVersion) result.languageVersion = pythonVersion;
     return result;
   } catch (error) {
-    throw new Error(`Failed to parse Python config: ${error}`);
+    throw new Error(`Failed to parse Python config: ${error}`, { cause: error });
   }
 }
 
@@ -331,7 +331,7 @@ export async function parseCargoToml(filePath: string): Promise<ParsedConfig> {
     if (rustVersion) result.languageVersion = rustVersion;
     return result;
   } catch (error) {
-    throw new Error(`Failed to parse Cargo.toml: ${error}`);
+    throw new Error(`Failed to parse Cargo.toml: ${error}`, { cause: error });
   }
 }
 
@@ -379,7 +379,7 @@ export async function parseCsProj(filePath: string): Promise<ParsedConfig> {
     if (targetFramework) result.languageVersion = targetFramework;
     return result;
   } catch (error) {
-    throw new Error(`Failed to parse .csproj: ${error}`);
+    throw new Error(`Failed to parse .csproj: ${error}`, { cause: error });
   }
 }
 
@@ -424,6 +424,6 @@ export async function parseGoMod(filePath: string): Promise<ParsedConfig> {
     if (goVersion) result.languageVersion = goVersion;
     return result;
   } catch (error) {
-    throw new Error(`Failed to parse go.mod: ${error}`);
+    throw new Error(`Failed to parse go.mod: ${error}`, { cause: error });
   }
 }

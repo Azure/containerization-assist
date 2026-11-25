@@ -56,12 +56,7 @@ export function extractLocalDependencyManagement(project: PomProject): Map<strin
 
   const projectDep = project.dependencyManagement?.dependencies?.dependency;
   if (projectDep) {
-    let deps: Dependency[] = [];
-    if (Array.isArray(projectDep)) {
-      deps = projectDep;
-    } else {
-      deps = [projectDep];
-    }
+    const deps: Dependency[] = Array.isArray(projectDep) ? projectDep : [projectDep];
 
     for (const dep of deps) {
       if (dep.groupId && dep.artifactId && dep.version) {

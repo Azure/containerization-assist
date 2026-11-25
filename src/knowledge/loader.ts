@@ -216,7 +216,9 @@ function loadEmbeddedPack(packName: string, packData: unknown, stats: LoadStats)
     const errorMessage = String(error);
     stats.failures.push({ name: packName, error: errorMessage });
     logger.error({ pack: packName, error }, 'Failed to load knowledge pack');
-    throw new Error(`Failed to load embedded knowledge pack ${packName}: ${errorMessage}`);
+    throw new Error(`Failed to load embedded knowledge pack ${packName}: ${errorMessage}`, {
+      cause: error,
+    });
   }
 }
 

@@ -53,7 +53,7 @@ Tests complete containerization workflows by chaining tools together:
 ## Prerequisites
 
 ### Required for All Tests
-- Node.js 18+ installed
+- Node.js 22.13+ (22.x) or 24+ installed
 - Project built (`npm run build`)
 
 ### Required for Docker Tests
