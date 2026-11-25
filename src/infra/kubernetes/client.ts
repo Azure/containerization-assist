@@ -69,7 +69,7 @@ export const createKubernetesClient = (
     } catch (error) {
       const errorMsg = `Failed to load kubeconfig: ${error instanceof Error ? error.message : String(error)}`;
       logger.error({ error: errorMsg }, 'Kubeconfig load failed');
-      throw new Error(errorMsg);
+      throw new Error(errorMsg, { cause: error });
     }
   } else {
     // Validate kubeconfig before attempting to load
@@ -101,7 +101,7 @@ export const createKubernetesClient = (
     } catch (error) {
       const errorMsg = `Failed to load kubeconfig: ${error instanceof Error ? error.message : String(error)}`;
       logger.error({ error: errorMsg }, 'Kubeconfig load failed');
-      throw new Error(errorMsg);
+      throw new Error(errorMsg, { cause: error });
     }
   }
 

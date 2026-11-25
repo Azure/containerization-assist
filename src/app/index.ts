@@ -177,6 +177,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         logger.error({ error }, 'Failed to load knowledge base during server startup');
         throw new Error(
           `Server startup failed: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
         );
       }
 

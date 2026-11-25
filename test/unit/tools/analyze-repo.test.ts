@@ -35,6 +35,35 @@ jest.mock('node:fs', () => ({
 // Import the mocked fs after setting up the mock
 import { promises as fs } from 'node:fs';
 import analyzeTool from '@/tools/analyze-repo/tool';
+import {
+  parsePackageJson,
+  parsePomXml,
+  parseGradle,
+  parsePythonConfig,
+  parseCargoToml,
+  parseCsProj,
+  parseGoMod,
+} from '@/tools/analyze-repo/parsers';
+
+describe('repository parser error causes', () => {
+  it.each([
+    ['package.json', parsePackageJson],
+    ['pom.xml', parsePomXml],
+    ['build.gradle', parseGradle],
+    ['requirements.txt', parsePythonConfig],
+    ['Cargo.toml', parseCargoToml],
+    ['app.csproj', parseCsProj],
+    ['go.mod', parseGoMod],
+  ] as const)('preserves the original error when reading %s fails', async (fileName, parse) => {
+    const cause = new Error('Permission denied');
+    jest.mocked(fs.readFile).mockRejectedValueOnce(cause);
+
+    await expect(parse(fileName)).rejects.toMatchObject({
+      message: expect.stringContaining('Failed to parse'),
+      cause,
+    });
+  });
+});
 
 describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
   let mockContext: ToolContext;

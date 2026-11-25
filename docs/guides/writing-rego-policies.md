@@ -468,7 +468,7 @@ opa build -t wasm \
 
 **Build Requirements**:
 - OPA CLI (development dependency only)
-- Node.js 20+
+- Node.js 22.13+ (22.x) or 24+
 - Automatically runs during `npm run build`
 
 ### Custom WASM Compilation

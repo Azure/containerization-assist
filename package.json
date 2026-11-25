@@ -5,7 +5,7 @@
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "^22.13.0 || >=24"
   },
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -159,7 +159,7 @@
   "devDependencies": {
     "@ai-sdk/azure": "^4.0.34",
     "@ai-sdk/openai": "^4.0.33",
-    "@eslint/js": "^9.38.0",
+    "@eslint/js": "^10.0.1",
     "@jest/globals": "^30.2.0",
     "@types/dockerode": "^3.3.44",
     "@types/glob": "^8.1.0",
@@ -172,7 +172,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
     "ai": "^7.0.55",
-    "eslint": "^9.38.0",
+    "eslint": "^10.15.0",
     "husky": "^9.1.7",
     "jest": "^30.2.0",
     "lint-staged": "^16.2.6",

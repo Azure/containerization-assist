@@ -56,7 +56,7 @@ See [Policy Authoring Guide](docs/guides/policy-authoring.md) for details.
 
 ## System Requirements
 
-- Node.js 20+
+- Node.js 22.13+ (22.x) or 24+
 - Docker or Docker Desktop
 - Optional: [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) (for security scanning features)
 - Optional: Kubernetes (for deployment features)

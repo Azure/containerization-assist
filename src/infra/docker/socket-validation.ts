@@ -283,7 +283,7 @@ export function validateDockerSocket(
   quiet = false,
 ): SocketValidationResult {
   const warnings: string[] = [];
-  let dockerSocket = '';
+  let dockerSocket: string;
   const defaultDockerSocket = autoDetectDockerSocket();
 
   // Priority order: CLI option -> DOCKER_SOCKET env -> DOCKER_HOST env -> auto-detect
