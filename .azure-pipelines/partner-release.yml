@@ -2,6 +2,16 @@
 trigger: none
 pr: none
 
+parameters:
+  - name: npmRegistry
+    displayName: Approved CFS-backed Azure Artifacts npm registry URL
+    type: string
+    default: https://pkgs.dev.azure.com/AzureContainerUpstream/Kubernetes/_packaging/Kubernetes_PublicPackages/npm/registry/
+  - name: publish
+    displayName: Publish partner drop and create GitHub release
+    type: boolean
+    default: false
+
 resources:
   repositories:
     - repository: 1esPipelines
@@ -16,7 +26,7 @@ variables:
   # Folder name under `drops/` in partner drop storage (not the npm package name).
   PartnerDropFolder: containerization-assist
   Language: js
-  NodeVersion: "22.x"
+  NodeVersion: '22.x'
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
@@ -39,12 +49,17 @@ extends:
         jobs:
           - job: Build
             displayName: Build Partner Drop
+            variables:
+              NPM_CONFIG_REGISTRY: ${{ parameters.npmRegistry }}
+              NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)/ca-official.npmrc
+              NPM_CONFIG_REPLACE_REGISTRY_HOST: npmjs
+              NPM_CONFIG_CACHE: $(Agent.TempDirectory)/ca-npm-cache-$(System.JobId)-$(System.JobAttempt)
             templateContext:
               outputs:
                 - output: pipelineArtifact
-                  displayName: Publish build artifacts
-                  targetPath: $(Build.ArtifactStagingDirectory)/build-output
-                  artifactName: build-artifacts-$(Build.BuildId)
+                  displayName: Publish release artifacts
+                  targetPath: $(Build.ArtifactStagingDirectory)/partner-drop
+                  artifactName: partner-drop-$(Build.BuildId)
             steps:
               - checkout: self
                 persistCredentials: false
@@ -54,17 +69,7 @@ extends:
                 inputs:
                   versionSpec: $(NodeVersion)
 
-              # Route this build's install through the CFS proxy (1ES agents
-              # block npmjs). Lockfile 'resolved' URLs are rewritten, then
-              # restored so staged artifacts stay pristine.
-              - script: |
-                  set -euo pipefail
-                  backup="package-lock.json.bak"
-                  cp package-lock.json "$backup"
-                  trap 'mv -f "$backup" package-lock.json' EXIT
-                  sed -i 's#https://registry\.npmjs\.org/#https://packagefeedproxy.microsoft.io/npm/#g' package-lock.json
-                  NPM_CONFIG_REGISTRY=https://packagefeedproxy.microsoft.io/npm/ NPM_CONFIG_ALWAYS_AUTH=true npm ci
-                displayName: Install dependencies via CFS proxy (1ES agents block public registry)
+              - template: /.azure-pipelines/templates/npm-ci.yml@self
 
               - script: npm run build
                 displayName: Build project
@@ -72,71 +77,17 @@ extends:
               - script: |
                   set -euo pipefail
                   VERSION=$(node -p "require('./package.json').version")
+                  IS_PRERELEASE=$(node -p "require('./package.json').version.split('+')[0].includes('-')")
                   echo "Resolved version: $VERSION"
                   echo "##vso[task.setvariable variable=PackageVersion;isOutput=true]$VERSION"
+                  echo "##vso[task.setvariable variable=IsPrerelease;isOutput=true]$IS_PRERELEASE"
                 name: package_version
                 displayName: Resolve package version
 
-              - task: CopyFiles@2
-                displayName: Stage build outputs for publish stage
-                inputs:
-                  sourceFolder: $(Build.SourcesDirectory)
-                  contents: |
-                    package.json
-                    package-lock.json
-                    README.md
-                    LICENSE
-                    CHANGELOG.md
-                    dist/**
-                    dist-cjs/**
-                    skills/**/SKILL.md
-                    policies/**/*.rego
-                    policies/compiled/*.wasm
-                    policies.user.examples/**/*.rego
-                    policies.user.examples/**/*.md
-                    knowledge/packs/**/*.json
-                    scripts/prepare-cjs-package.cjs
-                    scripts/restore-package.cjs
-                  targetFolder: $(Build.ArtifactStagingDirectory)/build-output
-
-      - stage: Publish
-        displayName: Publish Partner Drop
-        dependsOn: Build
-        condition: succeeded()
-        variables:
-          PackageVersion: $[ stageDependencies.Build.Build.outputs['package_version.PackageVersion'] ]
-        jobs:
-          - job: Publish
-            displayName: Publish Partner Drop
-            templateContext:
-              outputs:
-                - output: pipelineArtifact
-                  displayName: Publish tarball as pipeline artifact
-                  targetPath: $(Build.ArtifactStagingDirectory)/partner-drop
-                  artifactName: partner-drop-$(PackageVersion)
-            steps:
-              - checkout: none
-
-              - download: current
-                artifact: build-artifacts-$(Build.BuildId)
-                displayName: Download build artifacts
-
-              - task: NodeTool@0
-                displayName: Use Node.js $(NodeVersion)
-                inputs:
-                  versionSpec: $(NodeVersion)
-
               - script: |
                   set -euo pipefail
-                  ARTIFACT_DIR="$(Pipeline.Workspace)/build-artifacts-$(Build.BuildId)"
-                  echo "##vso[task.setvariable variable=WorkDir]$ARTIFACT_DIR"
-                  ls -la "$ARTIFACT_DIR"
-                displayName: Locate downloaded artifacts
-
-              - script: |
-                  set -euo pipefail
-                  VERSION="$(PackageVersion)"
-                  CHANGELOG="$(WorkDir)/CHANGELOG.md"
+                  VERSION="$(package_version.PackageVersion)"
+                  CHANGELOG="$(Build.SourcesDirectory)/CHANGELOG.md"
                   if [ ! -f "$CHANGELOG" ]; then
                     echo "##vso[task.logissue type=error]CHANGELOG.md not found at $CHANGELOG"
                     exit 1
@@ -156,19 +107,18 @@ extends:
                     echo "##vso[task.logissue type=error]No CHANGELOG.md entry found for version $VERSION"
                     exit 1
                   fi
-                  NOTES_FILE="$(Build.ArtifactStagingDirectory)/release-notes.md"
+                  mkdir -p "$(Build.ArtifactStagingDirectory)/partner-drop"
+                  NOTES_FILE="$(Build.ArtifactStagingDirectory)/partner-drop/release-notes.md"
                   {
                     echo "Publish $VERSION"
                     echo
                     echo "$NOTES"
                   } > "$NOTES_FILE"
-                  echo "##vso[task.setvariable variable=ReleaseNotesFile]$NOTES_FILE"
                   echo "Release notes written to $NOTES_FILE"
                 displayName: Validate CHANGELOG and extract notes
 
               - script: |
                   set -euo pipefail
-                  cd "$(WorkDir)"
                   # Use `npm pack --json` and parse the filename out of the
                   # structured output. Parsing `npm pack` stdout is brittle
                   # because warnings/notices can be interleaved.
@@ -177,28 +127,55 @@ extends:
                     echo "##vso[task.logissue type=error]Expected tarball not found: $TARBALL"
                     exit 1
                   fi
-                  echo "##vso[task.setvariable variable=TarballName]$TARBALL"
+                  echo "##vso[task.setvariable variable=TarballName;isOutput=true]$TARBALL"
                   ls -la "$TARBALL"
+                name: package_tarball
                 displayName: Create package tarball
 
               - task: CopyFiles@2
                 displayName: Stage tarball for 1ES artifact output
                 inputs:
-                  sourceFolder: "$(WorkDir)"
-                  contents: "$(TarballName)"
-                  targetFolder: "$(Build.ArtifactStagingDirectory)/partner-drop"
+                  sourceFolder: '$(Build.SourcesDirectory)'
+                  contents: '$(package_tarball.TarballName)'
+                  targetFolder: '$(Build.ArtifactStagingDirectory)/partner-drop'
 
-              - task: AzurePowerShell@5
+      - stage: Publish
+        displayName: Publish Partner Drop
+        dependsOn: Build
+        condition: and(succeeded(), ${{ eq(parameters.publish, true) }})
+        variables:
+          PackageVersion: $[ stageDependencies.Build.Build.outputs['package_version.PackageVersion'] ]
+          IsPrerelease: $[ stageDependencies.Build.Build.outputs['package_version.IsPrerelease'] ]
+          TarballName: $[ stageDependencies.Build.Build.outputs['package_tarball.TarballName'] ]
+        jobs:
+          - job: Publish
+            displayName: Publish Partner Drop
+            templateContext:
+              type: releaseJob
+              isProduction: true
+              inputs:
+                - input: pipelineArtifact
+                  artifactName: partner-drop-$(Build.BuildId)
+                  targetPath: $(Pipeline.Workspace)/partner-drop
+            steps:
+              - checkout: none
+
+              - task: AzureCLI@2
                 displayName: Upload tarball to partner drop storage
                 inputs:
-                  azureSubscription: "$(AzureServiceConnection)"
-                  ScriptType: InlineScript
-                  azurePowerShellVersion: LatestVersion
-                  pwsh: true
-                  Inline: |
-                    azcopy copy "$(Build.ArtifactStagingDirectory)/partner-drop/*" "https://$(StorageAccountName).blob.core.windows.net/drops/$(PartnerDropFolder)/$(Language)/$(PackageVersion)/"
-                env:
-                  AZCOPY_AUTO_LOGIN_TYPE: PSCRED
+                  azureSubscription: '$(AzureServiceConnection)'
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    set -euo pipefail
+                    az storage blob upload \
+                      --account-name "$(StorageAccountName)" \
+                      --container-name drops \
+                      --name "$(PartnerDropFolder)/$(Language)/$(PackageVersion)/$(TarballName)" \
+                      --file "$(Pipeline.Workspace)/partner-drop/$(TarballName)" \
+                      --auth-mode login \
+                      --overwrite false \
+                      --only-show-errors
 
               - task: GitHubRelease@1
                 displayName: Create GitHub release
@@ -210,7 +187,7 @@ extends:
                   tagSource: userGivenTag
                   tag: $(PackageVersion)
                   title: $(PackageVersion)
-                  releaseNotesFilePath: $(ReleaseNotesFile)
+                  releaseNotesFilePath: $(Pipeline.Workspace)/partner-drop/release-notes.md
                   isDraft: false
-                  isPreRelease: false
+                  isPreRelease: $(IsPrerelease)
                   addChangeLog: false

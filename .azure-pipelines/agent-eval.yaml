@@ -4,6 +4,10 @@ trigger: none
 pr: none
 
 parameters:
+  - name: npmRegistry
+    displayName: Approved CFS-backed Azure Artifacts npm registry URL
+    type: string
+    default: https://pkgs.dev.azure.com/AzureContainerUpstream/Kubernetes/_packaging/Kubernetes_PublicPackages/npm/registry/
   - name: fixtures
     type: string
     default: test/fixtures/legacy-java/spring-boot-rest-api,test/fixtures/legacy-java/spring-mvc-war,test/fixtures/legacy-java/ejb-ant-monolith,test/fixtures/legacy-java/wildfly-container-quickstart
@@ -58,6 +62,11 @@ extends:
         jobs:
           - job: gradient
             displayName: Gradient sweep
+            variables:
+              NPM_CONFIG_REGISTRY: ${{ parameters.npmRegistry }}
+              NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)/ca-eval.npmrc
+              NPM_CONFIG_REPLACE_REGISTRY_HOST: npmjs
+              NPM_CONFIG_CACHE: $(Agent.TempDirectory)/ca-npm-cache-$(System.JobId)-$(System.JobAttempt)
             timeoutInMinutes: ${{ parameters.timeoutInMinutes }}
             templateContext:
               outputs:
@@ -89,17 +98,7 @@ extends:
                   AZURE_FOUNDRY_API_KEY: $(AZURE_FOUNDRY_API_KEY)
                   AZURE_FOUNDRY_ENDPOINT: $(AZURE_FOUNDRY_ENDPOINT)
 
-              # Route this build's install through the CFS proxy (1ES agents
-              # block npmjs). Lockfile 'resolved' URLs are rewritten, then
-              # restored so the working tree stays pristine.
-              - script: |
-                  set -euo pipefail
-                  backup="package-lock.json.bak"
-                  cp package-lock.json "$backup"
-                  trap 'mv -f "$backup" package-lock.json' EXIT
-                  sed -i 's#https://registry\.npmjs\.org/#https://packagefeedproxy.microsoft.io/npm/#g' package-lock.json
-                  NPM_CONFIG_REGISTRY=https://packagefeedproxy.microsoft.io/npm/ NPM_CONFIG_ALWAYS_AUTH=true npm ci
-                displayName: Install dependencies via CFS proxy (1ES agents block public registry)
+              - template: /.azure-pipelines/templates/npm-ci.yml@self
 
               - script: npm run build
                 displayName: Build project

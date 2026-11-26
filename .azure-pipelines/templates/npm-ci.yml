@@ -1,0 +1,33 @@
+steps:
+  - bash: |
+      set -euo pipefail
+      node <<'NODE'
+      const fs = require('node:fs');
+      const value = process.env.NPM_CONFIG_REGISTRY;
+      let registry;
+      try {
+        registry = new URL(value);
+      } catch {
+        throw new Error('Set npmRegistry to the approved CFS-backed Azure Artifacts npm registry URL.');
+      }
+      if (registry.protocol !== 'https:' ||
+          !(registry.hostname === 'pkgs.dev.azure.com' ||
+            registry.hostname.endsWith('.pkgs.visualstudio.com')) ||
+          !/\/_packaging\/[^/]+\/npm\/registry\/$/.test(registry.pathname) ||
+          registry.username || registry.password || registry.search || registry.hash) {
+        throw new Error('npmRegistry must be an HTTPS Azure Artifacts npm registry URL without credentials.');
+      }
+      fs.writeFileSync(process.env.NPM_CONFIG_USERCONFIG, `registry=${registry.href}\n`, { mode: 0o600 });
+      NODE
+    displayName: Configure approved npm feed
+
+  - task: npmAuthenticate@0
+    displayName: Authenticate to approved npm feed
+    inputs:
+      workingFile: $(NPM_CONFIG_USERCONFIG)
+
+  - bash: |
+      set -euo pipefail
+      npm ci
+      git diff --exit-code -- package.json package-lock.json
+    displayName: Restore locked dependencies through approved feed
